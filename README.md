@@ -15,5 +15,17 @@ Ein cloudbasiertes Dashboard für Hybrid-Athleten das:
 - Streamlit (Dashboard)
 - Railway (Cloud Hosting)
 
+## Phasen
+- ✅ Phase 1: Fundament (Entwicklungsumgebung, GitHub)
+- 🔄 Phase 2: Erste Python-Schritte
+- ⏳ Phase 3: Datenbank einrichten
+- ⏳ Phase 4: Garmin Datenanbindung
+- ⏳ Phase 5: Dashboard
+- ⏳ Phase 6: Cloud Deployment
+- ⏳ Phase 7: Intelligenz & Features
+
 ## Status
-🚧 In Entwicklung
+🔄 Phase 2 – Erste Python-Schritte
+
+## Session Log
+- Session 1: Entwicklungsumgebung eingerichtet, GitHub verbunden
