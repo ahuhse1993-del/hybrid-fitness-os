@@ -1,37 +1,51 @@
 import streamlit as st
 import pandas as pd
 import sys
+from datetime import date
 sys.path.append('.')
 from database.connection import get_connection
 
-# Seitenkonfiguration
 st.set_page_config(
     page_title="Hybrid Fitness OS",
     page_icon="💪",
     layout="wide"
 )
 
-# Header
 st.title("Hybrid Fitness OS 💪")
 st.subheader("Willkommen zurück, Alexander")
 
-# Drei Spalten für Übersicht
 col1, col2, col3 = st.columns(3)
-
 with col1:
-    st.metric("Trainings diese Woche", "1")
+    st.metric("Trainings diese Woche", "4")
 with col2:
-    st.metric("Kilometer diese Woche", "8.5 km")
+    st.metric("Kilometer diese Woche", "37.2 km")
 with col3:
     st.metric("Aktuelle Form", "Gut 🟢")
 
-# Befinden
 st.divider()
 st.subheader("Wie fühlst du dich heute?")
-befinden = st.slider("Befinden", 1, 10, 7)
-st.write(f"Aktuelles Befinden: {befinden}/10")
 
-# Trainings aus Datenbank
+col1, col2, col3 = st.columns(3)
+with col1:
+    energy = st.slider("Energie", 1, 10, 7)
+with col2:
+    sleep = st.slider("Schlafqualität", 1, 10, 7)
+with col3:
+    stress = st.slider("Stress", 1, 10, 3)
+
+notes = st.text_input("Notiz (optional)")
+
+if st.button("Befinden speichern"):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO feelings (date, energy_level, sleep_quality, stress_level, notes) VALUES (%s, %s, %s, %s, %s)",
+        (date.today(), energy, sleep, stress, notes)
+    )
+    conn.commit()
+    conn.close()
+    st.success("✅ Befinden gespeichert!")
+
 st.divider()
 st.subheader("Letzte Trainings")
 
