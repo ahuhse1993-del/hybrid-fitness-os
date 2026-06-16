@@ -25,7 +25,9 @@ Ein cloudbasiertes Dashboard für Hybrid-Athleten das:
 - ⏳ Phase 7: Intelligenz & Features
 
 ## Status
-🔄 Phase 2 – Erste Python-Schritte
+✅ Phase 1: Abgeschlossen
+✅ Phase 2: Abgeschlossen
+🔄 Phase 3: Datenbank einrichten – als nächstes
 
 ## Session Log
 - Session 1: Entwicklungsumgebung eingerichtet, GitHub verbunden

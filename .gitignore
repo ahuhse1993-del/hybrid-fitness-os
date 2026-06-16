@@ -1,0 +1,12 @@
+# Virtuelle Umgebung
+venv/
+
+# Python Cache
+__pycache__/
+*.pyc
+
+# Mac System Dateien
+.DS_Store
+
+# Umgebungsvariablen (Passwörter etc.)
+.env
