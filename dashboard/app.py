@@ -14,17 +14,28 @@ st.set_page_config(
 st.title("Hybrid Fitness OS 💪")
 st.subheader("Willkommen zurück, Alexander")
 
+# Daten aus Datenbank laden
+conn = get_connection()
+df = pd.read_sql("SELECT * FROM trainings ORDER BY date DESC", conn)
+conn.close()
+
+# Datum konvertieren
+df['date'] = pd.to_datetime(df['date'])
+today = pd.Timestamp.today()
+week_start = today - pd.Timedelta(days=7)
+
+# Metriken
 col1, col2, col3 = st.columns(3)
 with col1:
-    st.metric("Trainings diese Woche", "4")
+    st.metric("Trainings diese Woche", len(df[df['date'] >= week_start]))
 with col2:
-    st.metric("Kilometer diese Woche", "37.2 km")
+    st.metric("Kilometer diese Woche", f"{df[df['date'] >= week_start]['distance_km'].sum():.1f} km")
 with col3:
-    st.metric("Aktuelle Form", "Gut 🟢")
+    st.metric("Ø Herzfrequenz", f"{df['heart_rate_avg'].mean():.0f} bpm")
 
+# Befinden Input
 st.divider()
 st.subheader("Wie fühlst du dich heute?")
-
 col1, col2, col3 = st.columns(3)
 with col1:
     energy = st.slider("Energie", 1, 10, 7)
@@ -46,11 +57,10 @@ if st.button("Befinden speichern"):
     conn.close()
     st.success("✅ Befinden gespeichert!")
 
+# Trainings
 st.divider()
-st.subheader("Letzte Trainings")
-
-conn = get_connection()
-df = pd.read_sql("SELECT date, type, duration_minutes, distance_km, rating FROM trainings ORDER BY date DESC", conn)
-conn.close()
-
-st.dataframe(df, use_container_width=True)
+st.subheader("Letzte Aktivitäten")
+st.dataframe(
+    df[['date', 'type', 'duration_minutes', 'distance_km', 'heart_rate_avg', 'notes']].head(10),
+    use_container_width=True
+)
