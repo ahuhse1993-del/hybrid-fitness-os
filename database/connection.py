@@ -1,11 +1,17 @@
 import psycopg2
+import os
 
 def get_connection():
-    conn = psycopg2.connect(
-        dbname="hybridfitnessdb",
-        user="lexshapes",
-        host="localhost"
-    )
+    database_url = os.getenv("DATABASE_URL")
+    
+    if database_url:
+        conn = psycopg2.connect(database_url)
+    else:
+        conn = psycopg2.connect(
+            dbname="hybridfitnessdb",
+            user="lexshapes",
+            host="localhost"
+        )
     return conn
 
 def test_connection():
