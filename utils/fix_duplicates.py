@@ -5,11 +5,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 def fix_duplicates():
-    conn = psycopg2.connect(
-        dbname="hybridfitnessdb",
-        user="lexshapes",
-        host="localhost"
-    )
+    conn = psycopg2.connect(os.getenv("RAILWAY_DATABASE_URL"))
     cursor = conn.cursor()
     
     print("🔄 Duplikate werden bereinigt...")
