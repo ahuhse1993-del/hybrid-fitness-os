@@ -4,23 +4,36 @@ import os
 
 load_dotenv()
 
-def get_mfa():
-    return input("Garmin MFA Code: ")
+def login_garmin():
+    email = os.getenv("GARMIN_EMAIL")
+    password = os.getenv("GARMIN_PASSWORD")
+    
+    client = Garmin(
+        email=email,
+        password=password,
+        prompt_mfa=lambda: input("MFA code: ")
+    )
+    
+    client.login("~/.garminconnect")
+    print("✅ Garmin eingeloggt!")
+    return client
 
-def get_garmin_activities(limit=10):
-    try:
-        email = os.getenv("GARMIN_EMAIL")
-        password = os.getenv("GARMIN_PASSWORD")
-        client = Garmin(email, password, prompt_mfa=get_mfa)
-        client.login()
-        activities = client.get_activities(0, limit)
-        print(f"✅ {len(activities)} Aktivitäten geladen!")
-        return activities
-    except Exception as e:
-        print(f"❌ Fehler: {e}")
-        return []
+def get_garmin_sleep(date):
+    client = login_garmin()
+    sleep = client.get_sleep_data(date)
+    return sleep
+
+def get_garmin_hrv(date):
+    client = login_garmin()
+    hrv = client.get_hrv_data(date)
+    return hrv
+
+def get_garmin_body_battery(date):
+    client = login_garmin()
+    battery = client.get_body_battery(date, date)
+    return battery
 
 if __name__ == "__main__":
-    activities = get_garmin_activities()
-    for activity in activities:
-        print(f"{activity['startTimeLocal']} - {activity['activityName']} - {activity['distance']}m")
+    client = login_garmin()
+    sleep = client.get_sleep_data("2026-06-16")
+    print(f"Schlaf: {sleep}")
