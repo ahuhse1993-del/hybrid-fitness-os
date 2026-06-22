@@ -73,4 +73,7 @@ if __name__ == "__main__":
     print("=== CAIRN Morning Brief ===\n")
     result = generate_morning_brief()
     print("Brief:", result.get("brief"))
-    print("\nSuggestion:", result.get("suggestion"))
+    print("\nSuggestion:", result.get("suggestion")) 
+
+
+    

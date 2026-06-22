@@ -638,10 +638,10 @@ body{background:var(--bg);font-family:'DM Sans',sans-serif;color:var(--black);fo
       </div>
 
       <!-- ANPASSUNG – prominent -->
-      <div class="adapt-block" onclick="openReplan()">
+      <div class="adapt-block" id="adapt-block" onclick="openReplan()" style="display:none">
         <div class="adapt-text">
           <div class="adapt-label">EINE IDEE VON MIR</div>
-          <div class="adapt-desc">Ich w&uuml;rde heute auf 4&times;1 km k&uuml;rzen &mdash; gleiche Qualit&auml;t, weniger Last</div>
+          <div class="adapt-desc" id="cb-suggestion">Ich w&uuml;rde heute auf 4&times;1 km k&uuml;rzen &mdash; gleiche Qualit&auml;t, weniger Last</div>
         </div>
         <button class="adapt-btn">ANSEHEN &rarr;</button>
       </div>
@@ -1017,7 +1017,11 @@ function loadMorningBrief() {
       }
 
       var suggEl = document.getElementById('cb-suggestion');
-      if (suggEl && data.suggestion) suggEl.textContent = data.suggestion;
+    if (suggEl && data.suggestion) {
+            suggEl.textContent = data.suggestion;
+            var adaptBlock = document.getElementById('adapt-block');
+            if (adaptBlock) adaptBlock.style.display = 'flex';
+          }
     })
     .catch(function() {
       document.getElementById('cb-decision').innerHTML =
