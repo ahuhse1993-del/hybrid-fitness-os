@@ -37,7 +37,8 @@ def save_checkin():
     if existing:
         cur.execute("""
             UPDATE daily_logs SET feel=%s, notes=%s, athlete_text=%s,
-            morning_brief=NULL, suggestion=NULL, session_type=NULL, session_zone=NULL
+            morning_brief=NULL, suggestion=NULL, session_type=NULL, session_zone=NULL,
+            primary_target=NULL, secondary_target=NULL
             WHERE date=%s
         """, (feel, notes, text, today))
     else:
@@ -60,7 +61,8 @@ def morning_brief():
         cur = conn.cursor()
 
         cur.execute("""
-            SELECT feel, notes, athlete_text, morning_brief, suggestion, session_type, session_zone
+            SELECT feel, notes, athlete_text, morning_brief, suggestion,
+                   session_type, session_zone, primary_target, secondary_target
             FROM daily_logs WHERE date = %s
         """, (today,))
         row = cur.fetchone()
@@ -74,7 +76,9 @@ def morning_brief():
                     "brief": row[3],
                     "suggestion": row[4],
                     "session_type": row[5] or "",
-                    "session_zone": row[6] or ""
+                    "session_zone": row[6] or "",
+                    "primary_target": row[7] or "none",
+                    "secondary_target": row[8] or "none"
                 })
             athlete_feedback = {
                 'feel': row[0] or '',
@@ -87,17 +91,20 @@ def morning_brief():
         suggestion = result.get("suggestion", "")
         session_type = result.get("session_type", "")
         session_zone = result.get("session_zone", "")
+        primary_target = result.get("primary_target", "none")
+        secondary_target = result.get("secondary_target", "none")
 
         if row:
             cur.execute("""
                 UPDATE daily_logs SET morning_brief=%s, suggestion=%s,
-                session_type=%s, session_zone=%s WHERE date=%s
-            """, (brief, suggestion, session_type, session_zone, today))
+                session_type=%s, session_zone=%s, primary_target=%s, secondary_target=%s
+                WHERE date=%s
+            """, (brief, suggestion, session_type, session_zone, primary_target, secondary_target, today))
         else:
             cur.execute("""
-                INSERT INTO daily_logs (date, morning_brief, suggestion, session_type, session_zone)
-                VALUES (%s, %s, %s, %s, %s)
-            """, (today, brief, suggestion, session_type, session_zone))
+                INSERT INTO daily_logs (date, morning_brief, suggestion, session_type, session_zone, primary_target, secondary_target)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+            """, (today, brief, suggestion, session_type, session_zone, primary_target, secondary_target))
 
         conn.commit()
         conn.close()
@@ -107,7 +114,9 @@ def morning_brief():
             "brief": brief,
             "suggestion": suggestion,
             "session_type": session_type,
-            "session_zone": session_zone
+            "session_zone": session_zone,
+            "primary_target": primary_target,
+            "secondary_target": secondary_target
         })
 
     except Exception as e:

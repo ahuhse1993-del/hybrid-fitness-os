@@ -7,21 +7,21 @@ load_dotenv()
 
 from data.data_service import get_daily_snapshot
 
-TRAINING_ZONES = {
-    "Rest Day": {"zone": "", "hm": False},
-    "Recovery Run": {"zone": "Z1", "hm": True},
-    "Easy Run": {"zone": "Z2", "hm": True},
-    "Long Run": {"zone": "Z2", "hm": True},
-    "Progression Run": {"zone": "Z2-Z4", "hm": True},
-    "Tempo Run": {"zone": "Z3-Z4", "hm": True},
-    "Threshold Run": {"zone": "Z4", "hm": True},
-    "Intervalle": {"zone": "Z5", "hm": False},
-    "Hill Repeats": {"zone": "Z4-Z5", "hm": False},
-    "Strides": {"zone": "Z5", "hm": False},
-    "Race Pace Run": {"zone": "Wettkampftempo", "hm": True},
-    "Trail Run": {"zone": "Z2-Z3", "hm": True},
-    "Krafttraining": {"zone": "", "hm": False},
-    "Mobilität": {"zone": "", "hm": False},
+TRAINING_CATALOGUE = {
+    "Rest Day":        {"zone": "",          "primary": "none",       "secondary": "none"},
+    "Recovery Run":    {"zone": "Z1",        "primary": "heart_rate", "secondary": "none"},
+    "Easy Run":        {"zone": "Z2",        "primary": "heart_rate", "secondary": "pace"},
+    "Long Run":        {"zone": "Z2",        "primary": "heart_rate", "secondary": "pace"},
+    "Progression Run": {"zone": "Z2-Z4",     "primary": "pace",       "secondary": "heart_rate"},
+    "Tempo Run":       {"zone": "Z3-Z4",     "primary": "pace",       "secondary": "heart_rate"},
+    "Threshold Run":   {"zone": "Z4",        "primary": "pace",       "secondary": "heart_rate"},
+    "Intervalle":      {"zone": "Z5",        "primary": "pace",       "secondary": "none"},
+    "Hill Repeats":    {"zone": "Z4-Z5",     "primary": "rpe",        "secondary": "pace"},
+    "Strides":         {"zone": "Z5",        "primary": "rpe",        "secondary": "none"},
+    "Race Pace Run":   {"zone": "Wettkampf", "primary": "pace",       "secondary": "heart_rate"},
+    "Trail Run":       {"zone": "Z2-Z3",     "primary": "rpe",        "secondary": "none"},
+    "Krafttraining":   {"zone": "",          "primary": "none",       "secondary": "none"},
+    "Mobilität":       {"zone": "",          "primary": "none",       "secondary": "none"},
 }
 
 def generate_morning_brief(athlete_feedback: dict = None):
@@ -51,7 +51,7 @@ def generate_morning_brief(athlete_feedback: dict = None):
         if text:
             feedback_text += "Eigene Worte: \"" + text + "\"\n"
 
-    session_types = ", ".join(TRAINING_ZONES.keys())
+    session_types = ", ".join(TRAINING_CATALOGUE.keys())
 
     prompt = "Du bist CAIRN - ein erfahrener Ausdauer-Coach. Du sprichst wie ein ruhiger Bergfuehrer. Nie wie Software.\n\n"
     prompt += "Athlet-Daten von heute Morgen:\n"
@@ -63,12 +63,11 @@ def generate_morning_brief(athlete_feedback: dict = None):
     if feedback_text:
         prompt += "Athlet sagt heute Morgen:\n" + feedback_text + "\n"
     prompt += "Antworte NUR mit diesem JSON. Kein Text davor oder danach. Kein Markdown:\n"
-    prompt += '{"brief": "...", "suggestion": "...", "session_type": "...", "session_zone": "..."}\n\n'
+    prompt += '{"brief": "...", "suggestion": "...", "session_type": "..."}\n\n'
     prompt += "brief: Vollstaendiger Morning Brief, max 150 Woerter, kurze Saetze, auf Deutsch.\n"
     prompt += "Niemals: Algorithmus, Score, Metrik. Immer: Ich sehe, Ich wuerde, Dein Koerper.\n"
     prompt += "suggestion: Ein einziger konkreter Vorschlag fuer heute, max 12 Woerter, kein Punkt am Ende.\n"
-    prompt += "session_type: Einer dieser Typen: " + session_types + "\n"
-    prompt += "session_zone: Die passende Zone laut Trainingstyp. Bei Rest Day leer lassen.\n"
+    prompt += "session_type: Genau einer dieser Typen: " + session_types + "\n"
 
     client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 
@@ -82,17 +81,25 @@ def generate_morning_brief(athlete_feedback: dict = None):
 
     try:
         result = json.loads(raw)
-        # Zone aus Tabelle übernehmen wenn session_type bekannt
         session_type = result.get("session_type", "")
-        if session_type in TRAINING_ZONES:
-            result["session_zone"] = TRAINING_ZONES[session_type]["zone"]
+        if session_type in TRAINING_CATALOGUE:
+            cat = TRAINING_CATALOGUE[session_type]
+            result["session_zone"] = cat["zone"]
+            result["primary_target"] = cat["primary"]
+            result["secondary_target"] = cat["secondary"]
+        else:
+            result["session_zone"] = ""
+            result["primary_target"] = "none"
+            result["secondary_target"] = "none"
         return result
     except json.JSONDecodeError:
         return {
             "brief": raw,
             "suggestion": "Heute ruhig bleiben",
             "session_type": "Recovery Run",
-            "session_zone": "Z1"
+            "session_zone": "Z1",
+            "primary_target": "heart_rate",
+            "secondary_target": "none"
         }
 
 if __name__ == "__main__":
