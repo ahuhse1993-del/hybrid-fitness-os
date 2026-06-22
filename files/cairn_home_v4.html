@@ -221,7 +221,7 @@ body{background:var(--bg);font-family:'DM Sans',sans-serif;color:var(--black);fo
 
 /* COACH TEXT */
 .cb-decision{
-  font-size:14px;font-weight:300;
+  font-size:22px;font-weight:300;
   line-height:1.4;letter-spacing:-.02em;
   margin-bottom:14px;color:var(--black);
 }
@@ -659,7 +659,7 @@ body{background:var(--bg);font-family:'DM Sans',sans-serif;color:var(--black);fo
       <div class="ts-meta">
         <div class="ts-item"><div class="ts-lbl">DISTANZ</div><div class="ts-val" id="session-dist">~10 km</div></div>
         <div class="ts-item"><div class="ts-lbl">STRUKTUR</div><div class="ts-val" id="session-struct">6&times;1 km</div></div>
-        <div class="ts-item"><div class="ts-lbl">ZONE</div><div class="ts-val" id="session-zone">Z4&ndash;Z5</div></div>
+        <div class="ts-item"><div class="ts-lbl">ZONE</div><div class="ts-val" id="session-zone">—</div></div>
         <div class="ts-item"><div class="ts-lbl">PACE</div><div class="ts-val">5:05&ndash;10</div></div>
         <div class="ts-item"><div class="ts-lbl">DAUER</div><div class="ts-val" id="session-dur">~55 min</div></div>
       </div>
@@ -928,15 +928,17 @@ function closeAll(){
   document.getElementById('ov-confirm').classList.remove('open');
 }
 function acceptReplan(){
-  var suggestion = document.getElementById('cb-suggestion').textContent || 'Angepasste Einheit';
-  document.getElementById('session-name').textContent = suggestion;
+  var sessionType = document.body.dataset.sessionType || document.getElementById('cb-suggestion').textContent || 'Angepasste Einheit';
+  var sessionZone = document.body.dataset.sessionZone || '';
+  document.getElementById('session-name').textContent = sessionType;
+  document.getElementById('session-zone').textContent = sessionZone;
   document.getElementById('session-dist').textContent = '';
   document.getElementById('session-struct').textContent = '';
   document.getElementById('session-dur').textContent = '';
-  document.getElementById('cal-name').textContent = suggestion;
-  document.getElementById('cal-meta').textContent = '';
+  document.getElementById('cal-name').textContent = sessionType;
+  document.getElementById('cal-meta').textContent = sessionZone;
   var confirmText = document.getElementById('confirm-text');
-  if (confirmText) confirmText.textContent = suggestion + ' — im Kalender übernommen.';
+  if (confirmText) confirmText.textContent = sessionType + ' \u2014 im Kalender \u00fcbernommen.';
   document.getElementById('ov-replan').classList.remove('open');
   document.getElementById('ov-confirm').classList.add('open');
 }
@@ -1027,21 +1029,15 @@ function loadMorningBrief() {
           .map(function(l) { return '<div class="cb-why-item">' + l + '</div>'; }).join('');
       }
 
-    var suggEl = document.getElementById('cb-suggestion');
+      var suggEl = document.getElementById('cb-suggestion');
       if (suggEl && data.suggestion) {
         suggEl.textContent = data.suggestion;
         var adaptBlock = document.getElementById('adapt-block');
         if (adaptBlock) adaptBlock.style.display = 'flex';
       }
-      if (data.session_type) {
-        var snEl = document.getElementById('session-name');
-        if (snEl) snEl.textContent = data.session_type;
-      }
-      if (data.session_zone !== undefined) {
-        var szEl = document.getElementById('session-zone');
-        if (szEl) szEl.textContent = data.session_zone || 'REST';
-      
-      }
+      // session_type und session_zone im dataset speichern — erst bei Annahme in DOM
+      if (data.session_type) document.body.dataset.sessionType = data.session_type;
+      if (data.session_zone) document.body.dataset.sessionZone = data.session_zone;
     })
     .catch(function() {
       document.getElementById('cb-decision').innerHTML =
