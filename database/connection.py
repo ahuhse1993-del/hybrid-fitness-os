@@ -1,8 +1,12 @@
 import psycopg2
 import os
+from dotenv import load_dotenv
+
+load_dotenv("/Users/lexshapes/hybrid-fitness-os/.env")
 
 def get_connection():
-    database_url = os.getenv("DATABASE_URL")
+    # Railway hat Priorität
+    database_url = os.getenv("RAILWAY_DATABASE_URL") or os.getenv("DATABASE_URL")
     
     if database_url:
         conn = psycopg2.connect(database_url)
@@ -17,7 +21,10 @@ def get_connection():
 def test_connection():
     try:
         conn = get_connection()
-        print("✅ Datenbankverbindung erfolgreich!")
+        cur = conn.cursor()
+        cur.execute("SELECT COUNT(*) FROM trainings")
+        count = cur.fetchone()[0]
+        print(f"✅ Verbindung erfolgreich — {count} Trainings")
         conn.close()
     except Exception as e:
         print(f"❌ Fehler: {e}")

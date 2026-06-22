@@ -1,0 +1,1060 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CAIRN</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#F0EDE6;
+  --stone:#9E9B95;
+  --mid:#2E2C2A;
+  --black:#1A1918;
+  --accent:#E8D84A;
+  --accent-mid:#C9BB2E;
+  --accent-dark:#8C7F0A;
+  --cal-bg:#E4E1D9;
+  --dot:radial-gradient(circle,rgba(46,44,42,.26) 1px,transparent 1px);
+}
+body{background:var(--bg);font-family:'DM Sans',sans-serif;color:var(--black);font-size:14px}
+.pg{display:grid;grid-template-columns:48px 1fr;min-height:100vh}
+.sb{background:var(--black);display:flex;flex-direction:column;align-items:center;padding:18px 0;position:sticky;top:0;height:100vh}
+.sb-logo{font-family:'DM Mono',monospace;font-size:8px;color:var(--stone);letter-spacing:.2em;writing-mode:vertical-rl;transform:rotate(180deg);padding-top:6px;margin-bottom:auto}
+.sb-nav{display:flex;flex-direction:column;align-items:center;gap:22px;margin-bottom:20px}
+.si{font-size:15px;color:#4A4846;cursor:pointer}.si.on{color:var(--bg)}.si:hover{color:var(--accent)}
+.body{display:flex;flex-direction:column}
+.d-bar{height:10px;display:flex;width:100%}
+.d-fill{height:100%;background:var(--black)}
+.d-rest{flex:1;height:100%;background-image:var(--dot);background-size:4px 4px}
+
+/* ═══════════════════════════════════
+   CHECK-IN POPOUT – einmal pro Tag
+═══════════════════════════════════ */
+.checkin-backdrop{
+  display:none;
+  position:fixed;inset:0;
+  background:rgba(26,25,24,.65);
+  z-index:200;
+  align-items:center;
+  justify-content:center;
+}
+.checkin-backdrop.open{display:flex}
+.checkin-box{
+  background:var(--black);
+  width:100%;
+  max-width:480px;
+  border-top:3px solid var(--accent);
+  padding:32px;
+  position:relative;
+}
+.ci-time{
+  font-family:'DM Mono',monospace;font-size:8px;
+  color:rgba(240,237,230,.25);letter-spacing:.18em;
+  margin-bottom:24px;
+}
+.ci-greeting{
+  font-size:22px;font-weight:300;color:#F0EDE6;
+  line-height:1.4;letter-spacing:-.01em;margin-bottom:6px;
+}
+.ci-greeting b{font-weight:500}
+.ci-sub{
+  font-size:14px;color:rgba(240,237,230,.4);
+  font-weight:300;margin-bottom:28px;
+}
+.ci-question{
+  font-family:'DM Mono',monospace;font-size:9px;
+  color:rgba(240,237,230,.4);letter-spacing:.16em;
+  margin-bottom:14px;
+}
+.ci-feels{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:24px}
+.ci-feel{
+  padding:10px 18px;
+  border:.5px solid rgba(240,237,230,.15);
+  color:rgba(240,237,230,.45);
+  font-family:'DM Mono',monospace;font-size:9px;
+  letter-spacing:.1em;cursor:pointer;
+  background:transparent;transition:all .15s;
+}
+.ci-feel:hover{border-color:rgba(240,237,230,.4);color:#F0EDE6}
+.ci-feel.sel{background:var(--accent);border-color:var(--accent);color:var(--black);font-weight:500}
+.ci-notes-label{
+  font-family:'DM Mono',monospace;font-size:9px;
+  color:rgba(240,237,230,.25);letter-spacing:.14em;margin-bottom:10px;
+}
+.ci-notes{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:28px}
+.ci-note{
+  padding:7px 14px;
+  border:.5px solid rgba(240,237,230,.1);
+  color:rgba(240,237,230,.3);
+  font-family:'DM Mono',monospace;font-size:9px;
+  letter-spacing:.07em;cursor:pointer;
+  background:transparent;transition:all .15s;
+}
+.ci-note:hover{border-color:rgba(240,237,230,.28);color:rgba(240,237,230,.55)}
+.ci-note.sel{border-color:rgba(232,216,74,.35);color:var(--accent)}
+.ci-submit{
+  width:100%;
+  padding:13px;
+  background:rgba(240,237,230,.08);
+  border:.5px solid rgba(240,237,230,.15);
+  color:rgba(240,237,230,.3);
+  font-family:'DM Mono',monospace;font-size:10px;
+  letter-spacing:.12em;cursor:pointer;
+  transition:all .2s;pointer-events:none;
+}
+.ci-submit.ready{
+  background:var(--accent);
+  border-color:var(--accent);
+  color:var(--black);font-weight:500;
+  pointer-events:all;
+}
+
+/* ═══════════════════════════════════
+   TOPBAR
+═══════════════════════════════════ */
+.topbar{
+  display:flex;justify-content:space-between;align-items:stretch;
+  padding:0;border-bottom:1px solid var(--black);
+}
+.topbar-inner{
+  padding:16px 28px;
+  display:flex;flex-direction:column;justify-content:center;
+}
+.dateline{font-family:'DM Mono',monospace;font-size:9px;color:var(--stone);letter-spacing:.14em}
+.greeting-top{font-size:15px;font-weight:300;color:var(--mid)}
+.greeting-top b{font-weight:500;color:var(--black)}
+.coach-chat-btn{
+  display:flex;align-items:center;justify-content:center;
+  background:var(--accent);border:none;
+  cursor:pointer;padding:0;
+  width:96px;
+  align-self:stretch;
+  flex-shrink:0;
+  position:relative;
+  transition:background .15s;
+  overflow:visible;
+}
+.coach-chat-btn:hover{background:var(--accent-mid)}
+.coach-chat-btn .tooltip{
+  opacity:0;
+  position:fixed;
+  background:var(--black);
+  color:#F0EDE6;
+  font-family:'DM Mono',monospace;
+  font-size:8px;
+  letter-spacing:.1em;
+  padding:5px 12px;
+  white-space:nowrap;
+  pointer-events:none;
+  z-index:9999;
+  transition:opacity .15s;
+  top:72px;
+  right:28px;
+}
+.coach-chat-btn:hover .tooltip{opacity:1}
+
+/* ═══════════════════════════════════
+   COACH BRIEF BLOCK – oben, dominant
+   Enthält Athleten-Feedback + Coach-Antwort
+═══════════════════════════════════ */
+.coach-brief{
+  margin:0 28px;
+  border:.5px solid var(--black);
+  border-top:none;
+  display:grid;
+  grid-template-columns:180px 1fr;
+  min-height:300px;
+}
+.cb-illus{
+  border-right:.5px solid var(--black);
+  background:#E8E5DD;
+  display:flex;flex-direction:column;
+  position:relative;
+}
+.cb-illus-state{
+  font-family:'DM Mono',monospace;font-size:8px;
+  letter-spacing:.14em;color:var(--stone);
+  padding:10px 14px;border-bottom:.5px solid rgba(46,44,42,.12);
+}
+.cb-illus-art{
+  flex:1;display:flex;align-items:center;justify-content:center;padding:20px;
+}
+.cb-right{
+  padding:26px 30px;
+  display:flex;flex-direction:column;justify-content:space-between;
+}
+
+/* ATHLET-ECHO – Rückmeldung des Athleten oben */
+.athlete-echo{
+  display:inline-flex;align-items:center;gap:8px;
+  padding:6px 12px;
+  background:rgba(46,44,42,.05);
+  border-left:2px solid rgba(46,44,42,.2);
+  font-size:12px;color:var(--stone);
+  margin-bottom:16px;
+}
+.ae-lbl{
+  font-family:'DM Mono',monospace;font-size:8px;
+  color:var(--stone);letter-spacing:.1em;
+}
+
+/* COACH KICKER */
+.cb-kicker{
+  font-family:'DM Mono',monospace;font-size:9px;
+  color:var(--stone);letter-spacing:.14em;margin-bottom:10px;
+}
+
+/* STATUS BADGE */
+.status-badge{
+  font-family:'DM Mono',monospace;font-size:10px;
+  letter-spacing:.14em;padding:6px 14px;
+  display:inline-flex;align-items:center;gap:7px;
+  margin-bottom:16px;width:fit-content;
+}
+.status-badge.go{background:var(--black);color:var(--bg)}
+.status-badge .sdot{width:6px;height:6px;border-radius:50%;background:var(--accent);flex-shrink:0}
+.status-badge.warn{background:rgba(140,127,10,.1);border:.5px solid var(--accent-dark);color:var(--accent-dark)}
+.status-badge.warn .sdot{background:var(--accent-dark)}
+
+/* COACH TEXT */
+.cb-decision{
+  font-size:22px;font-weight:300;
+  line-height:1.4;letter-spacing:-.02em;
+  margin-bottom:14px;color:var(--black);
+}
+.cb-decision b{font-weight:500}
+.cb-quote{
+  font-size:14px;font-weight:300;font-style:italic;
+  color:var(--mid);border-left:2px solid var(--accent);
+  padding:7px 13px;margin-bottom:16px;line-height:1.6;
+}
+.cb-why-label{
+  font-family:'DM Mono',monospace;font-size:8px;
+  color:var(--stone);letter-spacing:.14em;margin-bottom:8px;
+}
+.cb-why-items{display:flex;flex-direction:column;gap:6px;margin-bottom:20px}
+.cb-why-item{
+  display:flex;align-items:flex-start;gap:10px;
+  font-size:13px;color:var(--mid);line-height:1.45;
+}
+.cb-why-item::before{
+  content:'';width:3px;height:3px;border-radius:50%;
+  background:var(--stone);flex-shrink:0;margin-top:7px;
+}
+
+/* AKTIONS-BLOCK – Suggestions darunter */
+.adapt-block{
+  background:var(--black);
+  border-left:3px solid var(--accent);
+  padding:14px 18px;
+  display:flex;align-items:center;
+  justify-content:space-between;gap:16px;
+  cursor:pointer;
+}
+.adapt-text{display:flex;flex-direction:column;gap:3px}
+.adapt-label{font-family:'DM Mono',monospace;font-size:8px;color:var(--accent);letter-spacing:.12em}
+.adapt-desc{font-size:13px;color:#F0EDE6}
+.adapt-btn{
+  background:var(--accent);border:none;color:var(--black);
+  font-family:'DM Mono',monospace;font-size:9px;
+  padding:8px 16px;cursor:pointer;letter-spacing:.1em;
+  white-space:nowrap;font-weight:500;flex-shrink:0;
+}
+
+/* SUGGESTIONS UNTER DEM ADAPT-BLOCK */
+.suggestions{
+  margin:0 28px;
+  border:.5px solid var(--black);border-top:none;
+  display:grid;grid-template-columns:repeat(3,1fr);
+}
+.sug-item{
+  padding:14px 18px;border-right:.5px solid var(--black);
+  cursor:pointer;transition:background .12s;
+  display:flex;flex-direction:column;gap:4px;
+}
+.sug-item:last-child{border-right:none}
+.sug-item:hover{background:#E8E4DC}
+.sug-icon{font-size:14px;color:var(--stone);margin-bottom:4px}
+.sug-label{font-family:'DM Mono',monospace;font-size:8px;color:var(--stone);letter-spacing:.12em}
+.sug-desc{font-size:12px;color:var(--mid)}
+
+/* TODAY SESSION */
+.today-session{
+  margin:0 28px;border:.5px solid var(--black);border-top:none;
+  display:grid;grid-template-columns:1fr auto;
+}
+.ts-left{
+  padding:16px 24px;border-right:.5px solid var(--black);
+  background-image:var(--dot);background-size:6px 6px;
+}
+.ts-kicker{font-family:'DM Mono',monospace;font-size:9px;color:var(--mid);letter-spacing:.14em;margin-bottom:5px}
+.ts-name{font-size:22px;font-weight:300;letter-spacing:-.02em;margin-bottom:10px}
+.ts-meta{display:flex;gap:22px;flex-wrap:wrap}
+.ts-item{display:flex;flex-direction:column;gap:2px}
+.ts-lbl{font-family:'DM Mono',monospace;font-size:8px;color:var(--mid);letter-spacing:.1em}
+.ts-val{font-family:'DM Mono',monospace;font-size:13px;font-weight:500}
+.ts-right{
+  display:flex;align-items:center;justify-content:center;
+  padding:14px 20px;background:var(--bg);min-width:120px;
+}
+.ts-illus{
+  width:84px;height:64px;
+  border:.5px dashed rgba(46,44,42,.2);
+  display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:4px;
+}
+
+/* DATA STRIP */
+.data-strip{
+  margin:0 28px;border:.5px solid var(--black);border-top:none;
+  display:grid;grid-template-columns:1fr 1fr 280px;
+}
+.ds-cell{padding:14px 20px;border-right:.5px solid var(--black)}
+.ds-cell:last-child{border-right:none}
+.ds-kicker{font-family:'DM Mono',monospace;font-size:8px;color:var(--stone);letter-spacing:.12em;margin-bottom:4px}
+.ds-val{font-size:26px;font-weight:300;font-family:'DM Mono',monospace;letter-spacing:-.02em;line-height:1}
+.ds-sub{font-family:'DM Mono',monospace;font-size:8px;color:var(--stone);margin-top:3px}
+.health-mini{padding:14px 20px;background:var(--black)}
+.hm-kicker{font-family:'DM Mono',monospace;font-size:8px;color:rgba(240,237,230,.3);letter-spacing:.12em;margin-bottom:8px}
+.hm-rows{display:flex;flex-direction:column;gap:5px}
+.hm-row{display:flex;align-items:center;gap:8px}
+.hm-nm{font-family:'DM Mono',monospace;font-size:8px;color:rgba(240,237,230,.28);width:40px}
+.hm-bar{flex:1;height:8px;display:flex}
+.hm-fi{height:100%;background:rgba(240,237,230,.6)}
+.hm-dot{flex:1;height:100%;background-image:radial-gradient(circle,rgba(240,237,230,.13) 1px,transparent 1px);background-size:4px 4px}
+.hm-vl{font-family:'DM Mono',monospace;font-size:8px;color:rgba(240,237,230,.28);width:34px;text-align:right}
+
+/* KALENDER */
+.plan-outer{margin:0 28px;border:.5px solid var(--black);border-top:none}
+.plan-head{display:flex;justify-content:space-between;align-items:center;padding:10px 18px;border-bottom:1px solid var(--black)}
+.plan-lbl{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.12em;color:var(--stone)}
+.kwtabs{display:flex;border:.5px solid var(--black)}
+.kwt{font-family:'DM Mono',monospace;font-size:8px;letter-spacing:.07em;padding:4px 12px;color:var(--mid);cursor:pointer;border-right:.5px solid var(--black)}
+.kwt:last-child{border-right:none}
+.kwt.on{background:var(--black);color:var(--bg)}
+.week-block{border-bottom:1px solid var(--black)}
+.week-block:last-child{border-bottom:none}
+.week-inner{display:grid;grid-template-columns:1fr 180px}
+.week-cal{background:var(--cal-bg);border-right:1px solid var(--black)}
+.week-top{display:grid;grid-template-columns:28px repeat(7,1fr);border-bottom:1px solid var(--black)}
+.week-kw{font-family:'DM Mono',monospace;font-size:9px;color:var(--stone);padding:7px 6px;border-right:1px solid var(--black)}
+.dh-cell{padding:6px 8px;border-right:.5px solid rgba(46,44,42,.18);background:var(--cal-bg)}
+.dh-cell:last-child{border-right:none}
+.dh-name{font-family:'DM Mono',monospace;font-size:8px;color:var(--stone);letter-spacing:.06em}
+.dh-date{font-family:'DM Mono',monospace;font-size:12px;color:var(--black);font-weight:500;margin-top:1px}
+.dh-cell.today-col{background:var(--black)}
+.dh-cell.today-col .dh-name{color:rgba(232,216,74,.55)}
+.dh-cell.today-col .dh-date{color:var(--accent)}
+.cal-row{display:grid;grid-template-columns:28px repeat(7,1fr)}
+.day-cell{padding:5px 4px;min-height:70px;background:var(--cal-bg)}
+.day-cell.today-cell{background-image:radial-gradient(circle,rgba(232,216,74,.06) 1px,transparent 1px);background-size:6px 6px}
+.tc{padding:7px;border-radius:3px;cursor:grab;border:1px solid rgba(46,44,42,.18);background:var(--bg);box-shadow:0 1px 3px rgba(26,25,24,.06);transition:box-shadow .15s,transform .1s}
+.tc:hover{box-shadow:0 3px 8px rgba(26,25,24,.13);transform:translateY(-1px)}
+.tc-tag{font-family:'DM Mono',monospace;font-size:7px;letter-spacing:.08em;margin-bottom:3px;font-weight:500;color:var(--stone)}
+.tc-name{font-size:10px;font-weight:500;line-height:1.3;color:var(--black)}
+.tc-meta{font-family:'DM Mono',monospace;font-size:7px;margin-top:3px;color:var(--stone)}
+.tc.today-card{border-color:var(--accent);border-width:1.5px}
+.tc.easy{background:#D0CCC3;border-color:rgba(46,44,42,.12)}.tc.easy .tc-tag{color:var(--mid)}.tc.easy .tc-name{color:var(--black)}
+.tc.quality{background:var(--black);border-color:var(--accent);border-width:1.5px}.tc.quality .tc-tag{color:rgba(232,216,74,.5)}.tc.quality .tc-name{color:var(--accent)}.tc.quality .tc-meta{color:rgba(232,216,74,.4)}
+.tc.long{background:var(--mid)}.tc.long .tc-tag{color:rgba(158,155,149,.6)}.tc.long .tc-name{color:var(--bg)}.tc.long .tc-meta{color:var(--stone)}
+.tc.gym{background:var(--bg);border-color:rgba(46,44,42,.22)}
+.tc.run{background:#C4C0B8}.tc.run .tc-name{color:var(--black)}
+.tc.rest{background:transparent;border:.5px dashed rgba(46,44,42,.12);box-shadow:none}
+.tc.rest .tc-name{font-family:'DM Mono',monospace;font-size:7px;color:rgba(46,44,42,.22)}
+.tc.rest:hover{box-shadow:none;transform:none}
+.tc.done{opacity:.25}
+.week-summary{padding:12px 14px;display:flex;flex-direction:column;gap:7px;background:var(--bg)}
+.ws-title{font-family:'DM Mono',monospace;font-size:8px;color:var(--stone);letter-spacing:.1em}
+.ws-row{display:flex;flex-direction:column;gap:3px}
+.ws-lbl{font-family:'DM Mono',monospace;font-size:7px;color:var(--stone);letter-spacing:.08em}
+.ws-nums{display:flex;justify-content:space-between;align-items:baseline}
+.ws-done{font-size:14px;font-weight:300;font-family:'DM Mono',monospace}
+.ws-plan{font-family:'DM Mono',monospace;font-size:7px;color:var(--stone)}
+
+/* REPLAN OVERLAY */
+.overlay{display:none;position:fixed;inset:0;background:rgba(26,25,24,.75);z-index:150;align-items:center;justify-content:center}
+.overlay.open{display:flex}
+.ov-box{background:var(--bg);border-top:3px solid var(--accent);max-width:520px;width:90%;padding:28px}
+.ov-kicker{font-family:'DM Mono',monospace;font-size:9px;color:var(--accent-dark);letter-spacing:.14em;margin-bottom:10px}
+.ov-headline{font-size:18px;font-weight:400;margin-bottom:8px}
+.ov-sub{font-size:13px;color:var(--mid);line-height:1.65;margin-bottom:20px}
+.ov-cards{display:grid;grid-template-columns:1fr 36px 1fr;align-items:center;margin-bottom:16px}
+.ov-card{padding:14px 16px;border:.5px solid var(--black)}
+.ov-card.before{background:#E8E4DC;opacity:.6}
+.ov-card.after{background:var(--black)}
+.ov-card-tag{font-family:'DM Mono',monospace;font-size:7px;letter-spacing:.1em;margin-bottom:5px}
+.ov-card.before .ov-card-tag{color:var(--stone)}
+.ov-card.after .ov-card-tag{color:rgba(232,216,74,.45)}
+.ov-card-name{font-size:14px;font-weight:500}
+.ov-card.before .ov-card-name{color:var(--mid)}
+.ov-card.after .ov-card-name{color:var(--accent)}
+.ov-card-meta{font-family:'DM Mono',monospace;font-size:9px;margin-top:4px}
+.ov-card.before .ov-card-meta{color:var(--stone)}
+.ov-card.after .ov-card-meta{color:rgba(232,216,74,.45)}
+.ov-arrow{text-align:center;color:var(--stone);font-size:16px}
+.ov-reason{font-family:'DM Mono',monospace;font-size:9px;color:var(--mid);line-height:1.7;padding:10px 12px;background:#E8E4DC;border-left:2px solid var(--accent-dark);margin-bottom:16px}
+.ov-btns{display:flex;gap:10px}
+.ov-btn-y{background:var(--accent);border:none;color:var(--black);font-family:'DM Mono',monospace;font-size:9px;padding:10px 20px;cursor:pointer;letter-spacing:.1em;font-weight:500}
+.ov-btn-n{background:transparent;border:.5px solid var(--stone);color:var(--mid);font-family:'DM Mono',monospace;font-size:9px;padding:10px 16px;cursor:pointer}
+
+/* REJECT OVERLAY */
+.ov-reject{display:none;position:fixed;inset:0;background:rgba(26,25,24,.75);z-index:160;align-items:center;justify-content:center}
+.ov-reject.open{display:flex}
+.rej-box{background:var(--bg);border-top:2px solid var(--stone);max-width:440px;width:90%;padding:28px}
+.rej-learn{font-family:'DM Mono',monospace;font-size:8px;color:var(--accent-dark);letter-spacing:.1em;padding:5px 10px;background:rgba(140,127,10,.08);border:.5px solid rgba(140,127,10,.2);display:inline-block;margin-bottom:12px}
+.rej-headline{font-size:15px;font-weight:400;margin-bottom:14px;line-height:1.5}
+.rej-opts{display:flex;flex-direction:column;gap:7px;margin-bottom:12px}
+.rej-opt{display:flex;align-items:flex-start;gap:10px;background:#E8E4DC;border:.5px solid rgba(46,44,42,.15);padding:10px 14px;cursor:pointer;font-size:13px;color:var(--mid);line-height:1.4}
+.rej-opt:hover{background:#DEDAD2}
+.rej-opt.sel{background:var(--mid);color:var(--bg);border-color:var(--black)}
+.rej-opt i{font-size:13px;color:var(--stone);flex-shrink:0;margin-top:1px}
+.rej-opt.sel i{color:var(--accent)}
+.rej-note{width:100%;min-height:50px;background:#E8E4DC;border:.5px solid rgba(46,44,42,.18);padding:10px;font-family:'DM Sans',sans-serif;font-size:13px;color:var(--mid);resize:none;outline:none;margin-bottom:10px}
+.rej-footer{font-family:'DM Mono',monospace;font-size:8px;color:var(--stone);letter-spacing:.06em;line-height:1.6;margin-bottom:12px}
+.rej-btns{display:flex;gap:8px}
+.rej-btn-s{background:var(--mid);border:none;color:var(--bg);font-family:'DM Mono',monospace;font-size:9px;padding:10px 20px;cursor:pointer;letter-spacing:.1em}
+.rej-btn-c{background:transparent;border:.5px solid var(--stone);color:var(--stone);font-family:'DM Mono',monospace;font-size:9px;padding:10px 14px;cursor:pointer}
+
+/* CONFIRM */
+.ov-confirm{display:none;position:fixed;inset:0;background:rgba(26,25,24,.75);z-index:170;align-items:center;justify-content:center}
+.ov-confirm.open{display:flex}
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════
+     CHECK-IN POPOUT (einmal pro Tag)
+═══════════════════════════════════ -->
+<div class="checkin-backdrop" id="checkin">
+  <div class="checkin-box">
+    <div class="ci-time" id="ci-time">MI · 17 JUN 2026 · 06:41</div>
+    <div class="ci-greeting">Guten Morgen, <b>Alexander.</b></div>
+    <div class="ci-sub">Kurz zu dir, bevor wir starten.</div>
+
+    <div class="ci-question">WIE F&Uuml;HLST DU DICH HEUTE MORGEN?</div>
+    <div class="ci-feels">
+      <button class="ci-feel" onclick="selFeel(this,'Frisch')">Frisch</button>
+      <button class="ci-feel" onclick="selFeel(this,'Gut')">Gut</button>
+      <button class="ci-feel" onclick="selFeel(this,'Ok')">Ok</button>
+      <button class="ci-feel" onclick="selFeel(this,'M&uuml;de')">M&uuml;de</button>
+      <button class="ci-feel" onclick="selFeel(this,'Ersch&ouml;pft')">Ersch&ouml;pft</button>
+    </div>
+
+    <div class="ci-notes-label">IRGENDWAS ERW&Auml;HNENSWERT?</div>
+    <div class="ci-notes">
+      <button class="ci-note" onclick="togNote(this)">Schlechter Schlaf</button>
+      <button class="ci-note" onclick="togNote(this)">Schwere Beine</button>
+      <button class="ci-note" onclick="togNote(this)">Stressiger Tag</button>
+      <button class="ci-note" onclick="togNote(this)">F&uuml;hle mich gut</button>
+      <button class="ci-note" onclick="togNote(this)">Kein Anliegen</button>
+    </div>
+
+    <!-- Freitext + Diktat -->
+    <div style="margin-bottom:24px">
+      <div style="font-family:'DM Mono',monospace;font-size:9px;color:rgba(240,237,230,.25);letter-spacing:.14em;margin-bottom:10px">EIGENE WORTE (OPTIONAL)</div>
+      <div style="position:relative">
+        <textarea id="ci-freitext"
+          style="width:100%;min-height:72px;background:rgba(240,237,230,.06);border:.5px solid rgba(240,237,230,.12);padding:11px 44px 11px 12px;font-family:'DM Sans',sans-serif;font-size:13px;color:#F0EDE6;resize:none;outline:none;line-height:1.6;placeholder-color:rgba(240,237,230,.2)"
+          placeholder="Wie f&uuml;hlst du dich wirklich? Schreib oder diktiere..."></textarea>
+        <button id="ci-dik-btn" onclick="toggleCiDiktat(this)"
+          style="position:absolute;bottom:9px;right:9px;width:28px;height:28px;background:rgba(240,237,230,.08);border:.5px solid rgba(240,237,230,.15);cursor:pointer;display:flex;align-items:center;justify-content:center;border-radius:50%;transition:all .15s">
+          <i class="ti ti-microphone" style="font-size:12px;color:rgba(232,216,74,.7)"></i>
+        </button>
+      </div>
+      <div id="ci-dik-status" style="display:none;font-family:'DM Mono',monospace;font-size:9px;color:var(--accent);margin-top:6px;align-items:center;gap:5px">
+        <div style="width:5px;height:5px;background:var(--accent);border-radius:50%"></div>
+        DIKTAT AKTIV &mdash; KLICK ZUM STOPPEN
+      </div>
+    </div>
+
+    <button class="ci-submit" id="ci-submit" onclick="submitCheckin()">
+      SO F&Uuml;HLE ICH MICH &rarr;
+    </button>
+  </div>
+</div>
+
+<!-- REPLAN OVERLAY -->
+<div class="overlay" id="ov-replan">
+  <div class="ov-box">
+    <div class="ov-kicker">CAIRN &middot; EINE IDEE</div>
+    <div class="ov-headline">Weniger ist heute mehr.</div>
+    <div class="ov-sub">Die Intervalle bleiben, das Volumen sinkt leicht. Du kommst frischer in den Wettkampf.</div>
+    <div class="ov-cards">
+      <div class="ov-card before">
+        <div class="ov-card-tag">ORIGINAL</div>
+        <div class="ov-card-name">Tempo-Intervalle</div>
+        <div class="ov-card-meta">6&times;1 km &middot; ~55 min</div>
+      </div>
+      <div class="ov-arrow">&#x2192;</div>
+      <div class="ov-card after">
+        <div class="ov-card-tag">VORSCHLAG</div>
+        <div class="ov-card-name">Kurze Intervalle</div>
+        <div class="ov-card-meta">4&times;1 km &middot; ~40 min</div>
+      </div>
+    </div>
+    <div class="ov-reason">Begr&uuml;ndung: HRV leicht reduziert &middot; 7 Tage bis Wettkampf &middot; Frische wichtiger als Volumen</div>
+    <div class="ov-btns">
+      <button class="ov-btn-y" onclick="acceptReplan()">ANPASSEN &#10003;</button>
+      <button class="ov-btn-n" onclick="rejectReplan()">ORIGINAL BEHALTEN</button>
+    </div>
+  </div>
+</div>
+
+<!-- REJECT OVERLAY -->
+<div class="ov-reject" id="ov-reject">
+  <div class="rej-box">
+    <div class="rej-learn">&#x21BA; CAIRN LERNT VON DIR</div>
+    <div class="rej-headline">Was spricht f&uuml;r das Original heute?</div>
+    <div class="rej-opts">
+      <div class="rej-opt" onclick="selRej(this)"><i class="ti ti-mood-happy"></i><span>Ich f&uuml;hle mich besser als die Daten zeigen</span></div>
+      <div class="rej-opt" onclick="selRej(this)"><i class="ti ti-clock"></i><span>Ich habe heute nur dieses Zeitfenster</span></div>
+      <div class="rej-opt" onclick="selRej(this)"><i class="ti ti-target"></i><span>Dieses Training ist wichtig f&uuml;r meinen Plan</span></div>
+      <div class="rej-opt" onclick="selRej(this)"><i class="ti ti-brain"></i><span>Ich m&ouml;chte es versuchen und bei Bedarf anpassen</span></div>
+    </div>
+    <textarea class="rej-note" placeholder="Eigene Anmerkung (optional)..."></textarea>
+    <div class="rej-footer">Ich lerne aus deinen Entscheidungen &mdash; nicht nur aus deinen Daten.<br>Jede Antwort hilft mir, dich besser zu begleiten.</div>
+    <div class="rej-btns">
+      <button class="rej-btn-s" onclick="sendReject()">SENDEN &amp; ORIGINAL STARTEN</button>
+      <button class="rej-btn-c" onclick="closeReject()">ABBRECHEN</button>
+    </div>
+  </div>
+</div>
+
+<!-- CONFIRM -->
+<div class="ov-confirm" id="ov-confirm">
+  <div style="background:var(--black);border-left:3px solid var(--accent);padding:28px;max-width:360px;width:90%;text-align:center">
+    <i class="ti ti-check" style="font-size:26px;color:var(--accent);display:block;margin-bottom:12px"></i>
+    <div style="font-family:'DM Mono',monospace;font-size:10px;color:var(--accent);letter-spacing:.12em;margin-bottom:8px">WORKOUT AKTUALISIERT</div>
+    <div style="font-size:13px;color:#F0EDE6;line-height:1.65;margin-bottom:18px">Intervalle auf 4&times;1 km angepasst und im Kalender &uuml;bernommen.</div>
+    <button onclick="closeAll()" style="background:var(--accent);border:none;color:var(--black);font-family:'DM Mono',monospace;font-size:9px;padding:10px 22px;cursor:pointer;letter-spacing:.1em">SCHLIESSEN</button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════
+     HAUPTSEITE
+═══════════════════════════════════ -->
+<div class="pg">
+<div class="sb">
+  <div class="sb-logo">CAIRN</div>
+  <div class="sb-nav">
+    <i class="ti ti-layout-dashboard si on"></i>
+    <i class="ti ti-calendar si"></i>
+    <i class="ti ti-chart-line si"></i>
+    <i class="ti ti-shoe si"></i>
+    <i class="ti ti-stethoscope si"></i>
+  </div>
+  <i class="ti ti-settings si"></i>
+</div>
+
+<div class="body">
+  <!-- TOPBAR -->
+  <div class="topbar">
+    <div class="topbar-inner">
+      <div class="dateline">MI 17 JUN 2026 &middot; KW 25</div>
+      <div class="greeting-top">Guten Morgen, <b>Alexander.</b></div>
+    </div>
+    <button class="coach-chat-btn">
+        <svg width="48" height="48" viewBox="0 0 38 38" fill="none">
+          <line x1="19" y1="0" x2="19" y2="38" stroke="rgba(26,25,24,.12)" stroke-width=".8"/>
+          <line x1="0" y1="19" x2="38" y2="19" stroke="rgba(26,25,24,.12)" stroke-width=".8"/>
+          <circle cx="19" cy="19" r="14" stroke="rgba(26,25,24,.2)" stroke-width=".8" fill="none" stroke-dasharray="2 1.5"/>
+          <circle cx="19" cy="19" r="7" stroke="rgba(26,25,24,.3)" stroke-width="1" fill="none"/>
+          <circle cx="19" cy="19" r="2.5" fill="rgba(26,25,24,.5)"/>
+          <line x1="19" y1="19" x2="19" y2="10" stroke="rgba(26,25,24,.45)" stroke-width="1.2" stroke-linecap="round"/>
+          <line x1="19" y1="19" x2="24" y2="24" stroke="rgba(26,25,24,.2)" stroke-width="1" stroke-linecap="round"/>
+          <line x1="19" y1="3" x2="19" y2="7" stroke="rgba(26,25,24,.3)" stroke-width="1"/>
+          <line x1="19" y1="31" x2="19" y2="35" stroke="rgba(26,25,24,.3)" stroke-width="1"/>
+          <line x1="3" y1="19" x2="7" y2="19" stroke="rgba(26,25,24,.3)" stroke-width="1"/>
+          <line x1="31" y1="19" x2="35" y2="19" stroke="rgba(26,25,24,.3)" stroke-width="1"/>
+        </svg>
+        <div class="tooltip">CHAT &Ouml;FFNEN</div>
+      </button>
+  </div>
+
+  <!-- ANALYSE-BALKEN -->
+  <div id="analyse-bar" style="display:none;background:var(--black);border-left:3px solid var(--accent);padding:10px 28px;align-items:center;justify-content:space-between;gap:16px">
+    <div style="display:flex;align-items:center;gap:14px">
+      <div style="width:6px;height:6px;border-radius:50%;background:var(--accent);flex-shrink:0"></div>
+      <div>
+        <div style="font-family:DM Mono,monospace;font-size:8px;color:rgba(232,216,74,.5);letter-spacing:.14em;margin-bottom:2px">NEUE AKTIVIT&Auml;T</div>
+        <div style="font-size:13px;color:#F0EDE6">Morgenrunde T&uuml;llinger &middot; 12.4 km &middot; heute 06:41</div>
+      </div>
+    </div>
+    <button onclick="startAnalyse()" style="background:var(--accent);border:none;color:var(--black);font-family:DM Mono,monospace;font-size:9px;padding:8px 18px;cursor:pointer;letter-spacing:.1em;font-weight:500;flex-shrink:0">ANALYSE STARTEN &rarr;</button>
+  </div>
+
+  <!-- ═══ COACH BRIEF ═══ -->
+  <div class="coach-brief">
+    <!-- ILLUSTRATION -->
+    <div class="cb-illus">
+      <div class="cb-illus-state">FOKUS</div>
+      <div class="cb-illus-art">
+        <svg width="110" height="110" viewBox="0 0 110 110" fill="none">
+          <line x1="55" y1="0" x2="55" y2="110" stroke="rgba(46,44,42,.07)" stroke-width="1"/>
+          <line x1="0" y1="55" x2="110" y2="55" stroke="rgba(46,44,42,.07)" stroke-width="1"/>
+          <line x1="0" y1="0" x2="110" y2="110" stroke="rgba(46,44,42,.04)" stroke-width="1"/>
+          <line x1="110" y1="0" x2="0" y2="110" stroke="rgba(46,44,42,.04)" stroke-width="1"/>
+          <circle cx="55" cy="55" r="48" stroke="rgba(46,44,42,.1)" stroke-width="1" fill="none" stroke-dasharray="3 2"/>
+          <circle cx="55" cy="55" r="30" stroke="rgba(46,44,42,.18)" stroke-width="1" fill="none"/>
+          <circle cx="55" cy="55" r="14" stroke="rgba(46,44,42,.3)" stroke-width="1.2" fill="none"/>
+          <circle cx="55" cy="55" r="3.5" fill="rgba(46,44,42,.5)"/>
+          <line x1="55" y1="23" x2="55" y2="29" stroke="rgba(46,44,42,.28)" stroke-width="1"/>
+          <line x1="55" y1="81" x2="55" y2="87" stroke="rgba(46,44,42,.28)" stroke-width="1"/>
+          <line x1="23" y1="55" x2="29" y2="55" stroke="rgba(46,44,42,.28)" stroke-width="1"/>
+          <line x1="81" y1="55" x2="87" y2="55" stroke="rgba(46,44,42,.28)" stroke-width="1"/>
+          <text x="55" y="106" font-family="DM Mono" font-size="7" fill="rgba(46,44,42,.18)" text-anchor="middle" letter-spacing="3">FOKUS</text>
+          <text x="55" y="9" font-family="DM Mono" font-size="5" fill="rgba(46,44,42,.12)" text-anchor="middle" letter-spacing="1">ILLUSTRATION · CLAUDE DESIGN</text>
+        </svg>
+      </div>
+    </div>
+
+    <!-- COACH TEXT -->
+    <div class="cb-right">
+      <div>
+        <div class="cb-kicker">CAIRN &middot; MORNING BRIEF</div>
+
+        <!-- ATHLET-ECHO -->
+        <div class="athlete-echo" id="athlete-echo" style="display:none">
+          <span class="ae-lbl">DU &middot;</span>
+          <span id="echo-text"></span>
+        </div>
+
+        <!-- COACH STIMME – keine Labels, keine Status-Badges -->
+        <div class="cb-decision" id="cb-decision">
+          <span style="color:var(--stone);font-size:13px;font-family:'DM Mono',monospace">Coach lädt...</span>
+        </div>
+
+        <!-- COACH EINORDNUNG -->
+        <div class="cb-quote" id="cb-quote"></div>
+
+        <!-- WAS ICH SEHE -->
+        <div class="cb-why-label">WAS ICH SEHE</div>
+        <div class="cb-why-items" id="cb-why-items">
+          <div class="cb-why-item" style="color:var(--stone)">Einen Moment...</div>
+        </div>
+      </div>
+
+      <!-- ANPASSUNG – prominent -->
+      <div class="adapt-block" onclick="openReplan()">
+        <div class="adapt-text">
+          <div class="adapt-label">EINE IDEE VON MIR</div>
+          <div class="adapt-desc">Ich w&uuml;rde heute auf 4&times;1 km k&uuml;rzen &mdash; gleiche Qualit&auml;t, weniger Last</div>
+        </div>
+        <button class="adapt-btn">ANSEHEN &rarr;</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SUGGESTIONS -->
+
+
+  <!-- TODAY SESSION -->
+  <div class="today-session">
+    <div class="ts-left">
+      <div class="ts-kicker">TODAY&apos;S SESSION</div>
+      <div class="ts-name" id="session-name">Tempo-Intervalle</div>
+      <div class="ts-meta">
+        <div class="ts-item"><div class="ts-lbl">DISTANZ</div><div class="ts-val" id="session-dist">~10 km</div></div>
+        <div class="ts-item"><div class="ts-lbl">STRUKTUR</div><div class="ts-val" id="session-struct">6&times;1 km</div></div>
+        <div class="ts-item"><div class="ts-lbl">ZONE</div><div class="ts-val">Z4&ndash;Z5</div></div>
+        <div class="ts-item"><div class="ts-lbl">PACE</div><div class="ts-val">5:05&ndash;10</div></div>
+        <div class="ts-item"><div class="ts-lbl">DAUER</div><div class="ts-val" id="session-dur">~55 min</div></div>
+      </div>
+    </div>
+    <div class="ts-right">
+      <div class="ts-illus">
+        <i class="ti ti-palette" style="font-size:13px;color:rgba(46,44,42,.18)"></i>
+        <div style="font-family:'DM Mono',monospace;font-size:7px;color:rgba(46,44,42,.25);text-align:center;line-height:1.5">ILLUS.<br>SESSION</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DATA STRIP -->
+  <div class="data-strip">
+    <div class="ds-cell">
+      <div class="ds-kicker">WOCHE</div>
+      <div class="ds-val">36</div>
+      <div class="ds-sub">km &middot; 3 von 6 Einheiten</div>
+      <div class="d-bar" style="margin-top:8px"><div class="d-fill" style="width:65%"></div><div class="d-rest"></div></div>
+    </div>
+    <div class="ds-cell">
+      <div class="ds-kicker">FORM</div>
+      <div class="ds-val" style="color:var(--accent-dark)">AUFBAU</div>
+      <div class="ds-sub">Woche 3 von 4</div>
+      <div style="margin-top:10px">
+        <div style="font-family:'DM Mono',monospace;font-size:7px;color:var(--stone);margin-bottom:3px">WETTKAMPF</div>
+        <div style="font-family:'DM Mono',monospace;font-size:13px;color:var(--black)">7 Tage</div>
+      </div>
+    </div>
+    <div class="health-mini">
+      <div class="hm-kicker">HEALTH SNAPSHOT</div>
+      <div class="hm-rows">
+        <div class="hm-row"><div class="hm-nm">HRV</div><div class="hm-bar"><div class="hm-fi" style="width:61%"></div><div class="hm-dot"></div></div><div class="hm-vl">61 ms</div></div>
+        <div class="hm-row"><div class="hm-nm">SCHLAF</div><div class="hm-bar"><div class="hm-fi" style="width:76%"></div><div class="hm-dot"></div></div><div class="hm-vl">6.8 h</div></div>
+        <div class="hm-row"><div class="hm-nm">PULS</div><div class="hm-bar"><div class="hm-fi" style="width:82%"></div><div class="hm-dot"></div></div><div class="hm-vl">51 bpm</div></div>
+        <div class="hm-row"><div class="hm-nm">TSS</div><div class="hm-bar"><div class="hm-fi" style="width:68%"></div><div class="hm-dot"></div></div><div class="hm-vl">68</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- KALENDER -->
+  <div class="plan-outer">
+    <div class="plan-head">
+      <div class="plan-lbl">4-WOCHEN-AUSBLICK</div>
+      <div class="kwtabs">
+        <div class="kwt on">ALLE</div>
+        <div class="kwt">KW 25</div><div class="kwt">KW 26</div><div class="kwt">KW 27</div><div class="kwt">KW 28</div>
+      </div>
+    </div>
+    <!-- KW 25 -->
+    <div class="week-block">
+      <div class="week-inner">
+        <div class="week-cal">
+          <div class="week-top">
+            <div class="week-kw">25</div>
+            <div class="dh-cell"><div class="dh-name">MO</div><div class="dh-date">9</div></div>
+            <div class="dh-cell"><div class="dh-name">DI</div><div class="dh-date">10</div></div>
+            <div class="dh-cell today-col"><div class="dh-name">MI</div><div class="dh-date">11</div></div>
+            <div class="dh-cell"><div class="dh-name">DO</div><div class="dh-date">12</div></div>
+            <div class="dh-cell"><div class="dh-name">FR</div><div class="dh-date">13</div></div>
+            <div class="dh-cell"><div class="dh-name">SA</div><div class="dh-date">14</div></div>
+            <div class="dh-cell"><div class="dh-name">SO</div><div class="dh-date">15</div></div>
+          </div>
+          <div class="cal-row">
+            <div></div>
+            <div class="day-cell"><div class="tc gym done"><div class="tc-tag">KRAFT</div><div class="tc-name">Oberk&ouml;rper A</div><div class="tc-meta">5&times;5</div></div></div>
+            <div class="day-cell"><div class="tc easy done"><div class="tc-tag">EASY</div><div class="tc-name">Easy Run</div><div class="tc-meta">8 km</div></div></div>
+            <div class="day-cell today-cell"><div class="tc quality today-card"><div class="tc-tag">TEMPO</div><div class="tc-name" id="cal-name">Intervalle</div><div class="tc-meta" id="cal-meta">6&times;1 km</div></div></div>
+            <div class="day-cell"><div class="tc gym"><div class="tc-tag">KRAFT</div><div class="tc-name">Unterk&ouml;rper B</div><div class="tc-meta">3&times;8</div></div></div>
+            <div class="day-cell"><div class="tc rest"><div class="tc-name">REST</div></div></div>
+            <div class="day-cell"><div class="tc rest"><div class="tc-name">REST</div></div></div>
+            <div class="day-cell"><div class="tc long"><div class="tc-tag">LONG</div><div class="tc-name">Long Run</div><div class="tc-meta">22 km</div></div></div>
+          </div>
+        </div>
+        <div class="week-summary">
+          <div class="ws-title">KW 25 &middot; LAUFEND</div>
+          <div class="ws-row"><div class="ws-lbl">KILOMETER</div><div class="ws-nums"><div class="ws-done">36</div><div class="ws-plan">/ 55</div></div><div class="d-bar"><div class="d-fill" style="width:65%"></div><div class="d-rest"></div></div></div>
+          <div class="ws-row"><div class="ws-lbl">ZEIT</div><div class="ws-nums"><div class="ws-done">3:20</div><div class="ws-plan">/ 5:30</div></div><div class="d-bar"><div class="d-fill" style="width:60%"></div><div class="d-rest"></div></div></div>
+          <div class="ws-row"><div class="ws-lbl">EINHEITEN</div><div class="ws-nums"><div class="ws-done">3</div><div class="ws-plan">/ 6</div></div><div class="d-bar"><div class="d-fill" style="width:50%"></div><div class="d-rest"></div></div></div>
+        </div>
+      </div>
+    </div>
+    <!-- KW 26 -->
+    <div class="week-block">
+      <div class="week-inner">
+        <div class="week-cal">
+          <div class="week-top">
+            <div class="week-kw" style="color:var(--stone)">26</div>
+            <div class="dh-cell"><div class="dh-name">MO</div><div class="dh-date">16</div></div>
+            <div class="dh-cell"><div class="dh-name">DI</div><div class="dh-date">17</div></div>
+            <div class="dh-cell"><div class="dh-name">MI</div><div class="dh-date">18</div></div>
+            <div class="dh-cell"><div class="dh-name">DO</div><div class="dh-date">19</div></div>
+            <div class="dh-cell"><div class="dh-name">FR</div><div class="dh-date">20</div></div>
+            <div class="dh-cell"><div class="dh-name">SA</div><div class="dh-date">21</div></div>
+            <div class="dh-cell"><div class="dh-name">SO</div><div class="dh-date">22</div></div>
+          </div>
+          <div class="cal-row">
+            <div></div>
+            <div class="day-cell"><div class="tc gym"><div class="tc-tag">KRAFT</div><div class="tc-name">Oberk&ouml;rper B</div><div class="tc-meta">4&times;6</div></div></div>
+            <div class="day-cell"><div class="tc easy"><div class="tc-tag">EASY</div><div class="tc-name">Easy Run</div><div class="tc-meta">10 km</div></div></div>
+            <div class="day-cell"><div class="tc rest"><div class="tc-name">REST</div></div></div>
+            <div class="day-cell"><div class="tc run"><div class="tc-tag">LAUF</div><div class="tc-name">Fahrtspiel</div><div class="tc-meta">12 km</div></div></div>
+            <div class="day-cell"><div class="tc gym"><div class="tc-tag">KRAFT</div><div class="tc-name">Ganzk&ouml;rper</div><div class="tc-meta">3&times;10</div></div></div>
+            <div class="day-cell"><div class="tc easy"><div class="tc-tag">EASY</div><div class="tc-name">Recovery</div><div class="tc-meta">6 km</div></div></div>
+            <div class="day-cell"><div class="tc long"><div class="tc-tag">LONG</div><div class="tc-name">Long Run</div><div class="tc-meta">26 km</div></div></div>
+          </div>
+        </div>
+        <div class="week-summary">
+          <div class="ws-title" style="color:var(--stone)">KW 26 &middot; PLAN</div>
+          <div class="ws-row"><div class="ws-lbl">KILOMETER</div><div class="ws-nums"><div class="ws-done" style="color:var(--stone)">&mdash;</div><div class="ws-plan">/ 58</div></div><div class="d-bar"><div class="d-rest" style="flex:1"></div></div></div>
+          <div class="ws-row"><div class="ws-lbl">ZEIT</div><div class="ws-nums"><div class="ws-done" style="color:var(--stone)">&mdash;</div><div class="ws-plan">/ 6:00</div></div><div class="d-bar"><div class="d-rest" style="flex:1"></div></div></div>
+          <div class="ws-row"><div class="ws-lbl">EINHEITEN</div><div class="ws-nums"><div class="ws-done" style="color:var(--stone)">&mdash;</div><div class="ws-plan">/ 6</div></div><div class="d-bar"><div class="d-rest" style="flex:1"></div></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+</div>
+
+<script>
+// ─── CHECK-IN DIKTAT ───
+let ciRec = null, ciDikOn = false;
+
+function toggleCiDiktat(btn) {
+  const status = document.getElementById('ci-dik-status');
+  const ta = document.getElementById('ci-freitext');
+  const ic = btn.querySelector('i');
+
+  if (ciDikOn) {
+    if (ciRec) ciRec.stop();
+    return;
+  }
+
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) { alert('Diktat: Chrome verwenden.'); return; }
+
+  ciRec = new SR();
+  ciRec.lang = 'de-DE';
+  ciRec.continuous = true;
+  ciRec.interimResults = true;
+  let ft = ta.value;
+
+  ciRec.onstart = () => {
+    ciDikOn = true;
+    btn.style.background = 'var(--accent)';
+    btn.style.borderColor = 'var(--accent)';
+    ic.style.color = 'var(--black)';
+    status.style.display = 'flex';
+  };
+  ciRec.onresult = e => {
+    let interim = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const t = e.results[i][0].transcript;
+      if (e.results[i].isFinal) ft += (ft ? ' ' : '') + t;
+      else interim += t;
+    }
+    ta.value = ft + (interim ? ' ' + interim : '');
+  };
+  ciRec.onerror = () => resetCiDik(btn, ic, status);
+  ciRec.onend = () => { resetCiDik(btn, ic, status); ta.value = ft; };
+  ciRec.start();
+}
+
+function resetCiDik(btn, ic, status) {
+  ciDikOn = false;
+  btn.style.background = 'rgba(240,237,230,.08)';
+  btn.style.borderColor = 'rgba(240,237,230,.15)';
+  ic.style.color = 'rgba(232,216,74,.7)';
+  status.style.display = 'none';
+}
+
+
+const TODAY = new Date().toDateString();
+const lastCheckin = localStorage.getItem('cairn_checkin_date');
+
+if(lastCheckin !== TODAY){
+  document.getElementById('checkin').classList.add('open');
+}
+
+// Zeit setzen
+const now = new Date();
+const days=['SO','MO','DI','MI','DO','FR','SA'];
+const months=['JAN','FEB','MÄR','APR','MAI','JUN','JUL','AUG','SEP','OKT','NOV','DEZ'];
+document.getElementById('ci-time').textContent =
+  days[now.getDay()] + ' \u00b7 ' + String(now.getDate()).padStart(2,'0') + ' ' + months[now.getMonth()] + ' ' + now.getFullYear() + ' \u00b7 ' + String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
+
+let selectedFeel = null;
+
+function selFeel(el, val){
+  document.querySelectorAll('.ci-feel').forEach(x=>x.classList.remove('sel'));
+  el.classList.add('sel');
+  selectedFeel = val;
+  document.getElementById('ci-submit').classList.add('ready');
+}
+
+function togNote(el){
+  el.classList.toggle('sel');
+}
+
+function submitCheckin(){
+  if(!selectedFeel) return;
+
+  // Freitext holen
+  const freitext = document.getElementById('ci-freitext').value.trim();
+
+  // Notizen sammeln
+  const notes = [...document.querySelectorAll('.ci-note.sel')].map(x=>x.textContent.trim()).filter(n=>n!=='Kein Anliegen');
+
+  // Feedback an Coach API senden — danach Brief automatisch laden
+  fetch('http://127.0.0.1:5002/api/checkin', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      feel: selectedFeel,
+      notes: notes,
+      text: freitext
+    })
+  }).then(r => r.json())
+    .then(d => {
+      console.log('Check-in gesendet:', d);
+      // Brief neu generieren mit dem Feedback
+      loadMorningBrief();
+    })
+    .catch(e => console.log('API nicht erreichbar — offline mode'));
+
+  // Datum speichern
+  localStorage.setItem('cairn_checkin_date', TODAY);
+  localStorage.setItem('cairn_checkin_feel', selectedFeel);
+  if (freitext) localStorage.setItem('cairn_checkin_text', freitext);
+
+  // Echo aufbauen
+  const feelMap = {'Frisch':'Frisch','Gut':'Gut','Ok':'Ok','Müde':'Müde','Erschöpft':'Erschöpft'};
+  let echo = feelMap[selectedFeel] || selectedFeel;
+  if(notes.length) echo += ' · ' + notes.join(' · ');
+  if(freitext) echo += ' · "' + freitext.substring(0, 60) + (freitext.length > 60 ? '...' : '') + '"';
+
+  document.getElementById('echo-text').textContent = echo;
+  document.getElementById('athlete-echo').style.display = 'flex';
+
+  // Popout schliessen
+  document.getElementById('checkin').classList.remove('open');
+
+  // Coach-Text anpassen wenn müde/erschöpft
+  if(selectedFeel === 'Müde' || selectedFeel === 'Erschöpft'){
+    document.querySelector('.cb-decision').innerHTML =
+      'Du erz&auml;hlst mir, du bist m&uuml;de.<br><b>Ich w&uuml;rde heute etwas zur&uuml;ckhalten.</b>';
+    document.querySelector('.cb-quote').innerHTML =
+      '&ldquo;Die k&uuml;ngsten Athleten wissen, wann sie zur&uuml;ckhalten.&rdquo;';
+  }
+}
+
+// ─── REPLAN FLOW ───
+function openReplan(){document.getElementById('ov-replan').classList.add('open')}
+function closeAll(){
+  document.getElementById('ov-replan').classList.remove('open');
+  document.getElementById('ov-reject').classList.remove('open');
+  document.getElementById('ov-confirm').classList.remove('open');
+}
+function acceptReplan(){
+  document.getElementById('session-name').textContent='Kurze Intervalle';
+  document.getElementById('session-dist').textContent='~8 km';
+  document.getElementById('session-struct').innerHTML='4\u00d71 km';
+  document.getElementById('session-dur').textContent='~40 min';
+  document.getElementById('cal-name').textContent='Kurze Intervalle';
+  document.getElementById('cal-meta').innerHTML='4\u00d71 km';
+  document.getElementById('ov-replan').classList.remove('open');
+  document.getElementById('ov-confirm').classList.add('open');
+}
+function rejectReplan(){
+  document.getElementById('ov-replan').classList.remove('open');
+  document.getElementById('ov-reject').classList.add('open');
+}
+function selRej(el){document.querySelectorAll('.rej-opt').forEach(x=>x.classList.remove('sel'));el.classList.add('sel')}
+function sendReject(){document.getElementById('ov-reject').classList.remove('open')}
+function closeReject(){document.getElementById('ov-reject').classList.remove('open')}
+// ─── ANALYSE FLOW ───
+function showAnalysePopup(){
+  document.getElementById('analyse-popup').style.display='flex';
+}
+function startAnalyse(){
+  document.getElementById('analyse-popup').style.display='none';
+  // Balken ausblenden – Analyse gestartet
+  document.getElementById('analyse-bar').style.display='none';
+  // Hier später: redirect zur Analyse-Seite
+  alert('→ Analyse-Seite öffnet sich (noch nicht gebaut)');
+}
+function dismissAnalyse(){
+  document.getElementById('analyse-popup').style.display='none';
+  // Balken einblenden – Analyse noch ausstehend
+  const bar = document.getElementById('analyse-bar');
+  bar.style.display='flex';
+}
+
+// Neue Aktivität simulieren – Popup erscheint nach Morning Brief
+// In Produktion: wird getriggert wenn neue Strava/Garmin Aktivität vorhanden
+const hasNewActivity = true; // Simulation
+const analyseCheckKey = 'cairn_analyse_' + TODAY;
+if(hasNewActivity && !localStorage.getItem(analyseCheckKey)){
+  // Nach Morning Brief Checkin zeigen, oder direkt wenn kein Checkin nötig
+  setTimeout(function(){
+    if(!document.getElementById('checkin').classList.contains('open')){
+      showAnalysePopup();
+    }
+  }, 300);
+}
+
+// ─── MORNING BRIEF VOM COACH LADEN ───
+function loadMorningBrief() {
+  // Alten Inhalt leeren — nichts anzeigen während geladen wird
+  const decEl = document.getElementById('cb-decision');
+  const quoteEl = document.getElementById('cb-quote');
+  const whyEl = document.getElementById('cb-why-items');
+
+  if (quoteEl) quoteEl.innerHTML = '';
+  if (whyEl) whyEl.innerHTML = '';
+
+  // Ladebalken — gleiche Systematik wie Wochenkilometer
+  if (decEl) decEl.innerHTML =
+    '<div style="margin-bottom:10px;font-family:\'DM Mono\',monospace;font-size:9px;color:var(--stone);letter-spacing:.1em">COACH ANALYSIERT DEINE DATEN</div>' +
+    '<div style="height:10px;display:flex;width:100%;overflow:hidden">' +
+      '<div id="brief-load-fill" style="height:100%;background:var(--black);width:0%;transition:width 5s ease-out"></div>' +
+      '<div id="brief-load-rest" style="flex:1;height:100%;background-image:var(--dot);background-size:4px 4px"></div>' +
+    '</div>';
+
+  // Animation starten
+  setTimeout(function() {
+    var fill = document.getElementById('brief-load-fill');
+    var rest = document.getElementById('brief-load-rest');
+    if (fill) fill.style.width = '95%';
+    if (rest) rest.style.flex = '0.05';
+  }, 50);
+
+  fetch('http://127.0.0.1:5002/api/morning-brief')
+    .then(r => r.json())
+    .then(data => {
+      if (data.status !== 'ok') return;
+      const brief = data.brief;
+      const lines = brief.split('\n').map(l => l.replace(/\*\*/g, '').replace(/^#+\s*/, '').replace(/^[-*]\s*/, '').trim()).filter(l => l.length > 10);
+
+      // Erste Zeile = Headline
+      const decEl = document.getElementById('cb-decision');
+      if (decEl && lines[0]) decEl.innerHTML = lines[0];
+
+      // Letzte Zeile = Schlussgedanke / Quote
+      const quoteEl = document.getElementById('cb-quote');
+      if (quoteEl && lines.length > 1) {
+        quoteEl.innerHTML = '&ldquo;' + lines[lines.length - 1] + '&rdquo;';
+      }
+
+      // Mittlere Zeilen = Bullet Points
+      const whyEl = document.getElementById('cb-why-items');
+      if (whyEl && lines.length > 2) {
+        whyEl.innerHTML = lines.slice(1, lines.length - 1).slice(0, 4)
+          .map(function(l){ return '<div class="cb-why-item">' + l + '</div>'; }).join('');
+      }
+    })
+    .catch(() => {
+      document.getElementById('cb-decision').innerHTML =
+        'Die letzten Tage wurden gut verarbeitet.<br><b>Heute ist ein guter Tag f&uuml;r Tempo.</b>';
+      document.getElementById('cb-quote').innerHTML =
+        '&ldquo;Heute z&auml;hlt Qualit&auml;t, nicht Volumen.&rdquo;';
+      document.getElementById('cb-why-items').innerHTML =
+        '<div class="cb-why-item">Schlaf war ausreichend</div>' +
+        '<div class="cb-why-item">Belastung diese Woche kontrolliert</div>' +
+        '<div class="cb-why-item">In 7 Tagen ist Wettkampf</div>';
+    });
+}
+
+// Brief nur laden wenn Check-in heute bereits erledigt
+if(lastCheckin === TODAY){
+  loadMorningBrief();
+}
+
+</script>
+
+<!-- ANALYSE POPOUT -->
+<div id="analyse-popup" style="display:none;position:fixed;inset:0;background:rgba(26,25,24,.65);z-index:300;align-items:center;justify-content:center">
+  <div style="background:var(--black);border-top:3px solid var(--accent);max-width:440px;width:90%;padding:32px;position:relative">
+    <div style="font-family:DM Mono,monospace;font-size:8px;color:rgba(232,216,74,.45);letter-spacing:.18em;margin-bottom:20px">CAIRN &middot; NEUE AKTIVIT&Auml;T</div>
+    <div style="font-size:20px;font-weight:300;color:#F0EDE6;line-height:1.4;margin-bottom:6px">Neue Aktivit&auml;t erkannt.</div>
+    <div style="font-size:14px;color:rgba(240,237,230,.45);font-weight:300;margin-bottom:24px">M&ouml;chtest du jetzt die Analyse starten?</div>
+    <div style="background:rgba(240,237,230,.05);border:.5px solid rgba(240,237,230,.1);padding:14px 16px;margin-bottom:24px">
+      <div style="font-family:DM Mono,monospace;font-size:8px;color:rgba(232,216,74,.45);letter-spacing:.12em;margin-bottom:6px">MORGENRUNDE T&Uuml;LLINGER</div>
+      <div style="display:flex;gap:20px">
+        <div><div style="font-family:DM Mono,monospace;font-size:8px;color:rgba(240,237,230,.3);letter-spacing:.1em;margin-bottom:2px">DISTANZ</div><div style="font-family:DM Mono,monospace;font-size:16px;color:#F0EDE6">12.4 km</div></div>
+        <div><div style="font-family:DM Mono,monospace;font-size:8px;color:rgba(240,237,230,.3);letter-spacing:.1em;margin-bottom:2px">ZEIT</div><div style="font-family:DM Mono,monospace;font-size:16px;color:#F0EDE6">1:04 h</div></div>
+        <div><div style="font-family:DM Mono,monospace;font-size:8px;color:rgba(240,237,230,.3);letter-spacing:.1em;margin-bottom:2px">HEUTE</div><div style="font-family:DM Mono,monospace;font-size:16px;color:#F0EDE6">06:41</div></div>
+      </div>
+    </div>
+    <div style="display:flex;gap:10px">
+      <button onclick="startAnalyse()" style="flex:1;background:var(--accent);border:none;color:var(--black);font-family:DM Mono,monospace;font-size:10px;padding:13px;cursor:pointer;letter-spacing:.12em;font-weight:500">JETZT ANALYSIEREN &rarr;</button>
+      <button onclick="dismissAnalyse()" style="background:transparent;border:.5px solid rgba(240,237,230,.2);color:rgba(240,237,230,.4);font-family:DM Mono,monospace;font-size:10px;padding:13px 18px;cursor:pointer;letter-spacing:.1em">SP&Auml;TER</button>
+    </div>
+  </div>
+</div>
+</body>
+</html>
