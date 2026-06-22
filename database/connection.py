@@ -2,7 +2,7 @@ import psycopg2
 import os
 from dotenv import load_dotenv
 
-load_dotenv("/Users/lexshapes/hybrid-fitness-os/.env")
+load_dotenv()
 
 def get_connection():
     # Railway hat Priorität

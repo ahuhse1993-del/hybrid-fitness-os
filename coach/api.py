@@ -4,7 +4,7 @@ import os, psycopg2
 from datetime import date
 from dotenv import load_dotenv
 
-load_dotenv("/Users/lexshapes/hybrid-fitness-os/.env")
+load_dotenv()
 
 app = Flask(__name__)
 CORS(app)
