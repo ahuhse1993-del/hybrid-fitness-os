@@ -641,7 +641,7 @@ body{background:var(--bg);font-family:'DM Sans',sans-serif;color:var(--black);fo
       <div class="adapt-block" onclick="openReplan()">
         <div class="adapt-text">
           <div class="adapt-label">EINE IDEE VON MIR</div>
-          <div class="adapt-desc" id="cb-suggestion">Ich w&uuml;rde heute auf 4&times;1 km k&uuml;rzen &mdash; gleiche Qualit&auml;t, weniger Last</div>
+          <div class="adapt-desc">Ich w&uuml;rde heute auf 4&times;1 km k&uuml;rzen &mdash; gleiche Qualit&auml;t, weniger Last</div>
         </div>
         <button class="adapt-btn">ANSEHEN &rarr;</button>
       </div>
@@ -994,32 +994,32 @@ function loadMorningBrief() {
   }, 50);
 
   fetch('https://web-production-297f2.up.railway.app/api/morning-brief')
-    .then(r => r.json())
-    .then(data => {
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
       if (data.status !== 'ok') return;
-      const brief = data.brief;
-      const lines = brief.split('\n').map(l => l.replace(/\*\*/g, '').replace(/^#+\s*/, '').replace(/^[-*]\s*/, '').trim()).filter(l => l.length > 10);
+      var brief = data.brief;
+      var lines = brief.split('\n').map(function(l) {
+        return l.replace(/\*\*/g, '').replace(/^#+\s*/, '').replace(/^[-*]\s*/, '').trim();
+      }).filter(function(l) { return l.length > 10; });
 
-      // Erste Zeile = Headline
-      const decEl = document.getElementById('cb-decision');
+      var decEl = document.getElementById('cb-decision');
       if (decEl && lines[0]) decEl.innerHTML = lines[0];
 
-      // Letzte Zeile = Schlussgedanke / Quote
-      const quoteEl = document.getElementById('cb-quote');
+      var quoteEl = document.getElementById('cb-quote');
       if (quoteEl && lines.length > 1) {
         quoteEl.innerHTML = '&ldquo;' + lines[lines.length - 1] + '&rdquo;';
       }
 
-      // Mittlere Zeilen = Bullet Points
-      const whyEl = document.getElementById('cb-why-items');
-      // Suggestion in schwarze Box
-      const suggEl = document.getElementById('cb-suggestion');
-      if (suggEl && data.suggestion) suggEl.textContent = data.suggestion;
+      var whyEl = document.getElementById('cb-why-items');
+      if (whyEl && lines.length > 2) {
         whyEl.innerHTML = lines.slice(1, lines.length - 1).slice(0, 4)
-          .map(function(l){ return '<div class="cb-why-item">' + l + '</div>'; }).join('');
+          .map(function(l) { return '<div class="cb-why-item">' + l + '</div>'; }).join('');
       }
+
+      var suggEl = document.getElementById('cb-suggestion');
+      if (suggEl && data.suggestion) suggEl.textContent = data.suggestion;
     })
-    .catch(() => {
+    .catch(function() {
       document.getElementById('cb-decision').innerHTML =
         'Die letzten Tage wurden gut verarbeitet.<br><b>Heute ist ein guter Tag f&uuml;r Tempo.</b>';
       document.getElementById('cb-quote').innerHTML =
