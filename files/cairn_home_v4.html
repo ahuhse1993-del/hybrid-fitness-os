@@ -221,7 +221,7 @@ body{background:var(--bg);font-family:'DM Sans',sans-serif;color:var(--black);fo
 
 /* COACH TEXT */
 .cb-decision{
-  font-size:16px;font-weight:300;
+  font-size:22px;font-weight:300;
   line-height:1.4;letter-spacing:-.02em;
   margin-bottom:14px;color:var(--black);
 }
@@ -480,22 +480,22 @@ body{background:var(--bg);font-family:'DM Sans',sans-serif;color:var(--black);fo
 <div class="overlay" id="ov-replan">
   <div class="ov-box">
     <div class="ov-kicker">CAIRN &middot; EINE IDEE</div>
-    <div class="ov-headline">Weniger ist heute mehr.</div>
-    <div class="ov-sub">Die Intervalle bleiben, das Volumen sinkt leicht. Du kommst frischer in den Wettkampf.</div>
+    <div class="ov-headline" id="replan-headline">Coach-Vorschlag</div>
+    <div class="ov-sub" id="replan-sub">Der Coach hat eine Anpassung f&uuml;r heute.</div>
     <div class="ov-cards">
       <div class="ov-card before">
         <div class="ov-card-tag">ORIGINAL</div>
-        <div class="ov-card-name">Tempo-Intervalle</div>
-        <div class="ov-card-meta">6&times;1 km &middot; ~55 min</div>
+        <div class="ov-card-name" id="replan-original">Geplante Einheit</div>
+        <div class="ov-card-meta"></div>
       </div>
       <div class="ov-arrow">&#x2192;</div>
       <div class="ov-card after">
         <div class="ov-card-tag">VORSCHLAG</div>
-        <div class="ov-card-name">Kurze Intervalle</div>
-        <div class="ov-card-meta">4&times;1 km &middot; ~40 min</div>
+        <div class="ov-card-name" id="replan-suggestion">—</div>
+        <div class="ov-card-meta"></div>
       </div>
     </div>
-    <div class="ov-reason">Begr&uuml;ndung: HRV leicht reduziert &middot; 7 Tage bis Wettkampf &middot; Frische wichtiger als Volumen</div>
+    <div class="ov-reason" id="replan-reason">Basierend auf deinen heutigen Daten und deinem Feedback.</div>
     <div class="ov-btns">
       <button class="ov-btn-y" onclick="acceptReplan()">ANPASSEN &#10003;</button>
       <button class="ov-btn-n" onclick="rejectReplan()">ORIGINAL BEHALTEN</button>
@@ -528,7 +528,7 @@ body{background:var(--bg);font-family:'DM Sans',sans-serif;color:var(--black);fo
   <div style="background:var(--black);border-left:3px solid var(--accent);padding:28px;max-width:360px;width:90%;text-align:center">
     <i class="ti ti-check" style="font-size:26px;color:var(--accent);display:block;margin-bottom:12px"></i>
     <div style="font-family:'DM Mono',monospace;font-size:10px;color:var(--accent);letter-spacing:.12em;margin-bottom:8px">WORKOUT AKTUALISIERT</div>
-    <div style="font-size:13px;color:#F0EDE6;line-height:1.65;margin-bottom:18px">Intervalle auf 4&times;1 km angepasst und im Kalender &uuml;bernommen.</div>
+    <div style="font-size:13px;color:#F0EDE6;line-height:1.65;margin-bottom:18px" id="confirm-text">Einheit angepasst und im Kalender &uuml;bernommen.</div>
     <button onclick="closeAll()" style="background:var(--accent);border:none;color:var(--black);font-family:'DM Mono',monospace;font-size:9px;padding:10px 22px;cursor:pointer;letter-spacing:.1em">SCHLIESSEN</button>
   </div>
 </div>
@@ -913,20 +913,30 @@ function submitCheckin(){
 }
 
 // ─── REPLAN FLOW ───
-function openReplan(){document.getElementById('ov-replan').classList.add('open')}
+function openReplan(){
+  var suggestion = document.getElementById('cb-suggestion').textContent || '—';
+  var sessionName = document.getElementById('session-name').textContent || 'Geplante Einheit';
+  document.getElementById('replan-headline').textContent = 'Eine Idee f\u00fcr heute.';
+  document.getElementById('replan-sub').textContent = 'Basierend auf deinem Feedback und deinen Daten.';
+  document.getElementById('replan-original').textContent = sessionName;
+  document.getElementById('replan-suggestion').textContent = suggestion;
+  document.getElementById('ov-replan').classList.add('open');
+}
 function closeAll(){
   document.getElementById('ov-replan').classList.remove('open');
   document.getElementById('ov-reject').classList.remove('open');
   document.getElementById('ov-confirm').classList.remove('open');
 }
 function acceptReplan(){
-  var suggestion = document.getElementById('cb-suggestion').textContent;
-  document.getElementById('session-name').textContent = suggestion || 'Angepasste Einheit';
+  var suggestion = document.getElementById('cb-suggestion').textContent || 'Angepasste Einheit';
+  document.getElementById('session-name').textContent = suggestion;
   document.getElementById('session-dist').textContent = '';
   document.getElementById('session-struct').textContent = '';
   document.getElementById('session-dur').textContent = '';
-  document.getElementById('cal-name').textContent = suggestion || 'Angepasst';
+  document.getElementById('cal-name').textContent = suggestion;
   document.getElementById('cal-meta').textContent = '';
+  var confirmText = document.getElementById('confirm-text');
+  if (confirmText) confirmText.textContent = suggestion + ' — im Kalender übernommen.';
   document.getElementById('ov-replan').classList.remove('open');
   document.getElementById('ov-confirm').classList.add('open');
 }
