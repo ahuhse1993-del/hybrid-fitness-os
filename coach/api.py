@@ -1,6 +1,6 @@
 from flask import Flask, jsonify, request, send_file
 from flask_cors import CORS
-import os, psycopg2
+import os, psycopg2, json
 from datetime import date
 from dotenv import load_dotenv
 
@@ -37,7 +37,8 @@ def save_checkin():
 
     if existing:
         cur.execute("""
-            UPDATE daily_logs SET feel=%s, notes=%s, athlete_text=%s
+            UPDATE daily_logs SET feel=%s, notes=%s, athlete_text=%s,
+            morning_brief=NULL, suggestion=NULL
             WHERE date=%s
         """, (feel, notes, text, today))
     else:
@@ -61,33 +62,45 @@ def morning_brief():
         cur = conn.cursor()
 
         cur.execute("""
-            SELECT feel, notes, athlete_text, morning_brief
+            SELECT feel, notes, athlete_text, morning_brief, suggestion
             FROM daily_logs WHERE date = %s
         """, (today,))
         row = cur.fetchone()
 
         athlete_feedback = {}
         if row:
-            if row[3]:
+            if row[3] and row[4]:
                 conn.close()
-                return jsonify({"status": "ok", "brief": row[3]})
+                return jsonify({
+                    "status": "ok",
+                    "brief": row[3],
+                    "suggestion": row[4]
+                })
             athlete_feedback = {
                 'feel': row[0] or '',
                 'notes': row[1].split(', ') if row[1] else [],
                 'text': row[2] or ''
             }
 
-        brief = generate_morning_brief(athlete_feedback=athlete_feedback)
+        result = generate_morning_brief(athlete_feedback=athlete_feedback)
+        brief = result.get("brief", "")
+        suggestion = result.get("suggestion", "")
 
         if row:
-            cur.execute("UPDATE daily_logs SET morning_brief=%s WHERE date=%s", (brief, today))
+            cur.execute("""
+                UPDATE daily_logs SET morning_brief=%s, suggestion=%s
+                WHERE date=%s
+            """, (brief, suggestion, today))
         else:
-            cur.execute("INSERT INTO daily_logs (date, morning_brief) VALUES (%s, %s)", (today, brief))
+            cur.execute("""
+                INSERT INTO daily_logs (date, morning_brief, suggestion)
+                VALUES (%s, %s, %s)
+            """, (today, brief, suggestion))
 
         conn.commit()
         conn.close()
 
-        return jsonify({"status": "ok", "brief": brief})
+        return jsonify({"status": "ok", "brief": brief, "suggestion": suggestion})
 
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500

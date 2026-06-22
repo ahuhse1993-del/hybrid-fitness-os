@@ -641,7 +641,7 @@ body{background:var(--bg);font-family:'DM Sans',sans-serif;color:var(--black);fo
       <div class="adapt-block" onclick="openReplan()">
         <div class="adapt-text">
           <div class="adapt-label">EINE IDEE VON MIR</div>
-          <div class="adapt-desc">Ich w&uuml;rde heute auf 4&times;1 km k&uuml;rzen &mdash; gleiche Qualit&auml;t, weniger Last</div>
+          <div class="adapt-desc" id="cb-suggestion">Ich w&uuml;rde heute auf 4&times;1 km k&uuml;rzen &mdash; gleiche Qualit&auml;t, weniger Last</div>
         </div>
         <button class="adapt-btn">ANSEHEN &rarr;</button>
       </div>
@@ -1012,7 +1012,9 @@ function loadMorningBrief() {
 
       // Mittlere Zeilen = Bullet Points
       const whyEl = document.getElementById('cb-why-items');
-      if (whyEl && lines.length > 2) {
+      // Suggestion in schwarze Box
+      const suggEl = document.getElementById('cb-suggestion');
+      if (suggEl && data.suggestion) suggEl.textContent = data.suggestion;
         whyEl.innerHTML = lines.slice(1, lines.length - 1).slice(0, 4)
           .map(function(l){ return '<div class="cb-why-item">' + l + '</div>'; }).join('');
       }

@@ -1,11 +1,10 @@
 import anthropic
 import os
-import sys
+import json
 from dotenv import load_dotenv
 
 load_dotenv()
 
-sys.path.append("/Users/lexshapes/hybrid-fitness-os")
 from data.data_service import get_daily_snapshot
 
 def generate_morning_brief(athlete_feedback: dict = None):
@@ -23,7 +22,6 @@ def generate_morning_brief(athlete_feedback: dict = None):
         recent.append(line)
     recent_text = "\n".join(recent)
 
-    # Athlet-Feedback aufbereiten
     feedback_text = ""
     if athlete_feedback:
         feel = athlete_feedback.get('feel', '')
@@ -49,32 +47,35 @@ Letzte Aktivitäten:
 
 {f"Athlet sagt heute Morgen:{chr(10)}{feedback_text}" if feedback_text else ""}
 
-Schreibe jetzt den Morning Brief. Struktur:
-1. Kurze Begrüssung (1 Satz)
-2. Was ich sehe (2-3 Sätze — beziehe dich auf Schlaf, Erholung UND was der Athlet selbst sagt)
-3. Meine Empfehlung für heute (konkret, 2-3 Sätze)
-4. Warum (1-2 Sätze)
-5. Schlussgedanke (1 prägnanter Satz)
+Antworte NUR mit einem JSON-Objekt. Kein Text davor oder danach. Kein Markdown. Nur reines JSON:
 
-Regeln:
-- Kurze Sätze
-- Nie: Algorithmus, Score, Metrik, System, Readiness
-- Immer: "Ich sehe...", "Ich würde...", "Dein Körper..."
-- Wenn der Athlet etwas in eigenen Worten geschrieben hat — darauf eingehen
-- Auf Deutsch
-- Max 150 Wörter"""
+{{
+  "brief": "Der vollständige Morning Brief als Fliesstext. Max 150 Wörter. Kurze Sätze. Niemals: Algorithmus, Score, Metrik. Immer: Ich sehe, Ich würde, Dein Körper. Auf Deutsch. Bezieht sich auf Schlaf, Erholung und was der Athlet selbst gesagt hat.",
+  "suggestion": "Ein einziger konkreter Vorschlag für heute — max 12 Wörter. Kein Punkt am Ende. Beispiel: Ich würde heute auf 4x1 km kürzen — gleiche Qualität, weniger Last"
+}}"""
 
     client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 
     message = client.messages.create(
         model="claude-sonnet-4-6",
-        max_tokens=400,
+        max_tokens=600,
         messages=[{"role": "user", "content": prompt}]
     )
 
-    return message.content[0].text
+    raw = message.content[0].text.strip()
+
+    try:
+        result = json.loads(raw)
+        return result
+    except json.JSONDecodeError:
+        # Fallback falls JSON nicht sauber
+        return {
+            "brief": raw,
+            "suggestion": "Heute ruhig bleiben — Erholung ist Training"
+        }
 
 if __name__ == "__main__":
     print("=== CAIRN Morning Brief ===\n")
-    brief = generate_morning_brief()
-    print(brief)
+    result = generate_morning_brief()
+    print("Brief:", result.get("brief"))
+    print("\nSuggestion:", result.get("suggestion"))
