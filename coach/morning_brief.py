@@ -18,7 +18,7 @@ def generate_morning_brief(athlete_feedback: dict = None):
 
     recent = []
     for a in activities[:3]:
-        line = f"- {a.get('date')} | {a.get('type')} | {a.get('name')} | {a.get('distance_km')}km | {a.get('duration_min')}min | HF {a.get('avg_hr')} bpm"
+        line = "- " + str(a.get('date')) + " | " + str(a.get('type')) + " | " + str(a.get('name')) + " | " + str(a.get('distance_km')) + "km | " + str(a.get('duration_min')) + "min | HF " + str(a.get('avg_hr')) + " bpm"
         recent.append(line)
     recent_text = "\n".join(recent)
 
@@ -28,31 +28,27 @@ def generate_morning_brief(athlete_feedback: dict = None):
         notes = athlete_feedback.get('notes', [])
         text = athlete_feedback.get('text', '')
         if feel:
-            feedback_text += f"Gefühl: {feel}\n"
+            feedback_text += "Gefuehl: " + feel + "\n"
         if notes:
-            feedback_text += f"Notizen: {', '.join(notes)}\n"
+            feedback_text += "Notizen: " + ', '.join(notes) + "\n"
         if text:
-            feedback_text += f"Eigene Worte: \"{text}\"\n"
+            feedback_text += "Eigene Worte: \"" + text + "\"\n"
 
-    prompt = f"""Du bist CAIRN — ein erfahrener Ausdauer-Coach. Du sprichst wie ein ruhiger Bergführer. Nie wie Software.
-
-Athlet-Daten von heute Morgen:
-- Schlaf: {sleep.get('duration_h')}h | Score: {sleep.get('score')} | Tief: {sleep.get('deep_h')}h | REM: {sleep.get('rem_h')}h
-- HRV: {hrv.get('hrv_last_night')} ms | Status: {hrv.get('status')} | 5-Tage-Avg: {hrv.get('hrv_5day_avg')}
-- Body Battery: +{bb.get('charged')} / -{bb.get('drained')}
-- Ruhepuls: {rhr.get('rhr')} bpm
-
-Letzte Aktivitäten:
-{recent_text}
-
-{f"Athlet sagt heute Morgen:{chr(10)}{feedback_text}" if feedback_text else ""}
-
-Antworte NUR mit einem JSON-Objekt. Kein Text davor oder danach. Kein Markdown. Nur reines JSON:
-
-{{
-  "brief": "Der vollständige Morning Brief als Fliesstext. Max 150 Wörter. Kurze Sätze. Niemals: Algorithmus, Score, Metrik. Immer: Ich sehe, Ich würde, Dein Körper. Auf Deutsch. Bezieht sich auf Schlaf, Erholung und was der Athlet selbst gesagt hat.",
-  "suggestion": "Ein einziger konkreter Vorschlag für heute — max 12 Wörter. Kein Punkt am Ende. Beispiel: Ich würde heute auf 4x1 km kürzen — gleiche Qualität, weniger Last"
-}}"""
+    prompt = "Du bist CAIRN - ein erfahrener Ausdauer-Coach. Du sprichst wie ein ruhiger Bergfuehrer. Nie wie Software.\n\n"
+    prompt += "Athlet-Daten von heute Morgen:\n"
+    prompt += "- Schlaf: " + str(sleep.get('duration_h')) + "h | Score: " + str(sleep.get('score')) + " | Tief: " + str(sleep.get('deep_h')) + "h | REM: " + str(sleep.get('rem_h')) + "h\n"
+    prompt += "- HRV: " + str(hrv.get('hrv_last_night')) + " ms | Status: " + str(hrv.get('status')) + " | 5-Tage-Avg: " + str(hrv.get('hrv_5day_avg')) + "\n"
+    prompt += "- Body Battery: +" + str(bb.get('charged')) + " / -" + str(bb.get('drained')) + "\n"
+    prompt += "- Ruhepuls: " + str(rhr.get('rhr')) + " bpm\n\n"
+    prompt += "Letzte Aktivitaeten:\n" + recent_text + "\n\n"
+    if feedback_text:
+        prompt += "Athlet sagt heute Morgen:\n" + feedback_text + "\n"
+    prompt += "Antworte NUR mit diesem JSON. Kein Text davor oder danach. Kein Markdown:\n"
+    prompt += '{"brief": "Morning Brief hier", "suggestion": "Vorschlag hier"}\n\n'
+    prompt += "brief: Vollstaendiger Morning Brief, max 150 Woerter, kurze Saetze, auf Deutsch. "
+    prompt += "Niemals: Algorithmus, Score, Metrik. Immer: Ich sehe, Ich wuerde, Dein Koerper. "
+    prompt += "Bezieht sich auf Schlaf, Erholung und was der Athlet selbst gesagt hat.\n"
+    prompt += "suggestion: Ein einziger konkreter Vorschlag fuer heute, max 12 Woerter, kein Punkt am Ende."
 
     client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 
@@ -68,10 +64,9 @@ Antworte NUR mit einem JSON-Objekt. Kein Text davor oder danach. Kein Markdown. 
         result = json.loads(raw)
         return result
     except json.JSONDecodeError:
-        # Fallback falls JSON nicht sauber
         return {
             "brief": raw,
-            "suggestion": "Heute ruhig bleiben — Erholung ist Training"
+            "suggestion": "Heute ruhig bleiben - Erholung ist Training"
         }
 
 if __name__ == "__main__":
