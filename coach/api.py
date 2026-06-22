@@ -98,3 +98,14 @@ def health():
 if __name__ == '__main__':
     port = int(os.getenv("PORT", 5002))
     app.run(debug=False, host='0.0.0.0', port=port)
+
+    from flask import Flask, jsonify, request, send_file
+import os
+
+@app.route('/')
+def home():
+    return send_file(os.path.join(os.path.dirname(__file__), '..', 'files', 'cairn_home_v4.html'))
+
+@app.route('/analyse')
+def analyse():
+    return send_file(os.path.join(os.path.dirname(__file__), '..', 'files', 'cairn_analyse_v4.html'))

@@ -870,7 +870,7 @@ function submitCheckin(){
   const notes = [...document.querySelectorAll('.ci-note.sel')].map(x=>x.textContent.trim()).filter(n=>n!=='Kein Anliegen');
 
   // Feedback an Coach API senden — danach Brief automatisch laden
-  fetch('http://127.0.0.1:5002/api/checkin', {
+  fetch('https://web-production-297f2.up.railway.app/api/checkin', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({
@@ -993,7 +993,7 @@ function loadMorningBrief() {
     if (rest) rest.style.flex = '0.05';
   }, 50);
 
-  fetch('http://127.0.0.1:5002/api/morning-brief')
+  fetch('https://web-production-297f2.up.railway.app/api/morning-brief')
     .then(r => r.json())
     .then(data => {
       if (data.status !== 'ok') return;
