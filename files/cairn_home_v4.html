@@ -221,7 +221,7 @@ body{background:var(--bg);font-family:'DM Sans',sans-serif;color:var(--black);fo
 
 /* COACH TEXT */
 .cb-decision{
-  font-size:22px;font-weight:300;
+  font-size:16px;font-weight:300;
   line-height:1.4;letter-spacing:-.02em;
   margin-bottom:14px;color:var(--black);
 }
@@ -920,12 +920,13 @@ function closeAll(){
   document.getElementById('ov-confirm').classList.remove('open');
 }
 function acceptReplan(){
-  document.getElementById('session-name').textContent='Kurze Intervalle';
-  document.getElementById('session-dist').textContent='~8 km';
-  document.getElementById('session-struct').innerHTML='4\u00d71 km';
-  document.getElementById('session-dur').textContent='~40 min';
-  document.getElementById('cal-name').textContent='Kurze Intervalle';
-  document.getElementById('cal-meta').innerHTML='4\u00d71 km';
+  var suggestion = document.getElementById('cb-suggestion').textContent;
+  document.getElementById('session-name').textContent = suggestion || 'Angepasste Einheit';
+  document.getElementById('session-dist').textContent = '';
+  document.getElementById('session-struct').textContent = '';
+  document.getElementById('session-dur').textContent = '';
+  document.getElementById('cal-name').textContent = suggestion || 'Angepasst';
+  document.getElementById('cal-meta').textContent = '';
   document.getElementById('ov-replan').classList.remove('open');
   document.getElementById('ov-confirm').classList.add('open');
 }
