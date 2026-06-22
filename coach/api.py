@@ -31,14 +31,13 @@ def save_checkin():
 
     conn = get_db()
     cur = conn.cursor()
-
     cur.execute("SELECT id FROM daily_logs WHERE date = %s", (today,))
     existing = cur.fetchone()
 
     if existing:
         cur.execute("""
             UPDATE daily_logs SET feel=%s, notes=%s, athlete_text=%s,
-            morning_brief=NULL, suggestion=NULL
+            morning_brief=NULL, suggestion=NULL, session_type=NULL, session_zone=NULL
             WHERE date=%s
         """, (feel, notes, text, today))
     else:
@@ -49,7 +48,6 @@ def save_checkin():
 
     conn.commit()
     conn.close()
-    print(f"Check-in gespeichert: {feel} | {notes} | {text[:50]}")
     return jsonify({"status": "ok"})
 
 @app.route('/api/morning-brief', methods=['GET'])
@@ -62,7 +60,7 @@ def morning_brief():
         cur = conn.cursor()
 
         cur.execute("""
-            SELECT feel, notes, athlete_text, morning_brief, suggestion
+            SELECT feel, notes, athlete_text, morning_brief, suggestion, session_type, session_zone
             FROM daily_logs WHERE date = %s
         """, (today,))
         row = cur.fetchone()
@@ -74,7 +72,9 @@ def morning_brief():
                 return jsonify({
                     "status": "ok",
                     "brief": row[3],
-                    "suggestion": row[4]
+                    "suggestion": row[4],
+                    "session_type": row[5] or "",
+                    "session_zone": row[6] or ""
                 })
             athlete_feedback = {
                 'feel': row[0] or '',
@@ -85,22 +85,30 @@ def morning_brief():
         result = generate_morning_brief(athlete_feedback=athlete_feedback)
         brief = result.get("brief", "")
         suggestion = result.get("suggestion", "")
+        session_type = result.get("session_type", "")
+        session_zone = result.get("session_zone", "")
 
         if row:
             cur.execute("""
-                UPDATE daily_logs SET morning_brief=%s, suggestion=%s
-                WHERE date=%s
-            """, (brief, suggestion, today))
+                UPDATE daily_logs SET morning_brief=%s, suggestion=%s,
+                session_type=%s, session_zone=%s WHERE date=%s
+            """, (brief, suggestion, session_type, session_zone, today))
         else:
             cur.execute("""
-                INSERT INTO daily_logs (date, morning_brief, suggestion)
-                VALUES (%s, %s, %s)
-            """, (today, brief, suggestion))
+                INSERT INTO daily_logs (date, morning_brief, suggestion, session_type, session_zone)
+                VALUES (%s, %s, %s, %s, %s)
+            """, (today, brief, suggestion, session_type, session_zone))
 
         conn.commit()
         conn.close()
 
-        return jsonify({"status": "ok", "brief": brief, "suggestion": suggestion})
+        return jsonify({
+            "status": "ok",
+            "brief": brief,
+            "suggestion": suggestion,
+            "session_type": session_type,
+            "session_zone": session_zone
+        })
 
     except Exception as e:
         import traceback

@@ -659,7 +659,7 @@ body{background:var(--bg);font-family:'DM Sans',sans-serif;color:var(--black);fo
       <div class="ts-meta">
         <div class="ts-item"><div class="ts-lbl">DISTANZ</div><div class="ts-val" id="session-dist">~10 km</div></div>
         <div class="ts-item"><div class="ts-lbl">STRUKTUR</div><div class="ts-val" id="session-struct">6&times;1 km</div></div>
-        <div class="ts-item"><div class="ts-lbl">ZONE</div><div class="ts-val">Z4&ndash;Z5</div></div>
+        <div class="ts-item"><div class="ts-lbl">ZONE</div><div class="ts-val" id="session-zone">Z4&ndash;Z5</div></div>
         <div class="ts-item"><div class="ts-lbl">PACE</div><div class="ts-val">5:05&ndash;10</div></div>
         <div class="ts-item"><div class="ts-lbl">DAUER</div><div class="ts-val" id="session-dur">~55 min</div></div>
       </div>
@@ -1027,11 +1027,20 @@ function loadMorningBrief() {
           .map(function(l) { return '<div class="cb-why-item">' + l + '</div>'; }).join('');
       }
 
-      var suggEl = document.getElementById('cb-suggestion');
+    var suggEl = document.getElementById('cb-suggestion');
       if (suggEl && data.suggestion) {
         suggEl.textContent = data.suggestion;
         var adaptBlock = document.getElementById('adapt-block');
         if (adaptBlock) adaptBlock.style.display = 'flex';
+      }
+      if (data.session_type) {
+        var snEl = document.getElementById('session-name');
+        if (snEl) snEl.textContent = data.session_type;
+      }
+      if (data.session_zone !== undefined) {
+        var szEl = document.getElementById('session-zone');
+        if (szEl) szEl.textContent = data.session_zone || 'REST';
+      
       }
     })
     .catch(function() {
