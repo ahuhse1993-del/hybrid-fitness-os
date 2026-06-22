@@ -10,7 +10,8 @@ app = Flask(__name__)
 CORS(app)
 
 def get_db():
-    return psycopg2.connect(os.getenv("RAILWAY_DATABASE_URL"))
+    database_url = os.getenv("RAILWAY_DATABASE_URL") or os.getenv("DATABASE_URL")
+    return psycopg2.connect(database_url)
 
 @app.route('/api/checkin', methods=['POST'])
 def save_checkin():
