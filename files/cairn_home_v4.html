@@ -1386,8 +1386,7 @@ function checkWeekChanges(weekDate) {
     };
   });
 
-  // Coach-Check Button deaktivieren während Prüfung läuft
-  var btn = document.querySelector('[data-week="' + weekDate + '"] .week-summary button');
+  console.log('Coach Check - Week Plan:', JSON.stringify(weekPlan));
 
   fetch('https://web-production-297f2.up.railway.app/api/plan/check', {
     method: 'POST',
