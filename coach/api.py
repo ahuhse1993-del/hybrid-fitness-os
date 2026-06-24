@@ -209,7 +209,14 @@ def check_plan():
         prompt += '2. Nicht mehr als 2 harte Sessions hintereinander.\n'
         prompt += '3. Nach Long Run kein hartes Training direkt danach.\n\n'
         prompt += 'Antworte NUR mit JSON, kein Markdown:\n'
-        prompt += '{"ok": true, "message": "Kurzes Feedback auf Deutsch"}'
+        prompt += '{"ok": true, "message": "Kurzes Feedback auf Deutsch"}\n\n'
+        prompt += 'WICHTIG fuer die message:\n'
+        prompt += 'Sprich wie ein erfahrener Bergfuehrer. Ruhig, direkt, menschlich.\n'
+        prompt += 'Nie: Regelverstoß, Session, Parameter, Algorithmus.\n'
+        prompt += 'Immer kurze Saetze. Max 2 Saetze. Auf Deutsch.\n'
+        prompt += 'Beispiel ok=false: "Nach einem Beintraining brauchen die Muskeln Zeit. Ich wuerde die Intervalle einen Tag verschieben."\n'
+        prompt += 'Beispiel ok=true: "Die Woche sieht gut aus. Ich wuerde nichts aendern."'
+        
 
         client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
         message = client.messages.create(
