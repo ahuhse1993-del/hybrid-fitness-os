@@ -8,9 +8,6 @@ on:
 jobs:
   sync:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: /home/runner/work/hybrid-fitness-os/hybrid-fitness-os
 
     steps:
       - uses: actions/checkout@v4
@@ -28,5 +25,4 @@ jobs:
           GARMIN_EMAIL: ${{ secrets.GARMIN_EMAIL }}
           GARMIN_PASSWORD: ${{ secrets.GARMIN_PASSWORD }}
           RAILWAY_DATABASE_URL: ${{ secrets.RAILWAY_DATABASE_URL }}
-          PYTHONPATH: /home/runner/work/hybrid-fitness-os/hybrid-fitness-os
-        run: python data/garmin_import_history.py
+        run: python data/garmin_sync_all.py
