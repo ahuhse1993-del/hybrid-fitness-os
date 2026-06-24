@@ -21,9 +21,13 @@
 }
 body{background:var(--bg);font-family:'DM Sans',sans-serif;color:var(--black);font-size:14px}
 .pg{display:grid;grid-template-columns:48px 1fr;min-height:100vh}
-.sb{background:var(--black);display:flex;flex-direction:column;align-items:center;padding:18px 0;position:sticky;top:0;height:100vh}
-.sb-logo{font-family:'DM Mono',monospace;font-size:8px;color:var(--stone);letter-spacing:.2em;writing-mode:vertical-rl;transform:rotate(180deg);padding-top:6px;margin-bottom:auto}
-.sb-nav{display:flex;flex-direction:column;align-items:center;gap:22px;margin-bottom:20px}
+.sb{background:var(--black);display:flex;flex-direction:column;align-items:center;padding:18px 0;position:sticky;top:0;height:100vh;width:48px}
+.sb-logo{font-family:'DM Mono',monospace;font-size:9.6px;color:var(--stone);letter-spacing:.22em;writing-mode:vertical-rl;transform:rotate(180deg);padding-top:6px;margin-bottom:auto}
+.sb-nav{display:flex;flex-direction:column;align-items:center;gap:18px;margin-bottom:20px}
+.sb-item{display:flex;align-items:center;justify-content:center;cursor:pointer;padding:4px 0}
+.sb-item:hover .sb-lbl{color:var(--accent)}
+.sb-item.on .sb-lbl{color:var(--bg)}
+.sb-lbl{font-family:'DM Mono',monospace;font-size:9.6px;color:#4A4846;letter-spacing:.22em;text-transform:uppercase;writing-mode:vertical-rl;transform:rotate(180deg)}
 .si{font-size:15px;color:#4A4846;cursor:pointer}.si.on{color:var(--bg)}.si:hover{color:var(--accent)}
 .body{display:flex;flex-direction:column}
 .d-bar{height:10px;display:flex;width:100%}
@@ -69,7 +73,12 @@ body{background:var(--bg);font-family:'DM Sans',sans-serif;color:var(--black);fo
   color:rgba(240,237,230,.4);letter-spacing:.16em;
   margin-bottom:14px;
 }
-.ci-feels{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:24px}
+/* MOOD SLIDER */
+.mood-slider-wrap{margin-bottom:24px}
+.mood-slider{-webkit-appearance:none;appearance:none;width:100%;height:2px;background:rgba(240,237,230,.15);outline:none;border-radius:0;cursor:pointer}
+.mood-slider::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:16px;height:16px;background:var(--accent);cursor:pointer;border-radius:0}
+.mood-slider::-moz-range-thumb{width:16px;height:16px;background:var(--accent);cursor:pointer;border-radius:0;border:none}
+.mood-value{font-family:'DM Mono',monospace;font-size:28px;color:var(--accent);letter-spacing:-.02em;margin-top:12px;font-weight:500}
 .ci-feel{
   padding:10px 18px;
   border:.5px solid rgba(240,237,230,.15);
@@ -164,15 +173,20 @@ body{background:var(--bg);font-family:'DM Sans',sans-serif;color:var(--black);fo
   margin:0 28px;
   border:.5px solid var(--black);
   border-top:none;
-  display:grid;
-  grid-template-columns:180px 1fr;
+  display:flex;
   min-height:300px;
 }
+.cb-right{
+  flex:1;
+  padding:26px 30px;
+  display:flex;flex-direction:column;justify-content:space-between;
+}
 .cb-illus{
-  border-right:.5px solid var(--black);
+  border-left:.5px solid var(--black);
   background:#E8E5DD;
   display:flex;flex-direction:column;
   position:relative;
+  flex-shrink:0;
 }
 .cb-illus-state{
   font-family:'DM Mono',monospace;font-size:8px;
@@ -222,7 +236,7 @@ body{background:var(--bg);font-family:'DM Sans',sans-serif;color:var(--black);fo
 /* COACH TEXT */
 .cb-decision{
   font-size:14px;font-weight:300;
-  line-height:1.4;letter-spacing:-.02em;
+  line-height:1.6;letter-spacing:-.01em;
   margin-bottom:14px;color:var(--black);
 }
 .cb-decision b{font-weight:500}
@@ -284,10 +298,10 @@ body{background:var(--bg);font-family:'DM Sans',sans-serif;color:var(--black);fo
 /* TODAY SESSION */
 .today-session{
   margin:0 28px;border:.5px solid var(--black);border-top:none;
-  display:grid;grid-template-columns:1fr auto;
+  display:grid;grid-template-columns:120px 1fr;
 }
 .ts-left{
-  padding:16px 24px;border-right:.5px solid var(--black);
+  padding:16px 24px;
   background-image:var(--dot);background-size:6px 6px;
 }
 .ts-kicker{font-family:'DM Mono',monospace;font-size:9px;color:var(--mid);letter-spacing:.14em;margin-bottom:5px}
@@ -298,10 +312,11 @@ body{background:var(--bg);font-family:'DM Sans',sans-serif;color:var(--black);fo
 .ts-val{font-family:'DM Mono',monospace;font-size:13px;font-weight:500}
 .ts-right{
   display:flex;align-items:center;justify-content:center;
-  padding:14px 20px;background:var(--bg);min-width:120px;
+  background:var(--bg);
+  border-right:.5px solid var(--black);
 }
 .ts-illus{
-  width:84px;height:64px;
+  width:88px;height:88px;
   border:.5px dashed rgba(46,44,42,.2);
   display:flex;flex-direction:column;
   align-items:center;justify-content:center;gap:4px;
@@ -431,16 +446,13 @@ body{background:var(--bg);font-family:'DM Sans',sans-serif;color:var(--black);fo
 <div class="checkin-backdrop" id="checkin">
   <div class="checkin-box">
     <div class="ci-time" id="ci-time">MI · 17 JUN 2026 · 06:41</div>
-    <div class="ci-greeting">Guten Morgen, <b>Alexander.</b></div>
+    <div class="ci-greeting" id="ci-greeting">Guten Morgen, <b>Alexander.</b></div>
     <div class="ci-sub">Kurz zu dir, bevor wir starten.</div>
 
     <div class="ci-question">WIE F&Uuml;HLST DU DICH HEUTE MORGEN?</div>
-    <div class="ci-feels">
-      <button class="ci-feel" onclick="selFeel(this,'Frisch')">Frisch</button>
-      <button class="ci-feel" onclick="selFeel(this,'Gut')">Gut</button>
-      <button class="ci-feel" onclick="selFeel(this,'Ok')">Ok</button>
-      <button class="ci-feel" onclick="selFeel(this,'M&uuml;de')">M&uuml;de</button>
-      <button class="ci-feel" onclick="selFeel(this,'Ersch&ouml;pft')">Ersch&ouml;pft</button>
+    <div class="mood-slider-wrap">
+      <input type="range" class="mood-slider" id="mood-slider" min="1" max="10" value="5" step="1" oninput="updateMoodSlider(this.value)">
+      <div class="mood-value" id="mood-value">5</div>
     </div>
 
     <div class="ci-notes-label">IRGENDWAS ERW&Auml;HNENSWERT?</div>
@@ -540,13 +552,13 @@ body{background:var(--bg);font-family:'DM Sans',sans-serif;color:var(--black);fo
 <div class="sb">
   <div class="sb-logo">CAIRN</div>
   <div class="sb-nav">
-    <i class="ti ti-layout-dashboard si on"></i>
-    <i class="ti ti-calendar si"></i>
-    <i class="ti ti-chart-line si"></i>
-    <i class="ti ti-shoe si"></i>
-    <i class="ti ti-stethoscope si"></i>
+    <div class="sb-item on"><span class="sb-lbl">Today</span></div>
+    <div class="sb-item"><span class="sb-lbl">Plan</span></div>
+    <div class="sb-item"><span class="sb-lbl">Activities</span></div>
+    <div class="sb-item"><span class="sb-lbl">Coach</span></div>
+    <div class="sb-item"><span class="sb-lbl">Athlete</span></div>
   </div>
-  <i class="ti ti-settings si"></i>
+  <div class="sb-item"><span class="sb-lbl" style="color:#333">⚙</span></div>
 </div>
 
 <div class="body">
@@ -554,7 +566,7 @@ body{background:var(--bg);font-family:'DM Sans',sans-serif;color:var(--black);fo
   <div class="topbar">
     <div class="topbar-inner">
       <div class="dateline">MI 17 JUN 2026 &middot; KW 25</div>
-      <div class="greeting-top">Guten Morgen, <b>Alexander.</b></div>
+      <div class="greeting-top" id="greeting-top">Guten Morgen, <b>Alexander.</b></div>
     </div>
     <button class="coach-chat-btn">
         <svg width="48" height="48" viewBox="0 0 38 38" fill="none">
@@ -588,33 +600,10 @@ body{background:var(--bg);font-family:'DM Sans',sans-serif;color:var(--black);fo
 
   <!-- ═══ COACH BRIEF ═══ -->
   <div class="coach-brief">
-    <!-- ILLUSTRATION -->
-    <div class="cb-illus">
-      <div class="cb-illus-state">FOKUS</div>
-      <div class="cb-illus-art">
-        <svg width="110" height="110" viewBox="0 0 110 110" fill="none">
-          <line x1="55" y1="0" x2="55" y2="110" stroke="rgba(46,44,42,.07)" stroke-width="1"/>
-          <line x1="0" y1="55" x2="110" y2="55" stroke="rgba(46,44,42,.07)" stroke-width="1"/>
-          <line x1="0" y1="0" x2="110" y2="110" stroke="rgba(46,44,42,.04)" stroke-width="1"/>
-          <line x1="110" y1="0" x2="0" y2="110" stroke="rgba(46,44,42,.04)" stroke-width="1"/>
-          <circle cx="55" cy="55" r="48" stroke="rgba(46,44,42,.1)" stroke-width="1" fill="none" stroke-dasharray="3 2"/>
-          <circle cx="55" cy="55" r="30" stroke="rgba(46,44,42,.18)" stroke-width="1" fill="none"/>
-          <circle cx="55" cy="55" r="14" stroke="rgba(46,44,42,.3)" stroke-width="1.2" fill="none"/>
-          <circle cx="55" cy="55" r="3.5" fill="rgba(46,44,42,.5)"/>
-          <line x1="55" y1="23" x2="55" y2="29" stroke="rgba(46,44,42,.28)" stroke-width="1"/>
-          <line x1="55" y1="81" x2="55" y2="87" stroke="rgba(46,44,42,.28)" stroke-width="1"/>
-          <line x1="23" y1="55" x2="29" y2="55" stroke="rgba(46,44,42,.28)" stroke-width="1"/>
-          <line x1="81" y1="55" x2="87" y2="55" stroke="rgba(46,44,42,.28)" stroke-width="1"/>
-          <text x="55" y="106" font-family="DM Mono" font-size="7" fill="rgba(46,44,42,.18)" text-anchor="middle" letter-spacing="3">FOKUS</text>
-          <text x="55" y="9" font-family="DM Mono" font-size="5" fill="rgba(46,44,42,.12)" text-anchor="middle" letter-spacing="1">ILLUSTRATION · CLAUDE DESIGN</text>
-        </svg>
-      </div>
-    </div>
-
-    <!-- COACH TEXT -->
+    <!-- COACH TEXT links -->
     <div class="cb-right">
       <div>
-        <div class="cb-kicker">CAIRN &middot; MORNING BRIEF</div>
+        <div class="cb-kicker">CAIRN</div>
 
         <!-- ATHLET-ECHO -->
         <div class="athlete-echo" id="athlete-echo" style="display:none">
@@ -622,7 +611,7 @@ body{background:var(--bg);font-family:'DM Sans',sans-serif;color:var(--black);fo
           <span id="echo-text"></span>
         </div>
 
-        <!-- COACH STIMME – keine Labels, keine Status-Badges -->
+        <!-- COACH STIMME -->
         <div class="cb-decision" id="cb-decision">
           <span style="color:var(--stone);font-size:13px;font-family:'DM Mono',monospace">Coach lädt...</span>
         </div>
@@ -646,6 +635,28 @@ body{background:var(--bg);font-family:'DM Sans',sans-serif;color:var(--black);fo
         <button class="adapt-btn">ANSEHEN &rarr;</button>
       </div>
     </div>
+
+    <!-- ILLUSTRATION rechts -->
+    <div class="cb-illus">
+      <div class="cb-illus-state">FOKUS</div>
+      <div class="cb-illus-art">
+        <svg width="110" height="110" viewBox="0 0 110 110" fill="none">
+          <line x1="55" y1="0" x2="55" y2="110" stroke="rgba(46,44,42,.07)" stroke-width="1"/>
+          <line x1="0" y1="55" x2="110" y2="55" stroke="rgba(46,44,42,.07)" stroke-width="1"/>
+          <line x1="0" y1="0" x2="110" y2="110" stroke="rgba(46,44,42,.04)" stroke-width="1"/>
+          <line x1="110" y1="0" x2="0" y2="110" stroke="rgba(46,44,42,.04)" stroke-width="1"/>
+          <circle cx="55" cy="55" r="48" stroke="rgba(46,44,42,.1)" stroke-width="1" fill="none" stroke-dasharray="3 2"/>
+          <circle cx="55" cy="55" r="30" stroke="rgba(46,44,42,.18)" stroke-width="1" fill="none"/>
+          <circle cx="55" cy="55" r="14" stroke="rgba(46,44,42,.3)" stroke-width="1.2" fill="none"/>
+          <circle cx="55" cy="55" r="3.5" fill="rgba(46,44,42,.5)"/>
+          <line x1="55" y1="23" x2="55" y2="29" stroke="rgba(46,44,42,.28)" stroke-width="1"/>
+          <line x1="55" y1="81" x2="55" y2="87" stroke="rgba(46,44,42,.28)" stroke-width="1"/>
+          <line x1="23" y1="55" x2="29" y2="55" stroke="rgba(46,44,42,.28)" stroke-width="1"/>
+          <line x1="81" y1="55" x2="87" y2="55" stroke="rgba(46,44,42,.28)" stroke-width="1"/>
+          <text x="55" y="106" font-family="DM Mono" font-size="7" fill="rgba(46,44,42,.18)" text-anchor="middle" letter-spacing="3">FOKUS</text>
+        </svg>
+      </div>
+    </div>
   </div>
 
   <!-- SUGGESTIONS -->
@@ -653,6 +664,12 @@ body{background:var(--bg);font-family:'DM Sans',sans-serif;color:var(--black);fo
 
   <!-- TODAY SESSION -->
   <div class="today-session">
+    <div class="ts-right" style="border-right:.5px solid var(--black);border-left:none">
+      <div class="ts-illus">
+        <i class="ti ti-palette" style="font-size:13px;color:rgba(46,44,42,.18)"></i>
+        <div style="font-family:'DM Mono',monospace;font-size:7px;color:rgba(46,44,42,.25);text-align:center;line-height:1.5">ILLUS.<br>SESSION</div>
+      </div>
+    </div>
     <div class="ts-left">
       <div class="ts-kicker">TODAY&apos;S SESSION</div>
       <div class="ts-name" id="session-name">Tempo-Intervalle</div>
@@ -662,12 +679,6 @@ body{background:var(--bg);font-family:'DM Sans',sans-serif;color:var(--black);fo
         <div class="ts-item"><div class="ts-lbl">ZONE</div><div class="ts-val" id="session-zone">—</div></div>
         <div class="ts-item" id="session-pace-item"><div class="ts-lbl">PACE</div><div class="ts-val" id="session-pace">—</div></div>
         <div class="ts-item"><div class="ts-lbl">DAUER</div><div class="ts-val" id="session-dur">~55 min</div></div>
-      </div>
-    </div>
-    <div class="ts-right">
-      <div class="ts-illus">
-        <i class="ti ti-palette" style="font-size:13px;color:rgba(46,44,42,.18)"></i>
-        <div style="font-family:'DM Mono',monospace;font-size:7px;color:rgba(46,44,42,.25);text-align:center;line-height:1.5">ILLUS.<br>SESSION</div>
       </div>
     </div>
   </div>
@@ -704,76 +715,12 @@ body{background:var(--bg);font-family:'DM Sans',sans-serif;color:var(--black);fo
   <div class="plan-outer">
     <div class="plan-head">
       <div class="plan-lbl">4-WOCHEN-AUSBLICK</div>
-      <div class="kwtabs">
-        <div class="kwt on">ALLE</div>
-        <div class="kwt">KW 25</div><div class="kwt">KW 26</div><div class="kwt">KW 27</div><div class="kwt">KW 28</div>
+      <div class="kwtabs" id="kwtabs">
+        <div class="kwt on" onclick="filterWeek('all',this)">ALLE</div>
       </div>
     </div>
-    <!-- KW 25 -->
-    <div class="week-block">
-      <div class="week-inner">
-        <div class="week-cal">
-          <div class="week-top">
-            <div class="week-kw">25</div>
-            <div class="dh-cell"><div class="dh-name">MO</div><div class="dh-date">9</div></div>
-            <div class="dh-cell"><div class="dh-name">DI</div><div class="dh-date">10</div></div>
-            <div class="dh-cell today-col"><div class="dh-name">MI</div><div class="dh-date">11</div></div>
-            <div class="dh-cell"><div class="dh-name">DO</div><div class="dh-date">12</div></div>
-            <div class="dh-cell"><div class="dh-name">FR</div><div class="dh-date">13</div></div>
-            <div class="dh-cell"><div class="dh-name">SA</div><div class="dh-date">14</div></div>
-            <div class="dh-cell"><div class="dh-name">SO</div><div class="dh-date">15</div></div>
-          </div>
-          <div class="cal-row">
-            <div></div>
-            <div class="day-cell"><div class="tc gym done"><div class="tc-tag">KRAFT</div><div class="tc-name">Oberk&ouml;rper A</div><div class="tc-meta">5&times;5</div></div></div>
-            <div class="day-cell"><div class="tc easy done"><div class="tc-tag">EASY</div><div class="tc-name">Easy Run</div><div class="tc-meta">8 km</div></div></div>
-            <div class="day-cell today-cell"><div class="tc quality today-card"><div class="tc-tag">TEMPO</div><div class="tc-name" id="cal-name">Intervalle</div><div class="tc-meta" id="cal-meta">6&times;1 km</div></div></div>
-            <div class="day-cell"><div class="tc gym"><div class="tc-tag">KRAFT</div><div class="tc-name">Unterk&ouml;rper B</div><div class="tc-meta">3&times;8</div></div></div>
-            <div class="day-cell"><div class="tc rest"><div class="tc-name">REST</div></div></div>
-            <div class="day-cell"><div class="tc rest"><div class="tc-name">REST</div></div></div>
-            <div class="day-cell"><div class="tc long"><div class="tc-tag">LONG</div><div class="tc-name">Long Run</div><div class="tc-meta">22 km</div></div></div>
-          </div>
-        </div>
-        <div class="week-summary">
-          <div class="ws-title">KW 25 &middot; LAUFEND</div>
-          <div class="ws-row"><div class="ws-lbl">KILOMETER</div><div class="ws-nums"><div class="ws-done">36</div><div class="ws-plan">/ 55</div></div><div class="d-bar"><div class="d-fill" style="width:65%"></div><div class="d-rest"></div></div></div>
-          <div class="ws-row"><div class="ws-lbl">ZEIT</div><div class="ws-nums"><div class="ws-done">3:20</div><div class="ws-plan">/ 5:30</div></div><div class="d-bar"><div class="d-fill" style="width:60%"></div><div class="d-rest"></div></div></div>
-          <div class="ws-row"><div class="ws-lbl">EINHEITEN</div><div class="ws-nums"><div class="ws-done">3</div><div class="ws-plan">/ 6</div></div><div class="d-bar"><div class="d-fill" style="width:50%"></div><div class="d-rest"></div></div></div>
-        </div>
-      </div>
-    </div>
-    <!-- KW 26 -->
-    <div class="week-block">
-      <div class="week-inner">
-        <div class="week-cal">
-          <div class="week-top">
-            <div class="week-kw" style="color:var(--stone)">26</div>
-            <div class="dh-cell"><div class="dh-name">MO</div><div class="dh-date">16</div></div>
-            <div class="dh-cell"><div class="dh-name">DI</div><div class="dh-date">17</div></div>
-            <div class="dh-cell"><div class="dh-name">MI</div><div class="dh-date">18</div></div>
-            <div class="dh-cell"><div class="dh-name">DO</div><div class="dh-date">19</div></div>
-            <div class="dh-cell"><div class="dh-name">FR</div><div class="dh-date">20</div></div>
-            <div class="dh-cell"><div class="dh-name">SA</div><div class="dh-date">21</div></div>
-            <div class="dh-cell"><div class="dh-name">SO</div><div class="dh-date">22</div></div>
-          </div>
-          <div class="cal-row">
-            <div></div>
-            <div class="day-cell"><div class="tc gym"><div class="tc-tag">KRAFT</div><div class="tc-name">Oberk&ouml;rper B</div><div class="tc-meta">4&times;6</div></div></div>
-            <div class="day-cell"><div class="tc easy"><div class="tc-tag">EASY</div><div class="tc-name">Easy Run</div><div class="tc-meta">10 km</div></div></div>
-            <div class="day-cell"><div class="tc rest"><div class="tc-name">REST</div></div></div>
-            <div class="day-cell"><div class="tc run"><div class="tc-tag">LAUF</div><div class="tc-name">Fahrtspiel</div><div class="tc-meta">12 km</div></div></div>
-            <div class="day-cell"><div class="tc gym"><div class="tc-tag">KRAFT</div><div class="tc-name">Ganzk&ouml;rper</div><div class="tc-meta">3&times;10</div></div></div>
-            <div class="day-cell"><div class="tc easy"><div class="tc-tag">EASY</div><div class="tc-name">Recovery</div><div class="tc-meta">6 km</div></div></div>
-            <div class="day-cell"><div class="tc long"><div class="tc-tag">LONG</div><div class="tc-name">Long Run</div><div class="tc-meta">26 km</div></div></div>
-          </div>
-        </div>
-        <div class="week-summary">
-          <div class="ws-title" style="color:var(--stone)">KW 26 &middot; PLAN</div>
-          <div class="ws-row"><div class="ws-lbl">KILOMETER</div><div class="ws-nums"><div class="ws-done" style="color:var(--stone)">&mdash;</div><div class="ws-plan">/ 58</div></div><div class="d-bar"><div class="d-rest" style="flex:1"></div></div></div>
-          <div class="ws-row"><div class="ws-lbl">ZEIT</div><div class="ws-nums"><div class="ws-done" style="color:var(--stone)">&mdash;</div><div class="ws-plan">/ 6:00</div></div><div class="d-bar"><div class="d-rest" style="flex:1"></div></div></div>
-          <div class="ws-row"><div class="ws-lbl">EINHEITEN</div><div class="ws-nums"><div class="ws-done" style="color:var(--stone)">&mdash;</div><div class="ws-plan">/ 6</div></div><div class="d-bar"><div class="d-rest" style="flex:1"></div></div></div>
-        </div>
-      </div>
+    <div id="calendar-body">
+      <div style="padding:28px;font-family:'DM Mono',monospace;font-size:9px;color:var(--stone);letter-spacing:.1em">PLAN WIRD GELADEN...</div>
     </div>
   </div>
 
@@ -836,6 +783,42 @@ function resetCiDik(btn, ic, status) {
 const TODAY = new Date().toDateString();
 const lastCheckin = localStorage.getItem('cairn_checkin_date');
 
+const MOOD_MAP = {1:'1',2:'2',3:'3',4:'4',5:'5',6:'6',7:'7',8:'8',9:'9',10:'10'};
+let selectedFeel = '5';
+
+function updateMoodSlider(val) {
+  selectedFeel = String(parseInt(val));
+  document.getElementById('mood-value').textContent = selectedFeel;
+  document.getElementById('ci-submit').classList.add('ready');
+}
+
+// Coach Illustration quadratisch machen
+function squareIllus() {
+  var illus = document.querySelector('.cb-illus');
+  if (illus) {
+    var h = illus.offsetHeight;
+    illus.style.width = h + 'px';
+  }
+}
+squareIllus();
+window.addEventListener('resize', squareIllus);
+
+// Slider und Submit beim Start initialisieren
+updateMoodSlider(5);
+document.getElementById('ci-submit').classList.add('ready');
+
+
+(function() {
+  var h = new Date().getHours();
+  var gruss = h < 12 ? 'Guten Morgen' : h < 18 ? 'Guten Tag' : 'Guten Abend';
+  var name = 'Alexander';
+  var html = gruss + ', <b>' + name + '.</b>';
+  var g1 = document.getElementById('ci-greeting');
+  var g2 = document.getElementById('greeting-top');
+  if (g1) g1.innerHTML = html;
+  if (g2) g2.innerHTML = html;
+})();
+
 if(lastCheckin !== TODAY){
   document.getElementById('checkin').classList.add('open');
 }
@@ -847,21 +830,11 @@ const months=['JAN','FEB','MÄR','APR','MAI','JUN','JUL','AUG','SEP','OKT','NOV'
 document.getElementById('ci-time').textContent =
   days[now.getDay()] + ' \u00b7 ' + String(now.getDate()).padStart(2,'0') + ' ' + months[now.getMonth()] + ' ' + now.getFullYear() + ' \u00b7 ' + String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
 
-let selectedFeel = null;
-
-function selFeel(el, val){
-  document.querySelectorAll('.ci-feel').forEach(x=>x.classList.remove('sel'));
-  el.classList.add('sel');
-  selectedFeel = val;
-  document.getElementById('ci-submit').classList.add('ready');
-}
-
 function togNote(el){
   el.classList.toggle('sel');
 }
 
 function submitCheckin(){
-  if(!selectedFeel) return;
 
   // Freitext holen
   const freitext = document.getElementById('ci-freitext').value.trim();
@@ -1067,10 +1040,372 @@ function loadMorningBrief() {
     });
 }
 
+// ─── DYNAMISCHER KALENDER ───
+var planData = [];
+var pendingChanges = {};
+var activeWeekFilter = 'all';
+var draggedItem = null;
+
+var DAY_NAMES = ['MO','DI','MI','DO','FR','SA','SO'];
+var TYPE_CLASS = {
+  'Krafttraining': 'gym',
+  'Easy Run': 'easy',
+  'Recovery Run': 'easy',
+  'Long Run': 'long',
+  'Intervalle': 'quality',
+  'Hill Repeats': 'quality',
+  'Threshold Run': 'quality',
+  'Tempo Run': 'quality',
+  'Race Pace Run': 'quality',
+  'Trail Run': 'run',
+  'Progression Run': 'run',
+  'Strides': 'run',
+  'Mobilität': 'gym',
+  'Rest Day': 'rest'
+};
+
+function getMonday(d) {
+  var day = d.getDay();
+  var diff = d.getDate() - day + (day === 0 ? -6 : 1);
+  return new Date(d.setDate(diff));
+}
+
+function getWeekNumber(d) {
+  var date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  var dayNum = date.getUTCDay() || 7;
+  date.setUTCDate(date.getUTCDate() + 4 - dayNum);
+  var yearStart = new Date(Date.UTC(date.getUTCFullYear(),0,1));
+  return Math.ceil((((date - yearStart) / 86400000) + 1)/7);
+}
+
+function loadPlan() {
+  fetch('https://web-production-297f2.up.railway.app/api/plan')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      planData = data.plan;
+      renderCalendar();
+    })
+    .catch(function() {
+      document.getElementById('calendar-body').innerHTML =
+        '<div style="padding:28px;font-family:\'DM Mono\',monospace;font-size:9px;color:var(--stone)">Plan konnte nicht geladen werden.</div>';
+    });
+}
+
+function renderCalendar() {
+  var today = new Date();
+  var todayStr = today.toISOString().split('T')[0];
+
+  // Wochen gruppieren
+  var weeks = {};
+  planData.forEach(function(item) {
+    if (!weeks[item.week_date]) weeks[item.week_date] = [];
+    weeks[item.week_date].push(item);
+  });
+
+  var weekDates = Object.keys(weeks).sort();
+  var html = '';
+
+  // KW Tabs aktualisieren
+  var tabsHtml = '<div class="kwt on" onclick="filterWeek(\'all\',this)">ALLE</div>';
+  weekDates.forEach(function(wd) {
+    var d = new Date(wd + 'T12:00:00');
+    var kw = getWeekNumber(d);
+    tabsHtml += '<div class="kwt" onclick="filterWeek(\'' + wd + '\',this)">KW ' + kw + '</div>';
+  });
+  document.getElementById('kwtabs').innerHTML = tabsHtml;
+
+  weekDates.forEach(function(weekDate) {
+    var monday = new Date(weekDate + 'T12:00:00');
+    var kw = getWeekNumber(monday);
+    var isCurrentWeek = false;
+
+    var days = {};
+    weeks[weekDate].forEach(function(item) { days[item.day_of_week] = item; });
+
+    var headerHtml = '<div class="week-kw">' + kw + '</div>';
+    for (var d = 0; d < 7; d++) {
+      var dayDate = new Date(monday);
+      dayDate.setDate(monday.getDate() + d);
+      var dayStr = dayDate.toISOString().split('T')[0];
+      var isToday = dayStr === todayStr;
+      if (isToday) isCurrentWeek = true;
+      var dayNum = dayDate.getDate();
+      headerHtml += '<div class="dh-cell' + (isToday ? ' today-col' : '') + '">' +
+        '<div class="dh-name">' + DAY_NAMES[d] + '</div>' +
+        '<div class="dh-date">' + dayNum + '</div></div>';
+    }
+
+    var rowHtml = '<div></div>';
+    for (var d = 0; d < 7; d++) {
+      var dayDate = new Date(monday);
+      dayDate.setDate(monday.getDate() + d);
+      var dayStr = dayDate.toISOString().split('T')[0];
+      var isToday = dayStr === todayStr;
+      var isPast = dayDate < new Date(todayStr);
+      var item = days[d];
+
+      var cellClass = 'day-cell' + (isToday ? ' today-cell' : '');
+      rowHtml += '<div class="' + cellClass + '" data-week="' + weekDate + '" data-day="' + d + '" ' +
+        'ondragover="onDragOver(event)" ondrop="onDrop(event,\'' + weekDate + '\',' + d + ')">';
+
+      if (item && item.session_type !== 'Rest Day') {
+        var tcClass = TYPE_CLASS[item.session_type] || 'run';
+        if (isPast) tcClass += ' done';
+        if (isToday) tcClass += ' today-card';
+        var meta = '';
+        if (item.distance_km > 0) meta = item.distance_km + ' km';
+        else if (item.duration_min > 0) meta = item.duration_min + ' min';
+
+        var noteText = item.notes ? '<div class="tc-meta">' + item.notes + '</div>' : (meta ? '<div class="tc-meta">' + meta + '</div>' : '');
+
+        var isDraggable = !isPast;
+        rowHtml += '<div class="tc ' + tcClass + '" ' +
+          (isDraggable ? 'draggable="true" ' +
+          'ondragstart="onDragStart(event,' + item.id + ',\'' + item.week_date + '\',' + item.day_of_week + ')" ' +
+          'ondragend="onDragEnd(event)" ' +
+          'style="cursor:grab"' : 'style="cursor:default;opacity:.5"') + '>' +
+          '<div class="tc-tag">' + item.session_type.toUpperCase() + '</div>' +
+          '<div class="tc-name">' + item.session_type + '</div>' +
+          noteText +
+          '</div>';
+      } else if (item && item.session_type === 'Rest Day') {
+        rowHtml += '<div class="tc rest" ondragover="onDragOver(event)" ondrop="onDrop(event,\'' + weekDate + '\',' + d + ')">' +
+          '<div class="tc-name">REST</div></div>';
+      }
+      rowHtml += '</div>';
+    }
+
+    // Wochensummary
+    var totalKm = 0, totalMin = 0, totalSessions = 0;
+    weeks[weekDate].forEach(function(item) {
+      if (item.session_type !== 'Rest Day') {
+        totalKm += parseFloat(item.distance_km) || 0;
+        totalMin += parseInt(item.duration_min) || 0;
+        totalSessions++;
+      }
+    });
+    var hours = Math.floor(totalMin / 60);
+    var mins = totalMin % 60;
+
+    // Pending changes Button
+    var hasPending = pendingChanges[weekDate] && Object.keys(pendingChanges[weekDate]).length > 0;
+    var pendingBtn = hasPending ?
+      '<button onclick="checkWeekChanges(\'' + weekDate + '\')" style="' +
+      'background:var(--accent);border:none;color:var(--black);font-family:\'DM Mono\',monospace;' +
+      'font-size:8px;letter-spacing:.1em;padding:6px 12px;cursor:pointer;margin-top:10px;width:100%;font-weight:500">' +
+      'ÄNDERUNGEN PRÜFEN →</button>' : '';
+
+    var summaryTitle = isCurrentWeek ? 'KW ' + kw + ' · LAUFEND' : 'KW ' + kw + ' · PLAN';
+    var summaryColor = isCurrentWeek ? '' : 'color:var(--stone)';
+
+    html += '<div class="week-block" data-week="' + weekDate + '" style="' +
+      (activeWeekFilter !== 'all' && activeWeekFilter !== weekDate ? 'display:none' : '') + '">' +
+      '<div class="week-inner">' +
+      '<div class="week-cal">' +
+      '<div class="week-top">' + headerHtml + '</div>' +
+      '<div class="cal-row">' + rowHtml + '</div>' +
+      '</div>' +
+      '<div class="week-summary">' +
+      '<div class="ws-title" style="' + summaryColor + '">' + summaryTitle + '</div>' +
+      '<div class="ws-row"><div class="ws-lbl">KILOMETER</div>' +
+      '<div class="ws-nums"><div class="ws-done" style="' + summaryColor + '">' + (isCurrentWeek ? '—' : totalKm.toFixed(0)) + '</div>' +
+      '<div class="ws-plan">/ ' + totalKm.toFixed(0) + '</div></div>' +
+      '<div class="d-bar"><div class="d-fill" style="width:' + (isCurrentWeek ? '0' : '100') + '%"></div><div class="d-rest"></div></div></div>' +
+      '<div class="ws-row"><div class="ws-lbl">ZEIT</div>' +
+      '<div class="ws-nums"><div class="ws-done" style="' + summaryColor + '">' + (isCurrentWeek ? '—' : hours + ':' + String(mins).padStart(2,'0')) + '</div>' +
+      '<div class="ws-plan">/ ' + hours + ':' + String(mins).padStart(2,'0') + '</div></div>' +
+      '<div class="d-bar"><div class="d-fill" style="width:0%"></div><div class="d-rest"></div></div></div>' +
+      '<div class="ws-row"><div class="ws-lbl">EINHEITEN</div>' +
+      '<div class="ws-nums"><div class="ws-done" style="' + summaryColor + '">—</div>' +
+      '<div class="ws-plan">/ ' + totalSessions + '</div></div>' +
+      '<div class="d-bar"><div class="d-fill" style="width:0%"></div><div class="d-rest"></div></div></div>' +
+      pendingBtn +
+      '</div></div></div>';
+  });
+
+  document.getElementById('calendar-body').innerHTML = html;
+}
+
+function filterWeek(weekDate, el) {
+  activeWeekFilter = weekDate;
+  document.querySelectorAll('.kwt').forEach(function(t) { t.classList.remove('on'); });
+  el.classList.add('on');
+  document.querySelectorAll('.week-block').forEach(function(b) {
+    if (weekDate === 'all' || b.dataset.week === weekDate) {
+      b.style.display = '';
+    } else {
+      b.style.display = 'none';
+    }
+  });
+}
+
+function onDragStart(event, id, weekDate, day) {
+  draggedItem = {id: id, weekDate: weekDate, day: day};
+  event.dataTransfer.effectAllowed = 'move';
+  event.currentTarget.style.opacity = '0.5';
+}
+
+function onDragEnd(event) {
+  event.currentTarget.style.opacity = '1';
+  document.querySelectorAll('.day-cell').forEach(function(c) {
+    c.classList.remove('drag-over');
+  });
+}
+
+function onDragOver(event) {
+  event.preventDefault();
+  event.dataTransfer.dropEffect = 'move';
+  var cell = event.currentTarget.closest('.day-cell');
+  if (cell) {
+    document.querySelectorAll('.day-cell').forEach(function(c) { c.classList.remove('drag-over'); });
+    cell.classList.add('drag-over');
+  }
+}
+
+function onDrop(event, targetWeek, targetDay) {
+  event.preventDefault();
+  document.querySelectorAll('.day-cell').forEach(function(c) { c.classList.remove('drag-over'); });
+  if (!draggedItem) return;
+
+  var sourceId = draggedItem.id;
+  if (draggedItem.weekDate === targetWeek && draggedItem.day === targetDay) {
+    draggedItem = null;
+    return;
+  }
+
+  // Source item per ID finden
+  var sourceIdx = planData.findIndex(function(i) { return i.id === sourceId; });
+  if (sourceIdx === -1) { draggedItem = null; return; }
+
+  // Target item per week + day finden
+  var targetIdx = planData.findIndex(function(i) {
+    return i.week_date === targetWeek && i.day_of_week === targetDay;
+  });
+
+  var sourceItem = planData[sourceIdx];
+  var oldWeek = sourceItem.week_date;
+  var oldDay = sourceItem.day_of_week;
+
+  // Source verschieben
+  planData[sourceIdx] = Object.assign({}, sourceItem, {
+    week_date: targetWeek,
+    day_of_week: targetDay
+  });
+
+  if (!pendingChanges[targetWeek]) pendingChanges[targetWeek] = {};
+  pendingChanges[targetWeek][sourceId] = {
+    id: sourceId, week_date: targetWeek, day_of_week: targetDay
+  };
+
+  // Target tauschen wenn nicht Rest Day
+  if (targetIdx !== -1 && planData[targetIdx].session_type !== 'Rest Day') {
+    var targetItem = planData[targetIdx];
+    planData[targetIdx] = Object.assign({}, targetItem, {
+      week_date: oldWeek,
+      day_of_week: oldDay
+    });
+    if (!pendingChanges[oldWeek]) pendingChanges[oldWeek] = {};
+    pendingChanges[oldWeek][targetItem.id] = {
+      id: targetItem.id, week_date: oldWeek, day_of_week: oldDay
+    };
+  }
+
+  draggedItem = null;
+  renderCalendar();
+}
+
+// ─── COACH CHECK ───
+function checkWeekChanges(weekDate) {
+  var weekItems = planData.filter(function(i) { return i.week_date === weekDate; });
+  weekItems.sort(function(a,b) { return a.day_of_week - b.day_of_week; });
+
+  var weekPlan = weekItems.map(function(item) {
+    return {
+      day: DAY_NAMES[item.day_of_week],
+      session_type: item.session_type
+    };
+  });
+
+  // Coach-Check Button deaktivieren während Prüfung läuft
+  var btn = document.querySelector('[data-week="' + weekDate + '"] .week-summary button');
+
+  fetch('https://web-production-297f2.up.railway.app/api/plan/check', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({week_plan: weekPlan})
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(data) {
+    var check = data.check;
+    showPlanCheckResult(check, weekDate);
+  })
+  .catch(function() {
+    showPlanCheckResult({ok: true, message: 'Plan sieht gut aus.'}, weekDate);
+  });
+}
+
+function showPlanCheckResult(check, weekDate) {
+  var existing = document.getElementById('plan-check-popup');
+  if (existing) existing.remove();
+
+  var popup = document.createElement('div');
+  popup.id = 'plan-check-popup';
+  popup.style.cssText = 'position:fixed;inset:0;background:rgba(26,25,24,.75);z-index:200;display:flex;align-items:center;justify-content:center';
+
+  var bgColor = check.ok ? 'var(--black)' : 'var(--bg)';
+  var borderColor = check.ok ? 'var(--accent)' : 'var(--accent-dark)';
+  var textColor = check.ok ? '#F0EDE6' : 'var(--black)';
+  var icon = check.ok ? '✓' : '!';
+  var title = check.ok ? 'PLAN SIEHT GUT AUS' : 'COACH HAT EINE ANMERKUNG';
+
+  popup.innerHTML =
+    '<div style="background:' + bgColor + ';border-top:3px solid ' + borderColor + ';max-width:440px;width:90%;padding:28px">' +
+    '<div style="font-family:\'DM Mono\',monospace;font-size:10px;color:' + borderColor + ';letter-spacing:.14em;margin-bottom:12px">' + icon + ' CAIRN · ' + title + '</div>' +
+    '<div style="font-size:14px;color:' + textColor + ';line-height:1.65;margin-bottom:20px">' + check.message + '</div>' +
+    '<div style="display:flex;gap:10px">' +
+    '<button onclick="confirmPlanChanges(\'' + weekDate + '\')" style="background:var(--accent);border:none;color:var(--black);font-family:\'DM Mono\',monospace;font-size:9px;padding:10px 20px;cursor:pointer;letter-spacing:.1em;font-weight:500">ÜBERNEHMEN ✓</button>' +
+    '<button onclick="discardPlanChanges(\'' + weekDate + '\')" style="background:transparent;border:.5px solid var(--stone);color:var(--stone);font-family:\'DM Mono\',monospace;font-size:9px;padding:10px 16px;cursor:pointer">VERWERFEN</button>' +
+    '</div></div>';
+
+  document.body.appendChild(popup);
+}
+
+function confirmPlanChanges(weekDate) {
+  var changes = [];
+  if (pendingChanges[weekDate]) {
+    Object.values(pendingChanges[weekDate]).forEach(function(c) { changes.push(c); });
+  }
+
+  fetch('https://web-production-297f2.up.railway.app/api/plan/update', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({changes: changes})
+  })
+  .then(function() {
+    delete pendingChanges[weekDate];
+    document.getElementById('plan-check-popup').remove();
+    renderCalendar();
+  });
+}
+
+function discardPlanChanges(weekDate) {
+  delete pendingChanges[weekDate];
+  document.getElementById('plan-check-popup').remove();
+  loadPlan(); // Plan neu laden = Änderungen verwerfen
+}
+
+// CSS für drag-over
+var dragStyle = document.createElement('style');
+dragStyle.textContent = '.day-cell.drag-over{background:rgba(232,216,74,.08);outline:1px dashed var(--accent)}';
+document.head.appendChild(dragStyle);
+
 // Brief nur laden wenn Check-in heute bereits erledigt
 if(lastCheckin === TODAY){
   loadMorningBrief();
 }
+
+// Plan laden
+loadPlan();
 
 </script>
 
