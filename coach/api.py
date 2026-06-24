@@ -193,20 +193,27 @@ def update_plan():
 @app.route('/api/plan/check', methods=['POST'])
 def check_plan():
     try:
-        from coach.morning_brief import TRAINING_CATALOGUE
         import anthropic
 
         data = request.get_json()
         week_plan = data.get('week_plan', [])
 
-        prompt = "Du bist CAIRN - ein erfahrener Coach. Analysiere diese Wochenstruktur und sage ob sie sinnvoll ist.\n\n"
+        prompt = "Du bist CAIRN - ein erfahrener Coach. Analysiere diese Wochenstruktur auf Konflikte.\n\n"
         prompt += "Neue Wochenstruktur:\n"
         for day in week_plan:
-            prompt += "- " + day.get('day', '') + ": " + day.get('session_type', 'Rest Day') + "\n"
+            prompt += "- " + day.get('day', '') + ": " + day.get('session_type', 'Rest Day') + " | " + day.get('notes', '') + "\n"
 
-        prompt += "\nAntworte NUR mit JSON:\n"
-        prompt += '{"ok": true, "message": "Kurzes Feedback in einem Satz auf Deutsch"}\n'
-        prompt += "ok=true wenn die Struktur sinnvoll ist. ok=false wenn es ein echtes Problem gibt (z.B. zu viele harte Einheiten hintereinander)."
+        prompt += """
+REGELN die du prüfen musst:
+1. Nach Unterkörper-Krafttraining (notes enthält 'Unterkörper' oder 'Lower Body') darf NICHT direkt eine Qualitätssession folgen (Intervalle, Tempo Run, Threshold Run, Hill Repeats, Race Pace Run). Mindestens ein Ruhetag oder Easy/Recovery Run dazwischen.
+2. Nicht mehr als 2 harte Sessions (Intervalle, Tempo, Threshold, Hill Repeats) in einer Woche hintereinander ohne Erholungstag.
+3. Nach einem Long Run sollte kein hartes Training direkt folgen.
+
+Wenn eine Regel verletzt ist: ok=false und erkläre konkret was das Problem ist (auf Deutsch, 1-2 Sätze).
+Wenn alles in Ordnung ist: ok=true mit kurzer Bestätigung.
+
+Antworte NUR mit JSON ohne Markdown:
+{"ok": true, "message": "Feedback auf Deutsch"}"""
 
         client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
         message = client.messages.create(
