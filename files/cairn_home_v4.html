@@ -1182,49 +1182,58 @@ function renderCalendar() {
         if (item.distance_km > 0) meta = item.distance_km + ' km';
         else if (item.duration_min > 0) meta = item.duration_min + ' min';
 
-        // CAIRN Session Classification System
+        // CAIRN Session Naming System
         var category, description, volume, cardClass;
         var st = item.session_type;
         var notes = item.notes || '';
         var km = item.distance_km > 0 ? item.distance_km + ' km' : '';
         var mins = item.duration_min > 0 ? item.duration_min + ' min' : '';
 
+        // Workout Type Mapping → sichtbarer Titel
+        var typeMap = {
+          'Easy Run': 'EASY RUN',
+          'Recovery Run': 'RECOVERY RUN',
+          'Long Run': 'LONG RUN',
+          'Trail Run': 'TRAIL RUN',
+          'Intervalle': 'INTERVALS',
+          'Tempo Run': 'TEMPO RUN',
+          'Threshold Run': 'THRESHOLD RUN',
+          'Progression Run': 'PROGRESSION RUN',
+          'Race Pace Run': 'RACE PACE',
+          'Hill Repeats': 'HILL REPEATS',
+          'Strides': 'STRIDES',
+          'Krafttraining': 'STRENGTH',
+          'Mobilität': 'MOBILITY',
+          'Rest Day': 'REST'
+        };
+
+        // Card Class Mapping (für Farben)
+        var classMap = {
+          'Easy Run': 'easy',
+          'Recovery Run': 'easy',
+          'Long Run': 'long',
+          'Trail Run': 'long',
+          'Intervalle': 'quality',
+          'Tempo Run': 'quality',
+          'Threshold Run': 'quality',
+          'Progression Run': 'quality',
+          'Race Pace Run': 'quality',
+          'Hill Repeats': 'quality',
+          'Strides': 'run',
+          'Krafttraining': 'gym',
+          'Mobilität': 'gym'
+        };
+
+        category = typeMap[st] || st.toUpperCase();
+        cardClass = classMap[st] || 'run';
+
+        // Beschreibung aus notes
         if (st === 'Krafttraining') {
-          category = 'STRENGTH';
-          description = notes.split(' · ')[0] || 'Krafttraining';
+          description = notes.split(' · ')[0] || notes.split(' - ')[0] || '';
           volume = mins;
-          cardClass = 'gym';
-        } else if (st === 'Easy Run' || st === 'Recovery Run') {
-          category = 'RECOVERY';
-          description = notes.split(' · ')[0] || st;
-          volume = km || mins;
-          cardClass = 'easy';
-        } else if (st === 'Long Run' || st === 'Trail Run') {
-          category = 'LONG RUN';
-          description = notes.split(' · ')[0] || 'Easy effort';
-          volume = km || mins;
-          cardClass = 'long';
-        } else if (st === 'Intervalle' || st === 'Tempo Run' || st === 'Threshold Run' ||
-                   st === 'Progression Run' || st === 'Race Pace Run') {
-          category = 'QUALITY';
-          description = notes.split(' · ')[0] || st;
-          volume = km || mins;
-          cardClass = 'quality';
-        } else if (st === 'Hill Repeats' || st === 'Strides') {
-          category = 'HILLS';
-          description = notes.split(' · ')[0] || st;
-          volume = km || mins;
-          cardClass = 'quality';
-        } else if (st === 'Mobilität') {
-          category = 'STRENGTH';
-          description = notes || 'Mobilität';
-          volume = mins;
-          cardClass = 'gym';
         } else {
-          category = st.toUpperCase();
-          description = notes.split(' · ')[0] || st;
+          description = notes.split(' · ')[0] || notes.split(' - ')[0] || '';
           volume = km || mins;
-          cardClass = 'run';
         }
 
         if (isPast) cardClass += ' done';
@@ -1237,7 +1246,7 @@ function renderCalendar() {
           'ondragend="onDragEnd(event)" ' +
           'style="cursor:grab"' : 'style="cursor:default;opacity:.5"') + '>' +
           '<div class="tc-tag">' + category + '</div>' +
-          '<div class="tc-name">' + description + '</div>' +
+          (description ? '<div class="tc-name">' + description + '</div>' : '') +
           (volume ? '<div class="tc-meta">' + volume + '</div>' : '') +
           '</div>';
       } else if (item && item.session_type === 'Rest Day') {
