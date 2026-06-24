@@ -1382,7 +1382,7 @@ function checkWeekChanges(weekDate) {
     return {
       day: DAY_NAMES[item.day_of_week],
       session_type: item.session_type,
-      notes: item.notes || ''
+      notes: (item.notes || '').replace(/·/g, '-').replace(/×/g, 'x')
     };
   });
 
