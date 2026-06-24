@@ -4,10 +4,13 @@ Holt alle Aktivitäten von Garmin und speichert sie in die DB.
 Duplikate werden via garmin_id verhindert.
 """
 
+import sys, os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from garminconnect import Garmin
 from database.connection import get_connection
 from datetime import date
-import os, time
+import time
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -61,13 +64,11 @@ def import_all_activities():
         for a in activities:
             garmin_id = str(a.get("activityId", ""))
             
-            # Duplikat prüfen
             cur.execute("SELECT id FROM trainings WHERE garmin_id = %s", (garmin_id,))
             if cur.fetchone():
                 total_skipped += 1
                 continue
 
-            # Daten aufbereiten
             date_str = a.get("startTimeLocal", "")[:10]
             activity_type = map_activity_type(
                 a.get("activityType", {}).get("typeKey", "")
@@ -106,12 +107,11 @@ def import_all_activities():
 
         conn.commit()
         
-        # Wenn weniger als batch_size zurück — fertig
         if len(activities) < batch_size:
             break
             
         start += batch_size
-        time.sleep(1)  # Garmin Rate Limit respektieren
+        time.sleep(1)
 
     conn.close()
     print(f"\n=== FERTIG ===")

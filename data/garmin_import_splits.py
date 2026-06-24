@@ -3,9 +3,12 @@ CAIRN Garmin Splits Import
 Holt Splits für alle Garmin-Aktivitäten und speichert sie in die DB.
 """
 
+import sys, os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from garminconnect import Garmin
 from database.connection import get_connection
-import os, time
+import time
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -23,7 +26,6 @@ def import_splits():
     conn = get_connection()
     cur = conn.cursor()
 
-    # Alle Aktivitäten mit garmin_id holen
     cur.execute("""
         SELECT id, garmin_id, type, date 
         FROM trainings 
@@ -40,7 +42,6 @@ def import_splits():
 
     for idx, (training_id, garmin_id, act_type, act_date) in enumerate(activities):
         
-        # Bereits Splits vorhanden?
         cur.execute("SELECT COUNT(*) FROM splits WHERE training_id = %s", (training_id,))
         if cur.fetchone()[0] > 0:
             total_skipped += 1
@@ -61,7 +62,6 @@ def import_splits():
                 avg_hr = split.get("averageHR")
                 elevation = split.get("elevationGain")
 
-                # Pace berechnen (Sekunden pro km)
                 if distance_km and distance_km > 0 and duration_s:
                     pace_s = round(duration_s / distance_km)
                 else:
