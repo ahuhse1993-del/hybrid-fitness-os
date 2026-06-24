@@ -1,7 +1,7 @@
 from flask import Flask, jsonify, request, send_file
 from flask_cors import CORS
 import os, psycopg2, json
-from datetime import date
+from datetime import date, timedelta
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -69,16 +69,17 @@ def morning_brief():
 
         athlete_feedback = {}
         if row:
-            if row[3] and row[4]:
+            if row[3] and row[4] is not None:
                 conn.close()
                 return jsonify({
                     "status": "ok",
                     "brief": row[3],
-                    "suggestion": row[4],
+                    "suggestion": row[4] or "",
                     "session_type": row[5] or "",
                     "session_zone": row[6] or "",
                     "primary_target": row[7] or "none",
-                    "secondary_target": row[8] or "none"
+                    "secondary_target": row[8] or "none",
+                    "replan_needed": bool(row[4])
                 })
             athlete_feedback = {
                 'feel': row[0] or '',
@@ -93,6 +94,7 @@ def morning_brief():
         session_zone = result.get("session_zone", "")
         primary_target = result.get("primary_target", "none")
         secondary_target = result.get("secondary_target", "none")
+        replan_needed = result.get("replan_needed", False)
 
         if row:
             cur.execute("""
@@ -116,8 +118,106 @@ def morning_brief():
             "session_type": session_type,
             "session_zone": session_zone,
             "primary_target": primary_target,
-            "secondary_target": secondary_target
+            "secondary_target": secondary_target,
+            "replan_needed": replan_needed
         })
+
+    except Exception as e:
+        import traceback
+        return jsonify({"status": "error", "message": str(e), "trace": traceback.format_exc()}), 500
+
+@app.route('/api/plan', methods=['GET'])
+def get_plan():
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+
+        today = date.today()
+        monday = today - timedelta(days=today.weekday())
+
+        cur.execute("""
+            SELECT id, week_date, day_of_week, session_type, session_zone,
+                   duration_min, distance_km, notes
+            FROM training_plan
+            WHERE week_date >= %s AND week_date < %s
+            ORDER BY week_date, day_of_week
+        """, (monday, monday + timedelta(weeks=4)))
+
+        rows = cur.fetchall()
+        conn.close()
+
+        plan = []
+        for r in rows:
+            plan.append({
+                "id": r[0],
+                "week_date": str(r[1]),
+                "day_of_week": r[2],
+                "session_type": r[3],
+                "session_zone": r[4],
+                "duration_min": r[5],
+                "distance_km": float(r[6]) if r[6] else 0,
+                "notes": r[7] or ""
+            })
+
+        return jsonify({"status": "ok", "plan": plan})
+
+    except Exception as e:
+        import traceback
+        return jsonify({"status": "error", "message": str(e), "trace": traceback.format_exc()}), 500
+
+@app.route('/api/plan/update', methods=['POST'])
+def update_plan():
+    try:
+        data = request.get_json()
+        changes = data.get('changes', [])
+
+        conn = get_db()
+        cur = conn.cursor()
+
+        for change in changes:
+            cur.execute("""
+                UPDATE training_plan
+                SET week_date=%s, day_of_week=%s, updated_at=NOW()
+                WHERE id=%s
+            """, (change['week_date'], change['day_of_week'], change['id']))
+
+        conn.commit()
+        conn.close()
+
+        return jsonify({"status": "ok"})
+
+    except Exception as e:
+        import traceback
+        return jsonify({"status": "error", "message": str(e), "trace": traceback.format_exc()}), 500
+
+@app.route('/api/plan/check', methods=['POST'])
+def check_plan():
+    try:
+        from coach.morning_brief import TRAINING_CATALOGUE
+        import anthropic
+
+        data = request.get_json()
+        week_plan = data.get('week_plan', [])
+
+        prompt = "Du bist CAIRN - ein erfahrener Coach. Analysiere diese Wochenstruktur und sage ob sie sinnvoll ist.\n\n"
+        prompt += "Neue Wochenstruktur:\n"
+        for day in week_plan:
+            prompt += "- " + day.get('day', '') + ": " + day.get('session_type', 'Rest Day') + "\n"
+
+        prompt += "\nAntworte NUR mit JSON:\n"
+        prompt += '{"ok": true, "message": "Kurzes Feedback in einem Satz auf Deutsch"}\n'
+        prompt += "ok=true wenn die Struktur sinnvoll ist. ok=false wenn es ein echtes Problem gibt (z.B. zu viele harte Einheiten hintereinander)."
+
+        client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+        message = client.messages.create(
+            model="claude-sonnet-4-6",
+            max_tokens=200,
+            messages=[{"role": "user", "content": prompt}]
+        )
+
+        raw = message.content[0].text.strip()
+        result = json.loads(raw)
+        return jsonify({"status": "ok", "check": result})
 
     except Exception as e:
         import traceback
