@@ -1274,7 +1274,7 @@ function onDrop(event, targetWeek, targetDay) {
     return;
   }
 
-  // Source und Target Items direkt aus planData
+  // Source und Target direkt aus planData
   var sourceItem = null, targetItem = null;
   for (var i = 0; i < planData.length; i++) {
     if (planData[i].id === sourceId) sourceItem = planData[i];
@@ -1286,8 +1286,8 @@ function onDrop(event, targetWeek, targetDay) {
   var oldWeek = sourceItem.week_date;
   var oldDay = sourceItem.day_of_week;
 
-  // Tauschen — direkt Properties setzen, kein Object.assign
-  if (targetItem && targetItem.session_type !== 'Rest Day') {
+  // Immer tauschen — auch mit Rest Days
+  if (targetItem) {
     targetItem.week_date = oldWeek;
     targetItem.day_of_week = oldDay;
     if (!pendingChanges[oldWeek]) pendingChanges[oldWeek] = {};
