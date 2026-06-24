@@ -1156,7 +1156,9 @@ function renderCalendar() {
         if (item.distance_km > 0) meta = item.distance_km + ' km';
         else if (item.duration_min > 0) meta = item.duration_min + ' min';
 
-        var noteText = item.notes ? '<div class="tc-meta">' + item.notes + '</div>' : (meta ? '<div class="tc-meta">' + meta + '</div>' : '');
+        var cardTitle = item.notes ? item.notes.split(' · ')[0] : item.session_type;
+        var cardMeta = item.distance_km > 0 ? item.distance_km + ' km' : (item.duration_min > 0 ? item.duration_min + ' min' : '');
+        var noteText = cardMeta ? '<div class="tc-meta">' + cardMeta + '</div>' : '';
 
         var isDraggable = !isPast;
         rowHtml += '<div class="tc ' + tcClass + '" ' +
@@ -1165,7 +1167,7 @@ function renderCalendar() {
           'ondragend="onDragEnd(event)" ' +
           'style="cursor:grab"' : 'style="cursor:default;opacity:.5"') + '>' +
           '<div class="tc-tag">' + item.session_type.toUpperCase() + '</div>' +
-          '<div class="tc-name">' + item.session_type + '</div>' +
+          '<div class="tc-name">' + cardTitle + '</div>' +
           noteText +
           '</div>';
       } else if (item && item.session_type === 'Rest Day') {
@@ -1273,42 +1275,30 @@ function onDrop(event, targetWeek, targetDay) {
     return;
   }
 
-  // Source item per ID finden
-  var sourceIdx = planData.findIndex(function(i) { return i.id === sourceId; });
-  if (sourceIdx === -1) { draggedItem = null; return; }
+  // Source und Target Items direkt aus planData
+  var sourceItem = null, targetItem = null;
+  for (var i = 0; i < planData.length; i++) {
+    if (planData[i].id === sourceId) sourceItem = planData[i];
+    if (planData[i].week_date === targetWeek && planData[i].day_of_week === targetDay) targetItem = planData[i];
+  }
 
-  // Target item per week + day finden
-  var targetIdx = planData.findIndex(function(i) {
-    return i.week_date === targetWeek && i.day_of_week === targetDay;
-  });
+  if (!sourceItem) { draggedItem = null; return; }
 
-  var sourceItem = planData[sourceIdx];
   var oldWeek = sourceItem.week_date;
   var oldDay = sourceItem.day_of_week;
 
-  // Source verschieben
-  planData[sourceIdx] = Object.assign({}, sourceItem, {
-    week_date: targetWeek,
-    day_of_week: targetDay
-  });
-
-  if (!pendingChanges[targetWeek]) pendingChanges[targetWeek] = {};
-  pendingChanges[targetWeek][sourceId] = {
-    id: sourceId, week_date: targetWeek, day_of_week: targetDay
-  };
-
-  // Target tauschen wenn nicht Rest Day
-  if (targetIdx !== -1 && planData[targetIdx].session_type !== 'Rest Day') {
-    var targetItem = planData[targetIdx];
-    planData[targetIdx] = Object.assign({}, targetItem, {
-      week_date: oldWeek,
-      day_of_week: oldDay
-    });
+  // Tauschen — direkt Properties setzen, kein Object.assign
+  if (targetItem && targetItem.session_type !== 'Rest Day') {
+    targetItem.week_date = oldWeek;
+    targetItem.day_of_week = oldDay;
     if (!pendingChanges[oldWeek]) pendingChanges[oldWeek] = {};
-    pendingChanges[oldWeek][targetItem.id] = {
-      id: targetItem.id, week_date: oldWeek, day_of_week: oldDay
-    };
+    pendingChanges[oldWeek][targetItem.id] = {id: targetItem.id, week_date: oldWeek, day_of_week: oldDay};
   }
+
+  sourceItem.week_date = targetWeek;
+  sourceItem.day_of_week = targetDay;
+  if (!pendingChanges[targetWeek]) pendingChanges[targetWeek] = {};
+  pendingChanges[targetWeek][sourceId] = {id: sourceId, week_date: targetWeek, day_of_week: targetDay};
 
   draggedItem = null;
   renderCalendar();
