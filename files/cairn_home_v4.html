@@ -1171,8 +1171,7 @@ function renderCalendar() {
           noteText +
           '</div>';
       } else if (item && item.session_type === 'Rest Day') {
-        rowHtml += '<div class="tc rest" ondragover="onDragOver(event)" ondrop="onDrop(event,\'' + weekDate + '\',' + d + ')">' +
-          '<div class="tc-name">REST</div></div>';
+        rowHtml += '<div class="tc rest"><div class="tc-name">REST</div></div>';
       }
       rowHtml += '</div>';
     }
