@@ -2,17 +2,17 @@ name: Garmin Sync
 
 on:
   schedule:
-    - cron: '0 */2 * * *'  # alle 2 Stunden
-  workflow_dispatch:  # manuell auslösbar
+    - cron: '0 */2 * * *'
+  workflow_dispatch:
 
 jobs:
   sync:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
@@ -25,4 +25,6 @@ jobs:
           GARMIN_EMAIL: ${{ secrets.GARMIN_EMAIL }}
           GARMIN_PASSWORD: ${{ secrets.GARMIN_PASSWORD }}
           RAILWAY_DATABASE_URL: ${{ secrets.RAILWAY_DATABASE_URL }}
-        run: python data/garmin_import_history.py
+        run: |
+          cd /home/runner/work/hybrid-fitness-os/hybrid-fitness-os
+          PYTHONPATH=/home/runner/work/hybrid-fitness-os/hybrid-fitness-os python data/garmin_import_history.py
