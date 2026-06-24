@@ -221,7 +221,7 @@ body{background:var(--bg);font-family:'DM Sans',sans-serif;color:var(--black);fo
 
 /* COACH TEXT */
 .cb-decision{
-  font-size:14px;font-weight:300;
+  font-size:22px;font-weight:300;
   line-height:1.4;letter-spacing:-.02em;
   margin-bottom:14px;color:var(--black);
 }
@@ -660,7 +660,7 @@ body{background:var(--bg);font-family:'DM Sans',sans-serif;color:var(--black);fo
         <div class="ts-item"><div class="ts-lbl">DISTANZ</div><div class="ts-val" id="session-dist">~10 km</div></div>
         <div class="ts-item"><div class="ts-lbl">STRUKTUR</div><div class="ts-val" id="session-struct">6&times;1 km</div></div>
         <div class="ts-item"><div class="ts-lbl">ZONE</div><div class="ts-val" id="session-zone">—</div></div>
-        <div class="ts-item"><div class="ts-lbl">PACE</div><div class="ts-val">5:05&ndash;10</div></div>
+        <div class="ts-item" id="session-pace-item"><div class="ts-lbl">PACE</div><div class="ts-val" id="session-pace">—</div></div>
         <div class="ts-item"><div class="ts-lbl">DAUER</div><div class="ts-val" id="session-dur">~55 min</div></div>
       </div>
     </div>
@@ -930,11 +930,25 @@ function closeAll(){
 function acceptReplan(){
   var sessionType = document.body.dataset.sessionType || document.getElementById('cb-suggestion').textContent || 'Angepasste Einheit';
   var sessionZone = document.body.dataset.sessionZone || '';
+  var primaryTarget = document.body.dataset.primaryTarget || 'none';
+
   document.getElementById('session-name').textContent = sessionType;
   document.getElementById('session-zone').textContent = sessionZone;
   document.getElementById('session-dist').textContent = '';
   document.getElementById('session-struct').textContent = '';
   document.getElementById('session-dur').textContent = '';
+
+  // Pace nur zeigen wenn primary oder secondary target = pace
+  var secondaryTarget = document.body.dataset.secondaryTarget || 'none';
+  var paceEl = document.getElementById('session-pace-item');
+  if (paceEl) {
+    if (primaryTarget === 'pace' || secondaryTarget === 'pace') {
+      paceEl.style.display = '';
+    } else {
+      paceEl.style.display = 'none';
+    }
+  }
+
   document.getElementById('cal-name').textContent = sessionType;
   document.getElementById('cal-meta').textContent = sessionZone;
   var confirmText = document.getElementById('confirm-text');
@@ -1038,6 +1052,8 @@ function loadMorningBrief() {
       // session_type und session_zone im dataset speichern — erst bei Annahme in DOM
       if (data.session_type) document.body.dataset.sessionType = data.session_type;
       if (data.session_zone) document.body.dataset.sessionZone = data.session_zone;
+      if (data.primary_target) document.body.dataset.primaryTarget = data.primary_target;
+      if (data.secondary_target) document.body.dataset.secondaryTarget = data.secondary_target;
     })
     .catch(function() {
       document.getElementById('cb-decision').innerHTML =
