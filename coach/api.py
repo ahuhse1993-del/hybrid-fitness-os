@@ -21,35 +21,47 @@ def home():
 def analyse():
     return send_file(os.path.join(os.path.dirname(__file__), '..', 'files', 'cairn_analyse_v4.html'))
 
-@app.route('/api/checkin', methods=['POST'])
-def save_checkin():
-    data = request.get_json()
-    feel = data.get('feel', '')
-    notes = ', '.join(data.get('notes', []))
-    text = data.get('text', '')
-    today = date.today()
+@app.route('/api/plan/check', methods=['POST'])
+def check_plan():
+    try:
+        import anthropic
 
-    conn = get_db()
-    cur = conn.cursor()
-    cur.execute("SELECT id FROM daily_logs WHERE date = %s", (today,))
-    existing = cur.fetchone()
+        data = request.get_json(force=True)
+        week_plan = data.get('week_plan', [])
 
-    if existing:
-        cur.execute("""
-            UPDATE daily_logs SET feel=%s, notes=%s, athlete_text=%s,
-            morning_brief=NULL, suggestion=NULL, session_type=NULL, session_zone=NULL,
-            primary_target=NULL, secondary_target=NULL
-            WHERE date=%s
-        """, (feel, notes, text, today))
-    else:
-        cur.execute("""
-            INSERT INTO daily_logs (date, feel, notes, athlete_text)
-            VALUES (%s, %s, %s, %s)
-        """, (today, feel, notes, text))
+        lines = []
+        for day in week_plan:
+            lines.append(day.get('day', '') + ': ' + day.get('session_type', '') + ' | ' + day.get('notes', ''))
 
-    conn.commit()
-    conn.close()
-    return jsonify({"status": "ok"})
+        prompt = 'Du bist CAIRN Coach. Pruefe diese Wochenstruktur.\n\n'
+        prompt += 'Wochenplan:\n' + '\n'.join(lines) + '\n\n'
+        prompt += 'REGELN:\n'
+        prompt += '1. Nach Unterkörper-Krafttraining (notes enthaelt Unterkörper oder Lower Body) darf NICHT direkt eine Qualitaetssession folgen (Intervalle, Tempo Run, Threshold Run, Hill Repeats, Race Pace Run). Mindestens ein Ruhetag oder Easy Run dazwischen.\n'
+        prompt += '2. Nicht mehr als 2 harte Sessions hintereinander.\n'
+        prompt += '3. Nach Long Run kein hartes Training direkt danach.\n\n'
+        prompt += 'Antworte NUR mit JSON, kein Markdown:\n'
+        prompt += '{"ok": true, "message": "Kurzes Feedback auf Deutsch"}'
+
+        client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+        message = client.messages.create(
+            model="claude-sonnet-4-6",
+            max_tokens=200,
+            messages=[{"role": "user", "content": prompt}]
+        )
+
+        raw = message.content[0].text.strip()
+        raw = raw.replace('```json', '').replace('```', '').strip()
+
+        try:
+            result = json.loads(raw)
+        except Exception:
+            result = {"ok": True, "message": "Plan sieht gut aus."}
+
+        return jsonify({"status": "ok", "check": result})
+
+    except Exception as e:
+        import traceback
+        return jsonify({"status": "error", "message": str(e), "trace": traceback.format_exc()}), 500
 
 @app.route('/api/morning-brief', methods=['GET'])
 def morning_brief():
@@ -230,7 +242,7 @@ raw = message.content[0].text.strip()
         except:
             result = {"ok": True, "message": "Plan sieht gut aus."}
         return jsonify({"status": "ok", "check": result})
-        
+
 @app.route('/api/health', methods=['GET'])
 def health():
     return jsonify({"status": "ok", "date": str(date.today())})
