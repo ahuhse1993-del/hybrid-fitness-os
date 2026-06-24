@@ -916,15 +916,16 @@ function acceptReplan(){
   var sessionType = document.body.dataset.sessionType || document.getElementById('cb-suggestion').textContent || 'Angepasste Einheit';
   var sessionZone = document.body.dataset.sessionZone || '';
   var primaryTarget = document.body.dataset.primaryTarget || 'none';
+  var secondaryTarget = document.body.dataset.secondaryTarget || 'none';
 
+  // Today's Session Block aktualisieren
   document.getElementById('session-name').textContent = sessionType;
   document.getElementById('session-zone').textContent = sessionZone;
   document.getElementById('session-dist').textContent = '';
   document.getElementById('session-struct').textContent = '';
   document.getElementById('session-dur').textContent = '';
 
-  // Pace nur zeigen wenn primary oder secondary target = pace
-  var secondaryTarget = document.body.dataset.secondaryTarget || 'none';
+  // Pace nur zeigen wenn relevant
   var paceEl = document.getElementById('session-pace-item');
   if (paceEl) {
     if (primaryTarget === 'pace' || secondaryTarget === 'pace') {
@@ -933,6 +934,21 @@ function acceptReplan(){
       paceEl.style.display = 'none';
     }
   }
+
+  // Heutigen Tag im planData aktualisieren damit Kalender stimmt
+  var todayStr = new Date().toISOString().split('T')[0];
+  for (var i = 0; i < planData.length; i++) {
+    var itemDate = new Date(planData[i].week_date + 'T12:00:00');
+    itemDate.setDate(itemDate.getDate() + planData[i].day_of_week);
+    var itemStr = itemDate.toISOString().split('T')[0];
+    if (itemStr === todayStr) {
+      planData[i].session_type = sessionType;
+      planData[i].session_zone = sessionZone;
+      planData[i].notes = sessionType;
+      break;
+    }
+  }
+  renderCalendar();
 
   var confirmText = document.getElementById('confirm-text');
   if (confirmText) confirmText.textContent = sessionType + ' \u2014 im Kalender \u00fcbernommen.';
