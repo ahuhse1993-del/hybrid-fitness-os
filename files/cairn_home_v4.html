@@ -922,8 +922,6 @@ function acceptReplan(){
     }
   }
 
-  document.getElementById('cal-name').textContent = sessionType;
-  document.getElementById('cal-meta').textContent = sessionZone;
   var confirmText = document.getElementById('confirm-text');
   if (confirmText) confirmText.textContent = sessionType + ' \u2014 im Kalender \u00fcbernommen.';
   document.getElementById('ov-replan').classList.remove('open');
