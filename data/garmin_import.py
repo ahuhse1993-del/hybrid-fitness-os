@@ -1,6 +1,18 @@
+"""
+CAIRN Garmin History Import
+Holt alle Aktivitäten von Garmin und speichert sie in die DB.
+Duplikate werden via garmin_id verhindert.
+"""
+
+import sys, os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from garminconnect import Garmin
+from database.connection import get_connection
+from datetime import date
+import time
 from dotenv import load_dotenv
-import os
+
 
 load_dotenv()
 
