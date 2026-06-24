@@ -126,6 +126,69 @@ def morning_brief():
         import traceback
         return jsonify({"status": "error", "message": str(e), "trace": traceback.format_exc()}), 500
 
+@app.route('/api/dashboard', methods=['GET'])
+def dashboard():
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+        today = date.today()
+        monday = today - timedelta(days=today.weekday())
+        sunday = monday + timedelta(days=6)
+
+        # Echte Aktivitäten diese Woche aus trainings Tabelle
+        cur.execute("""
+            SELECT COALESCE(SUM(distance_km), 0), COUNT(*)
+            FROM trainings
+            WHERE date >= %s AND date <= %s
+            AND type NOT IN ('WeightTraining', 'Strength')
+        """, (monday, sunday))
+        row = cur.fetchone()
+        week_km = round(float(row[0]), 1) if row[0] else 0
+        week_sessions_done = int(row[1]) if row[1] else 0
+
+        # Geplante Einheiten diese Woche
+        cur.execute("""
+            SELECT COUNT(*) FROM training_plan
+            WHERE week_date = %s AND session_type != 'Rest Day'
+        """, (monday,))
+        row = cur.fetchone()
+        week_sessions_planned = int(row[0]) if row[0] else 0
+
+        # Health Snapshot aus daily_logs (gestern)
+        yesterday = today - timedelta(days=1)
+        cur.execute("""
+            SELECT hrv_last_night, sleep_duration_h, resting_hr,
+                   body_battery_charged, body_battery_drained
+            FROM daily_logs WHERE date = %s
+        """, (yesterday,))
+        health = cur.fetchone()
+
+        hrv = health[0] if health and health[0] else None
+        sleep = round(float(health[1]), 1) if health and health[1] else None
+        rhr = health[2] if health and health[2] else None
+        bb_charged = health[3] if health and health[3] else None
+
+        conn.close()
+
+        return jsonify({
+            "status": "ok",
+            "week": {
+                "km_done": week_km,
+                "sessions_done": week_sessions_done,
+                "sessions_planned": week_sessions_planned
+            },
+            "health": {
+                "hrv": hrv,
+                "sleep_h": sleep,
+                "rhr": rhr,
+                "body_battery": bb_charged
+            }
+        })
+
+    except Exception as e:
+        import traceback
+        return jsonify({"status": "error", "message": str(e), "trace": traceback.format_exc()}), 500
+
 @app.route('/api/plan', methods=['GET'])
 def get_plan():
     try:
@@ -208,15 +271,10 @@ def check_plan():
         prompt += '1. Nach Unterkörper-Krafttraining (notes enthaelt Unterkörper oder Lower Body) darf NICHT direkt eine Qualitaetssession folgen (Intervalle, Tempo Run, Threshold Run, Hill Repeats, Race Pace Run). Mindestens ein Ruhetag oder Easy Run dazwischen.\n'
         prompt += '2. Nicht mehr als 2 harte Sessions hintereinander.\n'
         prompt += '3. Nach Long Run kein hartes Training direkt danach.\n\n'
+        prompt += 'Sprich wie ein erfahrener Bergfuehrer. Ruhig, direkt, menschlich. Nie: Regelverstoß, Session, Parameter.\n'
+        prompt += 'Max 2 Saetze. Beispiel ok=false: "Nach einem Beintraining brauchen die Muskeln Zeit. Ich wuerde die Intervalle einen Tag verschieben."\n\n'
         prompt += 'Antworte NUR mit JSON, kein Markdown:\n'
-        prompt += '{"ok": true, "message": "Kurzes Feedback auf Deutsch"}\n\n'
-        prompt += 'WICHTIG fuer die message:\n'
-        prompt += 'Sprich wie ein erfahrener Bergfuehrer. Ruhig, direkt, menschlich.\n'
-        prompt += 'Nie: Regelverstoß, Session, Parameter, Algorithmus.\n'
-        prompt += 'Immer kurze Saetze. Max 2 Saetze. Auf Deutsch.\n'
-        prompt += 'Beispiel ok=false: "Nach einem Beintraining brauchen die Muskeln Zeit. Ich wuerde die Intervalle einen Tag verschieben."\n'
-        prompt += 'Beispiel ok=true: "Die Woche sieht gut aus. Ich wuerde nichts aendern."'
-        
+        prompt += '{"ok": true, "message": "Kurzes Feedback auf Deutsch"}'
 
         client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
         message = client.messages.create(
