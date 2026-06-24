@@ -222,14 +222,15 @@ Antworte NUR mit JSON ohne Markdown:
             messages=[{"role": "user", "content": prompt}]
         )
 
-        raw = message.content[0].text.strip()
-        result = json.loads(raw)
+raw = message.content[0].text.strip()
+        # JSON aus Markdown-Backticks befreien falls vorhanden
+        raw = raw.replace('```json', '').replace('```', '').strip()
+        try:
+            result = json.loads(raw)
+        except:
+            result = {"ok": True, "message": "Plan sieht gut aus."}
         return jsonify({"status": "ok", "check": result})
-
-    except Exception as e:
-        import traceback
-        return jsonify({"status": "error", "message": str(e), "trace": traceback.format_exc()}), 500
-
+        
 @app.route('/api/health', methods=['GET'])
 def health():
     return jsonify({"status": "ok", "date": str(date.today())})

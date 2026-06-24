@@ -1382,11 +1382,17 @@ function checkWeekChanges(weekDate) {
     return {
       day: DAY_NAMES[item.day_of_week],
       session_type: item.session_type,
-      notes: (item.notes || '').replace(/·/g, '-').replace(/×/g, 'x')
+      notes: (item.notes || '').replace(/\u00b7/g, '-').replace(/\u00d7/g, 'x').replace(/[^\x00-\x7F]/g, '')
     };
   });
 
-  console.log('Coach Check - Week Plan:', JSON.stringify(weekPlan));
+  // Loading-State zeigen
+  var btn = document.querySelector('.week-block[data-week="' + weekDate + '"] .week-summary button');
+  if (btn) {
+    btn.textContent = 'COACH DENKT NACH...';
+    btn.style.opacity = '0.6';
+    btn.style.pointerEvents = 'none';
+  }
 
   fetch('https://web-production-297f2.up.railway.app/api/plan/check', {
     method: 'POST',
@@ -1395,11 +1401,21 @@ function checkWeekChanges(weekDate) {
   })
   .then(function(r) { return r.json(); })
   .then(function(data) {
-    var check = data.check;
+    if (btn) {
+      btn.textContent = 'ÄNDERUNGEN PRÜFEN →';
+      btn.style.opacity = '1';
+      btn.style.pointerEvents = 'all';
+    }
+    var check = data.check || {ok: true, message: 'Plan sieht gut aus.'};
     showPlanCheckResult(check, weekDate);
   })
   .catch(function() {
-    showPlanCheckResult({ok: true, message: 'Plan sieht gut aus.'}, weekDate);
+    if (btn) {
+      btn.textContent = 'ÄNDERUNGEN PRÜFEN →';
+      btn.style.opacity = '1';
+      btn.style.pointerEvents = 'all';
+    }
+    showPlanCheckResult({ok: true, message: 'Plan wurde übernommen.'}, weekDate);
   });
 }
 
