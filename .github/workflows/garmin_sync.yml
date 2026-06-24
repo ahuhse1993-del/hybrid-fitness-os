@@ -8,6 +8,10 @@ on:
 jobs:
   sync:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: /home/runner/work/hybrid-fitness-os/hybrid-fitness-os
+
     steps:
       - uses: actions/checkout@v4
 
@@ -17,14 +21,12 @@ jobs:
           python-version: '3.11'
 
       - name: Install dependencies
-        run: |
-          pip install garminconnect psycopg2-binary python-dotenv
+        run: pip install garminconnect psycopg2-binary python-dotenv
 
       - name: Run Garmin sync
         env:
           GARMIN_EMAIL: ${{ secrets.GARMIN_EMAIL }}
           GARMIN_PASSWORD: ${{ secrets.GARMIN_PASSWORD }}
           RAILWAY_DATABASE_URL: ${{ secrets.RAILWAY_DATABASE_URL }}
-        run: |
-          cd /home/runner/work/hybrid-fitness-os/hybrid-fitness-os
-          PYTHONPATH=/home/runner/work/hybrid-fitness-os/hybrid-fitness-os python data/garmin_import_history.py
+          PYTHONPATH: /home/runner/work/hybrid-fitness-os/hybrid-fitness-os
+        run: python data/garmin_import_history.py
