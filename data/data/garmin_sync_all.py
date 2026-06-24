@@ -1,28 +1,27 @@
-name: Garmin Sync
+"""
+CAIRN Garmin Full Sync
+Importiert neue Aktivitäten und Garmin Health Daten.
+Läuft via GitHub Actions alle 2 Stunden.
+"""
 
-on:
-  schedule:
-    - cron: '0 */2 * * *'
-  workflow_dispatch:
+import sys, os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-jobs:
-  sync:
-    runs-on: ubuntu-latest
+from dotenv import load_dotenv
+load_dotenv()
 
-    steps:
-      - uses: actions/checkout@v4
+print("=== CAIRN Garmin Sync ===\n")
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
+# 1. Neue Aktivitäten importieren
+print("--- Aktivitäten ---")
+from data.garmin_import_history import import_all_activities
+import_all_activities()
 
-      - name: Install dependencies
-        run: pip install garminconnect psycopg2-binary python-dotenv
+# 2. Garmin Health Daten syncen
+print("\n--- Health ---")
+from data.data_service import sync_garmin_health
+from datetime import date, timedelta
+sync_garmin_health((date.today() - timedelta(days=1)).isoformat())
+sync_garmin_health(date.today().isoformat())
 
-      - name: Run Garmin sync
-        env:
-          GARMIN_EMAIL: ${{ secrets.GARMIN_EMAIL }}
-          GARMIN_PASSWORD: ${{ secrets.GARMIN_PASSWORD }}
-          RAILWAY_DATABASE_URL: ${{ secrets.RAILWAY_DATABASE_URL }}
-        run: python data/garmin_sync_all.py
+print("\n=== SYNC ABGESCHLOSSEN ===")
