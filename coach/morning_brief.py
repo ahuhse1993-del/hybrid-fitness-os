@@ -40,12 +40,16 @@ def generate_morning_brief(athlete_feedback: dict = None):
     recent_text = "\n".join(recent)
 
     feedback_text = ""
+    feel_score = 5
     if athlete_feedback:
-        feel = athlete_feedback.get('feel', '')
+        feel = athlete_feedback.get('feel', '5')
         notes = athlete_feedback.get('notes', [])
         text = athlete_feedback.get('text', '')
-        if feel:
-            feedback_text += "Gefuehl: " + feel + "\n"
+        try:
+            feel_score = int(feel)
+        except:
+            feel_score = 5
+        feedback_text += "Gefuehl (1-10): " + str(feel_score) + "\n"
         if notes:
             feedback_text += "Notizen: " + ', '.join(notes) + "\n"
         if text:
@@ -61,13 +65,20 @@ def generate_morning_brief(athlete_feedback: dict = None):
     prompt += "- Ruhepuls: " + str(rhr.get('rhr')) + " bpm\n\n"
     prompt += "Letzte Aktivitaeten:\n" + recent_text + "\n\n"
     if feedback_text:
-        prompt += "Athlet sagt heute Morgen:\n" + feedback_text + "\n"
-    prompt += "Antworte NUR mit diesem JSON. Kein Text davor oder danach. Kein Markdown:\n"
-    prompt += '{"brief": "...", "suggestion": "...", "session_type": "..."}\n\n'
-    prompt += "brief: Vollstaendiger Morning Brief, max 150 Woerter, kurze Saetze, auf Deutsch.\n"
-    prompt += "Niemals: Algorithmus, Score, Metrik. Immer: Ich sehe, Ich wuerde, Dein Koerper.\n"
-    prompt += "suggestion: Ein einziger konkreter Vorschlag fuer heute, max 12 Woerter, kein Punkt am Ende.\n"
-    prompt += "session_type: Genau einer dieser Typen: " + session_types + "\n"
+        prompt += "Athlet-Feedback:\n" + feedback_text + "\n"
+
+    prompt += """WICHTIGE COACHING-REGEL:
+Wenn der Athlet sich gut fuehlt (Gefuehl 7-10) UND keine klaren Warnsignale vorhanden sind → halte am Plan fest. Kein Vorschlag noetig.
+Nur wenn Gefuehl niedrig (1-5) ODER klare Warnsignale (HRV stark gesunken, Schlaf schlecht, eigene Worte zeigen Erschoepfung) → mache einen konkreten Anpassungsvorschlag.
+Wenn alles in Ordnung ist: suggestion = "" (leer lassen).
+
+Antworte NUR mit diesem JSON. Kein Text davor oder danach. Kein Markdown:
+{"brief": "...", "suggestion": "", "session_type": "...", "replan_needed": false}
+
+brief: Morning Brief auf Deutsch, max 150 Woerter, kurze Saetze. Nie: Algorithmus, Score, Metrik. Immer: Ich sehe, Ich wuerde, Dein Koerper.
+suggestion: Nur befuellen wenn replan_needed=true. Sonst leer lassen "".
+session_type: Einer dieser Typen: """ + session_types + """
+replan_needed: true nur wenn klare Warnsignale oder Athlet fuehlt sich schlecht (1-5). Sonst false."""
 
     client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 
@@ -91,15 +102,21 @@ def generate_morning_brief(athlete_feedback: dict = None):
             result["session_zone"] = ""
             result["primary_target"] = "none"
             result["secondary_target"] = "none"
+
+        # Wenn kein Replan nötig — suggestion leer
+        if not result.get("replan_needed", False):
+            result["suggestion"] = ""
+
         return result
     except json.JSONDecodeError:
         return {
             "brief": raw,
-            "suggestion": "Heute ruhig bleiben",
-            "session_type": "Recovery Run",
-            "session_zone": "Z1",
+            "suggestion": "",
+            "session_type": "Easy Run",
+            "session_zone": "Z2",
             "primary_target": "heart_rate",
-            "secondary_target": "none"
+            "secondary_target": "none",
+            "replan_needed": False
         }
 
 if __name__ == "__main__":
