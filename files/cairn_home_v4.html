@@ -699,9 +699,9 @@ body{background:var(--bg);font-family:'DM Sans',sans-serif;color:var(--black);fo
   <div class="data-strip">
     <div class="ds-cell">
       <div class="ds-kicker">WOCHE</div>
-      <div class="ds-val">36</div>
-      <div class="ds-sub">km &middot; 3 von 6 Einheiten</div>
-      <div class="d-bar" style="margin-top:8px"><div class="d-fill" style="width:65%"></div><div class="d-rest"></div></div>
+      <div class="ds-val" id="dash-km">—</div>
+      <div class="ds-sub" id="dash-sessions">km · — von — Einheiten</div>
+      <div class="d-bar" style="margin-top:8px"><div class="d-fill" id="dash-km-bar" style="width:0%"></div><div class="d-rest"></div></div>
     </div>
     <div class="ds-cell">
       <div class="ds-kicker">FORM</div>
@@ -715,10 +715,10 @@ body{background:var(--bg);font-family:'DM Sans',sans-serif;color:var(--black);fo
     <div class="health-mini">
       <div class="hm-kicker">HEALTH SNAPSHOT</div>
       <div class="hm-rows">
-        <div class="hm-row"><div class="hm-nm">HRV</div><div class="hm-bar"><div class="hm-fi" style="width:61%"></div><div class="hm-dot"></div></div><div class="hm-vl">61 ms</div></div>
-        <div class="hm-row"><div class="hm-nm">SCHLAF</div><div class="hm-bar"><div class="hm-fi" style="width:76%"></div><div class="hm-dot"></div></div><div class="hm-vl">6.8 h</div></div>
-        <div class="hm-row"><div class="hm-nm">PULS</div><div class="hm-bar"><div class="hm-fi" style="width:82%"></div><div class="hm-dot"></div></div><div class="hm-vl">51 bpm</div></div>
-        <div class="hm-row"><div class="hm-nm">TSS</div><div class="hm-bar"><div class="hm-fi" style="width:68%"></div><div class="hm-dot"></div></div><div class="hm-vl">68</div></div>
+        <div class="hm-row"><div class="hm-nm">HRV</div><div class="hm-bar"><div class="hm-fi" id="dash-hrv-bar" style="width:0%"></div><div class="hm-dot"></div></div><div class="hm-vl" id="dash-hrv">—</div></div>
+        <div class="hm-row"><div class="hm-nm">SCHLAF</div><div class="hm-bar"><div class="hm-fi" id="dash-sleep-bar" style="width:0%"></div><div class="hm-dot"></div></div><div class="hm-vl" id="dash-sleep">—</div></div>
+        <div class="hm-row"><div class="hm-nm">PULS</div><div class="hm-bar"><div class="hm-fi" id="dash-rhr-bar" style="width:0%"></div><div class="hm-dot"></div></div><div class="hm-vl" id="dash-rhr">—</div></div>
+        <div class="hm-row"><div class="hm-nm">BATTERY</div><div class="hm-bar"><div class="hm-fi" id="dash-bb-bar" style="width:0%"></div><div class="hm-dot"></div></div><div class="hm-vl" id="dash-bb">—</div></div>
       </div>
     </div>
   </div>
@@ -1483,12 +1483,55 @@ var dragStyle = document.createElement('style');
 dragStyle.textContent = '.day-cell.drag-over{background:rgba(232,216,74,.08);outline:1px dashed var(--accent)}';
 document.head.appendChild(dragStyle);
 
+// ─── DASHBOARD DATEN LADEN ───
+function loadDashboard() {
+  fetch('https://web-production-297f2.up.railway.app/api/dashboard')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.status !== 'ok') return;
+
+      var week = data.week;
+      var health = data.health;
+
+      // Wochenkilometer
+      var kmEl = document.getElementById('dash-km');
+      var sessEl = document.getElementById('dash-sessions');
+      var kmBarEl = document.getElementById('dash-km-bar');
+      if (kmEl) kmEl.textContent = week.km_done + ' km';
+      if (sessEl) sessEl.textContent = week.sessions_done + ' von ' + week.sessions_planned + ' Einheiten';
+      if (kmBarEl) {
+        var pct = week.sessions_planned > 0 ? Math.round((week.sessions_done / week.sessions_planned) * 100) : 0;
+        kmBarEl.style.width = pct + '%';
+      }
+
+      // Health Snapshot
+      if (health.hrv) {
+        document.getElementById('dash-hrv').textContent = health.hrv + ' ms';
+        document.getElementById('dash-hrv-bar').style.width = Math.min(health.hrv / 100 * 100, 100) + '%';
+      }
+      if (health.sleep_h) {
+        document.getElementById('dash-sleep').textContent = health.sleep_h + ' h';
+        document.getElementById('dash-sleep-bar').style.width = Math.min(health.sleep_h / 9 * 100, 100) + '%';
+      }
+      if (health.rhr) {
+        document.getElementById('dash-rhr').textContent = health.rhr + ' bpm';
+        document.getElementById('dash-rhr-bar').style.width = Math.min((80 - health.rhr) / 40 * 100, 100) + '%';
+      }
+      if (health.body_battery) {
+        document.getElementById('dash-bb').textContent = health.body_battery;
+        document.getElementById('dash-bb-bar').style.width = health.body_battery + '%';
+      }
+    })
+    .catch(function() {});
+}
+
 // Brief nur laden wenn Check-in heute bereits erledigt
 if(lastCheckin === TODAY){
   loadMorningBrief();
 }
 
-// Plan laden
+// Dashboard und Plan laden
+loadDashboard();
 loadPlan();
 
 </script>
