@@ -1267,6 +1267,12 @@ function renderCalendar() {
     var hours = Math.floor(totalMin / 60);
     var mins = totalMin % 60;
 
+    // Für aktuelle Woche: echte Daten aus Dashboard
+    var doneKm = isCurrentWeek ? (window.dashKmDone || 0) : totalKm;
+    var doneSessions = isCurrentWeek ? (window.dashSessionsDone || 0) : totalSessions;
+    var kmPct = totalKm > 0 ? Math.round(doneKm / totalKm * 100) : 0;
+    var sessionPct = totalSessions > 0 ? Math.round(doneSessions / totalSessions * 100) : 0;
+
     // Pending changes Button
     var hasPending = pendingChanges[weekDate] && Object.keys(pendingChanges[weekDate]).length > 0;
     var pendingBtn = hasPending ?
@@ -1288,17 +1294,17 @@ function renderCalendar() {
       '<div class="week-summary">' +
       '<div class="ws-title" style="' + summaryColor + '">' + summaryTitle + '</div>' +
       '<div class="ws-row"><div class="ws-lbl">KILOMETER</div>' +
-      '<div class="ws-nums"><div class="ws-done" style="' + summaryColor + '">' + (isCurrentWeek ? '—' : totalKm.toFixed(0)) + '</div>' +
+      '<div class="ws-nums"><div class="ws-done">' + doneKm.toFixed(0) + '</div>' +
       '<div class="ws-plan">/ ' + totalKm.toFixed(0) + '</div></div>' +
-      '<div class="d-bar"><div class="d-fill" style="width:' + (isCurrentWeek ? '0' : '100') + '%"></div><div class="d-rest"></div></div></div>' +
+      '<div class="d-bar"><div class="d-fill" style="width:' + kmPct + '%"></div><div class="d-rest"></div></div></div>' +
       '<div class="ws-row"><div class="ws-lbl">ZEIT</div>' +
-      '<div class="ws-nums"><div class="ws-done" style="' + summaryColor + '">' + (isCurrentWeek ? '—' : hours + ':' + String(mins).padStart(2,'0')) + '</div>' +
+      '<div class="ws-nums"><div class="ws-done" style="' + summaryColor + '">' + hours + ':' + String(mins).padStart(2,'0') + '</div>' +
       '<div class="ws-plan">/ ' + hours + ':' + String(mins).padStart(2,'0') + '</div></div>' +
-      '<div class="d-bar"><div class="d-fill" style="width:0%"></div><div class="d-rest"></div></div></div>' +
+      '<div class="d-bar"><div class="d-fill" style="width:' + (isCurrentWeek ? '0' : '100') + '%"></div><div class="d-rest"></div></div></div>' +
       '<div class="ws-row"><div class="ws-lbl">EINHEITEN</div>' +
-      '<div class="ws-nums"><div class="ws-done" style="' + summaryColor + '">—</div>' +
+      '<div class="ws-nums"><div class="ws-done">' + doneSessions + '</div>' +
       '<div class="ws-plan">/ ' + totalSessions + '</div></div>' +
-      '<div class="d-bar"><div class="d-fill" style="width:0%"></div><div class="d-rest"></div></div></div>' +
+      '<div class="d-bar"><div class="d-fill" style="width:' + sessionPct + '%"></div><div class="d-rest"></div></div></div>' +
       pendingBtn +
       '</div></div></div>';
   });
@@ -1493,7 +1499,11 @@ function loadDashboard() {
       var week = data.week;
       var health = data.health;
 
-      // Wochenkilometer
+      // Global speichern für Kalender
+      window.dashKmDone = week.km_done;
+      window.dashSessionsDone = week.sessions_done;
+
+      // Wochenkilometer im Data Strip
       var kmEl = document.getElementById('dash-km');
       var sessEl = document.getElementById('dash-sessions');
       var kmBarEl = document.getElementById('dash-km-bar');
@@ -1521,6 +1531,9 @@ function loadDashboard() {
         document.getElementById('dash-bb').textContent = health.body_battery;
         document.getElementById('dash-bb-bar').style.width = health.body_battery + '%';
       }
+
+      // Kalender neu rendern mit echten Wochendaten
+      if (planData.length > 0) renderCalendar();
     })
     .catch(function() {});
 }
