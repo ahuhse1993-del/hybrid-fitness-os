@@ -198,6 +198,7 @@ def get_plan():
         today = date.today()
         monday = today - timedelta(days=today.weekday())
 
+        # Trainingsplan (4 Wochen)
         cur.execute("""
             SELECT id, week_date, day_of_week, session_type, session_zone,
                    duration_min, distance_km, notes
@@ -207,27 +208,75 @@ def get_plan():
         """, (monday, monday + timedelta(weeks=4)))
 
         rows = cur.fetchall()
+
+        # Echte Aktivitäten dieser und letzter Woche
+        cur.execute("""
+            SELECT date, type, notes, duration_minutes, distance_km, heart_rate_avg, id
+            FROM trainings
+            WHERE date >= %s AND date <= %s
+            ORDER BY date
+        """, (monday, today))
+
+        actual_rows = cur.fetchall()
         conn.close()
+
+        # Echte Aktivitäten nach Datum indexieren
+        actual_by_date = {}
+        for r in actual_rows:
+            actual_by_date[str(r[0])] = {
+                "type": r[1],
+                "name": r[2] or r[1],
+                "duration_min": r[3],
+                "distance_km": float(r[4]) if r[4] else 0,
+                "avg_hr": r[5],
+                "training_id": r[6],
+                "is_actual": True
+            }
 
         plan = []
         for r in rows:
-            plan.append({
+            week_date = str(r[1])
+            day_of_week = r[2]
+
+            # Datum berechnen
+            item_date = date.fromisoformat(week_date) + timedelta(days=day_of_week)
+            item_date_str = str(item_date)
+            is_past = item_date < today
+
+            item = {
                 "id": r[0],
-                "week_date": str(r[1]),
-                "day_of_week": r[2],
+                "week_date": week_date,
+                "day_of_week": day_of_week,
                 "session_type": r[3],
                 "session_zone": r[4],
                 "duration_min": r[5],
                 "distance_km": float(r[6]) if r[6] else 0,
-                "notes": r[7] or ""
-            })
+                "notes": r[7] or "",
+                "is_actual": False,
+                "training_id": None
+            }
+
+            # Vergangene Tage: echte Aktivität überschreibt Plan
+            if is_past and item_date_str in actual_by_date:
+                actual = actual_by_date[item_date_str]
+                item["actual_type"] = actual["type"]
+                item["actual_name"] = actual["name"]
+                item["actual_km"] = actual["distance_km"]
+                item["actual_min"] = actual["duration_min"]
+                item["training_id"] = actual["training_id"]
+                item["is_done"] = True
+            elif is_past:
+                item["is_done"] = False
+            else:
+                item["is_done"] = False
+
+            plan.append(item)
 
         return jsonify({"status": "ok", "plan": plan})
 
     except Exception as e:
         import traceback
         return jsonify({"status": "error", "message": str(e), "trace": traceback.format_exc()}), 500
-
 @app.route('/api/plan/update', methods=['POST'])
 def update_plan():
     try:
