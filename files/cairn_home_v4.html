@@ -1615,7 +1615,7 @@ document.head.appendChild(dragStyle);
 
 // ─── DASHBOARD DATEN LADEN ───
 function loadDashboard() {
-  fetch('https://web-production-297f2.up.railway.app/api/dashboard')
+  return fetch('https://web-production-297f2.up.railway.app/api/dashboard')
     .then(function(r) { return r.json(); })
     .then(function(data) {
       if (data.status !== 'ok') return;
@@ -1667,9 +1667,12 @@ if(lastCheckin === TODAY){
   loadMorningBrief();
 }
 
-// Dashboard und Plan laden
-loadDashboard();
-loadPlan();
+// Dashboard zuerst laden, dann Plan
+loadDashboard().then(function() {
+  loadPlan();
+}).catch(function() {
+  loadPlan();
+});
 
 </script>
 
