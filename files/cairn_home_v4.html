@@ -1281,10 +1281,10 @@ function renderCalendar() {
     var mins = totalMin % 60;
 
     // Für aktuelle Woche: echte Daten aus Dashboard
-    var doneKm = isCurrentWeek ? (window.dashKmDone || 0) : totalKm;
-    var doneSessions = isCurrentWeek ? (window.dashSessionsDone || 0) : totalSessions;
-    var kmPct = totalKm > 0 ? Math.round(doneKm / totalKm * 100) : 0;
-    var sessionPct = totalSessions > 0 ? Math.round(doneSessions / totalSessions * 100) : 0;
+    var doneKm = isCurrentWeek ? (window.dashKmDone || 0) : 0;
+    var doneSessions = isCurrentWeek ? (window.dashSessionsDone || 0) : 0;
+    var kmPct = totalKm > 0 && isCurrentWeek ? Math.round(doneKm / totalKm * 100) : 0;
+    var sessionPct = totalSessions > 0 && isCurrentWeek ? Math.round(doneSessions / totalSessions * 100) : 0;
 
     // Pending changes Button
     var hasPending = pendingChanges[weekDate] && Object.keys(pendingChanges[weekDate]).length > 0;
@@ -1307,15 +1307,15 @@ function renderCalendar() {
       '<div class="week-summary">' +
       '<div class="ws-title" style="' + summaryColor + '">' + summaryTitle + '</div>' +
       '<div class="ws-row"><div class="ws-lbl">KILOMETER</div>' +
-      '<div class="ws-nums"><div class="ws-done">' + doneKm.toFixed(0) + '</div>' +
+      '<div class="ws-nums"><div class="ws-done">' + (isCurrentWeek ? doneKm.toFixed(0) : '—') + '</div>' +
       '<div class="ws-plan">/ ' + totalKm.toFixed(0) + '</div></div>' +
       '<div class="d-bar"><div class="d-fill" style="width:' + kmPct + '%"></div><div class="d-rest"></div></div></div>' +
       '<div class="ws-row"><div class="ws-lbl">ZEIT</div>' +
-      '<div class="ws-nums"><div class="ws-done" style="' + summaryColor + '">' + hours + ':' + String(mins).padStart(2,'0') + '</div>' +
+      '<div class="ws-nums"><div class="ws-done" style="' + summaryColor + '">' + (isCurrentWeek ? '—' : hours + ':' + String(mins).padStart(2,'0')) + '</div>' +
       '<div class="ws-plan">/ ' + hours + ':' + String(mins).padStart(2,'0') + '</div></div>' +
-      '<div class="d-bar"><div class="d-fill" style="width:' + (isCurrentWeek ? '0' : '100') + '%"></div><div class="d-rest"></div></div></div>' +
+      '<div class="d-bar"><div class="d-fill" style="width:0%"></div><div class="d-rest"></div></div></div>' +
       '<div class="ws-row"><div class="ws-lbl">EINHEITEN</div>' +
-      '<div class="ws-nums"><div class="ws-done">' + doneSessions + '</div>' +
+      '<div class="ws-nums"><div class="ws-done">' + (isCurrentWeek ? doneSessions : '—') + '</div>' +
       '<div class="ws-plan">/ ' + totalSessions + '</div></div>' +
       '<div class="d-bar"><div class="d-fill" style="width:' + sessionPct + '%"></div><div class="d-rest"></div></div></div>' +
       pendingBtn +
