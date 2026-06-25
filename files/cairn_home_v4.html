@@ -401,6 +401,23 @@ body{background:var(--bg);font-family:'DM Sans',sans-serif;color:var(--black);fo
 .ws-done{font-size:14px;font-weight:300;font-family:'DM Mono',monospace}
 .ws-plan{font-family:'DM Mono',monospace;font-size:7px;color:var(--stone)}
 
+/* KACHEL POPUP */
+.card-popup{display:none;position:fixed;inset:0;background:rgba(26,25,24,.75);z-index:200;align-items:center;justify-content:center}
+.card-popup.open{display:flex}
+.cp-box{background:var(--bg);border-top:3px solid var(--accent);max-width:480px;width:90%;padding:28px}
+.cp-box.past{border-top-color:var(--stone)}
+.cp-kicker{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.14em;color:var(--stone);margin-bottom:8px}
+.cp-title{font-size:20px;font-weight:300;margin-bottom:4px;letter-spacing:-.02em}
+.cp-date{font-family:'DM Mono',monospace;font-size:9px;color:var(--stone);margin-bottom:20px}
+.cp-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px}
+.cp-stat{display:flex;flex-direction:column;gap:3px}
+.cp-stat-lbl{font-family:'DM Mono',monospace;font-size:8px;color:var(--stone);letter-spacing:.1em}
+.cp-stat-val{font-family:'DM Mono',monospace;font-size:16px;font-weight:500}
+.cp-notes{font-size:13px;color:var(--mid);line-height:1.6;padding:12px;background:rgba(46,44,42,.05);margin-bottom:20px}
+.cp-btns{display:flex;gap:10px}
+.cp-btn-primary{background:var(--black);border:none;color:var(--bg);font-family:'DM Mono',monospace;font-size:9px;padding:10px 20px;cursor:pointer;letter-spacing:.1em}
+.cp-btn-secondary{background:transparent;border:.5px solid var(--stone);color:var(--stone);font-family:'DM Mono',monospace;font-size:9px;padding:10px 16px;cursor:pointer}
+
 /* REPLAN OVERLAY */
 .overlay{display:none;position:fixed;inset:0;background:rgba(26,25,24,.75);z-index:150;align-items:center;justify-content:center}
 .overlay.open{display:flex}
@@ -554,6 +571,18 @@ body{background:var(--bg);font-family:'DM Sans',sans-serif;color:var(--black);fo
     <div style="font-family:'DM Mono',monospace;font-size:10px;color:var(--accent);letter-spacing:.12em;margin-bottom:8px">WORKOUT AKTUALISIERT</div>
     <div style="font-size:13px;color:#F0EDE6;line-height:1.65;margin-bottom:18px" id="confirm-text">Einheit angepasst und im Kalender &uuml;bernommen.</div>
     <button onclick="closeAll()" style="background:var(--accent);border:none;color:var(--black);font-family:'DM Mono',monospace;font-size:9px;padding:10px 22px;cursor:pointer;letter-spacing:.1em">SCHLIESSEN</button>
+  </div>
+</div>
+
+<!-- KACHEL POPUP -->
+<div class="card-popup" id="card-popup">
+  <div class="cp-box" id="cp-box">
+    <div class="cp-kicker" id="cp-kicker">CAIRN · EINHEIT</div>
+    <div class="cp-title" id="cp-title">—</div>
+    <div class="cp-date" id="cp-date">—</div>
+    <div class="cp-stats" id="cp-stats"></div>
+    <div class="cp-notes" id="cp-notes" style="display:none"></div>
+    <div class="cp-btns" id="cp-btns"></div>
   </div>
 </div>
 
@@ -1066,6 +1095,71 @@ function loadMorningBrief() {
     });
 }
 
+// ─── KACHEL POPUP ───
+function openCardPopup(dataStr) {
+  var item = JSON.parse(decodeURIComponent(dataStr));
+  var isPast = item.is_done !== undefined && new Date(item.week_date) < new Date();
+
+  var box = document.getElementById('cp-box');
+  var kicker = document.getElementById('cp-kicker');
+  var title = document.getElementById('cp-title');
+  var dateEl = document.getElementById('cp-date');
+  var stats = document.getElementById('cp-stats');
+  var notes = document.getElementById('cp-notes');
+  var btns = document.getElementById('cp-btns');
+
+  var typeMap = {
+    'Easy Run':'EASY RUN','Recovery Run':'RECOVERY RUN','Long Run':'LONG RUN',
+    'Trail Run':'TRAIL RUN','Intervalle':'INTERVALS','Tempo Run':'TEMPO RUN',
+    'Threshold Run':'THRESHOLD RUN','Progression Run':'PROGRESSION RUN',
+    'Race Pace Run':'RACE PACE','Hill Repeats':'HILL REPEATS',
+    'Krafttraining':'STRENGTH','Mobilität':'MOBILITY'
+  };
+
+  var category = typeMap[item.session_type] || item.session_type.toUpperCase();
+  var DAY_NAMES = ['MO','DI','MI','DO','FR','SA','SO'];
+  var itemDate = new Date(item.week_date + 'T12:00:00');
+  itemDate.setDate(itemDate.getDate() + item.day_of_week);
+  var dateStr = DAY_NAMES[item.day_of_week] + ' · ' + itemDate.getDate() + '.' + (itemDate.getMonth()+1) + '.' + itemDate.getFullYear();
+
+  if (item.is_done) {
+    box.className = 'cp-box past';
+    kicker.textContent = 'CAIRN · ERLEDIGT';
+    title.textContent = item.actual_name || category;
+    dateEl.textContent = dateStr;
+    stats.innerHTML =
+      '<div class="cp-stat"><div class="cp-stat-lbl">DISTANZ</div><div class="cp-stat-val">' + (item.actual_km > 0 ? item.actual_km.toFixed(1) + ' km' : '—') + '</div></div>' +
+      '<div class="cp-stat"><div class="cp-stat-lbl">ZEIT</div><div class="cp-stat-val">' + (item.actual_min > 0 ? item.actual_min + ' min' : '—') + '</div></div>' +
+      '<div class="cp-stat"><div class="cp-stat-lbl">ZONE</div><div class="cp-stat-val">' + (item.session_zone || '—') + '</div></div>';
+    btns.innerHTML =
+      '<button class="cp-btn-primary" onclick="closeCardPopup()">ANALYSE ÖFFNEN →</button>' +
+      '<button class="cp-btn-secondary" onclick="closeCardPopup()">SCHLIESSEN</button>';
+  } else {
+    box.className = 'cp-box';
+    kicker.textContent = 'CAIRN · GEPLANT';
+    title.textContent = category;
+    dateEl.textContent = dateStr;
+    stats.innerHTML =
+      '<div class="cp-stat"><div class="cp-stat-lbl">DISTANZ</div><div class="cp-stat-val">' + (item.distance_km > 0 ? item.distance_km + ' km' : '—') + '</div></div>' +
+      '<div class="cp-stat"><div class="cp-stat-lbl">DAUER</div><div class="cp-stat-val">' + (item.duration_min > 0 ? item.duration_min + ' min' : '—') + '</div></div>' +
+      '<div class="cp-stat"><div class="cp-stat-lbl">ZONE</div><div class="cp-stat-val">' + (item.session_zone || '—') + '</div></div>';
+    if (item.notes) {
+      notes.textContent = item.notes;
+      notes.style.display = 'block';
+    } else {
+      notes.style.display = 'none';
+    }
+    btns.innerHTML =
+      '<button class="cp-btn-secondary" onclick="closeCardPopup()">SCHLIESSEN</button>';
+  }
+
+  document.getElementById('card-popup').classList.add('open');
+}
+
+function closeCardPopup() {
+  document.getElementById('card-popup').classList.remove('open');
+}
+
 // ─── DYNAMISCHER KALENDER ───
 var planData = [];
 var pendingChanges = {};
@@ -1252,11 +1346,28 @@ function renderCalendar() {
         var doneIndicator = item.is_done ? '<div style="width:5px;height:5px;background:var(--accent);border-radius:50%;margin-bottom:3px;opacity:.8;flex-shrink:0"></div>' : '';
 
         var isDraggable = !isPast;
+        var cardData = encodeURIComponent(JSON.stringify({
+          id: item.id,
+          session_type: item.session_type,
+          notes: item.notes || '',
+          distance_km: item.distance_km,
+          duration_min: item.duration_min,
+          session_zone: item.session_zone || '',
+          week_date: item.week_date,
+          day_of_week: item.day_of_week,
+          is_done: item.is_done || false,
+          actual_km: item.actual_km || 0,
+          actual_min: item.actual_min || 0,
+          actual_name: item.actual_name || '',
+          training_id: item.training_id || null
+        }));
+
         rowHtml += '<div class="tc ' + cardClass + '" ' +
           (isDraggable ? 'draggable="true" ' +
           'ondragstart="onDragStart(event,' + item.id + ',\'' + item.week_date + '\',' + item.day_of_week + ')" ' +
-          'ondragend="onDragEnd(event)" ' +
-          'style="cursor:grab"' : 'style="cursor:default"') + '>' +
+          'ondragend="onDragEnd(event)" ' : '') +
+          'onclick="openCardPopup(\'' + cardData + '\')" ' +
+          'style="cursor:pointer">' +
           doneIndicator +
           '<div class="tc-tag">' + category + '</div>' +
           (description ? '<div class="tc-name">' + description + '</div>' : '') +
