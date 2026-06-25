@@ -1071,6 +1071,8 @@ var planData = [];
 var pendingChanges = {};
 var activeWeekFilter = 'all';
 var draggedItem = null;
+window.dashKmDone = 0;
+window.dashSessionsDone = 0;
 
 var DAY_NAMES = ['MO','DI','MI','DO','FR','SA','SO'];
 var TYPE_CLASS = {
@@ -1189,6 +1191,13 @@ function renderCalendar() {
         var km = item.distance_km > 0 ? item.distance_km + ' km' : '';
         var mins = item.duration_min > 0 ? item.duration_min + ' min' : '';
 
+        // Erledigte Trainings: echte Aktivität anzeigen
+        if (item.is_done && item.actual_km !== undefined) {
+          notes = item.actual_name || notes;
+          km = item.actual_km > 0 ? item.actual_km.toFixed(1) + ' km' : '';
+          mins = item.actual_min > 0 ? item.actual_min + ' min' : '';
+        }
+
         // Workout Type Mapping → sichtbarer Titel
         var typeMap = {
           'Easy Run': 'EASY RUN',
@@ -1239,12 +1248,16 @@ function renderCalendar() {
         if (isPast) cardClass += ' done';
         if (isToday) cardClass += ' today-card';
 
+        // Kleiner gelber Punkt für erledigte Trainings
+        var doneIndicator = item.is_done ? '<div style="width:5px;height:5px;background:var(--accent);border-radius:50%;margin-bottom:3px;opacity:.8;flex-shrink:0"></div>' : '';
+
         var isDraggable = !isPast;
         rowHtml += '<div class="tc ' + cardClass + '" ' +
           (isDraggable ? 'draggable="true" ' +
           'ondragstart="onDragStart(event,' + item.id + ',\'' + item.week_date + '\',' + item.day_of_week + ')" ' +
           'ondragend="onDragEnd(event)" ' +
-          'style="cursor:grab"' : 'style="cursor:default;opacity:.5"') + '>' +
+          'style="cursor:grab"' : 'style="cursor:default"') + '>' +
+          doneIndicator +
           '<div class="tc-tag">' + category + '</div>' +
           (description ? '<div class="tc-name">' + description + '</div>' : '') +
           (volume ? '<div class="tc-meta">' + volume + '</div>' : '') +
