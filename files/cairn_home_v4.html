@@ -1140,13 +1140,21 @@ function openCardPopup(dataStr) {
 
   if (item.is_done) {
     box.className = 'cp-box past';
-    kicker.textContent = 'CAIRN · ERLEDIGT';
-    title.textContent = item.actual_name || category;
+    kicker.textContent = item.is_mismatch ? 'CAIRN · ABWEICHUNG VOM PLAN' : 'CAIRN · ERLEDIGT';
+    title.textContent = item.actual_name ? item.actual_name.split(' | ')[0] : category;
     dateEl.textContent = dateStr;
     stats.innerHTML =
       '<div class="cp-stat"><div class="cp-stat-lbl">DISTANZ</div><div class="cp-stat-val">' + (item.actual_km > 0 ? item.actual_km.toFixed(1) + ' km' : '—') + '</div></div>' +
       '<div class="cp-stat"><div class="cp-stat-lbl">ZEIT</div><div class="cp-stat-val">' + (item.actual_min > 0 ? item.actual_min + ' min' : '—') + '</div></div>' +
-      '<div class="cp-stat"><div class="cp-stat-lbl">ZONE</div><div class="cp-stat-val">' + (item.session_zone || '—') + '</div></div>';
+      '<div class="cp-stat"><div class="cp-stat-lbl">HF</div><div class="cp-stat-val">' + (item.actual_hr ? item.actual_hr + ' bpm' : '—') + '</div></div>';
+
+    if (item.is_mismatch) {
+      notes.innerHTML = '<span style="font-family:\'DM Mono\',monospace;font-size:8px;color:var(--stone);letter-spacing:.1em">GEPLANT WAR</span><br>' + category;
+      notes.style.display = 'block';
+    } else {
+      notes.style.display = 'none';
+    }
+
     btns.innerHTML =
       '<button class="cp-btn-primary" onclick="window.location.href=\'/analyse?id=' + (item.training_id || '') + '\'">' +
       'ANALYSE \u00d6FFNEN \u2192</button>' +
@@ -1303,7 +1311,16 @@ function renderCalendar() {
         var mins = item.duration_min > 0 ? item.duration_min + ' min' : '';
 
         // Erledigte Trainings: echte Aktivität anzeigen
-        if (item.is_done && item.actual_km !== undefined) {
+        if (item.is_done && item.actual_name) {
+          // Bei Mismatch: echten Typ verwenden
+          if (item.is_mismatch || item.is_spontaneous) {
+            var actualTypeMap = {
+              'Run': 'Easy Run', 'TrailRun': 'Trail Run',
+              'WeightTraining': 'Krafttraining', 'Ride': 'Ride',
+              'Hike': 'Hike', 'Walk': 'Walk', 'Other': 'Other'
+            };
+            st = actualTypeMap[item.actual_type] || item.actual_type || st;
+          }
           notes = item.actual_name || notes;
           km = item.actual_km > 0 ? item.actual_km.toFixed(1) + ' km' : '';
           mins = item.actual_min > 0 ? item.actual_min + ' min' : '';
@@ -1324,43 +1341,40 @@ function renderCalendar() {
           'Strides': 'STRIDES',
           'Krafttraining': 'STRENGTH',
           'Mobilität': 'MOBILITY',
-          'Rest Day': 'REST'
+          'Rest Day': 'REST',
+          'Hike': 'HIKE',
+          'Walk': 'WALK',
+          'Ride': 'RIDE',
+          'Other': 'ACTIVITY'
         };
 
-        // Card Class Mapping (für Farben)
         var classMap = {
-          'Easy Run': 'easy',
-          'Recovery Run': 'easy',
-          'Long Run': 'long',
-          'Trail Run': 'long',
-          'Intervalle': 'quality',
-          'Tempo Run': 'quality',
-          'Threshold Run': 'quality',
-          'Progression Run': 'quality',
-          'Race Pace Run': 'quality',
-          'Hill Repeats': 'quality',
-          'Strides': 'run',
-          'Krafttraining': 'gym',
-          'Mobilität': 'gym'
+          'Easy Run': 'easy', 'Recovery Run': 'easy',
+          'Long Run': 'long', 'Trail Run': 'long',
+          'Intervalle': 'quality', 'Tempo Run': 'quality',
+          'Threshold Run': 'quality', 'Progression Run': 'quality',
+          'Race Pace Run': 'quality', 'Hill Repeats': 'quality',
+          'Strides': 'run', 'Krafttraining': 'gym', 'Mobilität': 'gym',
+          'Hike': 'easy', 'Walk': 'easy', 'Ride': 'run'
         };
 
         category = typeMap[st] || st.toUpperCase();
         cardClass = classMap[st] || 'run';
 
-        // Beschreibung aus notes
         if (st === 'Krafttraining') {
-          description = notes.split(' · ')[0] || notes.split(' - ')[0] || '';
+          description = notes.split(' · ')[0] || notes.split(' - ')[0] || notes.split(' | ')[0] || '';
           volume = mins;
         } else {
-          description = notes.split(' · ')[0] || notes.split(' - ')[0] || '';
+          description = notes.split(' · ')[0] || notes.split(' - ')[0] || notes.split(' | ')[0] || '';
           volume = km || mins;
         }
 
         if (isPast) cardClass += ' done';
         if (isToday) cardClass += ' today-card';
 
-        // Kleiner gelber Punkt für erledigte Trainings
+        // Indikatoren
         var doneIndicator = item.is_done ? '<div style="width:5px;height:5px;background:var(--accent);border-radius:50%;margin-bottom:3px;opacity:.8;flex-shrink:0"></div>' : '';
+        var mismatchIndicator = item.is_mismatch ? '<div style="width:5px;height:5px;background:var(--accent-dark);border-radius:50%;margin-bottom:3px;opacity:.8;flex-shrink:0"></div>' : '';
 
         var isDraggable = !isPast;
         var cardData = encodeURIComponent(JSON.stringify({
@@ -1373,9 +1387,11 @@ function renderCalendar() {
           week_date: item.week_date,
           day_of_week: item.day_of_week,
           is_done: item.is_done || false,
+          is_mismatch: item.is_mismatch || false,
           actual_km: item.actual_km || 0,
           actual_min: item.actual_min || 0,
           actual_name: item.actual_name || '',
+          actual_hr: item.actual_hr || null,
           training_id: item.training_id || null
         }));
 
@@ -1385,7 +1401,7 @@ function renderCalendar() {
           'ondragend="onDragEnd(event)" ' : '') +
           'onclick="openCardPopup(\'' + cardData + '\')" ' +
           'style="cursor:pointer">' +
-          doneIndicator +
+          (item.is_mismatch ? mismatchIndicator : doneIndicator) +
           '<div class="tc-tag">' + category + '</div>' +
           (description ? '<div class="tc-name">' + description + '</div>' : '') +
           (volume ? '<div class="tc-meta">' + volume + '</div>' : '') +
