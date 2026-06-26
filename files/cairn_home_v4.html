@@ -1450,6 +1450,41 @@ function renderCalendar() {
   });
 
   document.getElementById('calendar-body').innerHTML = html;
+
+  // Today's Session aus Plan setzen
+  var todayItem = null;
+  planData.forEach(function(item) {
+    var itemDate = new Date(item.week_date + 'T12:00:00');
+    itemDate.setDate(itemDate.getDate() + item.day_of_week);
+    if (itemDate.toISOString().split('T')[0] === todayStr) {
+      todayItem = item;
+    }
+  });
+
+  if (todayItem) {
+    var typeMap = {
+      'Easy Run':'EASY RUN','Recovery Run':'RECOVERY RUN','Long Run':'LONG RUN',
+      'Trail Run':'TRAIL RUN','Intervalle':'INTERVALS','Tempo Run':'TEMPO RUN',
+      'Threshold Run':'THRESHOLD RUN','Progression Run':'PROGRESSION RUN',
+      'Race Pace Run':'RACE PACE','Hill Repeats':'HILL REPEATS',
+      'Krafttraining':'STRENGTH','Mobilität':'MOBILITY','Rest Day':'REST'
+    };
+    var sessionName = typeMap[todayItem.session_type] || todayItem.session_type;
+    var sessionNotes = todayItem.is_done ? (todayItem.actual_name || todayItem.notes || '') : (todayItem.notes || '');
+    var sessionKm = todayItem.is_done ? (todayItem.actual_km > 0 ? todayItem.actual_km.toFixed(1) + ' km' : '') : (todayItem.distance_km > 0 ? todayItem.distance_km + ' km' : '');
+    var sessionDur = todayItem.is_done ? (todayItem.actual_min > 0 ? todayItem.actual_min + ' min' : '') : (todayItem.duration_min > 0 ? todayItem.duration_min + ' min' : '');
+
+    var el = document.getElementById('session-name');
+    if (el) el.textContent = sessionName;
+    var distEl = document.getElementById('session-dist');
+    if (distEl) distEl.textContent = sessionKm;
+    var durEl = document.getElementById('session-dur');
+    if (durEl) durEl.textContent = sessionDur;
+    var zoneEl = document.getElementById('session-zone');
+    if (zoneEl) zoneEl.textContent = todayItem.session_zone || '—';
+    var structEl = document.getElementById('session-struct');
+    if (structEl) structEl.textContent = sessionNotes.split(' · ')[0] || '';
+  }
 }
 
 function filterWeek(weekDate, el) {
