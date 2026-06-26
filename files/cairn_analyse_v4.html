@@ -314,6 +314,12 @@ body{background:var(--bg);font-family:"DM Sans",sans-serif;color:var(--black);fo
         </div>
       </div>
 
+      <!-- PACE CHART -->
+      <div class="sec"><span class="secl">Pace pro Kilometer</span><div class="secln"></div></div>
+      <div id="pace-chart" style="padding:12px 16px;background:#E8E4DC;margin-bottom:2px;min-height:60px">
+        <div style="font-family:DM Mono,monospace;font-size:9px;color:#9E9B95">Wird geladen...</div>
+      </div>
+
       <!-- ROUTE + HÖHENPROFIL -->
       <div class="sec"><span class="secl">Route &amp; H&#246;henprofil</span><div class="secln"></div></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:2px;margin-bottom:2px">
@@ -563,6 +569,40 @@ function setEl(id, val) {
   if (el) el.textContent = val;
 }
 
+function buildPaceChart(splits) {
+  var chartEl = document.getElementById('pace-chart');
+  if (!chartEl) return;
+  var fullSplits = splits.filter(function(s) { return s.distance_km >= 0.9; });
+  if (fullSplits.length === 0) return;
+
+  var paces = fullSplits.map(function(s) {
+    if (!s.pace) return 0;
+    var p = s.pace.split(':');
+    return parseInt(p[0]) * 60 + parseInt(p[1]);
+  });
+  var minPace = Math.min.apply(null, paces.filter(function(p) { return p > 0; }));
+  var maxPace = Math.max.apply(null, paces);
+  var range = maxPace - minPace || 60;
+
+  var w = 400, h = 120, pad = 10;
+  var barW = Math.floor((w - pad * 2) / fullSplits.length) - 2;
+
+  var bars = '';
+  fullSplits.forEach(function(s, i) {
+    if (!s.pace) return;
+    var p = s.pace.split(':');
+    var paceSec = parseInt(p[0]) * 60 + parseInt(p[1]);
+    var barH = Math.round(((paceSec - minPace) / range) * (h - pad * 2 - 20)) + 20;
+    var x = pad + i * (barW + 2);
+    var y = h - barH - 15;
+    var paceStr = Math.floor(paceSec/60) + ':' + String(paceSec%60).padStart(2,'0');
+    bars += '<rect x="' + x + '" y="' + y + '" width="' + barW + '" height="' + barH + '" fill="rgba(46,44,42,.2)"/>';
+    bars += '<text x="' + (x + barW/2) + '" y="' + (h - 2) + '" font-family="DM Mono" font-size="8" fill="#9E9B95" text-anchor="middle">' + s.split + '</text>';
+  });
+
+  chartEl.innerHTML = '<svg width="100%" viewBox="0 0 400 ' + h + '">' + bars + '</svg>';
+}
+
 function loadActivity() {
   if (!trainingId) {
     document.getElementById("popup").classList.remove("open");
@@ -577,7 +617,25 @@ function loadActivity() {
       var a = data.activity;
       activityData = a;
 
+      var elevMatch = a.name.match(/\+(\d+)m/);
+      var elevStr = elevMatch ? '+' + elevMatch[1] + ' m' : '—';
+
       var pace = calcPace(a.distance_km, a.duration_min);
+      if (data.splits && data.splits.length > 1) {
+        var fullSplits = data.splits.filter(function(s) { return s.distance_km >= 0.9; });
+        if (fullSplits.length > 0) {
+          var totalPaceSec = 0;
+          fullSplits.forEach(function(s) {
+            if (s.pace) {
+              var parts = s.pace.split(':');
+              totalPaceSec += parseInt(parts[0]) * 60 + parseInt(parts[1]);
+            }
+          });
+          var avgPaceSec = Math.round(totalPaceSec / fullSplits.length);
+          pace = Math.floor(avgPaceSec/60) + ':' + String(avgPaceSec%60).padStart(2,'0') + '/km';
+        }
+      }
+
       var time = calcTime(a.duration_min);
       var name = a.name.split(' | ')[0];
       var dateStr = a.date;
@@ -592,15 +650,14 @@ function loadActivity() {
 
       setEl('fb-title', 'Wie war das Training?');
       setEl('fb-sub', name + ' · ' + dateStr);
-
       setEl('an-type', a.type + ' · ' + dateStr);
       setEl('an-title', name);
-
       setEl('hero-km', a.distance_km.toFixed(1));
       setEl('hero-name', name);
       setEl('hero-time', time);
       setEl('hero-pace', pace);
       setEl('hero-hr', (a.avg_hr || '—') + ' bpm');
+      setEl('hero-elev', elevStr);
 
       var tb = document.getElementById("stbd");
       if (tb) {
@@ -616,6 +673,8 @@ function loadActivity() {
           tb.innerHTML = '<tr><td colspan="6" style="color:#6B6860;font-family:DM Mono,monospace;font-size:9px;padding:12px">Keine Split-Daten verfügbar</td></tr>';
         }
       }
+
+      if (data.splits && data.splits.length > 1) buildPaceChart(data.splits);
 
       document.getElementById("popup").classList.add("open");
     })
