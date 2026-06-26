@@ -3,6 +3,7 @@ CAIRN Garmin Calendar Sync
 Holt geplante Workouts aus Garmin Kalender → training_plan Tabelle
 Europäische Woche: Montag = Tag 1 ... Sonntag = Tag 7
 week_date = Montag der Woche
+Holt auch Workout-Details (Distanz, Dauer, Struktur) via workoutId
 """
 
 import sys, os
@@ -14,10 +15,10 @@ load_dotenv()
 from garminconnect import Garmin
 from database.connection import get_connection
 from datetime import date, timedelta
+import time
 
 def map_title_to_session_type(title, sport_key):
     title_lower = title.lower()
-    # Titel-basiertes Mapping hat Vorrang
     if 'interval' in title_lower or 'intervall' in title_lower:
         return 'Intervalle'
     if 'hill' in title_lower or 'hügel' in title_lower or 'bergauf' in title_lower:
@@ -40,7 +41,8 @@ def map_title_to_session_type(title, sport_key):
         return 'Tempo Run'
     if 'strength' in title_lower or 'kraft' in title_lower:
         return 'Krafttraining'
-    # Sport-Key als Fallback
+    if 'shake out' in title_lower or 'shakeout' in title_lower:
+        return 'Recovery Run'
     mapping = {
         'running': 'Easy Run',
         'trail_running': 'Trail Run',
@@ -51,6 +53,55 @@ def map_title_to_session_type(title, sport_key):
         'hiking': 'Hike',
     }
     return mapping.get(sport_key, 'Easy Run')
+
+def get_workout_details(client, workout_id):
+    """Holt Distanz, Dauer und Struktur eines Workouts"""
+    try:
+        w = client.get_workout_by_id(workout_id)
+        dist_m = w.get('estimatedDistanceInMeters') or 0
+        dur_s = w.get('estimatedDurationInSecs') or 0
+        dist_km = round(dist_m / 1000, 1) if dist_m else 0
+        dur_min = round(dur_s / 60) if dur_s else 0
+
+        # Workout-Struktur aus Steps extrahieren
+        steps_text = []
+        segments = w.get('workoutSegments', [])
+        for seg in segments:
+            steps = seg.get('workoutSteps', [])
+            for step in steps:
+                step_type = step.get('stepType', {}).get('stepTypeKey', '')
+                desc = step.get('description', '') or ''
+                end_cond = step.get('endCondition', {}).get('conditionTypeKey', '')
+                end_val = step.get('endConditionValue')
+
+                if end_cond == 'lap.button':
+                    continue
+
+                if end_val:
+                    if end_cond == 'distance':
+                        val_str = f"{round(end_val/1000, 1)}km"
+                    elif end_cond == 'time':
+                        mins = round(end_val / 60)
+                        val_str = f"{mins} min"
+                    else:
+                        val_str = str(round(end_val))
+                else:
+                    val_str = ''
+
+                if step_type == 'warmup':
+                    steps_text.append(f"Warm-Up: {val_str} {desc}".strip())
+                elif step_type == 'cooldown':
+                    steps_text.append(f"Cool Down: {val_str} {desc}".strip())
+                elif step_type == 'interval':
+                    steps_text.append(f"{val_str} {desc}".strip())
+                elif step_type == 'rest':
+                    steps_text.append(f"Pause: {val_str}".strip())
+
+        structure = ' · '.join([s for s in steps_text if s]) if steps_text else ''
+        return dist_km, dur_min, structure
+    except Exception as e:
+        print(f"    ⚠️ Workout-Details Fehler: {e}")
+        return 0, 0, ''
 
 def sync_garmin_calendar():
     client = Garmin(os.getenv("GARMIN_EMAIL"), os.getenv("GARMIN_PASSWORD"))
@@ -89,10 +140,20 @@ def sync_garmin_calendar():
             continue
 
         item_monday = item_date - timedelta(days=item_date.weekday())
-        day_of_week = item_date.isoweekday()  # Mo=1...So=7
+        day_of_week = item_date.isoweekday()
 
         title = item.get('title', '')
         session_type = map_title_to_session_type(title, item.get('sportTypeKey', 'running'))
+
+        # Workout-Details holen
+        workout_id = item.get('workoutId')
+        dist_km, dur_min, structure = 0, 0, ''
+        if workout_id:
+            dist_km, dur_min, structure = get_workout_details(client, workout_id)
+            time.sleep(0.5)
+
+        # Notes: Struktur wenn vorhanden, sonst Titel
+        notes = structure if structure else title
 
         cur.execute("""
             INSERT INTO training_plan (week_date, day_of_week, session_type, session_zone, duration_min, distance_km, notes)
@@ -102,11 +163,11 @@ def sync_garmin_calendar():
             day_of_week,
             session_type,
             '',
-            0,
-            0,
-            title
+            dur_min,
+            dist_km,
+            notes
         ))
-        print(f"  ✅ {item_date} ({item_date.strftime('%A')}) | week_date: {item_monday} | Tag {day_of_week} | {session_type} | {title}")
+        print(f"  ✅ {item_date} | Tag {day_of_week} | {session_type} | {dist_km}km | {dur_min}min | {notes[:40]}")
 
     conn.commit()
     conn.close()
