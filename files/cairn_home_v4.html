@@ -1148,7 +1148,8 @@ function openCardPopup(dataStr) {
       '<div class="cp-stat"><div class="cp-stat-lbl">ZEIT</div><div class="cp-stat-val">' + (item.actual_min > 0 ? item.actual_min + ' min' : '—') + '</div></div>' +
       '<div class="cp-stat"><div class="cp-stat-lbl">ZONE</div><div class="cp-stat-val">' + (item.session_zone || '—') + '</div></div>';
     btns.innerHTML =
-      '<button class="cp-btn-primary" onclick="closeCardPopup()">ANALYSE ÖFFNEN →</button>' +
+      '<button class="cp-btn-primary" onclick="window.location.href=\'/analyse?id=' + (item.training_id || '') + '\'">' +
+      'ANALYSE \u00d6FFNEN \u2192</button>' +
       '<button class="cp-btn-secondary" onclick="closeCardPopup()">SCHLIESSEN</button>';
   } else {
     box.className = 'cp-box';
