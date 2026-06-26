@@ -537,16 +537,112 @@ body{background:var(--bg);font-family:"DM Sans",sans-serif;color:var(--black);fo
 </div>
 
 <script>
+// ─── URL Parameter lesen ───
+var trainingId = new URLSearchParams(window.location.search).get('id');
+
+// ─── Popup schliessen ───
 function closePop(){document.getElementById("popup").classList.remove("open")}
 function openFb(){document.getElementById("popup").classList.remove("open");document.getElementById("sfb").classList.add("on");document.getElementById("san").classList.remove("on");window.scrollTo(0,0)}
 function openAn(){document.getElementById("sfb").classList.remove("on");document.getElementById("san").classList.add("on");window.scrollTo(0,0)}
 function sg(btn){btn.parentElement.querySelectorAll("button").forEach(b=>b.classList.remove("sel"));btn.classList.add("sel")}
 function tSpl(){const c=document.getElementById("scnt"),a=document.getElementById("sarr");c.classList.toggle("open");a.textContent=c.classList.contains("open")?"&#9650;":"&#9660;"}
+
+// ─── Diktat ───
 let rec=null,don=false;
 function tDik(btn){const st=document.getElementById("dikst"),ta=document.getElementById("ftta"),ic=btn.querySelector("i");if(don){if(rec)rec.stop();return}const SR=window.SpeechRecognition||window.webkitSpeechRecognition;if(!SR){alert("Chrome verwenden.");return}rec=new SR();rec.lang="de-DE";rec.continuous=true;rec.interimResults=true;let ft=ta.value;rec.onstart=()=>{don=true;btn.style.background="var(--accent)";btn.classList.add("don");ic.style.color="var(--black)";st.style.display="flex"};rec.onresult=e=>{let it="";for(let i=e.resultIndex;i<e.results.length;i++){const t=e.results[i][0].transcript;if(e.results[i].isFinal)ft+=(ft?" ":"")+t;else it+=t}ta.value=ft+(it?" "+it:"")};rec.onerror=()=>rDik(btn,ic,st);rec.onend=()=>{rDik(btn,ic,st);ta.value=ft}}
 function rDik(btn,ic,st){don=false;btn.style.background="var(--black)";btn.classList.remove("don");ic.style.color="var(--accent)";st.style.display="none"}
-const sd=[["1","5:10","140","+18","168","Z2"],["2","5:05","142","+25","170","Z2"],["3","5:12","145","+35","167","Z2"],["4","5:25","151","+42","164","Z3"],["5","5:30","154","+38","163","Z3"],["6","5:28","152","+12","165","Z3"],["7","5:08","148","&#8722;28","169","Z2"],["8","5:02","146","&#8722;30","171","Z2"],["9","5:15","150","&#8722;15","168","Z2"],["10","5:18","152","&#8722;8","166","Z3"],["11","5:05","147","&#8722;12","170","Z2"],["12","5:00","144","&#8722;18","172","Z2"]];
-const tb=document.getElementById("stbd");sd.forEach((row,i)=>{const tr=document.createElement("tr");row.forEach((c,j)=>{const td=document.createElement("td");td.innerHTML=c;if(j===5)td.style.color=c==="Z3"?"var(--accent-dark)":"#6B6860";if(j===4&&parseInt(c)<170)td.style.color="var(--accent-dark)";if(i===11&&j===1){td.style.color="var(--accent)";td.style.fontWeight="500"}tr.appendChild(td)});tb.appendChild(tr)});
+
+// ─── Aktivität laden ───
+function loadActivity() {
+  if (!trainingId) {
+    document.getElementById("popup").classList.remove("open");
+    document.getElementById("san").classList.add("on");
+    return;
+  }
+
+  fetch('https://web-production-297f2.up.railway.app/api/activity/' + trainingId)
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.status !== 'ok') return;
+      var a = data.activity;
+
+      // Popup aktualisieren
+      var km = a.distance_km > 0 ? a.distance_km.toFixed(1) + ' km' : '—';
+      var dur = a.duration_min > 0 ? Math.floor(a.duration_min/60) + ':' + String(a.duration_min%60).padStart(2,'0') + ' h' : '—';
+      var pace = '—';
+      if (a.distance_km > 0 && a.duration_min > 0) {
+        var paceSec = Math.round(a.duration_min * 60 / a.distance_km);
+        pace = Math.floor(paceSec/60) + ':' + String(paceSec%60).padStart(2,'0') + '/km';
+      }
+
+      document.querySelector('.pop-title').textContent = a.name;
+      document.querySelector('.pop-sub').textContent = a.date + ' · ' + a.type;
+      var metas = document.querySelectorAll('.pm-val');
+      if (metas[0]) metas[0].innerHTML = a.distance_km.toFixed(1) + '<span class="pm-unit">km</span>';
+      if (metas[1]) metas[1].innerHTML = dur.replace(' h','') + '<span class="pm-unit">h</span>';
+      if (metas[2]) metas[2].innerHTML = pace.replace('/km','') + '<span class="pm-unit">min/km</span>';
+      if (metas[3]) metas[3].innerHTML = (a.avg_hr || '—') + '<span class="pm-unit">bpm</span>';
+
+      // Splits laden
+      var tb = document.getElementById("stbd");
+      if (tb && data.splits && data.splits.length > 0) {
+        tb.innerHTML = '';
+        data.splits.forEach(function(s) {
+          var tr = document.createElement("tr");
+          tr.innerHTML = '<td>' + s.split + '</td>' +
+            '<td>' + (s.pace || '—') + '</td>' +
+            '<td>' + (s.hr || '—') + '</td>' +
+            '<td>' + (s.elevation > 0 ? '+' + s.elevation.toFixed(0) : s.elevation < 0 ? s.elevation.toFixed(0) : '—') + '</td>' +
+            '<td>—</td><td>—</td>';
+          tb.appendChild(tr);
+        });
+      }
+
+      // Popup öffnen
+      document.getElementById("popup").classList.add("open");
+    })
+    .catch(function() {
+      document.getElementById("popup").classList.remove("open");
+      document.getElementById("san").classList.add("on");
+    });
+}
+
+// ─── Coach Analyse laden ───
+function loadAnalysis() {
+  if (!trainingId) return;
+
+  var summaryEl = document.querySelector('.rh');
+  var learningEl = document.querySelector('.ltxt');
+  if (summaryEl) summaryEl.textContent = 'Coach analysiert...';
+
+  fetch('https://web-production-297f2.up.railway.app/api/activity/' + trainingId + '/analyse')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.status !== 'ok') return;
+      var a = data.analysis;
+
+      if (summaryEl && a.summary) summaryEl.textContent = a.summary;
+      if (learningEl && a.meaning) learningEl.textContent = a.meaning;
+
+      // Beobachtungen
+      var rblock = document.querySelector('.rblock');
+      if (rblock && a.observations) {
+        var obsHtml = '<div class="rlbl">Coach · Beobachtungen</div>';
+        a.observations.forEach(function(obs) {
+          obsHtml += '<div style="font-size:13px;color:rgba(240,237,230,.6);line-height:1.6;padding:8px 0;border-bottom:.5px solid rgba(240,237,230,.07)">' + obs + '</div>';
+        });
+        if (a.closing) {
+          obsHtml += '<div style="margin-top:16px;font-style:italic;color:rgba(240,237,230,.4);font-size:13px">&ldquo;' + a.closing + '&rdquo;</div>';
+        }
+        rblock.innerHTML = obsHtml;
+      }
+    })
+    .catch(function() {});
+}
+
+// ─── Start ───
+loadActivity();
+setTimeout(loadAnalysis, 500);
 </script>
 </body>
 </html>
