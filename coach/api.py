@@ -51,6 +51,7 @@ def save_checkin():
     conn.close()
 
     # GitHub Actions Health Sync triggern
+    github_trigger_status = "skipped"
     try:
         import urllib.request
         github_token = os.getenv("CAIRN_GITHUB_TOKEN")
@@ -66,10 +67,13 @@ def save_checkin():
                 method="POST"
             )
             urllib.request.urlopen(req, timeout=5)
-    except Exception:
-        pass
+            github_trigger_status = "triggered"
+        else:
+            github_trigger_status = "no_token"
+    except Exception as e:
+        github_trigger_status = f"error: {str(e)}"
 
-    return jsonify({"status": "ok"})
+    return jsonify({"status": "ok", "github_sync": github_trigger_status})
 
 @app.route('/api/morning-brief', methods=['GET'])
 def morning_brief():
