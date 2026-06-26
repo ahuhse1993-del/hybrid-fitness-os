@@ -1,6 +1,7 @@
 import anthropic
 import os
 import json
+from datetime import date, timedelta
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -24,6 +25,11 @@ TRAINING_CATALOGUE = {
     "Mobilität":       {"zone": "",          "primary": "none",       "secondary": "none"},
 }
 
+DAY_NAMES_DE = {
+    0: "Montag", 1: "Dienstag", 2: "Mittwoch", 3: "Donnerstag",
+    4: "Freitag", 5: "Samstag", 6: "Sonntag"
+}
+
 def generate_morning_brief(athlete_feedback: dict = None):
     snapshot = get_daily_snapshot()
 
@@ -33,9 +39,42 @@ def generate_morning_brief(athlete_feedback: dict = None):
     rhr = snapshot.get("resting_hr", {})
     activities = snapshot.get("recent_activities", [])
 
+    # Datum-Kontext für den Coach
+    try:
+        import pytz
+        from datetime import datetime
+        zurich = pytz.timezone('Europe/Zurich')
+        today = datetime.now(zurich).date()
+    except Exception:
+        from datetime import datetime
+        today = (datetime.utcnow() + timedelta(hours=2)).date()
+
+    yesterday = today - timedelta(days=1)
+    day_before = today - timedelta(days=2)
+
+    today_str = f"{DAY_NAMES_DE[today.weekday()]}, {today.strftime('%d.%m.%Y')}"
+    yesterday_str = yesterday.strftime('%d.%m.%Y')
+    day_before_str = day_before.strftime('%d.%m.%Y')
+
+    # Aktivitäten mit relativem Datum beschriften
     recent = []
-    for a in activities[:3]:
-        line = "- " + str(a.get('date')) + " | " + str(a.get('type')) + " | " + str(a.get('name')) + " | " + str(a.get('distance_km')) + "km | " + str(a.get('duration_min')) + "min | HF " + str(a.get('avg_hr')) + " bpm"
+    for a in activities[:5]:
+        act_date_str = str(a.get('date', ''))
+        try:
+            act_date = date.fromisoformat(act_date_str)
+            if act_date == today:
+                rel = "heute"
+            elif act_date == yesterday:
+                rel = "gestern"
+            elif act_date == day_before:
+                rel = "vorgestern"
+            else:
+                diff = (today - act_date).days
+                rel = f"vor {diff} Tagen ({act_date_str})"
+        except Exception:
+            rel = act_date_str
+
+        line = f"- {rel} | {a.get('type')} | {a.get('name')} | {a.get('distance_km')}km | {a.get('duration_min')}min | HF {a.get('avg_hr')} bpm"
         recent.append(line)
     recent_text = "\n".join(recent)
 
@@ -47,23 +86,24 @@ def generate_morning_brief(athlete_feedback: dict = None):
         text = athlete_feedback.get('text', '')
         try:
             feel_score = int(feel)
-        except:
+        except Exception:
             feel_score = 5
-        feedback_text += "Gefuehl (1-10): " + str(feel_score) + "\n"
+        feedback_text += f"Gefuehl (1-10): {feel_score}\n"
         if notes:
             feedback_text += "Notizen: " + ', '.join(notes) + "\n"
         if text:
-            feedback_text += "Eigene Worte: \"" + text + "\"\n"
+            feedback_text += f"Eigene Worte: \"{text}\"\n"
 
     session_types = ", ".join(TRAINING_CATALOGUE.keys())
 
     prompt = "Du bist CAIRN - ein erfahrener Ausdauer-Coach. Du sprichst wie ein ruhiger Bergfuehrer. Nie wie Software.\n\n"
+    prompt += f"Heutiges Datum: {today_str}\n\n"
     prompt += "Athlet-Daten von heute Morgen:\n"
-    prompt += "- Schlaf: " + str(sleep.get('duration_h')) + "h | Score: " + str(sleep.get('score')) + " | Tief: " + str(sleep.get('deep_h')) + "h | REM: " + str(sleep.get('rem_h')) + "h\n"
-    prompt += "- HRV: " + str(hrv.get('hrv_last_night')) + " ms | Status: " + str(hrv.get('status')) + " | 5-Tage-Avg: " + str(hrv.get('hrv_5day_avg')) + "\n"
-    prompt += "- Body Battery: +" + str(bb.get('charged')) + " / -" + str(bb.get('drained')) + "\n"
-    prompt += "- Ruhepuls: " + str(rhr.get('rhr')) + " bpm\n\n"
-    prompt += "Letzte Aktivitaeten:\n" + recent_text + "\n\n"
+    prompt += f"- Schlaf: {sleep.get('duration_h')}h | Score: {sleep.get('score')} | Tief: {sleep.get('deep_h')}h | REM: {sleep.get('rem_h')}h\n"
+    prompt += f"- HRV: {hrv.get('hrv_last_night')} ms | Status: {hrv.get('status')} | 5-Tage-Avg: {hrv.get('hrv_5day_avg')}\n"
+    prompt += f"- Body Battery: +{bb.get('charged')} / -{bb.get('drained')}\n"
+    prompt += f"- Ruhepuls: {rhr.get('rhr')} bpm\n\n"
+    prompt += "Letzte Aktivitaeten (mit relativem Datum):\n" + recent_text + "\n\n"
     if feedback_text:
         prompt += "Athlet-Feedback:\n" + feedback_text + "\n"
 
@@ -72,11 +112,16 @@ Wenn der Athlet sich gut fuehlt (Gefuehl 7-10) UND keine klaren Warnsignale vorh
 Nur wenn Gefuehl niedrig (1-5) ODER klare Warnsignale (HRV stark gesunken, Schlaf schlecht, eigene Worte zeigen Erschoepfung) → mache einen konkreten Anpassungsvorschlag.
 Wenn alles in Ordnung ist: suggestion = "" (leer lassen).
 
+WICHTIG fuer den Brief:
+- Verwende die relativen Zeitangaben (gestern, heute, vorgestern) korrekt basierend auf den Aktivitaetsdaten.
+- Sprich konkret ueber die Aktivitaeten mit den richtigen Zeitangaben.
+- Nie: Algorithmus, Score, Metrik, Regelverstoß, Session.
+- Immer: Ich sehe, Ich wuerde, Dein Koerper.
+- Max 150 Woerter, kurze Saetze.
+
 Antworte NUR mit diesem JSON. Kein Text davor oder danach. Kein Markdown:
 {"brief": "...", "suggestion": "", "session_type": "...", "replan_needed": false}
 
-brief: Morning Brief auf Deutsch, max 150 Woerter, kurze Saetze. Nie: Algorithmus, Score, Metrik. Immer: Ich sehe, Ich wuerde, Dein Koerper.
-suggestion: Nur befuellen wenn replan_needed=true. Sonst leer lassen "".
 session_type: Einer dieser Typen: """ + session_types + """
 replan_needed: true nur wenn klare Warnsignale oder Athlet fuehlt sich schlecht (1-5). Sonst false."""
 
@@ -103,7 +148,6 @@ replan_needed: true nur wenn klare Warnsignale oder Athlet fuehlt sich schlecht 
             result["primary_target"] = "none"
             result["secondary_target"] = "none"
 
-        # Wenn kein Replan nötig — suggestion leer
         if not result.get("replan_needed", False):
             result["suggestion"] = ""
 
