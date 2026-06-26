@@ -456,6 +456,133 @@ def check_plan():
         import traceback
         return jsonify({"status": "error", "message": str(e), "trace": traceback.format_exc()}), 500
 
+@app.route('/api/activity/<int:training_id>', methods=['GET'])
+def get_activity(training_id):
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+
+        # Aktivität holen
+        cur.execute("""
+            SELECT id, date, type, notes, duration_minutes, distance_km,
+                   heart_rate_avg, garmin_id
+            FROM trainings WHERE id = %s
+        """, (training_id,))
+        row = cur.fetchone()
+        if not row:
+            conn.close()
+            return jsonify({"status": "error", "message": "Nicht gefunden"}), 404
+
+        activity = {
+            "id": row[0],
+            "date": str(row[1]),
+            "type": row[2],
+            "name": row[3] or row[2],
+            "duration_min": row[4],
+            "distance_km": float(row[5]) if row[5] else 0,
+            "avg_hr": row[6],
+            "garmin_id": row[7]
+        }
+
+        # Splits holen
+        cur.execute("""
+            SELECT split_number, distance_km, pace_seconds, heart_rate_avg, elevation_gain
+            FROM splits WHERE training_id = %s ORDER BY split_number
+        """, (training_id,))
+        splits = []
+        for s in cur.fetchall():
+            pace_min = None
+            if s[2]:
+                pace_min = f"{s[2] // 60}:{str(s[2] % 60).zfill(2)}"
+            splits.append({
+                "split": s[0],
+                "distance_km": float(s[1]) if s[1] else 0,
+                "pace": pace_min,
+                "hr": s[3],
+                "elevation": float(s[4]) if s[4] else 0
+            })
+
+        conn.close()
+        return jsonify({"status": "ok", "activity": activity, "splits": splits})
+
+    except Exception as e:
+        import traceback
+        return jsonify({"status": "error", "message": str(e), "trace": traceback.format_exc()}), 500
+
+@app.route('/api/activity/<int:training_id>/analyse', methods=['GET'])
+def analyse_activity(training_id):
+    try:
+        import anthropic
+        conn = get_db()
+        cur = conn.cursor()
+
+        cur.execute("""
+            SELECT id, date, type, notes, duration_minutes, distance_km, heart_rate_avg
+            FROM trainings WHERE id = %s
+        """, (training_id,))
+        row = cur.fetchone()
+        if not row:
+            conn.close()
+            return jsonify({"status": "error", "message": "Nicht gefunden"}), 404
+
+        cur.execute("""
+            SELECT split_number, distance_km, pace_seconds, heart_rate_avg
+            FROM splits WHERE training_id = %s ORDER BY split_number
+        """, (training_id,))
+        splits = cur.fetchall()
+        conn.close()
+
+        name = row[3] or row[2]
+        distance = float(row[5]) if row[5] else 0
+        duration = row[4] or 0
+        avg_hr = row[6] or 0
+        date_str = str(row[1])
+
+        splits_text = ""
+        for s in splits[:10]:
+            pace_str = f"{s[2]//60}:{str(s[2]%60).zfill(2)}/km" if s[2] else "—"
+            splits_text += f"  Km {s[0]}: {pace_str}, HF {s[3] or '—'}\n"
+
+        prompt = f"""Du bist CAIRN — ein erfahrener Ausdauer-Coach.
+
+Analysiere dieses Training auf Deutsch. Sprich direkt und menschlich.
+Nie wie Software. Kurze Sätze. Bedeutung vor Daten.
+
+Training: {name}
+Datum: {date_str}
+Distanz: {distance:.1f} km
+Dauer: {duration} min
+Ø Herzfrequenz: {avg_hr} bpm
+
+Splits:
+{splits_text if splits_text else "Keine Split-Daten verfügbar"}
+
+Struktur deiner Antwort (klar getrennt mit |||):
+1. Coach Summary (2-3 Sätze: was war das für ein Training, wie lief es)
+2. Was ich sehe (3 konkrete Beobachtungen)
+3. Was das bedeutet (1-2 Sätze für die nächsten Trainings)
+4. Closing Thought (1 Satz, motivierend aber geerdet)
+
+Antworte NUR mit JSON:
+{{"summary": "...", "observations": ["...", "...", "..."], "meaning": "...", "closing": "..."}}"""
+
+        client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+        message = client.messages.create(
+            model="claude-sonnet-4-6",
+            max_tokens=600,
+            messages=[{"role": "user", "content": prompt}]
+        )
+
+        raw = message.content[0].text.strip()
+        raw = raw.replace('```json', '').replace('```', '').strip()
+        result = json.loads(raw)
+
+        return jsonify({"status": "ok", "analysis": result})
+
+    except Exception as e:
+        import traceback
+        return jsonify({"status": "error", "message": str(e), "trace": traceback.format_exc()}), 500
+
 @app.route('/api/sync', methods=['POST'])
 def trigger_sync():
     try:
