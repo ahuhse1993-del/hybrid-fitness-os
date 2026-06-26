@@ -1,0 +1,31 @@
+name: Health Sync
+
+on:
+  workflow_dispatch:
+    inputs:
+      date:
+        description: 'Date to sync (YYYY-MM-DD)'
+        required: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install garminconnect psycopg2-binary python-dotenv
+
+      - name: Run Health sync
+        env:
+          GARMIN_EMAIL: ${{ secrets.GARMIN_EMAIL }}
+          GARMIN_PASSWORD: ${{ secrets.GARMIN_PASSWORD }}
+          RAILWAY_DATABASE_URL: ${{ secrets.RAILWAY_DATABASE_URL }}
+          SYNC_TYPE: health
+        run: python data/garmin_sync_all.py
