@@ -458,6 +458,28 @@ def check_plan():
         import traceback
         return jsonify({"status": "error", "message": str(e), "trace": traceback.format_exc()}), 500
 
+@app.route('/api/sync', methods=['POST'])
+def trigger_sync():
+    try:
+        import urllib.request
+        github_token = os.getenv("CAIRN_GITHUB_TOKEN")
+        if github_token:
+            req = urllib.request.Request(
+                "https://api.github.com/repos/ahuhse1993-del/hybrid-fitness-os/actions/workflows/garmin_sync.yml/dispatches",
+                data=b'{"ref":"main"}',
+                headers={
+                    "Authorization": f"Bearer {github_token}",
+                    "Accept": "application/vnd.github.v3+json",
+                    "Content-Type": "application/json"
+                },
+                method="POST"
+            )
+            urllib.request.urlopen(req, timeout=5)
+            return jsonify({"status": "ok", "message": "Sync gestartet"})
+        return jsonify({"status": "ok", "message": "Kein Token"})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
 @app.route('/api/health', methods=['GET'])
 def health():
     return jsonify({"status": "ok", "date": str(date.today())})
