@@ -1,7 +1,7 @@
 """
 CAIRN Garmin Full Sync
-Importiert neue Aktivitäten und Garmin Health Daten.
-Läuft via GitHub Actions alle 2 Stunden.
+health: Schlaf, HRV, Body Battery (morgens)
+activities: Neue Trainings (alle 2h)
 """
 
 import sys, os
@@ -10,18 +10,23 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from dotenv import load_dotenv
 load_dotenv()
 
-print("=== CAIRN Garmin Sync ===\n")
+sync_type = os.getenv('SYNC_TYPE', 'activities')
+print(f"=== CAIRN Garmin Sync ({sync_type}) ===\n")
 
-# 1. Neue Aktivitäten importieren
-print("--- Aktivitäten ---")
-from data.garmin_import_history import import_all_activities
-import_all_activities()
+if sync_type == 'health':
+    print("--- Health Sync ---")
+    from data.data_service import sync_garmin_health
+    from datetime import date, timedelta
+    sync_garmin_health((date.today() - timedelta(days=1)).isoformat())
+    sync_garmin_health(date.today().isoformat())
+    print("✅ Health sync abgeschlossen")
+else:
+    print("--- Aktivitäten Sync ---")
+    from data.garmin_import_history import import_all_activities
+    import_all_activities()
 
-# 2. Garmin Health Daten syncen
-print("\n--- Health ---")
-from data.data_service import sync_garmin_health
-from datetime import date, timedelta
-sync_garmin_health((date.today() - timedelta(days=1)).isoformat())
-sync_garmin_health(date.today().isoformat())
+    print("\n--- Kalender Sync ---")
+    from data.garmin_calendar_sync import sync_garmin_calendar
+    sync_garmin_calendar()
 
 print("\n=== SYNC ABGESCHLOSSEN ===")
