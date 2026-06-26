@@ -250,6 +250,7 @@ def get_plan():
         today = date.today()
         monday = today - timedelta(days=today.weekday())
 
+        # Trainingsplan (4 Wochen)
         cur.execute("""
             SELECT id, week_date, day_of_week, session_type, session_zone,
                    duration_min, distance_km, notes
@@ -257,66 +258,130 @@ def get_plan():
             WHERE week_date >= %s AND week_date < %s
             ORDER BY week_date, day_of_week
         """, (monday, monday + timedelta(weeks=4)))
+        plan_rows = cur.fetchall()
 
-        rows = cur.fetchall()
-
-        # Echte Aktivitäten dieser Woche
+        # Echte Aktivitäten dieser + letzter Woche
         cur.execute("""
             SELECT date, type, notes, duration_minutes, distance_km, heart_rate_avg, id
             FROM trainings
             WHERE date >= %s AND date <= %s
             ORDER BY date
         """, (monday, today))
-
         actual_rows = cur.fetchall()
         conn.close()
 
-        # Echte Aktivitäten nach Datum indexieren
+        # Typ-Matching: welche Garmin-Typen passen zu welchem Plan-Typ
+        type_match = {
+            'Easy Run': ['Run'],
+            'Recovery Run': ['Run'],
+            'Long Run': ['Run', 'TrailRun'],
+            'Trail Run': ['TrailRun', 'Run'],
+            'Intervalle': ['Run'],
+            'Tempo Run': ['Run'],
+            'Threshold Run': ['Run'],
+            'Progression Run': ['Run'],
+            'Race Pace Run': ['Run'],
+            'Hill Repeats': ['Run', 'TrailRun'],
+            'Strides': ['Run'],
+            'Krafttraining': ['WeightTraining'],
+            'Mobilität': ['WeightTraining'],
+        }
+
+        # Echte Aktivitäten nach Datum gruppieren
         actual_by_date = {}
         for r in actual_rows:
-            actual_by_date[str(r[0])] = {
+            d = str(r[0])
+            if d not in actual_by_date:
+                actual_by_date[d] = []
+            actual_by_date[d].append({
                 "type": r[1],
                 "name": r[2] or r[1],
                 "duration_min": r[3],
                 "distance_km": float(r[4]) if r[4] else 0,
                 "avg_hr": r[5],
                 "training_id": r[6],
-                "is_actual": True
-            }
+            })
 
         plan = []
-        for r in rows:
+        matched_training_ids = set()
+
+        for r in plan_rows:
             week_date = str(r[1])
             day_of_week = r[2]
+            session_type = r[3]
 
             item_date = date.fromisoformat(week_date) + timedelta(days=day_of_week)
             item_date_str = str(item_date)
-            is_past = item_date < today
+            is_past = item_date <= today
 
             item = {
                 "id": r[0],
                 "week_date": week_date,
                 "day_of_week": day_of_week,
-                "session_type": r[3],
+                "session_type": session_type,
                 "session_zone": r[4],
                 "duration_min": r[5],
                 "distance_km": float(r[6]) if r[6] else 0,
                 "notes": r[7] or "",
-                "is_actual": False,
-                "training_id": None,
-                "is_done": False
+                "is_done": False,
+                "is_mismatch": False,
+                "actual_type": None,
+                "actual_name": None,
+                "actual_km": 0,
+                "actual_min": 0,
+                "actual_hr": None,
+                "training_id": None
             }
 
             if is_past and item_date_str in actual_by_date:
-                actual = actual_by_date[item_date_str]
-                item["actual_type"] = actual["type"]
-                item["actual_name"] = actual["name"]
-                item["actual_km"] = actual["distance_km"]
-                item["actual_min"] = actual["duration_min"]
-                item["training_id"] = actual["training_id"]
-                item["is_done"] = True
+                expected_types = type_match.get(session_type, [])
+                for actual in actual_by_date[item_date_str]:
+                    if actual["training_id"] not in matched_training_ids:
+                        matched = actual["type"] in expected_types
+                        item["is_done"] = True
+                        item["is_mismatch"] = not matched
+                        item["actual_type"] = actual["type"]
+                        item["actual_name"] = actual["name"]
+                        item["actual_km"] = actual["distance_km"]
+                        item["actual_min"] = actual["duration_min"]
+                        item["actual_hr"] = actual["avg_hr"]
+                        item["training_id"] = actual["training_id"]
+                        matched_training_ids.add(actual["training_id"])
+                        break
 
             plan.append(item)
+
+        # Spontane Aktivitäten die keinem Plan entsprechen
+        for d_str, activities in actual_by_date.items():
+            for actual in activities:
+                if actual["training_id"] not in matched_training_ids:
+                    # Datum zurück in week_date + day_of_week umrechnen
+                    act_date = date.fromisoformat(d_str)
+                    act_monday = act_date - timedelta(days=act_date.weekday())
+                    # Wochentag relativ zum Plan-Start (Sonntag = 0)
+                    week_start = act_monday - timedelta(days=1)
+                    day_offset = (act_date - week_start).days - 1
+
+                    plan.append({
+                        "id": -actual["training_id"],
+                        "week_date": str(act_monday - timedelta(days=1)),
+                        "day_of_week": day_offset,
+                        "session_type": actual["type"],
+                        "session_zone": "",
+                        "duration_min": actual["duration_min"],
+                        "distance_km": actual["distance_km"],
+                        "notes": actual["name"],
+                        "is_done": True,
+                        "is_mismatch": False,
+                        "is_spontaneous": True,
+                        "actual_type": actual["type"],
+                        "actual_name": actual["name"],
+                        "actual_km": actual["distance_km"],
+                        "actual_min": actual["duration_min"],
+                        "actual_hr": actual["avg_hr"],
+                        "training_id": actual["training_id"]
+                    })
+                    matched_training_ids.add(actual["training_id"])
 
         return jsonify({"status": "ok", "plan": plan})
 
