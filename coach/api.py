@@ -50,30 +50,56 @@ def save_checkin():
     conn.commit()
     conn.close()
 
-    # GitHub Actions Health Sync triggern
-    github_trigger_status = "skipped"
+    # GitHub Actions Health Sync triggern und warten
     try:
-        import urllib.request
+        import urllib.request, urllib.error, time
         github_token = os.getenv("CAIRN_GITHUB_TOKEN")
         if github_token:
+            headers = {
+                "Authorization": f"Bearer {github_token}",
+                "Accept": "application/vnd.github.v3+json",
+                "Content-Type": "application/json"
+            }
+
+            # Workflow triggern
             req = urllib.request.Request(
                 "https://api.github.com/repos/ahuhse1993-del/hybrid-fitness-os/actions/workflows/health_sync.yml/dispatches",
                 data=b'{"ref":"main"}',
-                headers={
-                    "Authorization": f"Bearer {github_token}",
-                    "Accept": "application/vnd.github.v3+json",
-                    "Content-Type": "application/json"
-                },
+                headers=headers,
                 method="POST"
             )
-            urllib.request.urlopen(req, timeout=5)
-            github_trigger_status = "triggered"
-        else:
-            github_trigger_status = "no_token"
-    except Exception as e:
-        github_trigger_status = f"error: {str(e)}"
+            urllib.request.urlopen(req, timeout=10)
 
-    return jsonify({"status": "ok", "github_sync": github_trigger_status})
+            # 5 Sekunden warten damit GitHub den Run erstellt
+            time.sleep(5)
+
+            # Run ID holen
+            req2 = urllib.request.Request(
+                "https://api.github.com/repos/ahuhse1993-del/hybrid-fitness-os/actions/workflows/health_sync.yml/runs?per_page=1",
+                headers=headers
+            )
+            resp = urllib.request.urlopen(req2, timeout=10)
+            runs_data = json.loads(resp.read())
+            run_id = runs_data["workflow_runs"][0]["id"]
+
+            # Auf Completion warten (max 90 Sekunden)
+            for _ in range(18):
+                time.sleep(5)
+                req3 = urllib.request.Request(
+                    f"https://api.github.com/repos/ahuhse1993-del/hybrid-fitness-os/actions/runs/{run_id}",
+                    headers=headers
+                )
+                resp3 = urllib.request.urlopen(req3, timeout=10)
+                run_data = json.loads(resp3.read())
+                status = run_data.get("status")
+                conclusion = run_data.get("conclusion")
+                if status == "completed":
+                    break
+
+    except Exception as e:
+        pass
+
+    return jsonify({"status": "ok"})
 
 @app.route('/api/morning-brief', methods=['GET'])
 def morning_brief():
