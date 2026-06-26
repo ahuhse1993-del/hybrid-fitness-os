@@ -49,6 +49,26 @@ def save_checkin():
 
     conn.commit()
     conn.close()
+
+    # GitHub Actions Health Sync triggern
+    try:
+        import urllib.request
+        github_token = os.getenv("CAIRN_GITHUB_TOKEN")
+        if github_token:
+            req = urllib.request.Request(
+                "https://api.github.com/repos/ahuhse1993-del/hybrid-fitness-os/actions/workflows/health_sync.yml/dispatches",
+                data=b'{"ref":"main"}',
+                headers={
+                    "Authorization": f"Bearer {github_token}",
+                    "Accept": "application/vnd.github.v3+json",
+                    "Content-Type": "application/json"
+                },
+                method="POST"
+            )
+            urllib.request.urlopen(req, timeout=5)
+    except Exception:
+        pass
+
     return jsonify({"status": "ok"})
 
 @app.route('/api/morning-brief', methods=['GET'])
@@ -135,7 +155,7 @@ def dashboard():
         monday = today - timedelta(days=today.weekday())
         sunday = monday + timedelta(days=6)
 
-        # Echte Aktivitäten diese Woche aus trainings Tabelle
+        # Echte Aktivitäten diese Woche
         cur.execute("""
             SELECT COALESCE(SUM(distance_km), 0), COUNT(*)
             FROM trainings
@@ -198,7 +218,6 @@ def get_plan():
         today = date.today()
         monday = today - timedelta(days=today.weekday())
 
-        # Trainingsplan (4 Wochen)
         cur.execute("""
             SELECT id, week_date, day_of_week, session_type, session_zone,
                    duration_min, distance_km, notes
@@ -209,7 +228,7 @@ def get_plan():
 
         rows = cur.fetchall()
 
-        # Echte Aktivitäten dieser und letzter Woche
+        # Echte Aktivitäten dieser Woche
         cur.execute("""
             SELECT date, type, notes, duration_minutes, distance_km, heart_rate_avg, id
             FROM trainings
@@ -238,7 +257,6 @@ def get_plan():
             week_date = str(r[1])
             day_of_week = r[2]
 
-            # Datum berechnen
             item_date = date.fromisoformat(week_date) + timedelta(days=day_of_week)
             item_date_str = str(item_date)
             is_past = item_date < today
@@ -253,10 +271,10 @@ def get_plan():
                 "distance_km": float(r[6]) if r[6] else 0,
                 "notes": r[7] or "",
                 "is_actual": False,
-                "training_id": None
+                "training_id": None,
+                "is_done": False
             }
 
-            # Vergangene Tage: echte Aktivität überschreibt Plan
             if is_past and item_date_str in actual_by_date:
                 actual = actual_by_date[item_date_str]
                 item["actual_type"] = actual["type"]
@@ -265,10 +283,6 @@ def get_plan():
                 item["actual_min"] = actual["duration_min"]
                 item["training_id"] = actual["training_id"]
                 item["is_done"] = True
-            elif is_past:
-                item["is_done"] = False
-            else:
-                item["is_done"] = False
 
             plan.append(item)
 
@@ -277,6 +291,7 @@ def get_plan():
     except Exception as e:
         import traceback
         return jsonify({"status": "error", "message": str(e), "trace": traceback.format_exc()}), 500
+
 @app.route('/api/plan/update', methods=['POST'])
 def update_plan():
     try:
