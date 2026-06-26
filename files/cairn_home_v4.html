@@ -1044,18 +1044,25 @@ function loadNewActivities() {
       var text = name + (km ? ' · ' + km : '');
       document.getElementById('analyse-bar-text').textContent = text;
       document.getElementById('analyse-bar').style.display = 'flex';
+      // Activity ID direkt im Button speichern
+      var btn = document.querySelector('#analyse-bar button');
+      if (btn) btn.setAttribute('data-activity-id', a.id);
     })
     .catch(function() {});
 }
 
 function startAnalyse() {
-  if (currentNewActivity) {
-    // Als analysiert markieren
-    fetch('https://web-production-297f2.up.railway.app/api/activity/' + currentNewActivity.id + '/mark-analysed', {
+  var activityId = currentNewActivity ? currentNewActivity.id : null;
+  if (!activityId) {
+    var btn = document.querySelector('#analyse-bar button');
+    if (btn) activityId = btn.getAttribute('data-activity-id');
+  }
+  if (activityId) {
+    fetch('https://web-production-297f2.up.railway.app/api/activity/' + activityId + '/mark-analysed', {
       method: 'POST'
     });
     document.getElementById('analyse-bar').style.display = 'none';
-    window.location.href = '/analyse?id=' + currentNewActivity.id;
+    window.location.href = '/analyse?id=' + activityId;
   }
 }
 
