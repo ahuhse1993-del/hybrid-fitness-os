@@ -1,13 +1,23 @@
 from flask import Flask, jsonify, request, send_file
 from flask_cors import CORS
 import os, psycopg2, json
-from datetime import date, timedelta
+from datetime import date, timedelta, datetime
 from dotenv import load_dotenv
 
 load_dotenv()
 
 app = Flask(__name__)
 CORS(app)
+
+def get_today():
+    """Gibt das heutige Datum in Zürich Zeit zurück"""
+    try:
+        import pytz
+        zurich = pytz.timezone('Europe/Zurich')
+        return datetime.now(zurich).date()
+    except Exception:
+        # Fallback: UTC+2
+        return (datetime.utcnow() + timedelta(hours=2)).date()
 
 def get_db():
     database_url = os.getenv("RAILWAY_DATABASE_URL") or os.getenv("DATABASE_URL")
@@ -27,7 +37,7 @@ def save_checkin():
     feel = data.get('feel', '')
     notes = ', '.join(data.get('notes', []))
     text = data.get('text', '')
-    today = date.today()
+    today = get_today()
 
     conn = get_db()
     cur = conn.cursor()
@@ -106,7 +116,7 @@ def morning_brief():
     try:
         from coach.morning_brief import generate_morning_brief
 
-        today = date.today()
+        today = get_today()
         conn = get_db()
         cur = conn.cursor()
 
@@ -181,7 +191,7 @@ def dashboard():
     try:
         conn = get_db()
         cur = conn.cursor()
-        today = date.today()
+        today = get_today()
         monday = today - timedelta(days=today.weekday())
         sunday = monday + timedelta(days=6)
 
@@ -247,7 +257,7 @@ def get_plan():
         conn = get_db()
         cur = conn.cursor()
 
-        today = date.today()
+        today = get_today()
         monday = today - timedelta(days=today.weekday())
 
         # Trainingsplan (4 Wochen)
@@ -607,7 +617,7 @@ def trigger_sync():
 
 @app.route('/api/health', methods=['GET'])
 def health():
-    return jsonify({"status": "ok", "date": str(date.today())})
+    return jsonify({"status": "ok", "date": str(get_today())})
 
 if __name__ == '__main__':
     port = int(os.getenv("PORT", 5002))
