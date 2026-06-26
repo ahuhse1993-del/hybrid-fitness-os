@@ -418,6 +418,13 @@ body{background:var(--bg);font-family:'DM Sans',sans-serif;color:var(--black);fo
 .cp-btn-primary{background:var(--black);border:none;color:var(--bg);font-family:'DM Mono',monospace;font-size:9px;padding:10px 20px;cursor:pointer;letter-spacing:.1em}
 .cp-btn-secondary{background:transparent;border:.5px solid var(--stone);color:var(--stone);font-family:'DM Mono',monospace;font-size:9px;padding:10px 16px;cursor:pointer}
 
+/* REFRESH BUTTON ANIMATION */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+.refresh-spinning { animation: spin 1s linear infinite; }
+
 /* REPLAN OVERLAY */
 .overlay{display:none;position:fixed;inset:0;background:rgba(26,25,24,.75);z-index:150;align-items:center;justify-content:center}
 .overlay.open{display:flex}
@@ -609,14 +616,15 @@ body{background:var(--bg);font-family:'DM Sans',sans-serif;color:var(--black);fo
       <div class="dateline">MI 17 JUN 2026 &middot; KW 25</div>
       <div class="greeting-top" id="greeting-top">Guten Morgen, <b>Alexander.</b></div>
     </div>
-    <button class="coach-chat-btn" id="refresh-btn" onclick="triggerRefresh()" style="width:48px;background:var(--bg);border-right:.5px solid var(--black);">
-        <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
+    <div style="display:flex;align-self:stretch;border-left:.5px solid var(--black)">
+      <button class="coach-chat-btn" id="refresh-btn" onclick="triggerRefresh()" style="width:48px;background:var(--bg);border-right:.5px solid var(--black);">
+        <svg id="refresh-icon" width="18" height="18" viewBox="0 0 20 20" fill="none">
           <path d="M10 3C6.13 3 3 6.13 3 10s3.13 7 7 7 7-3.13 7-7" stroke="rgba(46,44,42,.4)" stroke-width="1.5" stroke-linecap="round" fill="none"/>
           <path d="M17 3v4h-4" stroke="rgba(46,44,42,.4)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
         </svg>
         <div class="tooltip">SYNC &amp; REFRESH</div>
       </button>
-    <button class="coach-chat-btn">
+      <button class="coach-chat-btn">
         <svg width="48" height="48" viewBox="0 0 38 38" fill="none">
           <line x1="19" y1="0" x2="19" y2="38" stroke="rgba(26,25,24,.12)" stroke-width=".8"/>
           <line x1="0" y1="19" x2="38" y2="19" stroke="rgba(26,25,24,.12)" stroke-width=".8"/>
@@ -632,6 +640,7 @@ body{background:var(--bg);font-family:'DM Sans',sans-serif;color:var(--black);fo
         </svg>
         <div class="tooltip">CHAT &Ouml;FFNEN</div>
       </button>
+    </div>
   </div>
 
   <!-- ANALYSE-BALKEN -->
@@ -1689,12 +1698,16 @@ dragStyle.textContent = '.day-cell.drag-over{background:rgba(232,216,74,.08);out
 document.head.appendChild(dragStyle);
 
 // ─── REFRESH / SYNC ───
+var refreshRunning = false;
+
 function triggerRefresh() {
+  if (refreshRunning) return;
+  refreshRunning = true;
+
   var btn = document.getElementById('refresh-btn');
-  if (btn) {
-    btn.style.opacity = '0.5';
-    btn.style.pointerEvents = 'none';
-  }
+  var icon = document.getElementById('refresh-icon');
+  if (btn) btn.style.pointerEvents = 'none';
+  if (icon) icon.classList.add('refresh-spinning');
 
   fetch('https://web-production-297f2.up.railway.app/api/sync', {
     method: 'POST',
@@ -1702,22 +1715,21 @@ function triggerRefresh() {
   })
   .then(function(r) { return r.json(); })
   .then(function(data) {
-    // Dashboard und Kalender neu laden
-    loadDashboard().then(function() {
-      loadPlan();
-    });
-    if (btn) {
-      btn.style.opacity = '1';
-      btn.style.pointerEvents = 'all';
-    }
+    // 60 Sekunden warten damit GitHub Actions fertig ist
+    setTimeout(function() {
+      loadDashboard().then(function() {
+        loadPlan();
+        if (btn) btn.style.pointerEvents = 'all';
+        if (icon) icon.classList.remove('refresh-spinning');
+        refreshRunning = false;
+      });
+    }, 60000);
   })
   .catch(function() {
-    // Auch ohne Sync neu laden
     loadDashboard().then(function() { loadPlan(); });
-    if (btn) {
-      btn.style.opacity = '1';
-      btn.style.pointerEvents = 'all';
-    }
+    if (btn) btn.style.pointerEvents = 'all';
+    if (icon) icon.classList.remove('refresh-spinning');
+    refreshRunning = false;
   });
 }
 
