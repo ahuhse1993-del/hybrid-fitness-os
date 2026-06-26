@@ -593,6 +593,53 @@ Antworte NUR mit JSON:
         import traceback
         return jsonify({"status": "error", "message": str(e), "trace": traceback.format_exc()}), 500
 
+@app.route('/api/new-activities', methods=['GET'])
+def new_activities():
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+        today = get_today()
+
+        cur.execute("""
+            SELECT id, date, type, notes, distance_km, duration_minutes, analysis_done
+            FROM trainings
+            WHERE date = %s AND analysis_done = FALSE
+            ORDER BY id DESC
+            LIMIT 5
+        """, (today,))
+        rows = cur.fetchall()
+        conn.close()
+
+        activities = []
+        for r in rows:
+            activities.append({
+                "id": r[0],
+                "date": str(r[1]),
+                "type": r[2],
+                "name": r[3] or r[2],
+                "distance_km": float(r[4]) if r[4] else 0,
+                "duration_min": r[5] or 0,
+                "analysis_done": r[6] or False
+            })
+
+        return jsonify({"status": "ok", "activities": activities})
+
+    except Exception as e:
+        import traceback
+        return jsonify({"status": "error", "message": str(e), "trace": traceback.format_exc()}), 500
+
+@app.route('/api/activity/<int:training_id>/mark-analysed', methods=['POST'])
+def mark_analysed(training_id):
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute("UPDATE trainings SET analysis_done = TRUE WHERE id = %s", (training_id,))
+        conn.commit()
+        conn.close()
+        return jsonify({"status": "ok"})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
 @app.route('/api/sync', methods=['POST'])
 def trigger_sync():
     try:

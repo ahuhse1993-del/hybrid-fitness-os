@@ -649,10 +649,13 @@ body{background:var(--bg);font-family:'DM Sans',sans-serif;color:var(--black);fo
       <div style="width:6px;height:6px;border-radius:50%;background:var(--accent);flex-shrink:0"></div>
       <div>
         <div style="font-family:DM Mono,monospace;font-size:8px;color:rgba(232,216,74,.5);letter-spacing:.14em;margin-bottom:2px">NEUE AKTIVIT&Auml;T</div>
-        <div style="font-size:13px;color:#F0EDE6">Morgenrunde T&uuml;llinger &middot; 12.4 km &middot; heute 06:41</div>
+        <div style="font-size:13px;color:#F0EDE6" id="analyse-bar-text">—</div>
       </div>
     </div>
-    <button onclick="startAnalyse()" style="background:var(--accent);border:none;color:var(--black);font-family:DM Mono,monospace;font-size:9px;padding:8px 18px;cursor:pointer;letter-spacing:.1em;font-weight:500;flex-shrink:0">ANALYSE STARTEN &rarr;</button>
+    <div style="display:flex;gap:8px;align-items:center">
+      <button onclick="startAnalyse()" style="background:var(--accent);border:none;color:var(--black);font-family:DM Mono,monospace;font-size:9px;padding:8px 18px;cursor:pointer;letter-spacing:.1em;font-weight:500;flex-shrink:0">ANALYSE STARTEN &rarr;</button>
+      <button onclick="dismissAnalyseBar()" style="background:transparent;border:.5px solid rgba(240,237,230,.2);color:rgba(240,237,230,.4);font-family:DM Mono,monospace;font-size:9px;padding:8px 12px;cursor:pointer">&#10005;</button>
+    </div>
   </div>
 
   <!-- ═══ COACH BRIEF ═══ -->
@@ -1023,35 +1026,51 @@ function rejectReplan(){
 function selRej(el){document.querySelectorAll('.rej-opt').forEach(x=>x.classList.remove('sel'));el.classList.add('sel')}
 function sendReject(){document.getElementById('ov-reject').classList.remove('open')}
 function closeReject(){document.getElementById('ov-reject').classList.remove('open')}
-// ─── ANALYSE FLOW ───
+// ─── NEUE AKTIVITÄTEN PRÜFEN ───
+var currentNewActivity = null;
+
+function loadNewActivities() {
+  fetch('https://web-production-297f2.up.railway.app/api/new-activities')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.status !== 'ok' || !data.activities || data.activities.length === 0) {
+        document.getElementById('analyse-bar').style.display = 'none';
+        return;
+      }
+      var a = data.activities[0];
+      currentNewActivity = a;
+      var km = a.distance_km > 0 ? a.distance_km.toFixed(1) + ' km' : '';
+      var name = a.name.split(' | ')[0];
+      var text = name + (km ? ' · ' + km : '');
+      document.getElementById('analyse-bar-text').textContent = text;
+      document.getElementById('analyse-bar').style.display = 'flex';
+    })
+    .catch(function() {});
+}
+
+function startAnalyse() {
+  if (currentNewActivity) {
+    // Als analysiert markieren
+    fetch('https://web-production-297f2.up.railway.app/api/activity/' + currentNewActivity.id + '/mark-analysed', {
+      method: 'POST'
+    });
+    document.getElementById('analyse-bar').style.display = 'none';
+    window.location.href = '/analyse?id=' + currentNewActivity.id;
+  }
+}
+
+function dismissAnalyseBar() {
+  document.getElementById('analyse-bar').style.display = 'none';
+}
+
+// ─── ANALYSE FLOW (legacy) ───
 function showAnalysePopup(){
   document.getElementById('analyse-popup').style.display='flex';
 }
-function startAnalyse(){
-  document.getElementById('analyse-popup').style.display='none';
-  // Balken ausblenden – Analyse gestartet
-  document.getElementById('analyse-bar').style.display='none';
-  // Hier später: redirect zur Analyse-Seite
-  alert('→ Analyse-Seite öffnet sich (noch nicht gebaut)');
-}
 function dismissAnalyse(){
   document.getElementById('analyse-popup').style.display='none';
-  // Balken einblenden – Analyse noch ausstehend
-  const bar = document.getElementById('analyse-bar');
+  var bar = document.getElementById('analyse-bar');
   bar.style.display='flex';
-}
-
-// Neue Aktivität simulieren – Popup erscheint nach Morning Brief
-// In Produktion: wird getriggert wenn neue Strava/Garmin Aktivität vorhanden
-const hasNewActivity = true; // Simulation
-const analyseCheckKey = 'cairn_analyse_' + TODAY;
-if(hasNewActivity && !localStorage.getItem(analyseCheckKey)){
-  // Nach Morning Brief Checkin zeigen, oder direkt wenn kein Checkin nötig
-  setTimeout(function(){
-    if(!document.getElementById('checkin').classList.contains('open')){
-      showAnalysePopup();
-    }
-  }, 300);
 }
 
 // ─── MORNING BRIEF VOM COACH LADEN ───
@@ -1776,6 +1795,7 @@ function triggerRefresh() {
     setTimeout(function() {
       loadDashboard().then(function() {
         loadPlan();
+        loadNewActivities();
         if (btn) btn.style.pointerEvents = 'all';
         if (icon) icon.classList.remove('refresh-spinning');
         refreshRunning = false;
@@ -1850,6 +1870,9 @@ loadDashboard().then(function() {
 }).catch(function() {
   loadPlan();
 });
+
+// Neue Aktivitäten prüfen
+loadNewActivities();
 
 </script>
 
