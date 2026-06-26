@@ -1258,14 +1258,32 @@ function renderCalendar() {
   var today = new Date();
   var todayStr = today.toISOString().split('T')[0];
 
-  // Wochen gruppieren
+  // Immer 4 Wochen ab Montag dieser Woche
+  var thisMonday = new Date(today);
+  var dayOfWeek = thisMonday.getDay();
+  var diff = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+  thisMonday.setDate(thisMonday.getDate() + diff);
+
+  var allWeekDates = [];
+  for (var w = 0; w < 4; w++) {
+    var wDate = new Date(thisMonday);
+    wDate.setDate(thisMonday.getDate() + w * 7);
+    allWeekDates.push(wDate.toISOString().split('T')[0]);
+  }
+
+  // Wochen aus planData
   var weeks = {};
   planData.forEach(function(item) {
     if (!weeks[item.week_date]) weeks[item.week_date] = [];
     weeks[item.week_date].push(item);
   });
 
-  var weekDates = Object.keys(weeks).sort();
+  // Alle 4 Wochen immer anzeigen
+  allWeekDates.forEach(function(weekDate) {
+    if (!weeks[weekDate]) weeks[weekDate] = [];
+  });
+
+  var weekDates = allWeekDates;
   var html = '';
 
   // KW Tabs aktualisieren
@@ -1388,9 +1406,15 @@ function renderCalendar() {
         if (isPast) cardClass += ' done';
         if (isToday) cardClass += ' today-card';
 
-        // Indikatoren
-        var doneIndicator = item.is_done ? '<div style="width:5px;height:5px;background:var(--accent);border-radius:50%;margin-bottom:3px;opacity:.8;flex-shrink:0"></div>' : '';
-        var mismatchIndicator = item.is_mismatch ? '<div style="width:5px;height:5px;background:var(--accent-dark);border-radius:50%;margin-bottom:3px;opacity:.8;flex-shrink:0"></div>' : '';
+        // Indikatoren — grün=match, orange=mismatch, rot=spontan
+        var indicator = '';
+        if (item.is_spontaneous) {
+          indicator = '<div style="width:5px;height:5px;background:#E05A2B;border-radius:50%;margin-bottom:3px;flex-shrink:0"></div>';
+        } else if (item.is_mismatch) {
+          indicator = '<div style="width:5px;height:5px;background:var(--accent-dark);border-radius:50%;margin-bottom:3px;flex-shrink:0"></div>';
+        } else if (item.is_done) {
+          indicator = '<div style="width:5px;height:5px;background:#4CAF50;border-radius:50%;margin-bottom:3px;flex-shrink:0"></div>';
+        }
 
         var isDraggable = !isPast;
         var cardData = encodeURIComponent(JSON.stringify({
@@ -1417,7 +1441,7 @@ function renderCalendar() {
           'ondragend="onDragEnd(event)" ' : '') +
           'onclick="openCardPopup(\'' + cardData + '\')" ' +
           'style="cursor:pointer">' +
-          (item.is_mismatch ? mismatchIndicator : doneIndicator) +
+          indicator +
           '<div class="tc-tag">' + category + '</div>' +
           (description ? '<div class="tc-name">' + description + '</div>' : '') +
           (volume ? '<div class="tc-meta">' + volume + '</div>' : '') +
@@ -1494,7 +1518,7 @@ function renderCalendar() {
     }
   });
 
-  if (todayItem) {
+  if (todayItem && !todayItem.is_spontaneous) {
     var typeMap = {
       'Easy Run':'EASY RUN','Recovery Run':'RECOVERY RUN','Long Run':'LONG RUN',
       'Trail Run':'TRAIL RUN','Intervalle':'INTERVALS','Tempo Run':'TEMPO RUN',
