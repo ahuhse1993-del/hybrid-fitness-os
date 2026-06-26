@@ -204,13 +204,15 @@ def dashboard():
         row = cur.fetchone()
         week_sessions_planned = int(row[0]) if row[0] else 0
 
-        # Health Snapshot aus daily_logs (gestern)
-        yesterday = today - timedelta(days=1)
+        # Health Snapshot — heute zuerst, dann gestern
         cur.execute("""
             SELECT hrv_last_night, sleep_duration_h, resting_hr,
                    body_battery_charged, body_battery_drained
-            FROM daily_logs WHERE date = %s
-        """, (yesterday,))
+            FROM daily_logs
+            WHERE date IN (%s, %s)
+            ORDER BY date DESC
+            LIMIT 1
+        """, (today, today - timedelta(days=1)))
         health = cur.fetchone()
 
         hrv = health[0] if health and health[0] else None
