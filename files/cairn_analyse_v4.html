@@ -151,14 +151,14 @@ body{background:var(--bg);font-family:"DM Sans",sans-serif;color:var(--black);fo
 <!-- POPUP -->
 <div class="pop open" id="popup">
   <div class="pop-box">
-    <div class="pop-lbl">Neue Aktivit&#228;t erkannt</div>
-    <div class="pop-title">Morgenrunde T&#252;llinger &#8212; 12.4 km</div>
-    <div class="pop-sub">Heute um 06:41 &#183; Trail Run</div>
+    <div class="pop-lbl">Aktivität</div>
+    <div class="pop-title" id="pop-title">Lädt...</div>
+    <div class="pop-sub" id="pop-sub">—</div>
     <div class="pop-meta">
-      <div><div class="pm-lbl">Distanz</div><div class="pm-val">12.4<span class="pm-unit">km</span></div></div>
-      <div><div class="pm-lbl">Zeit</div><div class="pm-val">1:04<span class="pm-unit">h</span></div></div>
-      <div><div class="pm-lbl">Pace &#216;</div><div class="pm-val">5:10<span class="pm-unit">min/km</span></div></div>
-      <div><div class="pm-lbl">HF &#216;</div><div class="pm-val">148<span class="pm-unit">bpm</span></div></div>
+      <div><div class="pm-lbl">Distanz</div><div class="pm-val" id="pop-dist">—</div></div>
+      <div><div class="pm-lbl">Zeit</div><div class="pm-val" id="pop-time">—</div></div>
+      <div><div class="pm-lbl">Pace &#216;</div><div class="pm-val" id="pop-pace">—</div></div>
+      <div><div class="pm-lbl">HF &#216;</div><div class="pm-val" id="pop-hr">—</div></div>
     </div>
     <div class="pop-actions">
       <button class="btn-yes" onclick="openFb()">ANALYSIEREN &#8594;</button>
@@ -192,8 +192,8 @@ body{background:var(--bg);font-family:"DM Sans",sans-serif;color:var(--black);fo
         <div style="display:flex;align-items:center">
           <div class="tpulse"></div>
           <div>
-            <div style="color:#F0EDE6;font-size:13px">Wie war der Lauf?</div>
-            <div style="color:#6B6860;font-family:DM Mono,monospace;font-size:9px;margin-top:1px">Morgenrunde T&#252;llinger &#183; DO 19.06.2026</div>
+            <div style="color:#F0EDE6;font-size:13px" id="fb-title">Wie war das Training?</div>
+            <div style="color:#6B6860;font-family:DM Mono,monospace;font-size:9px;margin-top:1px" id="fb-sub">—</div>
           </div>
         </div>
         <button class="tskip" onclick="openAn()">&#220;BERSPRINGEN</button>
@@ -254,8 +254,8 @@ body{background:var(--bg);font-family:"DM Sans",sans-serif;color:var(--black);fo
     <div class="scr" id="san">
       <div class="atop">
         <div>
-          <div style="font-family:DM Mono,monospace;font-size:8px;color:rgba(232,216,74,.4);letter-spacing:.08em;text-transform:uppercase;margin-bottom:2px">Trail Run &#183; DO 19.06.2026</div>
-          <div style="color:#F0EDE6;font-size:12px">Morgenrunde T&#252;llinger</div>
+          <div style="font-family:DM Mono,monospace;font-size:8px;color:rgba(232,216,74,.4);letter-spacing:.08em;text-transform:uppercase;margin-bottom:2px" id="an-type">—</div>
+          <div style="color:#F0EDE6;font-size:12px" id="an-title">Lädt...</div>
         </div>
         <button onclick="openFb()" style="background:transparent;border:none;color:#6B6860;font-family:DM Mono,monospace;font-size:9px;cursor:pointer">&#8592; ZUR&#220;CK</button>
       </div>
@@ -279,16 +279,12 @@ body{background:var(--bg);font-family:"DM Sans",sans-serif;color:var(--black);fo
           </svg>
           <div style="flex:1;min-width:0">
             <div class="clbl">Coach &#183; Analyse</div>
-            <div class="ch"><strong>Solide aerobe Arbeit.</strong><br>Alles im gr&#252;nen Bereich.</div>
-            <div class="cb">Du bist 12.4 km mit +312 m Aufstieg gelaufen und fast vollst&#228;ndig aerob geblieben. Die HF hat das Profil sauber begleitet. Du hast den Berg nicht bek&#228;mpft. Letzter Kilometer dein schnellster &#8212; die Reserven waren da.</div>
+            <div class="ch" id="coach-summary"><strong>Coach analysiert...</strong></div>
+            <div class="cb" id="coach-meaning"></div>
           </div>
         </div>
-        <ul class="tws">
-          <li class="tw"><span class="twd">&#8212;</span><span class="twt hi">78% der Zeit in Zone 2. Genau der Plan f&#252;r einen Easy Trail Run.</span></li>
-          <li class="tw"><span class="twd">&#8212;</span><span class="twt hi">Letzter Kilometer war dein schnellster &#8212; Reserven waren noch da.</span></li>
-          <li class="tw"><span class="twd">&#8212;</span><span class="twt warn">Kadenz &#216; 168 spm &#8212; f&#228;llt auf Anstiegen unter den Zielbereich 172&#8211;178.</span></li>
-          <li class="tw"><span class="twd">&#8212;</span><span class="twt">Belastung gut absorbiert. HF bei gleicher Pace tiefer als vor vier Wochen.</span></li>
-          <li class="tw"><span class="twd">&#8212;</span><span class="twt">Wettkampf in 7 Tagen. Diese Einheit war die letzte echte Belastung.</span></li>
+        <ul class="tws" id="coach-observations">
+          <li class="tw"><span class="twd">&#8212;</span><span class="twt">Analyse wird geladen...</span></li>
         </ul>
       </div>
 
@@ -297,9 +293,9 @@ body{background:var(--bg);font-family:"DM Sans",sans-serif;color:var(--black);fo
         <div style="display:grid;grid-template-columns:3fr 1fr">
           <div style="padding-bottom:10px">
             <div style="display:flex;align-items:baseline;gap:5px;margin-bottom:3px">
-              <div class="hdn">12.4</div><div class="hdu">km</div>
+              <div class="hdn" id="hero-km">—</div><div class="hdu">km</div>
             </div>
-            <div class="hsub">Morgenrunde T&#252;llinger &#183; Basel</div>
+            <div class="hsub" id="hero-name">—</div>
           </div>
           <div style="border-left:.5px solid rgba(46,44,42,.15);padding:0 0 10px 12px">
             <div style="font-family:DM Mono,monospace;font-size:8px;color:#9E9B95;letter-spacing:.05em;text-transform:uppercase;margin-bottom:7px">HF-Zonen</div>
@@ -311,10 +307,10 @@ body{background:var(--bg);font-family:"DM Sans",sans-serif;color:var(--black);fo
           </div>
         </div>
         <div class="hgrid">
-          <div class="hs"><div class="hsl">Zeit</div><div class="hsv">1:04<span class="hsu">h</span></div></div>
-          <div class="hs"><div class="hsl">Pace &#216;</div><div class="hsv">5:10<span class="hsu">min/km</span></div></div>
-          <div class="hs"><div class="hsl">HF &#216;</div><div class="hsv">148<span class="hsu">bpm</span></div></div>
-          <div class="hs"><div class="hsl">Aufstieg</div><div class="hsv">+312<span class="hsu">m</span></div></div>
+          <div class="hs"><div class="hsl">Zeit</div><div class="hsv" id="hero-time">—</div></div>
+          <div class="hs"><div class="hsl">Pace &#216;</div><div class="hsv" id="hero-pace">—</div></div>
+          <div class="hs"><div class="hsl">HF &#216;</div><div class="hsv" id="hero-hr">—</div></div>
+          <div class="hs"><div class="hsl">Aufstieg</div><div class="hsv" id="hero-elev">—</div></div>
         </div>
       </div>
 
@@ -537,22 +533,36 @@ body{background:var(--bg);font-family:"DM Sans",sans-serif;color:var(--black);fo
 </div>
 
 <script>
-// ─── URL Parameter lesen ───
 var trainingId = new URLSearchParams(window.location.search).get('id');
+var activityData = null;
 
-// ─── Popup schliessen ───
 function closePop(){document.getElementById("popup").classList.remove("open")}
 function openFb(){document.getElementById("popup").classList.remove("open");document.getElementById("sfb").classList.add("on");document.getElementById("san").classList.remove("on");window.scrollTo(0,0)}
-function openAn(){document.getElementById("sfb").classList.remove("on");document.getElementById("san").classList.add("on");window.scrollTo(0,0)}
+function openAn(){document.getElementById("sfb").classList.remove("on");document.getElementById("san").classList.add("on");window.scrollTo(0,0);loadAnalysis()}
 function sg(btn){btn.parentElement.querySelectorAll("button").forEach(b=>b.classList.remove("sel"));btn.classList.add("sel")}
-function tSpl(){const c=document.getElementById("scnt"),a=document.getElementById("sarr");c.classList.toggle("open");a.textContent=c.classList.contains("open")?"&#9650;":"&#9660;"}
-
-// ─── Diktat ───
+function tSpl(){const c=document.getElementById("scnt"),a=document.getElementById("sarr");c.classList.toggle("open");a.textContent=c.classList.contains("open")?"▲":"▼"}
 let rec=null,don=false;
 function tDik(btn){const st=document.getElementById("dikst"),ta=document.getElementById("ftta"),ic=btn.querySelector("i");if(don){if(rec)rec.stop();return}const SR=window.SpeechRecognition||window.webkitSpeechRecognition;if(!SR){alert("Chrome verwenden.");return}rec=new SR();rec.lang="de-DE";rec.continuous=true;rec.interimResults=true;let ft=ta.value;rec.onstart=()=>{don=true;btn.style.background="var(--accent)";btn.classList.add("don");ic.style.color="var(--black)";st.style.display="flex"};rec.onresult=e=>{let it="";for(let i=e.resultIndex;i<e.results.length;i++){const t=e.results[i][0].transcript;if(e.results[i].isFinal)ft+=(ft?" ":"")+t;else it+=t}ta.value=ft+(it?" "+it:"")};rec.onerror=()=>rDik(btn,ic,st);rec.onend=()=>{rDik(btn,ic,st);ta.value=ft}}
 function rDik(btn,ic,st){don=false;btn.style.background="var(--black)";btn.classList.remove("don");ic.style.color="var(--accent)";st.style.display="none"}
 
-// ─── Aktivität laden ───
+function calcPace(distKm, durMin) {
+  if (!distKm || !durMin || distKm === 0) return '—';
+  var paceSec = Math.round(durMin * 60 / distKm);
+  return Math.floor(paceSec/60) + ':' + String(paceSec%60).padStart(2,'0') + '/km';
+}
+
+function calcTime(durMin) {
+  if (!durMin) return '—';
+  var h = Math.floor(durMin/60);
+  var m = durMin % 60;
+  return h > 0 ? h + ':' + String(m).padStart(2,'0') + ' h' : m + ' min';
+}
+
+function setEl(id, val) {
+  var el = document.getElementById(id);
+  if (el) el.textContent = val;
+}
+
 function loadActivity() {
   if (!trainingId) {
     document.getElementById("popup").classList.remove("open");
@@ -565,40 +575,48 @@ function loadActivity() {
     .then(function(data) {
       if (data.status !== 'ok') return;
       var a = data.activity;
+      activityData = a;
 
-      // Popup aktualisieren
-      var km = a.distance_km > 0 ? a.distance_km.toFixed(1) + ' km' : '—';
-      var dur = a.duration_min > 0 ? Math.floor(a.duration_min/60) + ':' + String(a.duration_min%60).padStart(2,'0') + ' h' : '—';
-      var pace = '—';
-      if (a.distance_km > 0 && a.duration_min > 0) {
-        var paceSec = Math.round(a.duration_min * 60 / a.distance_km);
-        pace = Math.floor(paceSec/60) + ':' + String(paceSec%60).padStart(2,'0') + '/km';
-      }
+      var pace = calcPace(a.distance_km, a.duration_min);
+      var time = calcTime(a.duration_min);
+      var name = a.name.split(' | ')[0];
+      var dateStr = a.date;
+      var typeStr = a.type + ' · ' + dateStr;
 
-      document.querySelector('.pop-title').textContent = a.name;
-      document.querySelector('.pop-sub').textContent = a.date + ' · ' + a.type;
-      var metas = document.querySelectorAll('.pm-val');
-      if (metas[0]) metas[0].innerHTML = a.distance_km.toFixed(1) + '<span class="pm-unit">km</span>';
-      if (metas[1]) metas[1].innerHTML = dur.replace(' h','') + '<span class="pm-unit">h</span>';
-      if (metas[2]) metas[2].innerHTML = pace.replace('/km','') + '<span class="pm-unit">min/km</span>';
-      if (metas[3]) metas[3].innerHTML = (a.avg_hr || '—') + '<span class="pm-unit">bpm</span>';
+      setEl('pop-title', name);
+      setEl('pop-sub', typeStr);
+      document.getElementById('pop-dist').innerHTML = a.distance_km.toFixed(1) + '<span class="pm-unit">km</span>';
+      document.getElementById('pop-time').innerHTML = time.replace(' h','') + '<span class="pm-unit">h</span>';
+      document.getElementById('pop-pace').innerHTML = pace.replace('/km','') + '<span class="pm-unit">min/km</span>';
+      document.getElementById('pop-hr').innerHTML = (a.avg_hr || '—') + '<span class="pm-unit">bpm</span>';
 
-      // Splits laden
+      setEl('fb-title', 'Wie war das Training?');
+      setEl('fb-sub', name + ' · ' + dateStr);
+
+      setEl('an-type', a.type + ' · ' + dateStr);
+      setEl('an-title', name);
+
+      setEl('hero-km', a.distance_km.toFixed(1));
+      setEl('hero-name', name);
+      setEl('hero-time', time);
+      setEl('hero-pace', pace);
+      setEl('hero-hr', (a.avg_hr || '—') + ' bpm');
+
       var tb = document.getElementById("stbd");
-      if (tb && data.splits && data.splits.length > 0) {
-        tb.innerHTML = '';
-        data.splits.forEach(function(s) {
-          var tr = document.createElement("tr");
-          tr.innerHTML = '<td>' + s.split + '</td>' +
-            '<td>' + (s.pace || '—') + '</td>' +
-            '<td>' + (s.hr || '—') + '</td>' +
-            '<td>' + (s.elevation > 0 ? '+' + s.elevation.toFixed(0) : s.elevation < 0 ? s.elevation.toFixed(0) : '—') + '</td>' +
-            '<td>—</td><td>—</td>';
-          tb.appendChild(tr);
-        });
+      if (tb) {
+        if (data.splits && data.splits.length > 0) {
+          tb.innerHTML = '';
+          data.splits.forEach(function(s) {
+            var tr = document.createElement("tr");
+            var elev = s.elevation > 0 ? '+' + s.elevation.toFixed(0) : (s.elevation < 0 ? s.elevation.toFixed(0) : '—');
+            tr.innerHTML = '<td>' + s.split + '</td><td>' + (s.pace || '—') + '</td><td>' + (s.hr || '—') + '</td><td>' + elev + '</td><td>—</td><td>—</td>';
+            tb.appendChild(tr);
+          });
+        } else {
+          tb.innerHTML = '<tr><td colspan="6" style="color:#6B6860;font-family:DM Mono,monospace;font-size:9px;padding:12px">Keine Split-Daten verfügbar</td></tr>';
+        }
       }
 
-      // Popup öffnen
       document.getElementById("popup").classList.add("open");
     })
     .catch(function() {
@@ -607,13 +625,10 @@ function loadActivity() {
     });
 }
 
-// ─── Coach Analyse laden ───
+var analysisLoaded = false;
 function loadAnalysis() {
-  if (!trainingId) return;
-
-  var summaryEl = document.querySelector('.rh');
-  var learningEl = document.querySelector('.ltxt');
-  if (summaryEl) summaryEl.textContent = 'Coach analysiert...';
+  if (!trainingId || analysisLoaded) return;
+  analysisLoaded = true;
 
   fetch('https://web-production-297f2.up.railway.app/api/activity/' + trainingId + '/analyse')
     .then(function(r) { return r.json(); })
@@ -621,28 +636,35 @@ function loadAnalysis() {
       if (data.status !== 'ok') return;
       var a = data.analysis;
 
-      if (summaryEl && a.summary) summaryEl.textContent = a.summary;
-      if (learningEl && a.meaning) learningEl.textContent = a.meaning;
+      var summaryEl = document.getElementById('coach-summary');
+      var meaningEl = document.getElementById('coach-meaning');
+      var obsEl = document.getElementById('coach-observations');
 
-      // Beobachtungen
-      var rblock = document.querySelector('.rblock');
-      if (rblock && a.observations) {
-        var obsHtml = '<div class="rlbl">Coach · Beobachtungen</div>';
+      if (summaryEl && a.summary) summaryEl.innerHTML = '<strong>' + a.summary + '</strong>';
+      if (meaningEl && a.meaning) meaningEl.textContent = a.meaning;
+
+      if (obsEl && a.observations) {
+        obsEl.innerHTML = '';
         a.observations.forEach(function(obs) {
-          obsHtml += '<div style="font-size:13px;color:rgba(240,237,230,.6);line-height:1.6;padding:8px 0;border-bottom:.5px solid rgba(240,237,230,.07)">' + obs + '</div>';
+          var li = document.createElement('li');
+          li.className = 'tw';
+          li.innerHTML = '<span class="twd">—</span><span class="twt">' + obs + '</span>';
+          obsEl.appendChild(li);
         });
         if (a.closing) {
-          obsHtml += '<div style="margin-top:16px;font-style:italic;color:rgba(240,237,230,.4);font-size:13px">&ldquo;' + a.closing + '&rdquo;</div>';
+          var li = document.createElement('li');
+          li.className = 'tw';
+          li.innerHTML = '<span class="twd">—</span><span class="twt hi" style="font-style:italic">' + a.closing + '</span>';
+          obsEl.appendChild(li);
         }
-        rblock.innerHTML = obsHtml;
       }
     })
-    .catch(function() {});
+    .catch(function() {
+      setEl('coach-summary', 'Analyse konnte nicht geladen werden.');
+    });
 }
 
-// ─── Start ───
 loadActivity();
-setTimeout(loadAnalysis, 500);
 </script>
 </body>
 </html>
