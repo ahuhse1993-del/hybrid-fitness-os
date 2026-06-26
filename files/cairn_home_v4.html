@@ -1184,8 +1184,41 @@ function openCardPopup(dataStr) {
       '<div class="cp-stat"><div class="cp-stat-lbl">DISTANZ</div><div class="cp-stat-val">' + (item.distance_km > 0 ? item.distance_km + ' km' : '—') + '</div></div>' +
       '<div class="cp-stat"><div class="cp-stat-lbl">DAUER</div><div class="cp-stat-val">' + (item.duration_min > 0 ? item.duration_min + ' min' : '—') + '</div></div>' +
       '<div class="cp-stat"><div class="cp-stat-lbl">ZONE</div><div class="cp-stat-val">' + (item.session_zone || '—') + '</div></div>';
+
     if (item.notes) {
-      notes.textContent = item.notes;
+      // Workout-Phasen aus Notes parsen
+      var phases = item.notes.split(' · ').filter(function(p) { return p.trim(); });
+      var phasesHtml = '';
+
+      phases.forEach(function(phase) {
+        var phaseClass = '';
+        var phaseLabel = '';
+        var phaseContent = phase.trim();
+
+        if (phase.toLowerCase().startsWith('warm-up')) {
+          phaseLabel = 'WARM-UP';
+          phaseContent = phase.replace(/warm-up:/i, '').trim();
+          phasesHtml += '<div style="border-left:2px solid var(--stone);padding:8px 12px;margin-bottom:6px">' +
+            '<div style="font-family:\'DM Mono\',monospace;font-size:8px;color:var(--stone);letter-spacing:.1em;margin-bottom:3px">' + phaseLabel + '</div>' +
+            '<div style="font-size:13px;color:var(--mid)">' + phaseContent + '</div></div>';
+        } else if (phase.toLowerCase().startsWith('cool down')) {
+          phaseLabel = 'COOL DOWN';
+          phaseContent = phase.replace(/cool down:/i, '').trim();
+          phasesHtml += '<div style="border-left:2px solid var(--stone);padding:8px 12px;margin-bottom:6px">' +
+            '<div style="font-family:\'DM Mono\',monospace;font-size:8px;color:var(--stone);letter-spacing:.1em;margin-bottom:3px">' + phaseLabel + '</div>' +
+            '<div style="font-size:13px;color:var(--mid)">' + phaseContent + '</div></div>';
+        } else if (phase.match(/^\d+×/)) {
+          // Repeat Block z.B. "6× 2 min Bergauf"
+          phasesHtml += '<div style="border-left:2px solid var(--accent);padding:8px 12px;margin-bottom:6px;background:rgba(232,216,74,.04)">' +
+            '<div style="font-family:\'DM Mono\',monospace;font-size:8px;color:var(--accent-dark);letter-spacing:.1em;margin-bottom:3px">HAUPTTEIL</div>' +
+            '<div style="font-size:13px;color:var(--black);font-weight:500">' + phaseContent + '</div></div>';
+        } else {
+          phasesHtml += '<div style="border-left:2px solid rgba(46,44,42,.15);padding:8px 12px;margin-bottom:6px">' +
+            '<div style="font-size:13px;color:var(--mid)">' + phaseContent + '</div></div>';
+        }
+      });
+
+      notes.innerHTML = phasesHtml;
       notes.style.display = 'block';
     } else {
       notes.style.display = 'none';
