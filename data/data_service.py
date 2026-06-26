@@ -116,8 +116,8 @@ def sync_garmin_health(target_date: str = None):
             s.get("sleepScores", {}).get("overall", {}).get("value"),
             round(s.get("deepSleepSeconds", 0) / 3600, 1),
             round(s.get("remSleepSeconds", 0) / 3600, 1),
-            hrv_data.get("lastNight"),
-            hrv_data.get("lastNight5MinHigh"),
+            hrv_data.get("lastNightAvg"),      # Fix: war lastNight
+            hrv_data.get("weeklyAvg"),          # Fix: war lastNight5MinHigh
             hrv_data.get("status"),
             bb_data[0].get("charged") if bb_data else None,
             bb_data[0].get("drained") if bb_data else None,
