@@ -310,7 +310,7 @@ def get_plan():
             day_of_week = r[2]
             session_type = r[3]
 
-            item_date = date.fromisoformat(week_date) + timedelta(days=day_of_week)
+            item_date = date.fromisoformat(week_date) + timedelta(days=day_of_week - 1)
             item_date_str = str(item_date)
             is_past = item_date <= today
 
@@ -358,14 +358,12 @@ def get_plan():
                     # Datum zurück in week_date + day_of_week umrechnen
                     act_date = date.fromisoformat(d_str)
                     act_monday = act_date - timedelta(days=act_date.weekday())
-                    # Wochentag relativ zum Plan-Start (Sonntag = 0)
-                    week_start = act_monday - timedelta(days=1)
-                    day_offset = (act_date - week_start).days - 1
+                    day_of_week = act_date.isoweekday()  # Mo=1...So=7
 
                     plan.append({
                         "id": -actual["training_id"],
-                        "week_date": str(act_monday - timedelta(days=1)),
-                        "day_of_week": day_offset,
+                        "week_date": str(act_monday),
+                        "day_of_week": day_of_week,
                         "session_type": actual["type"],
                         "session_zone": "",
                         "duration_min": actual["duration_min"],

@@ -1,6 +1,8 @@
 """
 CAIRN Garmin Calendar Sync
 Holt geplante Workouts aus Garmin Kalender → training_plan Tabelle
+Europäische Woche: Montag = Tag 1 ... Sonntag = Tag 7
+week_date = Montag der Woche
 """
 
 import sys, os
@@ -34,13 +36,11 @@ def sync_garmin_calendar():
 
     today = date.today()
 
-    # Monate für die nächsten 5 Wochen
     months = set()
     for i in range(5):
         d = today + timedelta(weeks=i)
         months.add((d.year, d.month))
 
-    # Geplante Workouts holen — Duplikate via workout_id verhindern
     planned = []
     seen_ids = set()
     for year, month in sorted(months):
@@ -55,20 +55,16 @@ def sync_garmin_calendar():
 
     print(f"Gefundene geplante Workouts: {len(planned)}")
 
-    # Bestehende zukünftige Einträge löschen
     monday = today - timedelta(days=today.weekday())
-    sunday = monday - timedelta(days=1)
-    cur.execute("DELETE FROM training_plan WHERE week_date >= %s", (sunday,))
+    cur.execute("DELETE FROM training_plan WHERE week_date >= %s", (monday,))
 
     for item in planned:
         item_date = date.fromisoformat(item['date'])
         if item_date < today:
             continue
 
-        # Sonntag der Woche als week_date (Tag 0 = Sonntag)
         item_monday = item_date - timedelta(days=item_date.weekday())
-        item_sunday = item_monday - timedelta(days=1)
-        day_of_week = (item_date - item_sunday).days - 1
+        day_of_week = item_date.isoweekday()  # Mo=1...So=7
 
         session_type = map_sport_to_session_type(item.get('sportTypeKey', 'running'))
         title = item.get('title', '')
@@ -77,7 +73,7 @@ def sync_garmin_calendar():
             INSERT INTO training_plan (week_date, day_of_week, session_type, session_zone, duration_min, distance_km, notes)
             VALUES (%s, %s, %s, %s, %s, %s, %s)
         """, (
-            str(item_sunday),
+            str(item_monday),
             day_of_week,
             session_type,
             '',
@@ -85,7 +81,7 @@ def sync_garmin_calendar():
             0,
             title
         ))
-        print(f"  ✅ {item_date} | Tag {day_of_week} | {session_type} | {title}")
+        print(f"  ✅ {item_date} ({item_date.strftime('%A')}) | week_date: {item_monday} | Tag {day_of_week} | {session_type} | {title}")
 
     conn.commit()
     conn.close()

@@ -1151,8 +1151,8 @@ function openCardPopup(dataStr) {
   var category = typeMap[item.session_type] || item.session_type.toUpperCase();
   var DAY_NAMES = ['MO','DI','MI','DO','FR','SA','SO'];
   var itemDate = new Date(item.week_date + 'T12:00:00');
-  itemDate.setDate(itemDate.getDate() + item.day_of_week);
-  var dateStr = DAY_NAMES[item.day_of_week] + ' · ' + itemDate.getDate() + '.' + (itemDate.getMonth()+1) + '.' + itemDate.getFullYear();
+  itemDate.setDate(itemDate.getDate() + item.day_of_week - 1);
+  var dateStr = DAY_NAMES[item.day_of_week - 1] + ' · ' + itemDate.getDate() + '.' + (itemDate.getMonth()+1) + '.' + itemDate.getFullYear();
 
   if (item.is_done) {
     box.className = 'cp-box past';
@@ -1305,7 +1305,7 @@ function renderCalendar() {
       var dayStr = dayDate.toISOString().split('T')[0];
       var isToday = dayStr === todayStr;
       var isPast = dayDate < new Date(todayStr);
-      var item = days[d];
+      var item = days[d + 1];  // day_of_week: Mo=1...So=7
 
       var cellClass = 'day-cell' + (isToday ? ' today-cell' : '');
       rowHtml += '<div class="' + cellClass + '" data-week="' + weekDate + '" data-day="' + d + '" ' +
@@ -1488,7 +1488,7 @@ function renderCalendar() {
   var todayItem = null;
   planData.forEach(function(item) {
     var itemDate = new Date(item.week_date + 'T12:00:00');
-    itemDate.setDate(itemDate.getDate() + item.day_of_week);
+    itemDate.setDate(itemDate.getDate() + item.day_of_week - 1);
     if (itemDate.toISOString().split('T')[0] === todayStr) {
       todayItem = item;
     }
