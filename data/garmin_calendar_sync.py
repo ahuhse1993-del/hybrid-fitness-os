@@ -54,6 +54,39 @@ def map_title_to_session_type(title, sport_key):
     }
     return mapping.get(sport_key, 'Easy Run')
 
+def format_step(step):
+    """Formatiert einen einzelnen Step zu lesbarem Text"""
+    step_type = step.get('stepType', {}).get('stepTypeKey', '')
+    desc = step.get('description', '') or ''
+    end_cond = step.get('endCondition', {}).get('conditionTypeKey', '')
+    end_val = step.get('endConditionValue')
+
+    if end_cond == 'lap.button':
+        return None
+
+    if end_val:
+        if end_cond == 'distance':
+            val_str = f"{round(end_val/1000, 1)}km"
+        elif end_cond == 'time':
+            mins = round(end_val / 60)
+            val_str = f"{mins} min"
+        else:
+            val_str = str(round(end_val))
+    else:
+        val_str = ''
+
+    text = f"{val_str} {desc}".strip()
+
+    if step_type == 'warmup':
+        return f"Warm-Up: {text}"
+    elif step_type == 'cooldown' and text:
+        return f"Cool Down: {text}"
+    elif step_type == 'interval' and text:
+        return text
+    elif step_type == 'rest' and text:
+        return f"Pause: {text}"
+    return None
+
 def get_workout_details(client, workout_id):
     """Holt Distanz, Dauer und Struktur eines Workouts"""
     try:
@@ -63,39 +96,27 @@ def get_workout_details(client, workout_id):
         dist_km = round(dist_m / 1000, 1) if dist_m else 0
         dur_min = round(dur_s / 60) if dur_s else 0
 
-        # Workout-Struktur aus Steps extrahieren
         steps_text = []
         segments = w.get('workoutSegments', [])
         for seg in segments:
-            steps = seg.get('workoutSteps', [])
-            for step in steps:
+            for step in seg.get('workoutSteps', []):
                 step_type = step.get('stepType', {}).get('stepTypeKey', '')
-                desc = step.get('description', '') or ''
-                end_cond = step.get('endCondition', {}).get('conditionTypeKey', '')
-                end_val = step.get('endConditionValue')
 
-                if end_cond == 'lap.button':
-                    continue
-
-                if end_val:
-                    if end_cond == 'distance':
-                        val_str = f"{round(end_val/1000, 1)}km"
-                    elif end_cond == 'time':
-                        mins = round(end_val / 60)
-                        val_str = f"{mins} min"
-                    else:
-                        val_str = str(round(end_val))
+                if step_type == 'repeat':
+                    # Repeat-Block: z.B. "6× Bergauf 1:30 min"
+                    n = step.get('numberOfIterations', 1)
+                    inner_steps = step.get('workoutSteps', [])
+                    inner_parts = []
+                    for inner in inner_steps:
+                        formatted = format_step(inner)
+                        if formatted:
+                            inner_parts.append(formatted)
+                    if inner_parts:
+                        steps_text.append(f"{n}× {' + '.join(inner_parts)}")
                 else:
-                    val_str = ''
-
-                if step_type == 'warmup':
-                    steps_text.append(f"Warm-Up: {val_str} {desc}".strip())
-                elif step_type == 'cooldown':
-                    steps_text.append(f"Cool Down: {val_str} {desc}".strip())
-                elif step_type == 'interval':
-                    steps_text.append(f"{val_str} {desc}".strip())
-                elif step_type == 'rest':
-                    steps_text.append(f"Pause: {val_str}".strip())
+                    formatted = format_step(step)
+                    if formatted:
+                        steps_text.append(formatted)
 
         structure = ' · '.join([s for s in steps_text if s]) if steps_text else ''
         return dist_km, dur_min, structure
