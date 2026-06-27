@@ -60,7 +60,7 @@ def save_checkin():
     conn.commit()
     conn.close()
 
-    # GitHub Actions: erst Aktivitäten Sync, dann Health Sync
+    # GitHub Actions: beide Syncs gleichzeitig triggern, nur auf Health warten
     try:
         import urllib.request, urllib.error, time
         github_token = os.getenv("CAIRN_GITHUB_TOKEN")
@@ -71,19 +71,19 @@ def save_checkin():
                 "Content-Type": "application/json"
             }
 
-            # 1. Aktivitäten Sync triggern
-            req0 = urllib.request.Request(
-                "https://api.github.com/repos/ahuhse1993-del/hybrid-fitness-os/actions/workflows/garmin_sync.yml/dispatches",
-                data=b'{"ref":"main"}',
-                headers=headers,
-                method="POST"
-            )
-            urllib.request.urlopen(req0, timeout=10)
+            # Aktivitäten Sync triggern (läuft im Hintergrund)
+            try:
+                req0 = urllib.request.Request(
+                    "https://api.github.com/repos/ahuhse1993-del/hybrid-fitness-os/actions/workflows/garmin_sync.yml/dispatches",
+                    data=b'{"ref":"main"}',
+                    headers=headers,
+                    method="POST"
+                )
+                urllib.request.urlopen(req0, timeout=10)
+            except Exception:
+                pass
 
-            # 30 Sekunden warten bis Aktivitäten Sync fertig
-            time.sleep(30)
-
-            # 2. Health Sync triggern
+            # Health Sync triggern
             req1 = urllib.request.Request(
                 "https://api.github.com/repos/ahuhse1993-del/hybrid-fitness-os/actions/workflows/health_sync.yml/dispatches",
                 data=b'{"ref":"main"}',
@@ -104,8 +104,8 @@ def save_checkin():
             runs_data = json.loads(resp.read())
             run_id = runs_data["workflow_runs"][0]["id"]
 
-            # Auf Completion warten (max 90 Sekunden)
-            for _ in range(18):
+            # Nur auf Health Sync warten (max 60 Sekunden)
+            for _ in range(12):
                 time.sleep(5)
                 req3 = urllib.request.Request(
                     f"https://api.github.com/repos/ahuhse1993-del/hybrid-fitness-os/actions/runs/{run_id}",
@@ -113,8 +113,7 @@ def save_checkin():
                 )
                 resp3 = urllib.request.urlopen(req3, timeout=10)
                 run_data = json.loads(resp3.read())
-                status = run_data.get("status")
-                if status == "completed":
+                if run_data.get("status") == "completed":
                     break
 
     except Exception as e:
