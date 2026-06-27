@@ -961,26 +961,6 @@ function submitCheckin(){
   document.getElementById('checkin').classList.remove('open');
 }
 
-  // Ladebalken starten — Sync läuft
-  var decEl = document.getElementById('cb-decision');
-  var quoteEl = document.getElementById('cb-quote');
-  var whyEl = document.getElementById('cb-why-items');
-  if (quoteEl) quoteEl.innerHTML = '';
-  if (whyEl) whyEl.innerHTML = '';
-  if (decEl) decEl.innerHTML =
-    '<div style="margin-bottom:10px;font-family:\'DM Mono\',monospace;font-size:9px;color:var(--stone);letter-spacing:.1em">GARMIN DATEN WERDEN GELADEN</div>' +
-    '<div style="height:10px;display:flex;width:100%;overflow:hidden">' +
-      '<div id="brief-load-fill" style="height:100%;background:var(--black);width:0%;transition:width 90s linear"></div>' +
-      '<div id="brief-load-rest" style="flex:1;height:100%;background-image:var(--dot);background-size:4px 4px"></div>' +
-    '</div>' +
-    '<div style="margin-top:8px;font-family:\'DM Mono\',monospace;font-size:8px;color:var(--stone)">Schlaf · HRV · Body Battery · Ruhepuls</div>';
-
-  setTimeout(function() {
-    var fill = document.getElementById('brief-load-fill');
-    if (fill) fill.style.width = '92%';
-  }, 100);
-}
-
 // ─── REPLAN FLOW ───
 function openReplan(){
   var suggestion = document.getElementById('cb-suggestion').textContent || '—';
