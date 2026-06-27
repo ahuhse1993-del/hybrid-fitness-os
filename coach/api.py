@@ -60,7 +60,7 @@ def save_checkin():
     conn.commit()
     conn.close()
 
-    # GitHub Actions Health Sync triggern und warten
+    # GitHub Actions: erst Aktivitäten Sync, dann Health Sync
     try:
         import urllib.request, urllib.error, time
         github_token = os.getenv("CAIRN_GITHUB_TOKEN")
@@ -71,14 +71,26 @@ def save_checkin():
                 "Content-Type": "application/json"
             }
 
-            # Workflow triggern
-            req = urllib.request.Request(
+            # 1. Aktivitäten Sync triggern
+            req0 = urllib.request.Request(
+                "https://api.github.com/repos/ahuhse1993-del/hybrid-fitness-os/actions/workflows/garmin_sync.yml/dispatches",
+                data=b'{"ref":"main"}',
+                headers=headers,
+                method="POST"
+            )
+            urllib.request.urlopen(req0, timeout=10)
+
+            # 30 Sekunden warten bis Aktivitäten Sync fertig
+            time.sleep(30)
+
+            # 2. Health Sync triggern
+            req1 = urllib.request.Request(
                 "https://api.github.com/repos/ahuhse1993-del/hybrid-fitness-os/actions/workflows/health_sync.yml/dispatches",
                 data=b'{"ref":"main"}',
                 headers=headers,
                 method="POST"
             )
-            urllib.request.urlopen(req, timeout=10)
+            urllib.request.urlopen(req1, timeout=10)
 
             # 5 Sekunden warten damit GitHub den Run erstellt
             time.sleep(5)
@@ -102,7 +114,6 @@ def save_checkin():
                 resp3 = urllib.request.urlopen(req3, timeout=10)
                 run_data = json.loads(resp3.read())
                 status = run_data.get("status")
-                conclusion = run_data.get("conclusion")
                 if status == "completed":
                     break
 
