@@ -37,6 +37,7 @@ def save_checkin():
     feel = data.get('feel', '')
     notes = ', '.join(data.get('notes', []))
     text = data.get('text', '')
+    already_trained = data.get('already_trained', False)
     today = get_today()
 
     conn = get_db()
@@ -60,7 +61,6 @@ def save_checkin():
     conn.commit()
     conn.close()
 
-    # GitHub Actions: beide Syncs gleichzeitig triggern, nur auf Health warten
     try:
         import urllib.request, urllib.error, time
         github_token = os.getenv("CAIRN_GITHUB_TOKEN")
@@ -71,31 +71,32 @@ def save_checkin():
                 "Content-Type": "application/json"
             }
 
-            # Aktivitäten Sync triggern (läuft im Hintergrund)
-            try:
-                req0 = urllib.request.Request(
-                    "https://api.github.com/repos/ahuhse1993-del/hybrid-fitness-os/actions/workflows/garmin_sync.yml/dispatches",
-                    data=b'{"ref":"main"}',
-                    headers=headers,
-                    method="POST"
-                )
-                urllib.request.urlopen(req0, timeout=10)
-            except Exception:
-                pass
+            # Wenn bereits trainiert: erst Aktivitäten Sync, dann Health Sync
+            if already_trained:
+                try:
+                    req0 = urllib.request.Request(
+                        "https://api.github.com/repos/ahuhse1993-del/hybrid-fitness-os/actions/workflows/garmin_sync.yml/dispatches",
+                        data=b'{"ref":"main"}',
+                        headers=headers,
+                        method="POST"
+                    )
+                    urllib.request.urlopen(req0, timeout=10)
+                    # Warten bis Aktivitäten Sync fertig (~90s)
+                    time.sleep(90)
+                except Exception:
+                    pass
 
             # Health Sync triggern
-            req1 = urllib.request.Request(
+            req = urllib.request.Request(
                 "https://api.github.com/repos/ahuhse1993-del/hybrid-fitness-os/actions/workflows/health_sync.yml/dispatches",
                 data=b'{"ref":"main"}',
                 headers=headers,
                 method="POST"
             )
-            urllib.request.urlopen(req1, timeout=10)
+            urllib.request.urlopen(req, timeout=10)
 
-            # 5 Sekunden warten damit GitHub den Run erstellt
             time.sleep(5)
 
-            # Run ID holen
             req2 = urllib.request.Request(
                 "https://api.github.com/repos/ahuhse1993-del/hybrid-fitness-os/actions/workflows/health_sync.yml/runs?per_page=1",
                 headers=headers
@@ -104,7 +105,6 @@ def save_checkin():
             runs_data = json.loads(resp.read())
             run_id = runs_data["workflow_runs"][0]["id"]
 
-            # Nur auf Health Sync warten (max 60 Sekunden)
             for _ in range(12):
                 time.sleep(5)
                 req3 = urllib.request.Request(

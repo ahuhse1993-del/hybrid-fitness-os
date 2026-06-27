@@ -501,6 +501,15 @@ body{background:var(--bg);font-family:'DM Sans',sans-serif;color:var(--black);fo
     </div>
 
     <!-- Freitext + Diktat -->
+    <div style="margin-bottom:16px">
+      <div style="font-family:'DM Mono',monospace;font-size:9px;color:rgba(240,237,230,.25);letter-spacing:.14em;margin-bottom:10px">HAST DU HEUTE SCHON TRAINIERT?</div>
+      <div style="display:flex;gap:8px">
+        <button id="ci-trained-yes" onclick="setTrained(true)" style="flex:1;padding:10px;background:transparent;border:.5px solid rgba(240,237,230,.15);color:rgba(240,237,230,.4);font-family:'DM Mono',monospace;font-size:10px;cursor:pointer;letter-spacing:.1em;transition:all .15s">JA</button>
+        <button id="ci-trained-no" onclick="setTrained(false)" style="flex:1;padding:10px;background:transparent;border:.5px solid rgba(240,237,230,.15);color:rgba(240,237,230,.4);font-family:'DM Mono',monospace;font-size:10px;cursor:pointer;letter-spacing:.1em;transition:all .15s">NEIN</button>
+      </div>
+    </div>
+
+    <!-- Freitext + Diktat -->
     <div style="margin-bottom:24px">
       <div style="font-family:'DM Mono',monospace;font-size:9px;color:rgba(240,237,230,.25);letter-spacing:.14em;margin-bottom:10px">EIGENE WORTE (OPTIONAL)</div>
       <div style="position:relative">
@@ -890,33 +899,47 @@ const months=['JAN','FEB','MÄR','APR','MAI','JUN','JUL','AUG','SEP','OKT','NOV'
 document.getElementById('ci-time').textContent =
   days[now.getDay()] + ' \u00b7 ' + String(now.getDate()).padStart(2,'0') + ' ' + months[now.getMonth()] + ' ' + now.getFullYear() + ' \u00b7 ' + String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
 
-function togNote(el){
-  el.classList.toggle('sel');
+var alreadyTrained = false;
+
+function setTrained(val) {
+  alreadyTrained = val;
+  var yes = document.getElementById('ci-trained-yes');
+  var no = document.getElementById('ci-trained-no');
+  if (val) {
+    yes.style.background = 'var(--accent)';
+    yes.style.color = 'var(--black)';
+    yes.style.borderColor = 'var(--accent)';
+    no.style.background = 'transparent';
+    no.style.color = 'rgba(240,237,230,.4)';
+    no.style.borderColor = 'rgba(240,237,230,.15)';
+  } else {
+    no.style.background = 'rgba(240,237,230,.08)';
+    no.style.color = 'rgba(240,237,230,.6)';
+    no.style.borderColor = 'rgba(240,237,230,.25)';
+    yes.style.background = 'transparent';
+    yes.style.color = 'rgba(240,237,230,.4)';
+    yes.style.borderColor = 'rgba(240,237,230,.15)';
+  }
 }
 
 function submitCheckin(){
-
-  // Freitext holen
   const freitext = document.getElementById('ci-freitext').value.trim();
-
-  // Notizen sammeln
   const notes = [...document.querySelectorAll('.ci-note.sel')].map(x=>x.textContent.trim()).filter(n=>n!=='Kein Anliegen');
 
-  // Feedback an Coach API senden — danach Brief automatisch laden
   fetch('https://web-production-297f2.up.railway.app/api/checkin', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({
       feel: selectedFeel,
       notes: notes,
-      text: freitext
+      text: freitext,
+      already_trained: alreadyTrained
     })
   }).then(r => r.json())
     .then(d => {
-      console.log('Check-in gesendet:', d);
-      // Erst nach Sync: Dashboard + Brief laden
       loadDashboard().then(function() {
         loadMorningBrief();
+        loadNewActivities();
       });
     })
     .catch(e => {
@@ -924,22 +947,19 @@ function submitCheckin(){
       loadMorningBrief();
     });
 
-  // Datum speichern
   localStorage.setItem('cairn_checkin_date', TODAY);
   localStorage.setItem('cairn_checkin_feel', selectedFeel);
   if (freitext) localStorage.setItem('cairn_checkin_text', freitext);
 
-  // Echo aufbauen
-  const feelMap = {'Frisch':'Frisch','Gut':'Gut','Ok':'Ok','Müde':'Müde','Erschöpft':'Erschöpft'};
-  let echo = feelMap[selectedFeel] || selectedFeel;
+  let echo = selectedFeel;
   if(notes.length) echo += ' · ' + notes.join(' · ');
   if(freitext) echo += ' · "' + freitext.substring(0, 60) + (freitext.length > 60 ? '...' : '') + '"';
+  if(alreadyTrained) echo += ' · Schon trainiert ✓';
 
   document.getElementById('echo-text').textContent = echo;
   document.getElementById('athlete-echo').style.display = 'flex';
-
-  // Popout schliessen
   document.getElementById('checkin').classList.remove('open');
+}
 
   // Ladebalken starten — Sync läuft
   var decEl = document.getElementById('cb-decision');
