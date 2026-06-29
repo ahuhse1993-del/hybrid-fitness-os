@@ -717,7 +717,7 @@ function loadAnalysis() {
 
       var tagsEl=document.getElementById('rec-tags');
       if (tagsEl && a.tags && a.tags.length > 0) {
-        tagsEl.innerHTML=a.tags.map(function(t){return '<span class="tag '+(t.type||'")>'+t.label+'</span>';}).join('');
+        tagsEl.innerHTML=a.tags.map(function(t){return '<span class="tag '+(t.type||'')+'">' +t.label+'</span>';}).join('');
       }
     })
     .catch(function(){ setEl('coach-summary','Analyse konnte nicht geladen werden.'); });
