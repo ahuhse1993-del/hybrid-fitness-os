@@ -132,14 +132,17 @@ def morning_brief():
 
         cur.execute("""
             SELECT feel, notes, athlete_text, morning_brief, suggestion,
-                   session_type, session_zone, primary_target, secondary_target
+                   session_type, session_zone, primary_target, secondary_target,
+                   sleep_duration_h, hrv_last_night
             FROM daily_logs WHERE date = %s
         """, (today,))
         row = cur.fetchone()
 
         athlete_feedback = {}
         if row:
-            if row[3] and row[4] is not None:
+            # Brief nur aus Cache laden wenn Health-Daten vorhanden sind
+            has_health_data = row[9] is not None or row[10] is not None
+            if row[3] and row[4] is not None and has_health_data:
                 conn.close()
                 return jsonify({
                     "status": "ok",
@@ -584,7 +587,15 @@ Struktur deiner Antwort (klar getrennt mit |||):
 4. Closing Thought (1 Satz, motivierend aber geerdet)
 
 Antworte NUR mit JSON:
-{{"summary": "...", "observations": ["...", "...", "..."], "meaning": "...", "closing": "..."}}"""
+{{"summary": "...", "observations": ["...", "...", "..."], "meaning": "...", "recommendation": "...", "next_session": "...", "closing": "...", "tags": [{{"label": "...", "type": "good"}}, {{"label": "...", "type": "warn"}}]}}
+
+summary: 2-3 Sätze Coach-Stimme
+observations: 3 konkrete Beobachtungen
+meaning: 1-2 Sätze was das für die nächsten Trainings bedeutet
+recommendation: 1 prägnanter Satz was der Coach für morgen/nächste Session empfiehlt
+next_session: konkrete Beschreibung der nächsten empfohlenen Session (Typ, Dauer, Intensität)
+closing: 1 Schlusssatz, geerdet und direkt
+tags: 2-4 kurze Labels (max 20 Zeichen), type entweder "good" oder "warn" """
 
         client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
         message = client.messages.create(
