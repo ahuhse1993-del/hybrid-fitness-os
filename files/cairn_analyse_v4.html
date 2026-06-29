@@ -152,12 +152,13 @@ body{background:var(--bg);font-family:"DM Sans",sans-serif;color:var(--black);fo
 <div class="pop open" id="popup">
   <div class="pop-box">
     <div class="pop-lbl">Neue Aktivit&#228;t erkannt</div>
-    <div class="pop-title">Morgenrunde T&#252;llinger &#8212; 12.4 km</div>
-    <div class="pop-sub">Heute um 06:41 &#183; Trail Run</div>
+    <div class="pop-title" id="pop-title">Lädt...</div>
+    <div class="pop-sub" id="pop-sub">—</div>
     <div class="pop-meta">
-      <div><div class="pm-lbl">Distanz</div><div class="pm-val">12.4<span class="pm-unit">km</span></div></div>
-      <div><div class="pm-lbl">Zeit</div><div class="pm-val">1:04<span class="pm-unit">h</span></div></div>
-      <div><div class="pm-lbl">Pace &#216;</div><div class="pm-val">5:10<span class="pm-unit">min/km</span></div></div>
+      <div><div class="pm-lbl">Distanz</div><div class="pm-val" id="pop-dist">—</div></div>
+      <div><div class="pm-lbl">Zeit</div><div class="pm-val" id="pop-time">—</div></div>
+      <div><div class="pm-lbl">Pace &#216;</div><div class="pm-val" id="pop-pace">—</div></div>
+      <div><div class="pm-lbl">HF &#216;</div><div class="pm-val" id="pop-hr">—</div></div>
       <div><div class="pm-lbl">HF &#216;</div><div class="pm-val">148<span class="pm-unit">bpm</span></div></div>
     </div>
     <div class="pop-actions">
@@ -193,7 +194,7 @@ body{background:var(--bg);font-family:"DM Sans",sans-serif;color:var(--black);fo
           <div class="tpulse"></div>
           <div>
             <div style="color:#F0EDE6;font-size:13px">Wie war der Lauf?</div>
-            <div style="color:#6B6860;font-family:DM Mono,monospace;font-size:9px;margin-top:1px">Morgenrunde T&#252;llinger &#183; DO 19.06.2026</div>
+            <div style="color:#6B6860;font-family:DM Mono,monospace;font-size:9px;margin-top:1px" id="fb-sub">—</div>
           </div>
         </div>
         <button class="tskip" onclick="openAn()">&#220;BERSPRINGEN</button>
@@ -254,8 +255,8 @@ body{background:var(--bg);font-family:"DM Sans",sans-serif;color:var(--black);fo
     <div class="scr" id="san">
       <div class="atop">
         <div>
-          <div style="font-family:DM Mono,monospace;font-size:8px;color:rgba(232,216,74,.4);letter-spacing:.08em;text-transform:uppercase;margin-bottom:2px">Trail Run &#183; DO 19.06.2026</div>
-          <div style="color:#F0EDE6;font-size:12px">Morgenrunde T&#252;llinger</div>
+          <div style="font-family:DM Mono,monospace;font-size:8px;color:rgba(232,216,74,.4);letter-spacing:.08em;text-transform:uppercase;margin-bottom:2px" id="an-type">—</div>
+          <div style="color:#F0EDE6;font-size:12px" id="an-title">Lädt...</div>
         </div>
         <button onclick="openFb()" style="background:transparent;border:none;color:#6B6860;font-family:DM Mono,monospace;font-size:9px;cursor:pointer">&#8592; ZUR&#220;CK</button>
       </div>
@@ -279,16 +280,12 @@ body{background:var(--bg);font-family:"DM Sans",sans-serif;color:var(--black);fo
           </svg>
           <div style="flex:1;min-width:0">
             <div class="clbl">Coach &#183; Analyse</div>
-            <div class="ch"><strong>Solide aerobe Arbeit.</strong><br>Alles im gr&#252;nen Bereich.</div>
-            <div class="cb">Du bist 12.4 km mit +312 m Aufstieg gelaufen und fast vollst&#228;ndig aerob geblieben. Die HF hat das Profil sauber begleitet. Du hast den Berg nicht bek&#228;mpft. Letzter Kilometer dein schnellster &#8212; die Reserven waren da.</div>
+            <div class="ch" id="coach-summary"><strong>Coach analysiert...</strong></div>
+            <div class="cb" id="coach-meaning"></div>
           </div>
         </div>
-        <ul class="tws">
-          <li class="tw"><span class="twd">&#8212;</span><span class="twt hi">78% der Zeit in Zone 2. Genau der Plan f&#252;r einen Easy Trail Run.</span></li>
-          <li class="tw"><span class="twd">&#8212;</span><span class="twt hi">Letzter Kilometer war dein schnellster &#8212; Reserven waren noch da.</span></li>
-          <li class="tw"><span class="twd">&#8212;</span><span class="twt warn">Kadenz &#216; 168 spm &#8212; f&#228;llt auf Anstiegen unter den Zielbereich 172&#8211;178.</span></li>
-          <li class="tw"><span class="twd">&#8212;</span><span class="twt">Belastung gut absorbiert. HF bei gleicher Pace tiefer als vor vier Wochen.</span></li>
-          <li class="tw"><span class="twd">&#8212;</span><span class="twt">Wettkampf in 7 Tagen. Diese Einheit war die letzte echte Belastung.</span></li>
+        <ul class="tws" id="coach-observations">
+          <li class="tw"><span class="twd">&#8212;</span><span class="twt">Analyse wird geladen...</span></li>
         </ul>
       </div>
 
@@ -297,9 +294,9 @@ body{background:var(--bg);font-family:"DM Sans",sans-serif;color:var(--black);fo
         <div style="display:grid;grid-template-columns:3fr 1fr">
           <div style="padding-bottom:10px">
             <div style="display:flex;align-items:baseline;gap:5px;margin-bottom:3px">
-              <div class="hdn">12.4</div><div class="hdu">km</div>
+              <div class="hdn" id="hero-km">—</div><div class="hdu">km</div>
             </div>
-            <div class="hsub">Morgenrunde T&#252;llinger &#183; Basel</div>
+            <div class="hsub" id="hero-name">—</div>
           </div>
           <div style="border-left:.5px solid rgba(46,44,42,.15);padding:0 0 10px 12px" id="hf-zones">
             <div style="font-family:DM Mono,monospace;font-size:8px;color:#9E9B95;letter-spacing:.05em;text-transform:uppercase;margin-bottom:7px">HF-Zonen</div>
@@ -311,10 +308,10 @@ body{background:var(--bg);font-family:"DM Sans",sans-serif;color:var(--black);fo
           </div>
         </div>
         <div class="hgrid">
-          <div class="hs"><div class="hsl">Zeit</div><div class="hsv">1:04<span class="hsu">h</span></div></div>
-          <div class="hs"><div class="hsl">Pace &#216;</div><div class="hsv">5:10<span class="hsu">min/km</span></div></div>
-          <div class="hs"><div class="hsl">HF &#216;</div><div class="hsv">148<span class="hsu">bpm</span></div></div>
-          <div class="hs"><div class="hsl">Aufstieg</div><div class="hsv">+312<span class="hsu">m</span></div></div>
+          <div class="hs"><div class="hsl">Zeit</div><div class="hsv" id="hero-time">—</div></div>
+          <div class="hs"><div class="hsl">Pace &#216;</div><div class="hsv" id="hero-pace">—</div></div>
+          <div class="hs"><div class="hsl">HF &#216;</div><div class="hsv" id="hero-hr">—</div></div>
+          <div class="hs"><div class="hsl">Aufstieg</div><div class="hsv" id="hero-elev">—</div></div>
         </div>
       </div>
 
@@ -357,8 +354,8 @@ body{background:var(--bg);font-family:"DM Sans",sans-serif;color:var(--black);fo
       <div class="twocol">
         <div class="card">
           <div class="lbl" style="margin-bottom:4px">Pace pro km</div>
-          <div style="font-family:DM Mono,monospace;font-size:18px;font-weight:500;line-height:1;margin-bottom:2px">5:10 <span style="font-size:9px;color:#9E9B95;font-weight:400">min/km &#216;</span></div>
-          <div style="font-family:DM Mono,monospace;font-size:9px;color:var(--accent);margin-bottom:4px">Schnellste: km 12</div>
+          <div style="font-family:DM Mono,monospace;font-size:18px;font-weight:500;line-height:1;margin-bottom:2px" id="pace-avg">— <span style="font-size:9px;color:#9E9B95;font-weight:400">min/km &#216;</span></div>
+          <div style="font-family:DM Mono,monospace;font-size:9px;color:var(--accent);margin-bottom:4px" id="pace-best">—</div>
           <div class="vc">
             <div class="vcy"><span>5:00</span><span>5:20</span><span>5:40</span></div>
             <div class="vcg"><div class="vcgl" style="top:0"></div><div class="vcgl" style="top:25%"></div><div class="vcgl" style="top:50%"></div><div class="vcgl" style="top:75%"></div><div class="vcgl" style="bottom:0"></div></div>
@@ -410,7 +407,7 @@ body{background:var(--bg);font-family:"DM Sans",sans-serif;color:var(--black);fo
 
       <!-- GELERNT -->
       <div class="sec"><span class="secl">Was ich mitnehme</span><div class="secln"></div></div>
-      <div class="lblock"><div class="llbl">Heute gelernt</div><div class="ltxt">Deine Kadenz f&#228;llt auf l&#228;ngeren Anstiegen regelm&#228;ssig unter den Zielbereich. Auf flachen Abschnitten aktiv an k&#252;rzeren, schnelleren Schritten arbeiten.</div></div>
+      <div class="lblock"><div class="llbl">Heute gelernt</div><div class="ltxt" id="coach-meaning-block">Analyse wird geladen...</div></div>
 
       <!-- EMPFEHLUNG -->
       <div class="sec"><span class="secl">Was ich tun w&#252;rde</span><div class="secln"></div></div>
@@ -673,6 +670,19 @@ function loadActivity() {
         }
       }
 
+      // Pace Summary
+      setEl('pace-avg', pace.replace('/km',''));
+      if (data.splits && data.splits.length > 1) {
+        var fullSpl2 = data.splits.filter(function(s) { return s.distance_km >= 0.9 && s.pace; });
+        if (fullSpl2.length > 0) {
+          var sorted2 = fullSpl2.slice().sort(function(a,b) {
+            var ap=a.pace.split(':'); var bp=b.pace.split(':');
+            return (parseInt(ap[0])*60+parseInt(ap[1]))-(parseInt(bp[0])*60+parseInt(bp[1]));
+          });
+          setEl('pace-best', 'Schnellste: Km ' + sorted2[0].split + ' · ' + sorted2[0].pace + '/km');
+        }
+      }
+
       // Charts
       if (data.splits && data.splits.length > 1) buildPaceChart(data.splits);
       if (data.splits && data.splits.length > 0) buildHFZones(data.splits);
@@ -703,6 +713,8 @@ function loadAnalysis() {
 
       if (summaryEl && a.summary) summaryEl.innerHTML = '<strong>' + a.summary + '</strong>';
       if (meaningEl && a.meaning) meaningEl.textContent = a.meaning;
+      var meaningBlock = document.getElementById('coach-meaning-block');
+      if (meaningBlock && a.meaning) meaningBlock.textContent = a.meaning;
 
       if (obsEl && a.observations) {
         obsEl.innerHTML = '';
