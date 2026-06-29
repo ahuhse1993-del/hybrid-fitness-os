@@ -6,6 +6,8 @@
 <title>CAIRN · Analyse</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{--bg:#F0EDE6;--stone:#9E9B95;--mid:#2E2C2A;--black:#1A1918;--accent:#E8D84A;--accent-mid:#C9BB2E;--accent-dark:#8C7F0A;--dl:radial-gradient(circle,rgba(46,44,42,.13) 1px,transparent 1px)}
@@ -128,22 +130,16 @@ body{background:var(--bg);font-family:"DM Sans",sans-serif;color:var(--black);fo
 .ract{display:flex;gap:8px}
 .ryes{background:var(--accent);border:none;color:var(--black);font-family:"DM Mono",monospace;font-size:10px;padding:8px 18px;cursor:pointer;font-weight:500}
 .rno{background:transparent;border:.5px solid #333;color:#6B6860;font-family:"DM Mono",monospace;font-size:10px;padding:8px 12px;cursor:pointer}
-.wprev{display:none;border:.5px solid rgba(232,216,74,.2);padding:12px 14px;margin-top:10px}
-.wplbl{font-family:"DM Mono",monospace;font-size:9px;color:rgba(232,216,74,.4);letter-spacing:.1em;text-transform:uppercase;margin-bottom:9px}
-.wdays{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:10px}
-.wday{padding:5px 3px;text-align:center;background:#2E2C2A}
-.wday.today{background:rgba(232,216,74,.08);border:.5px solid rgba(232,216,74,.25)}
-.wday.rest{background:var(--black)}
-.wdn{font-family:"DM Mono",monospace;font-size:7px;color:#6B6860;display:block;margin-bottom:2px}
-.wdt{font-family:"DM Mono",monospace;font-size:7px;color:#F0EDE6;display:block}
-.wday.today .wdn{color:rgba(232,216,74,.5)}.wday.today .wdt{color:var(--accent)}
-.wconf{background:var(--accent);border:none;color:var(--black);font-family:"DM Mono",monospace;font-size:10px;padding:6px 14px;cursor:pointer;font-weight:500}
-.wadj{background:transparent;border:.5px solid #333;color:#6B6860;font-family:"DM Mono",monospace;font-size:10px;padding:6px 11px;cursor:pointer}
 .tagrow{display:flex;gap:5px;flex-wrap:wrap;margin-top:12px}
 .tag{font-family:"DM Mono",monospace;font-size:9px;padding:3px 9px;background:#2E2C2A;color:#6B6860}
 .tag.good{background:rgba(90,122,74,.16);color:#7AAD5A}.tag.warn{background:rgba(140,127,10,.16);color:var(--accent-dark)}
 @keyframes dp{0%,100%{box-shadow:0 0 0 0 rgba(232,216,74,.4)}60%{box-shadow:0 0 0 5px rgba(232,216,74,0)}}
 .don{animation:dp 1.2s infinite}
+/* LEAFLET OVERRIDES — CAIRN Stil */
+.leaflet-container{background:#1A1918}
+.leaflet-tile-pane{filter:grayscale(100%) brightness(0.45) contrast(1.1)}
+.leaflet-control-zoom{display:none}
+.leaflet-control-attribution{display:none}
 </style>
 </head>
 <body>
@@ -152,14 +148,13 @@ body{background:var(--bg);font-family:"DM Sans",sans-serif;color:var(--black);fo
 <div class="pop open" id="popup">
   <div class="pop-box">
     <div class="pop-lbl">Neue Aktivit&#228;t erkannt</div>
-    <div class="pop-title" id="pop-title">Lädt...</div>
-    <div class="pop-sub" id="pop-sub">—</div>
+    <div class="pop-title" id="pop-title">L&#228;dt...</div>
+    <div class="pop-sub" id="pop-sub">&#8212;</div>
     <div class="pop-meta">
-      <div><div class="pm-lbl">Distanz</div><div class="pm-val" id="pop-dist">—</div></div>
-      <div><div class="pm-lbl">Zeit</div><div class="pm-val" id="pop-time">—</div></div>
-      <div><div class="pm-lbl">Pace &#216;</div><div class="pm-val" id="pop-pace">—</div></div>
-      <div><div class="pm-lbl">HF &#216;</div><div class="pm-val" id="pop-hr">—</div></div>
-      <div><div class="pm-lbl">HF &#216;</div><div class="pm-val">148<span class="pm-unit">bpm</span></div></div>
+      <div><div class="pm-lbl">Distanz</div><div class="pm-val" id="pop-dist">&#8212;</div></div>
+      <div><div class="pm-lbl">Zeit</div><div class="pm-val" id="pop-time">&#8212;</div></div>
+      <div><div class="pm-lbl">Pace &#216;</div><div class="pm-val" id="pop-pace">&#8212;</div></div>
+      <div><div class="pm-lbl">HF &#216;</div><div class="pm-val" id="pop-hr">&#8212;</div></div>
     </div>
     <div class="pop-actions">
       <button class="btn-yes" onclick="openFb()">ANALYSIEREN &#8594;</button>
@@ -172,9 +167,12 @@ body{background:var(--bg);font-family:"DM Sans",sans-serif;color:var(--black);fo
   <div class="sb">
     <div class="sb-logo">CAIRN</div>
     <div class="sb-nav">
-      <i class="si ti ti-home-2"></i><i class="si ti ti-calendar-month"></i>
-      <i class="si ti ti-run on"></i><i class="si ti ti-user"></i>
-      <i class="si ti ti-message-2"></i><i class="si ti ti-first-aid-kit"></i>
+      <i class="si ti ti-home-2" onclick="window.location='/'"></i>
+      <i class="si ti ti-calendar-month"></i>
+      <i class="si ti ti-run on"></i>
+      <i class="si ti ti-user"></i>
+      <i class="si ti ti-message-2"></i>
+      <i class="si ti ti-first-aid-kit"></i>
     </div>
     <div style="width:48px;height:48px;background:var(--accent);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0">
       <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
@@ -194,7 +192,7 @@ body{background:var(--bg);font-family:"DM Sans",sans-serif;color:var(--black);fo
           <div class="tpulse"></div>
           <div>
             <div style="color:#F0EDE6;font-size:13px">Wie war der Lauf?</div>
-            <div style="color:#6B6860;font-family:DM Mono,monospace;font-size:9px;margin-top:1px" id="fb-sub">—</div>
+            <div style="color:#6B6860;font-family:DM Mono,monospace;font-size:9px;margin-top:1px" id="fb-sub">&#8212;</div>
           </div>
         </div>
         <button class="tskip" onclick="openAn()">&#220;BERSPRINGEN</button>
@@ -255,8 +253,8 @@ body{background:var(--bg);font-family:"DM Sans",sans-serif;color:var(--black);fo
     <div class="scr" id="san">
       <div class="atop">
         <div>
-          <div style="font-family:DM Mono,monospace;font-size:8px;color:rgba(232,216,74,.4);letter-spacing:.08em;text-transform:uppercase;margin-bottom:2px" id="an-type">—</div>
-          <div style="color:#F0EDE6;font-size:12px" id="an-title">Lädt...</div>
+          <div style="font-family:DM Mono,monospace;font-size:8px;color:rgba(232,216,74,.4);letter-spacing:.08em;text-transform:uppercase;margin-bottom:2px" id="an-type">&#8212;</div>
+          <div style="color:#F0EDE6;font-size:12px" id="an-title">L&#228;dt...</div>
         </div>
         <button onclick="openFb()" style="background:transparent;border:none;color:#6B6860;font-family:DM Mono,monospace;font-size:9px;cursor:pointer">&#8592; ZUR&#220;CK</button>
       </div>
@@ -294,24 +292,24 @@ body{background:var(--bg);font-family:"DM Sans",sans-serif;color:var(--black);fo
         <div style="display:grid;grid-template-columns:3fr 1fr">
           <div style="padding-bottom:10px">
             <div style="display:flex;align-items:baseline;gap:5px;margin-bottom:3px">
-              <div class="hdn" id="hero-km">—</div><div class="hdu">km</div>
+              <div class="hdn" id="hero-km">&#8212;</div><div class="hdu">km</div>
             </div>
-            <div class="hsub" id="hero-name">—</div>
+            <div class="hsub" id="hero-name">&#8212;</div>
           </div>
           <div style="border-left:.5px solid rgba(46,44,42,.15);padding:0 0 10px 12px" id="hf-zones">
             <div style="font-family:DM Mono,monospace;font-size:8px;color:#9E9B95;letter-spacing:.05em;text-transform:uppercase;margin-bottom:7px">HF-Zonen</div>
-            <div class="zr"><span class="zl">Z5</span><div class="zb"><div class="zf" id="hz5" style="width:0%"></div><div class="zd"></div></div><span class="zp" id="hp5">—</span></div>
-            <div class="zr"><span class="zl">Z4</span><div class="zb"><div class="zf" id="hz4" style="width:0%"></div><div class="zd"></div></div><span class="zp" id="hp4">—</span></div>
-            <div class="zr"><span class="zl">Z3</span><div class="zb"><div class="zf" id="hz3" style="width:0%"></div><div class="zd"></div></div><span class="zp" id="hp3">—</span></div>
-            <div class="zr"><span class="zl" id="hz2lbl">Z2</span><div class="zb"><div class="zf" id="hz2" style="width:0%"></div><div class="zd"></div></div><span class="zp" id="hp2">—</span></div>
-            <div class="zr"><span class="zl">Z1</span><div class="zb"><div class="zf" id="hz1" style="width:0%"></div><div class="zd"></div></div><span class="zp" id="hp1">—</span></div>
+            <div class="zr"><span class="zl">Z5</span><div class="zb"><div class="zf" id="hz5" style="width:0%"></div><div class="zd"></div></div><span class="zp" id="hp5">&#8212;</span></div>
+            <div class="zr"><span class="zl">Z4</span><div class="zb"><div class="zf" id="hz4" style="width:0%"></div><div class="zd"></div></div><span class="zp" id="hp4">&#8212;</span></div>
+            <div class="zr"><span class="zl">Z3</span><div class="zb"><div class="zf" id="hz3" style="width:0%"></div><div class="zd"></div></div><span class="zp" id="hp3">&#8212;</span></div>
+            <div class="zr"><span class="zl" id="hz2lbl">Z2</span><div class="zb"><div class="zf" id="hz2" style="width:0%"></div><div class="zd"></div></div><span class="zp" id="hp2">&#8212;</span></div>
+            <div class="zr"><span class="zl">Z1</span><div class="zb"><div class="zf" id="hz1" style="width:0%"></div><div class="zd"></div></div><span class="zp" id="hp1">&#8212;</span></div>
           </div>
         </div>
         <div class="hgrid">
-          <div class="hs"><div class="hsl">Zeit</div><div class="hsv" id="hero-time">—</div></div>
-          <div class="hs"><div class="hsl">Pace &#216;</div><div class="hsv" id="hero-pace">—</div></div>
-          <div class="hs"><div class="hsl">HF &#216;</div><div class="hsv" id="hero-hr">—</div></div>
-          <div class="hs"><div class="hsl">Aufstieg</div><div class="hsv" id="hero-elev">—</div></div>
+          <div class="hs"><div class="hsl">Zeit</div><div class="hsv" id="hero-time">&#8212;</div></div>
+          <div class="hs"><div class="hsl">Pace &#216;</div><div class="hsv" id="hero-pace">&#8212;</div></div>
+          <div class="hs"><div class="hsl">HF &#216;</div><div class="hsv" id="hero-hr">&#8212;</div></div>
+          <div class="hs"><div class="hsl">Aufstieg</div><div class="hsv" id="hero-elev">&#8212;</div></div>
         </div>
       </div>
 
@@ -319,29 +317,23 @@ body{background:var(--bg);font-family:"DM Sans",sans-serif;color:var(--black);fo
       <div class="sec"><span class="secl">Route &amp; H&#246;henprofil</span><div class="secln"></div></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:2px;margin-bottom:2px">
 
-        <!-- AKTIVITÄTS-ZUSAMMENFASSUNG statt Karte -->
-        <div style="height:340px;background:var(--black);position:relative;display:flex;flex-direction:column;padding:16px" id="activity-summary">
-          <div style="font-family:DM Mono,monospace;font-size:8px;color:rgba(232,216,74,.4);letter-spacing:.1em;text-transform:uppercase;margin-bottom:16px">CAIRN · EINORDNUNG</div>
-          <div style="flex:1;display:flex;flex-direction:column;justify-content:space-between">
-            <div id="sum-type" style="font-size:13px;color:rgba(240,237,230,.5);font-family:DM Mono,monospace;margin-bottom:12px">—</div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px">
-              <div><div style="font-family:DM Mono,monospace;font-size:8px;color:rgba(240,237,230,.28);letter-spacing:.06em;margin-bottom:4px">DISTANZ</div><div style="font-family:DM Mono,monospace;font-size:22px;font-weight:500;color:#F0EDE6" id="sum-km">—</div></div>
-              <div><div style="font-family:DM Mono,monospace;font-size:8px;color:rgba(240,237,230,.28);letter-spacing:.06em;margin-bottom:4px">ZEIT</div><div style="font-family:DM Mono,monospace;font-size:22px;font-weight:500;color:#F0EDE6" id="sum-time">—</div></div>
-              <div><div style="font-family:DM Mono,monospace;font-size:8px;color:rgba(240,237,230,.28);letter-spacing:.06em;margin-bottom:4px">PACE Ø</div><div style="font-family:DM Mono,monospace;font-size:22px;font-weight:500;color:#F0EDE6" id="sum-pace">—</div></div>
-              <div><div style="font-family:DM Mono,monospace;font-size:8px;color:rgba(240,237,230,.28);letter-spacing:.06em;margin-bottom:4px">HF Ø</div><div style="font-family:DM Mono,monospace;font-size:22px;font-weight:500;color:#F0EDE6" id="sum-hr">—</div></div>
-            </div>
-            <div style="border-top:.5px solid rgba(240,237,230,.07);padding-top:12px">
-              <div style="font-family:DM Mono,monospace;font-size:8px;color:rgba(232,216,74,.4);letter-spacing:.1em;margin-bottom:6px">SPLITS SCHNELLSTE → LANGSAMSTE</div>
-              <div id="sum-splits" style="font-family:DM Mono,monospace;font-size:11px;color:rgba(240,237,230,.4);line-height:1.8">—</div>
-            </div>
+        <!-- LEAFLET KARTE -->
+        <div style="height:340px;position:relative" id="map-container">
+          <div id="map" style="width:100%;height:100%"></div>
+          <div id="map-overlay" style="position:absolute;inset:0;background:var(--black);display:flex;align-items:center;justify-content:center;z-index:500;pointer-events:none">
+            <div style="font-family:DM Mono,monospace;font-size:9px;color:rgba(240,237,230,.3);letter-spacing:.1em">ROUTE WIRD GELADEN...</div>
+          </div>
+          <!-- CAIRN Label über Karte -->
+          <div style="position:absolute;top:10px;left:10px;z-index:600;background:rgba(26,25,24,.85);padding:4px 10px;pointer-events:none">
+            <div style="font-family:DM Mono,monospace;font-size:8px;color:rgba(232,216,74,.6);letter-spacing:.12em">ROUTE</div>
           </div>
         </div>
 
-                <!-- HÖHENPROFIL: dynamisch aus Splits -->
+        <!-- HÖHENPROFIL -->
         <div style="height:340px;background:#E8E4DC;display:flex;flex-direction:column;padding:12px 0 0 0">
           <div style="display:flex;gap:20px;margin-bottom:8px;flex-shrink:0;padding:0 12px">
-            <div><div style="font-family:DM Mono,monospace;font-size:8px;color:#9E9B95;text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px">Aufstieg</div><div style="font-family:DM Mono,monospace;font-size:18px;font-weight:500" id="elev-up">—</div></div>
-            <div><div style="font-family:DM Mono,monospace;font-size:8px;color:#9E9B95;text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px">Abstieg</div><div style="font-family:DM Mono,monospace;font-size:18px;font-weight:500" id="elev-down">—</div></div>
+            <div><div style="font-family:DM Mono,monospace;font-size:8px;color:#9E9B95;text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px">Aufstieg</div><div style="font-family:DM Mono,monospace;font-size:18px;font-weight:500" id="elev-up">&#8212;</div></div>
+            <div><div style="font-family:DM Mono,monospace;font-size:8px;color:#9E9B95;text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px">Abstieg</div><div style="font-family:DM Mono,monospace;font-size:18px;font-weight:500" id="elev-down">&#8212;</div></div>
           </div>
           <div id="elev-chart" style="flex:1;padding:0 12px 12px">
             <div style="font-family:DM Mono,monospace;font-size:9px;color:#9E9B95">Wird geladen...</div>
@@ -349,55 +341,14 @@ body{background:var(--bg);font-family:"DM Sans",sans-serif;color:var(--black);fo
         </div>
       </div>
 
-      <!-- PACE + KADENZ -->
-      <div class="sec"><span class="secl">Pace &amp; Kadenz</span><div class="secln"></div></div>
-      <div class="twocol">
-        <div class="card">
+      <!-- PACE CHART -->
+      <div class="sec"><span class="secl">Pace</span><div class="secln"></div></div>
+      <div style="margin-bottom:2px">
+        <div class="card" style="padding-bottom:20px">
           <div class="lbl" style="margin-bottom:4px">Pace pro km</div>
-          <div style="font-family:DM Mono,monospace;font-size:18px;font-weight:500;line-height:1;margin-bottom:2px" id="pace-avg">— <span style="font-size:9px;color:#9E9B95;font-weight:400">min/km &#216;</span></div>
-          <div style="font-family:DM Mono,monospace;font-size:9px;color:var(--accent);margin-bottom:4px" id="pace-best">—</div>
-          <div class="vc">
-            <div class="vcy"><span>5:00</span><span>5:20</span><span>5:40</span></div>
-            <div class="vcg"><div class="vcgl" style="top:0"></div><div class="vcgl" style="top:25%"></div><div class="vcgl" style="top:50%"></div><div class="vcgl" style="top:75%"></div><div class="vcgl" style="bottom:0"></div></div>
-            <div class="vcc">
-              <div class="vb"><div class="vbi"><div class="vbd" style="flex:.25"></div><div class="vbf" style="flex:.75"></div></div><span class="vblbl">1</span></div>
-              <div class="vb"><div class="vbi"><div class="vbd" style="flex:.12"></div><div class="vbf" style="flex:.88"></div></div><span class="vblbl">2</span></div>
-              <div class="vb"><div class="vbi"><div class="vbd" style="flex:.3"></div><div class="vbf" style="flex:.7"></div></div><span class="vblbl">3</span></div>
-              <div class="vb"><div class="vbi"><div class="vbd" style="flex:.56"></div><div class="vbf warn" style="flex:.44"></div></div><span class="vblbl warn">4</span></div>
-              <div class="vb"><div class="vbi"><div class="vbd" style="flex:.69"></div><div class="vbf warn" style="flex:.31"></div></div><span class="vblbl warn">5</span></div>
-              <div class="vb"><div class="vbi"><div class="vbd" style="flex:.63"></div><div class="vbf warn" style="flex:.37"></div></div><span class="vblbl warn">6</span></div>
-              <div class="vb"><div class="vbi"><div class="vbd" style="flex:.2"></div><div class="vbf" style="flex:.8"></div></div><span class="vblbl">7</span></div>
-              <div class="vb"><div class="vbi"><div class="vbd" style="flex:.05"></div><div class="vbf" style="flex:.95"></div></div><span class="vblbl">8</span></div>
-              <div class="vb"><div class="vbi"><div class="vbd" style="flex:.37"></div><div class="vbf" style="flex:.63"></div></div><span class="vblbl">9</span></div>
-              <div class="vb"><div class="vbi"><div class="vbd" style="flex:.44"></div><div class="vbf" style="flex:.56"></div></div><span class="vblbl">10</span></div>
-              <div class="vb"><div class="vbi"><div class="vbd" style="flex:.12"></div><div class="vbf" style="flex:.88"></div></div><span class="vblbl">11</span></div>
-              <div class="vb"><div class="vbi"><div class="vbf acc" style="flex:1"></div></div><span class="vblbl acc">12</span></div>
-            </div>
-          </div>
-        </div>
-        <div class="card">
-          <div class="lbl" style="margin-bottom:4px">Kadenz pro km</div>
-          <div style="font-family:DM Mono,monospace;font-size:18px;font-weight:500;line-height:1;margin-bottom:2px">168 <span style="font-size:9px;color:#9E9B95;font-weight:400">spm &#216;</span></div>
-          <div style="font-family:DM Mono,monospace;font-size:9px;color:var(--accent-dark);margin-bottom:4px">Ziel 172&#8211;178 spm</div>
-          <div class="vc" style="position:relative">
-            <div class="vcy"><span>178</span><span>168</span><span>158</span></div>
-            <div class="vcg"><div class="vcgl" style="top:0"></div><div class="vcgl" style="top:25%"></div><div class="vcgl" style="top:50%"></div><div class="vcgl" style="top:75%"></div><div class="vcgl" style="bottom:0"></div></div>
-            <div style="position:absolute;left:24px;right:0;top:30%;pointer-events:none;z-index:2"><div style="height:1px;background:var(--accent);opacity:.35"></div><div style="position:absolute;top:-8px;right:0;font-family:DM Mono,monospace;font-size:6px;color:var(--accent);opacity:.6">172</div></div>
-            <div class="vcc">
-              <div class="vb"><div class="vbi"><div class="vbd" style="flex:.5"></div><div class="vbf warn" style="flex:.5"></div></div><span class="vblbl warn">1</span></div>
-              <div class="vb"><div class="vbi"><div class="vbd" style="flex:.4"></div><div class="vbf warn" style="flex:.6"></div></div><span class="vblbl warn">2</span></div>
-              <div class="vb"><div class="vbi"><div class="vbd" style="flex:.55"></div><div class="vbf warn" style="flex:.45"></div></div><span class="vblbl warn">3</span></div>
-              <div class="vb"><div class="vbi"><div class="vbd" style="flex:.7"></div><div class="vbf warn" style="flex:.3"></div></div><span class="vblbl warn">4</span></div>
-              <div class="vb"><div class="vbi"><div class="vbd" style="flex:.75"></div><div class="vbf warn" style="flex:.25"></div></div><span class="vblbl warn">5</span></div>
-              <div class="vb"><div class="vbi"><div class="vbd" style="flex:.65"></div><div class="vbf warn" style="flex:.35"></div></div><span class="vblbl warn">6</span></div>
-              <div class="vb"><div class="vbi"><div class="vbd" style="flex:.45"></div><div class="vbf" style="flex:.55"></div></div><span class="vblbl">7</span></div>
-              <div class="vb"><div class="vbi"><div class="vbd" style="flex:.35"></div><div class="vbf" style="flex:.65"></div></div><span class="vblbl">8</span></div>
-              <div class="vb"><div class="vbi"><div class="vbd" style="flex:.5"></div><div class="vbf warn" style="flex:.5"></div></div><span class="vblbl warn">9</span></div>
-              <div class="vb"><div class="vbi"><div class="vbd" style="flex:.6"></div><div class="vbf warn" style="flex:.4"></div></div><span class="vblbl warn">10</span></div>
-              <div class="vb"><div class="vbi"><div class="vbd" style="flex:.4"></div><div class="vbf" style="flex:.6"></div></div><span class="vblbl">11</span></div>
-              <div class="vb"><div class="vbi"><div class="vbd" style="flex:.3"></div><div class="vbf" style="flex:.7"></div></div><span class="vblbl">12</span></div>
-            </div>
-          </div>
+          <div style="font-family:DM Mono,monospace;font-size:18px;font-weight:500;line-height:1;margin-bottom:2px" id="pace-avg">&#8212; <span style="font-size:9px;color:#9E9B95;font-weight:400">min/km &#216;</span></div>
+          <div style="font-family:DM Mono,monospace;font-size:9px;color:var(--accent);margin-bottom:4px" id="pace-best">&#8212;</div>
+          <div id="pace-chart" style="margin-top:12px"></div>
         </div>
       </div>
 
@@ -415,8 +366,8 @@ body{background:var(--bg);font-family:"DM Sans",sans-serif;color:var(--black);fo
         <div class="rlbl">Coach &#183; Empfehlung</div>
         <div class="rh" id="rec-headline">Wird geladen...</div>
         <div class="rbox" id="rec-box" style="display:none">
-          <div class="rblbl" id="rec-box-label">N&#228;CHSTE SESSION</div>
-          <div class="rbtxt" id="rec-box-text">—</div>
+          <div class="rblbl" id="rec-box-label">N&#196;CHSTE SESSION</div>
+          <div class="rbtxt" id="rec-box-text">&#8212;</div>
         </div>
         <div class="tagrow" id="rec-tags"></div>
         <div style="margin-top:20px;padding-top:14px;border-top:.5px solid rgba(240,237,230,.07)" id="rec-closing" style="display:none">
@@ -431,12 +382,14 @@ body{background:var(--bg);font-family:"DM Sans",sans-serif;color:var(--black);fo
 <script>
 var trainingId = new URLSearchParams(window.location.search).get('id');
 var activityData = null;
+var leafletMap = null;
 
 function closePop(){document.getElementById("popup").classList.remove("open")}
 function openFb(){document.getElementById("popup").classList.remove("open");document.getElementById("sfb").classList.add("on");document.getElementById("san").classList.remove("on");window.scrollTo(0,0)}
-function openAn(){document.getElementById("sfb").classList.remove("on");document.getElementById("san").classList.add("on");window.scrollTo(0,0);loadAnalysis()}
+function openAn(){document.getElementById("sfb").classList.remove("on");document.getElementById("san").classList.add("on");window.scrollTo(0,0);loadAnalysis();initMap()}
 function sg(btn){btn.parentElement.querySelectorAll("button").forEach(b=>b.classList.remove("sel"));btn.classList.add("sel")}
 function tSpl(){const c=document.getElementById("scnt"),a=document.getElementById("sarr");c.classList.toggle("open");a.textContent=c.classList.contains("open")?"▲":"▼"}
+
 let rec=null,don=false;
 function tDik(btn){const st=document.getElementById("dikst"),ta=document.getElementById("ftta"),ic=btn.querySelector("i");if(don){if(rec)rec.stop();return}const SR=window.SpeechRecognition||window.webkitSpeechRecognition;if(!SR){alert("Chrome verwenden.");return}rec=new SR();rec.lang="de-DE";rec.continuous=true;rec.interimResults=true;let ft=ta.value;rec.onstart=()=>{don=true;btn.style.background="var(--accent)";btn.classList.add("don");ic.style.color="var(--black)";st.style.display="flex"};rec.onresult=e=>{let it="";for(let i=e.resultIndex;i<e.results.length;i++){const t=e.results[i][0].transcript;if(e.results[i].isFinal)ft+=(ft?" ":"")+t;else it+=t}ta.value=ft+(it?" "+it:"")};rec.onerror=()=>rDik(btn,ic,st);rec.onend=()=>{rDik(btn,ic,st);ta.value=ft}}
 function rDik(btn,ic,st){don=false;btn.style.background="var(--black)";btn.classList.remove("don");ic.style.color="var(--accent)";st.style.display="none"}
@@ -453,7 +406,7 @@ function calcTime(durMin) {
 }
 function setEl(id, val) { var el = document.getElementById(id); if (el) el.textContent = val; }
 
-// HF Zonen Grenzen (bpm) — aus Strava/Garmin
+// HF Zonen
 var HF_ZONES = [
   {z:'Z5', min:172, max:999},
   {z:'Z4', min:162, max:171},
@@ -506,34 +459,57 @@ function buildHFZones(splits) {
 function buildPaceChart(splits) {
   var chartEl = document.getElementById('pace-chart');
   if (!chartEl) return;
-  var fullSplits = splits.filter(function(s) { return s.distance_km >= 0.9; });
+  var fullSplits = splits.filter(function(s) { return s.distance_km >= 0.9 && s.pace; });
   if (fullSplits.length === 0) return;
 
   var paces = fullSplits.map(function(s) {
-    if (!s.pace) return 0;
     var p = s.pace.split(':');
     return parseInt(p[0]) * 60 + parseInt(p[1]);
-  }).filter(function(p) { return p > 0; });
+  });
 
   var minPace = Math.min.apply(null, paces);
   var maxPace = Math.max.apply(null, paces);
-  var range = maxPace - minPace || 60;
-  var w = 400, h = 120, pad = 10;
-  var barW = Math.floor((w - pad * 2) / fullSplits.length) - 2;
+  var range = maxPace - minPace || 30;
+  var avgPaceSec = Math.round(paces.reduce(function(a,b){return a+b},0) / paces.length);
+
+  // Y-Achsen-Labels berechnen
+  var yTop = maxPace + 10;
+  var yMid = Math.round((minPace + maxPace) / 2);
+  var yBot = minPace - 10;
+  function fmtPace(s) { return Math.floor(s/60) + ':' + String(s%60).padStart(2,'0'); }
+
+  var w = 400, h = 120, padL = 32, padB = 16;
+  var chartH = h - padB;
+  var barW = Math.floor((w - padL) / fullSplits.length) - 2;
 
   var bars = '';
   fullSplits.forEach(function(s, i) {
-    if (!s.pace) return;
     var p = s.pace.split(':');
     var paceSec = parseInt(p[0]) * 60 + parseInt(p[1]);
-    var barH = Math.round(((paceSec - minPace) / range) * (h - pad * 2 - 20)) + 20;
-    var x = pad + i * (barW + 2);
-    var y = h - barH - 15;
-    bars += '<rect x="' + x + '" y="' + y + '" width="' + barW + '" height="' + barH + '" fill="rgba(46,44,42,.2)"/>';
-    bars += '<text x="' + (x + barW/2) + '" y="' + (h-2) + '" font-family="DM Mono" font-size="8" fill="#9E9B95" text-anchor="middle">' + s.split + '</text>';
+    var barH = Math.max(4, Math.round(((paceSec - yBot) / (yTop - yBot)) * chartH));
+    var x = padL + i * (barW + 2);
+    var y = chartH - barH;
+    var isAvg = Math.abs(paceSec - avgPaceSec) < 5;
+    var isSlow = paceSec > avgPaceSec + 15;
+    var fill = isSlow ? 'var(--accent-dark)' : (isAvg ? 'rgba(46,44,42,.35)' : 'rgba(46,44,42,.2)');
+    bars += '<rect x="' + x + '" y="' + y + '" width="' + barW + '" height="' + barH + '" fill="' + fill + '"/>';
+    bars += '<text x="' + (x + barW/2) + '" y="' + (h-2) + '" font-family="DM Mono" font-size="7" fill="#9E9B95" text-anchor="middle">' + s.split + '</text>';
   });
 
-  chartEl.innerHTML = '<svg width="100%" viewBox="0 0 400 ' + h + '">' + bars + '</svg>';
+  // Durchschnittslinie
+  var avgY = chartH - Math.round(((avgPaceSec - yBot) / (yTop - yBot)) * chartH);
+  var avgLine = '<line x1="' + padL + '" y1="' + avgY + '" x2="' + w + '" y2="' + avgY + '" stroke="var(--accent)" stroke-width="1" stroke-dasharray="3 2" opacity=".5"/>';
+  avgLine += '<text x="' + w + '" y="' + (avgY - 3) + '" font-family="DM Mono" font-size="6" fill="rgba(232,216,74,.6)" text-anchor="end">Ø ' + fmtPace(avgPaceSec) + '</text>';
+
+  // Y-Achse
+  var yAxis = '<text x="' + (padL-3) + '" y="8" font-family="DM Mono" font-size="6" fill="#9E9B95" text-anchor="end">' + fmtPace(yTop) + '</text>';
+  yAxis += '<text x="' + (padL-3) + '" y="' + (chartH/2+3) + '" font-family="DM Mono" font-size="6" fill="#9E9B95" text-anchor="end">' + fmtPace(yMid) + '</text>';
+
+  // Hilfslinien
+  var grid = '<line x1="' + padL + '" y1="0" x2="' + w + '" y2="0" stroke="rgba(158,155,149,.15)" stroke-width=".5"/>';
+  grid += '<line x1="' + padL + '" y1="' + Math.round(chartH/2) + '" x2="' + w + '" y2="' + Math.round(chartH/2) + '" stroke="rgba(158,155,149,.1)" stroke-width=".5"/>';
+
+  chartEl.innerHTML = '<svg width="100%" viewBox="0 0 ' + w + ' ' + h + '">' + grid + bars + avgLine + yAxis + '</svg>';
 }
 
 function buildElevationChart(splits) {
@@ -552,7 +528,6 @@ function buildElevationChart(splits) {
     return;
   }
 
-  // Kumulierte Höhe aufbauen
   var cumElev = [0];
   elevations.forEach(function(e) { cumElev.push(cumElev[cumElev.length-1] + e); });
 
@@ -575,6 +550,74 @@ function buildElevationChart(splits) {
     '<text x="0" y="' + (h-2) + '" font-family="DM Mono" font-size="7" fill="#9E9B95">1</text>' +
     '<text x="' + w + '" y="' + (h-2) + '" font-family="DM Mono" font-size="7" fill="#9E9B95" text-anchor="end">' + splits.length + '</text>' +
     '</svg>';
+}
+
+// ─── LEAFLET KARTE ───
+var mapInitialized = false;
+function initMap() {
+  if (mapInitialized || !trainingId) return;
+  mapInitialized = true;
+
+  // Karte initialisieren
+  leafletMap = L.map('map', {
+    zoomControl: false,
+    attributionControl: false,
+    scrollWheelZoom: false
+  });
+
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 18
+  }).addTo(leafletMap);
+
+  // GPS Daten laden
+  fetch('https://web-production-297f2.up.railway.app/api/activity/' + trainingId + '/gps')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      var overlay = document.getElementById('map-overlay');
+
+      if (data.status !== 'ok' || !data.points || data.points.length === 0) {
+        if (overlay) overlay.innerHTML = '<div style="font-family:DM Mono,monospace;font-size:9px;color:rgba(240,237,230,.2);letter-spacing:.1em">KEINE GPS-DATEN</div>';
+        return;
+      }
+
+      // Route zeichnen
+      var latlngs = data.points.map(function(p) { return [p.lat, p.lon]; });
+
+      // Linie — CAIRN Stil: Accent-gelb, dünn
+      L.polyline(latlngs, {
+        color: '#E8D84A',
+        weight: 2.5,
+        opacity: 0.85,
+        lineJoin: 'round'
+      }).addTo(leafletMap);
+
+      // Start / Ende Marker — minimal
+      var dotIcon = function(color) {
+        return L.divIcon({
+          className: '',
+          html: '<div style="width:8px;height:8px;background:' + color + ';border:1.5px solid #1A1918;border-radius:50%"></div>',
+          iconSize: [8,8],
+          iconAnchor: [4,4]
+        });
+      };
+
+      L.marker(latlngs[0], {icon: dotIcon('#E8D84A')}).addTo(leafletMap);
+      L.marker(latlngs[latlngs.length-1], {icon: dotIcon('#9E9B95')}).addTo(leafletMap);
+
+      // Karte auf Route zentrieren
+      var bounds = L.latLngBounds(latlngs);
+      leafletMap.fitBounds(bounds, {padding: [24, 24]});
+
+      // Overlay ausblenden
+      if (overlay) overlay.style.display = 'none';
+
+      // Karte nach Resize neu zeichnen
+      setTimeout(function() { leafletMap.invalidateSize(); }, 100);
+    })
+    .catch(function() {
+      var overlay = document.getElementById('map-overlay');
+      if (overlay) overlay.innerHTML = '<div style="font-family:DM Mono,monospace;font-size:9px;color:rgba(240,237,230,.2);letter-spacing:.1em">GPS NICHT VERFÜGBAR</div>';
+    });
 }
 
 function loadActivity() {
@@ -621,7 +664,6 @@ function loadActivity() {
       document.getElementById('pop-hr').innerHTML = (a.avg_hr || '—') + '<span class="pm-unit">bpm</span>';
 
       // Screens
-      setEl('fb-title', 'Wie war das Training?');
       setEl('fb-sub', name + ' · ' + dateStr);
       setEl('an-type', typeStr);
       setEl('an-title', name);
@@ -633,13 +675,6 @@ function loadActivity() {
       setEl('hero-pace', pace);
       setEl('hero-hr', (a.avg_hr || '—') + ' bpm');
       setEl('hero-elev', elevStr);
-
-      // Aktivitäts-Zusammenfassung
-      setEl('sum-type', typeStr);
-      setEl('sum-km', a.distance_km.toFixed(1) + ' km');
-      setEl('sum-time', time);
-      setEl('sum-pace', pace);
-      setEl('sum-hr', (a.avg_hr || '—') + ' bpm');
 
       // Splits Tabelle
       var tb = document.getElementById("stbd");
@@ -666,22 +701,12 @@ function loadActivity() {
             return (parseInt(ap[0])*60+parseInt(ap[1])) - (parseInt(bp[0])*60+parseInt(bp[1]));
           });
           var fastest = sorted[0]; var slowest = sorted[sorted.length-1];
-          setEl('sum-splits', 'Schnellste: Km ' + fastest.split + ' · ' + fastest.pace + '/km   Langsamste: Km ' + slowest.split + ' · ' + slowest.pace + '/km');
+          // Pace Summary
+          setEl('pace-best', 'Schnellste: Km ' + fastest.split + ' · ' + fastest.pace + '/km   Langsamste: Km ' + slowest.split + ' · ' + slowest.pace + '/km');
         }
       }
 
-      // Pace Summary
       setEl('pace-avg', pace.replace('/km',''));
-      if (data.splits && data.splits.length > 1) {
-        var fullSpl2 = data.splits.filter(function(s) { return s.distance_km >= 0.9 && s.pace; });
-        if (fullSpl2.length > 0) {
-          var sorted2 = fullSpl2.slice().sort(function(a,b) {
-            var ap=a.pace.split(':'); var bp=b.pace.split(':');
-            return (parseInt(ap[0])*60+parseInt(ap[1]))-(parseInt(bp[0])*60+parseInt(bp[1]));
-          });
-          setEl('pace-best', 'Schnellste: Km ' + sorted2[0].split + ' · ' + sorted2[0].pace + '/km');
-        }
-      }
 
       // Charts
       if (data.splits && data.splits.length > 1) buildPaceChart(data.splits);
@@ -732,10 +757,7 @@ function loadAnalysis() {
         }
       }
 
-      // Coach Empfehlung
-      if (a.recommendation) {
-        setEl('rec-headline', a.recommendation);
-      }
+      if (a.recommendation) setEl('rec-headline', a.recommendation);
       if (a.next_session) {
         setEl('rec-box-text', a.next_session);
         document.getElementById('rec-box').style.display = 'block';
@@ -745,7 +767,6 @@ function loadAnalysis() {
         document.getElementById('rec-closing').style.display = 'block';
       }
 
-      // Tags aus Analyse
       var tagsEl = document.getElementById('rec-tags');
       if (tagsEl && a.tags && a.tags.length > 0) {
         tagsEl.innerHTML = a.tags.map(function(t) {
