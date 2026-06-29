@@ -1,6 +1,10 @@
 name: Health Sync
 
 on:
+  schedule:
+    # Alle 15 Min von 05:00-09:30 UTC+2 (= 03:00-07:30 UTC)
+    - cron: '0,15,30,45 3,4,5,6 * * *'
+    - cron: '0,15,30 7 * * *'
   workflow_dispatch:
     inputs:
       date:
@@ -20,12 +24,76 @@ jobs:
           python-version: '3.11'
 
       - name: Install dependencies
-        run: pip install garminconnect psycopg2-binary python-dotenv
+        run: pip install garminconnect psycopg2-binary python-dotenv pytz
 
-      - name: Run Health sync
+      - name: Check if sync needed
+        id: check
+        env:
+          RAILWAY_DATABASE_URL: ${{ secrets.RAILWAY_DATABASE_URL }}
+        run: |
+          python << 'PYEOF'
+          import psycopg2, os, sys
+          from datetime import datetime, timezone, timedelta
+
+          zurich = timezone(timedelta(hours=2))
+          today = datetime.now(zurich).date()
+
+          conn = psycopg2.connect(os.getenv("RAILWAY_DATABASE_URL"))
+          cur = conn.cursor()
+
+          # Prüfen ob bereits complete für heute
+          cur.execute("""
+              SELECT health_complete FROM daily_logs WHERE date = %s
+          """, (today,))
+          row = cur.fetchone()
+          conn.close()
+
+          if row and row[0]:
+              print("SKIP=true")
+              with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+                  f.write("skip=true\n")
+          else:
+              print("SKIP=false")
+              with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+                  f.write("skip=false\n")
+          PYEOF
+
+      - name: Run Health Sync
+        if: steps.check.outputs.skip != 'true'
         env:
           GARMIN_EMAIL: ${{ secrets.GARMIN_EMAIL }}
           GARMIN_PASSWORD: ${{ secrets.GARMIN_PASSWORD }}
           RAILWAY_DATABASE_URL: ${{ secrets.RAILWAY_DATABASE_URL }}
           SYNC_TYPE: health
         run: python data/garmin_sync_all.py
+
+      - name: Mark health complete
+        if: steps.check.outputs.skip != 'true'
+        env:
+          RAILWAY_DATABASE_URL: ${{ secrets.RAILWAY_DATABASE_URL }}
+        run: |
+          python << 'PYEOF'
+          import psycopg2, os
+          from datetime import datetime, timezone, timedelta
+
+          zurich = timezone(timedelta(hours=2))
+          today = datetime.now(zurich).date()
+
+          conn = psycopg2.connect(os.getenv("RAILWAY_DATABASE_URL"))
+          cur = conn.cursor()
+
+          # health_complete nur setzen wenn alle Kernwerte vorhanden
+          cur.execute("""
+              UPDATE daily_logs
+              SET health_complete = TRUE
+              WHERE date = %s
+                AND sleep_duration_h IS NOT NULL
+                AND hrv_last_night IS NOT NULL
+                AND resting_hr IS NOT NULL
+          """, (today,))
+
+          updated = cur.rowcount
+          conn.commit()
+          conn.close()
+          print(f"✅ health_complete gesetzt: {updated} Zeile(n)")
+          PYEOF

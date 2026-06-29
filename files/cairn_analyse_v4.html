@@ -453,13 +453,13 @@ function calcTime(durMin) {
 }
 function setEl(id, val) { var el = document.getElementById(id); if (el) el.textContent = val; }
 
-// HF Zonen Grenzen (bpm) — Alexander
+// HF Zonen Grenzen (bpm) — aus Strava/Garmin
 var HF_ZONES = [
-  {z:'Z5', min:176, max:999, color:'var(--accent)'},
-  {z:'Z4', min:166, max:175, color:'var(--mid)'},
-  {z:'Z3', min:156, max:165, color:'var(--mid)'},
-  {z:'Z2', min:141, max:155, color:'var(--mid)'},
-  {z:'Z1', min:0,   max:140, color:'var(--mid)'}
+  {z:'Z5', min:172, max:999},
+  {z:'Z4', min:162, max:171},
+  {z:'Z3', min:153, max:161},
+  {z:'Z2', min:145, max:152},
+  {z:'Z1', min:0,   max:144}
 ];
 
 function buildHFZones(splits) {
@@ -469,10 +469,10 @@ function buildHFZones(splits) {
     if (!s.hr) return;
     var hr = parseInt(s.hr);
     total++;
-    if (hr >= 176) counts.Z5++;
-    else if (hr >= 166) counts.Z4++;
-    else if (hr >= 156) counts.Z3++;
-    else if (hr >= 141) counts.Z2++;
+    if (hr >= 172) counts.Z5++;
+    else if (hr >= 162) counts.Z4++;
+    else if (hr >= 153) counts.Z3++;
+    else if (hr >= 145) counts.Z2++;
     else counts.Z1++;
   });
   if (total === 0) return;

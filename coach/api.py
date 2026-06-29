@@ -600,7 +600,7 @@ tags: 2-4 kurze Labels (max 20 Zeichen), type entweder "good" oder "warn" """
         client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
         message = client.messages.create(
             model="claude-sonnet-4-6",
-            max_tokens=600,
+            max_tokens=1200,
             messages=[{"role": "user", "content": prompt}]
         )
 
@@ -658,6 +658,51 @@ def mark_analysed(training_id):
         conn.commit()
         conn.close()
         return jsonify({"status": "ok"})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route('/api/strava/webhook', methods=['GET', 'POST'])
+def strava_webhook():
+    # Strava Webhook Verification (GET)
+    if request.method == 'GET':
+        verify_token = request.args.get('hub.verify_token')
+        challenge = request.args.get('hub.challenge')
+        if verify_token == os.getenv('STRAVA_VERIFY_TOKEN', 'cairn_strava_webhook'):
+            return jsonify({"hub.challenge": challenge})
+        return jsonify({"error": "Invalid token"}), 403
+
+    # Neue Aktivität (POST)
+    try:
+        data = request.get_json()
+        object_type = data.get('object_type')
+        aspect_type = data.get('aspect_type')
+
+        # Nur neue Aktivitäten verarbeiten
+        if object_type != 'activity' or aspect_type != 'create':
+            return jsonify({"status": "ignored"})
+
+        # GitHub Actions triggern
+        import urllib.request
+        github_token = os.getenv("CAIRN_GITHUB_TOKEN")
+        if github_token:
+            payload = json.dumps({
+                "ref": "main",
+                "inputs": {"triggered_by": "webhook"}
+            }).encode()
+            req = urllib.request.Request(
+                "https://api.github.com/repos/ahuhske1993-del/hybrid-fitness-os/actions/workflows/garmin_sync.yml/dispatches",
+                data=payload,
+                headers={
+                    "Authorization": f"Bearer {github_token}",
+                    "Accept": "application/vnd.github.v3+json",
+                    "Content-Type": "application/json"
+                },
+                method="POST"
+            )
+            urllib.request.urlopen(req, timeout=5)
+
+        return jsonify({"status": "ok"})
+
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 

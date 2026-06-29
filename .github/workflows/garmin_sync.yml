@@ -1,9 +1,12 @@
-name: Garmin Sync
+name: Garmin Activity Sync
 
 on:
-  schedule:
-    - cron: '0 */2 * * *'
   workflow_dispatch:
+    inputs:
+      triggered_by:
+        description: 'Trigger source (webhook/manual)'
+        required: false
+        default: 'manual'
 
 jobs:
   sync:
@@ -20,9 +23,10 @@ jobs:
       - name: Install dependencies
         run: pip install garminconnect psycopg2-binary python-dotenv
 
-      - name: Run Garmin sync
+      - name: Run Daily Activity Sync
         env:
           GARMIN_EMAIL: ${{ secrets.GARMIN_EMAIL }}
           GARMIN_PASSWORD: ${{ secrets.GARMIN_PASSWORD }}
           RAILWAY_DATABASE_URL: ${{ secrets.RAILWAY_DATABASE_URL }}
-        run: python data/garmin_sync_all.py
+          TRIGGERED_BY: ${{ inputs.triggered_by || 'manual' }}
+        run: python data/garmin_sync_daily.py
