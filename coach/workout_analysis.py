@@ -13,10 +13,6 @@ from knowledge.loader import load_workout_analysis_knowledge
 
 
 def generate_workout_analysis(training_id: int) -> dict:
-    """
-    Generates a full workout analysis for a given training_id.
-    Returns dict matching the existing analysis response structure.
-    """
     import psycopg2
     database_url = os.getenv("RAILWAY_DATABASE_URL") or os.getenv("DATABASE_URL")
     conn = psycopg2.connect(database_url)
@@ -51,7 +47,7 @@ def generate_workout_analysis(training_id: int) -> dict:
 
     conn.close()
 
-    # ── Format data ──
+    # ── Format activity ──
     name = row[3] or row[2]
     distance = float(row[5]) if row[5] else 0
     duration = row[4] or 0
@@ -59,12 +55,36 @@ def generate_workout_analysis(training_id: int) -> dict:
     date_str = str(row[1])
     activity_type = row[2]
 
-    splits_text = ""
-    for s in splits[:20]:
-        pace_str = f"{s[2]//60}:{str(s[2]%60).zfill(2)}/km" if s[2] else "—"
-        elev = f"+{s[4]:.0f}m" if s[4] and s[4] > 0 else (f"{s[4]:.0f}m" if s[4] and s[4] < 0 else "—")
-        splits_text += f"  Km {s[0]}: {pace_str} | HF {s[3] or '—'} | Elevation {elev}\n"
+    # ── Format splits — elevation prominent ──
+    total_elevation_up = 0
+    total_elevation_down = 0
+    splits_lines = []
 
+    for s in splits:
+        split_num = s[0]
+        pace_str = f"{s[2]//60}:{str(s[2]%60).zfill(2)}/km" if s[2] else "—"
+        hr = s[3] or "—"
+        elev = float(s[4]) if s[4] else 0
+
+        if elev > 0:
+            total_elevation_up += elev
+            elev_str = f"+{elev:.0f}m ↑"
+        elif elev < 0:
+            total_elevation_down += abs(elev)
+            elev_str = f"{elev:.0f}m ↓"
+        else:
+            elev_str = "flat"
+
+        splits_lines.append(
+            f"  Km {split_num:2d}: {pace_str} | HF {hr} bpm | Elevation {elev_str}"
+        )
+
+    splits_text = "\n".join(splits_lines)
+
+    # ── Elevation summary ──
+    elevation_summary = f"Total ascent: +{total_elevation_up:.0f}m | Total descent: -{total_elevation_down:.0f}m"
+
+    # ── Recent trainings ──
     recent_text = ""
     for r in recent:
         parts = [str(r[0]), r[1]]
@@ -76,7 +96,7 @@ def generate_workout_analysis(training_id: int) -> dict:
     # ── Load knowledge ──
     knowledge = load_workout_analysis_knowledge()
 
-    # ── Build prompt ──
+    # ── System prompt ──
     system_prompt = f"""You are CAIRN — a professional endurance coach.
 
 Your entire coaching philosophy, communication style and decision framework is defined in the knowledge documents below.
@@ -87,6 +107,12 @@ Read them carefully. Every response must comply with them.
 
 ---
 
+IMPORTANT CONTEXT RULE:
+The splits data includes elevation per kilometer.
+When pace is slow, always check elevation before drawing conclusions.
+A slow kilometer on a steep climb is very different from a slow kilometer on flat terrain.
+The coach should always explain pace in the context of the elevation profile.
+
 LANGUAGE RULE:
 Always respond in German (Deutsch). The athlete is German-speaking.
 Write naturally. Like a coach standing next to the athlete after training.
@@ -95,17 +121,14 @@ OUTPUT RULE:
 Return ONLY a JSON object. No markdown fences. No preamble.
 Structure:
 {{
-  "summary": "2-3 sentences — coach opening + what happened",
+  "summary": "2-3 sentences — coach opening + what happened. React like a real coach.",
   "observations": ["observation 1", "observation 2", "observation 3"],
   "meaning": "1-2 sentences — what this means for upcoming training",
   "recommendation": "one clear sentence — what the coach recommends next",
   "next_session": "concrete description of the next recommended session",
   "closing": "one grounded closing thought",
   "tags": [{{"label": "short label max 20 chars", "type": "good or warn"}}]
-}}
-
-The summary should open like a real coach would — human, direct, sometimes with a reaction.
-Not like a report. Not like a fitness app."""
+}}"""
 
     user_prompt = f"""Analyse this workout for Alexander:
 
@@ -116,9 +139,13 @@ Type: {activity_type}
 Distance: {distance:.1f} km
 Duration: {duration} min
 Average HR: {avg_hr} bpm
+{elevation_summary}
 
-## Splits
+## Splits (pace | heart rate | elevation per km)
 {splits_text if splits_text else "No split data available."}
+
+Note: Elevation shows meters gained (+) or lost (-) per kilometer.
+Use this to explain pace variations — a slow km on a steep climb is expected and correct.
 
 ## Recent Training Context
 {recent_text if recent_text else "No recent training data."}
