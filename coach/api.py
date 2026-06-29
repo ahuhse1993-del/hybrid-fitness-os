@@ -75,7 +75,7 @@ def save_checkin():
             if already_trained:
                 try:
                     req0 = urllib.request.Request(
-                        "https://api.github.com/repos/ahuhse1993-del/hybrid-fitness-os/actions/workflows/garmin_sync.yml/dispatches",
+                        "https://api.github.com/repos/ahuhske1993-del/hybrid-fitness-os/actions/workflows/garmin_sync.yml/dispatches",
                         data=b'{"ref":"main"}',
                         headers=headers,
                         method="POST"
@@ -88,7 +88,7 @@ def save_checkin():
 
             # Health Sync triggern
             req = urllib.request.Request(
-                "https://api.github.com/repos/ahuhse1993-del/hybrid-fitness-os/actions/workflows/health_sync.yml/dispatches",
+                "https://api.github.com/repos/ahuhske1993-del/hybrid-fitness-os/actions/workflows/health_sync.yml/dispatches",
                 data=b'{"ref":"main"}',
                 headers=headers,
                 method="POST"
@@ -98,7 +98,7 @@ def save_checkin():
             time.sleep(5)
 
             req2 = urllib.request.Request(
-                "https://api.github.com/repos/ahuhse1993-del/hybrid-fitness-os/actions/workflows/health_sync.yml/runs?per_page=1",
+                "https://api.github.com/repos/ahuhske1993-del/hybrid-fitness-os/actions/workflows/health_sync.yml/runs?per_page=1",
                 headers=headers
             )
             resp = urllib.request.urlopen(req2, timeout=10)
@@ -108,7 +108,7 @@ def save_checkin():
             for _ in range(12):
                 time.sleep(5)
                 req3 = urllib.request.Request(
-                    f"https://api.github.com/repos/ahuhse1993-del/hybrid-fitness-os/actions/runs/{run_id}",
+                    f"https://api.github.com/repos/ahuhske1993-del/hybrid-fitness-os/actions/runs/{run_id}",
                     headers=headers
                 )
                 resp3 = urllib.request.urlopen(req3, timeout=10)
@@ -378,7 +378,6 @@ def get_plan():
         for d_str, activities in actual_by_date.items():
             for actual in activities:
                 if actual["training_id"] not in matched_training_ids:
-                    # Datum zurück in week_date + day_of_week umrechnen
                     act_date = date.fromisoformat(d_str)
                     act_monday = act_date - timedelta(days=act_date.weekday())
                     day_of_week = act_date.isoweekday()  # Mo=1...So=7
@@ -485,7 +484,6 @@ def get_activity(training_id):
         conn = get_db()
         cur = conn.cursor()
 
-        # Aktivität holen
         cur.execute("""
             SELECT id, date, type, notes, duration_minutes, distance_km,
                    heart_rate_avg, garmin_id
@@ -614,6 +612,27 @@ tags: 2-4 kurze Labels (max 20 Zeichen), type entweder "good" oder "warn" """
         import traceback
         return jsonify({"status": "error", "message": str(e), "trace": traceback.format_exc()}), 500
 
+@app.route('/api/activity/<int:training_id>/gps', methods=['GET'])
+def get_gps(training_id):
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT lat, lon, elevation
+            FROM gps_tracks
+            WHERE training_id = %s
+            ORDER BY point_index
+        """, (training_id,))
+        rows = cur.fetchall()
+        conn.close()
+
+        points = [{"lat": float(r[0]), "lon": float(r[1]), "ele": float(r[2]) if r[2] else 0} for r in rows]
+        return jsonify({"status": "ok", "points": points})
+
+    except Exception as e:
+        import traceback
+        return jsonify({"status": "error", "message": str(e), "trace": traceback.format_exc()}), 500
+
 @app.route('/api/new-activities', methods=['GET'])
 def new_activities():
     try:
@@ -663,7 +682,6 @@ def mark_analysed(training_id):
 
 @app.route('/api/strava/webhook', methods=['GET', 'POST'])
 def strava_webhook():
-    # Strava Webhook Verification (GET)
     if request.method == 'GET':
         verify_token = request.args.get('hub.verify_token')
         challenge = request.args.get('hub.challenge')
@@ -671,17 +689,14 @@ def strava_webhook():
             return jsonify({"hub.challenge": challenge})
         return jsonify({"error": "Invalid token"}), 403
 
-    # Neue Aktivität (POST)
     try:
         data = request.get_json()
         object_type = data.get('object_type')
         aspect_type = data.get('aspect_type')
 
-        # Nur neue Aktivitäten verarbeiten
         if object_type != 'activity' or aspect_type != 'create':
             return jsonify({"status": "ignored"})
 
-        # GitHub Actions triggern
         import urllib.request
         github_token = os.getenv("CAIRN_GITHUB_TOKEN")
         if github_token:
@@ -713,7 +728,7 @@ def trigger_sync():
         github_token = os.getenv("CAIRN_GITHUB_TOKEN")
         if github_token:
             req = urllib.request.Request(
-                "https://api.github.com/repos/ahuhse1993-del/hybrid-fitness-os/actions/workflows/garmin_sync.yml/dispatches",
+                "https://api.github.com/repos/ahuhske1993-del/hybrid-fitness-os/actions/workflows/garmin_sync.yml/dispatches",
                 data=b'{"ref":"main"}',
                 headers={
                     "Authorization": f"Bearer {github_token}",
