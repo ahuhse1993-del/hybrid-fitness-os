@@ -78,13 +78,12 @@ body{background:var(--bg);font-family:"DM Sans",sans-serif;color:var(--black);fo
 .hs{padding:9px 0 5px}.hs+.hs{border-left:.5px solid rgba(46,44,42,.12);padding-left:12px}
 .hsl{font-family:"DM Mono",monospace;font-size:8px;color:#9E9B95;letter-spacing:.05em;margin-bottom:2px;text-transform:uppercase}
 .hsv{font-family:"DM Mono",monospace;font-size:15px;font-weight:500;line-height:1}
-.hsu{font-family:"DM Mono",monospace;font-size:8px;color:#9E9B95;margin-left:1px}
 /* HF ZONEN */
 .zr{display:flex;align-items:center;gap:6px;margin-bottom:4px}.zr:last-child{margin-bottom:0}
 .zl{font-family:"DM Mono",monospace;font-size:9px;width:16px;flex-shrink:0;color:#6B6860}
 .zl.act{color:var(--accent)}
 .zb{flex:1;height:8px;display:flex;overflow:hidden}
-.zf{height:100%;background:var(--mid)}.zf.acc{background:var(--accent)}
+.zf{height:100%;background:var(--mid)}
 .zd{flex:1;height:100%;background-image:var(--dl);background-size:4px 4px}
 .zp{font-family:"DM Mono",monospace;font-size:9px;width:24px;text-align:right;flex-shrink:0;color:#6B6860}
 .zp.acc{color:var(--accent);font-weight:500}
@@ -95,19 +94,6 @@ body{background:var(--bg);font-family:"DM Sans",sans-serif;color:var(--black);fo
 /* CHARTS */
 .twocol{display:grid;grid-template-columns:1fr 1fr;gap:2px;margin-bottom:2px}
 .card{background:#E8E4DC;padding:13px 12px 10px}
-.vc{position:relative;height:150px;margin-top:8px}
-.vcy{position:absolute;left:0;top:0;bottom:16px;display:flex;flex-direction:column;justify-content:space-between;pointer-events:none}
-.vcy span{font-family:"DM Mono",monospace;font-size:6px;color:#9E9B95}
-.vcg{position:absolute;left:24px;right:0;top:0;bottom:16px;pointer-events:none}
-.vcgl{position:absolute;left:0;right:0;height:.5px;background:rgba(158,155,149,.18)}
-.vcc{position:absolute;left:24px;right:0;top:0;bottom:16px;display:flex;align-items:flex-end;gap:3px}
-.vb{flex:1;display:flex;flex-direction:column;align-items:center;height:100%;justify-content:flex-end;position:relative}
-.vbi{width:55%;display:flex;flex-direction:column;align-items:stretch;height:100%;justify-content:flex-end}
-.vbd{width:100%;background-image:var(--dl);background-size:4px 4px}
-.vbf{width:100%;background:var(--black);min-height:2px;flex-shrink:0}
-.vbf.acc{background:var(--accent)}.vbf.warn{background:var(--accent-dark)}
-.vblbl{position:absolute;bottom:-14px;left:50%;transform:translateX(-50%);font-family:"DM Mono",monospace;font-size:6px;color:#9E9B95;white-space:nowrap}
-.vblbl.acc{color:var(--accent)}.vblbl.warn{color:var(--accent-dark)}
 /* SPLITS */
 .stog{width:100%;background:#E8E4DC;border:none;border-bottom:.5px solid rgba(46,44,42,.12);padding:12px 16px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;margin-bottom:2px;font-family:"DM Mono",monospace;font-size:10px;color:#6B6860;letter-spacing:.06em;text-transform:uppercase}
 .scnt{display:none;background:#E8E4DC;padding:0 16px 12px;margin-bottom:2px}
@@ -127,24 +113,28 @@ body{background:var(--bg);font-family:"DM Sans",sans-serif;color:var(--black);fo
 .rbox{border:.5px solid rgba(232,216,74,.28);padding:13px 14px;margin-bottom:12px}
 .rblbl{font-family:"DM Mono",monospace;font-size:9px;color:rgba(232,216,74,.5);letter-spacing:.1em;margin-bottom:7px;text-transform:uppercase}
 .rbtxt{color:#F0EDE6;font-size:13px;line-height:1.72;margin-bottom:12px}
-.ract{display:flex;gap:8px}
-.ryes{background:var(--accent);border:none;color:var(--black);font-family:"DM Mono",monospace;font-size:10px;padding:8px 18px;cursor:pointer;font-weight:500}
-.rno{background:transparent;border:.5px solid #333;color:#6B6860;font-family:"DM Mono",monospace;font-size:10px;padding:8px 12px;cursor:pointer}
 .tagrow{display:flex;gap:5px;flex-wrap:wrap;margin-top:12px}
 .tag{font-family:"DM Mono",monospace;font-size:9px;padding:3px 9px;background:#2E2C2A;color:#6B6860}
 .tag.good{background:rgba(90,122,74,.16);color:#7AAD5A}.tag.warn{background:rgba(140,127,10,.16);color:var(--accent-dark)}
 @keyframes dp{0%,100%{box-shadow:0 0 0 0 rgba(232,216,74,.4)}60%{box-shadow:0 0 0 5px rgba(232,216,74,0)}}
 .don{animation:dp 1.2s infinite}
-/* LEAFLET OVERRIDES — CAIRN Stil */
+/* LEAFLET */
 .leaflet-container{background:#1A1918}
 .leaflet-tile-pane{filter:grayscale(100%) brightness(0.45) contrast(1.1)}
-.leaflet-control-zoom{display:none}
+.leaflet-control-zoom a{background:var(--black);color:var(--accent);border-color:#333;font-family:"DM Mono",monospace}
+.leaflet-control-zoom a:hover{background:#2E2C2A}
 .leaflet-control-attribution{display:none}
+/* KARTEN FULLSCREEN POPUP */
+.map-fullscreen{display:none;position:fixed;inset:0;z-index:1000;background:var(--black)}
+.map-fullscreen.open{display:block}
+.map-fullscreen-inner{width:100%;height:100%}
+.map-close-btn{position:absolute;top:16px;right:16px;z-index:1100;background:var(--black);border:.5px solid rgba(240,237,230,.2);color:#F0EDE6;font-family:"DM Mono",monospace;font-size:9px;padding:8px 16px;cursor:pointer;letter-spacing:.1em}
+.map-close-btn:hover{background:var(--accent);color:var(--black);border-color:var(--accent)}
 </style>
 </head>
 <body>
 
-<!-- POPUP -->
+<!-- AKTIVITÄTS-POPUP -->
 <div class="pop open" id="popup">
   <div class="pop-box">
     <div class="pop-lbl">Neue Aktivit&#228;t erkannt</div>
@@ -161,6 +151,12 @@ body{background:var(--bg);font-family:"DM Sans",sans-serif;color:var(--black);fo
       <button class="btn-no" onclick="closePop()">Sp&#228;ter</button>
     </div>
   </div>
+</div>
+
+<!-- KARTE FULLSCREEN -->
+<div class="map-fullscreen" id="map-fullscreen">
+  <div id="map-full" class="map-fullscreen-inner"></div>
+  <button class="map-close-btn" onclick="closeMapFullscreen()">&#10005; SCHLIESSEN</button>
 </div>
 
 <div class="pg">
@@ -205,7 +201,6 @@ body{background:var(--bg);font-family:"DM Sans",sans-serif;color:var(--black);fo
             <option>Nike Vomero 17 &#183; 487 km</option>
             <option>Hoka Speedgoat 6 &#183; 312 km</option>
             <option>Salomon S/Lab Ultra 3 &#183; 118 km</option>
-            <option>Anderer Schuh</option>
           </select>
         </div>
         <div class="fbs">
@@ -296,7 +291,7 @@ body{background:var(--bg);font-family:"DM Sans",sans-serif;color:var(--black);fo
             </div>
             <div class="hsub" id="hero-name">&#8212;</div>
           </div>
-          <div style="border-left:.5px solid rgba(46,44,42,.15);padding:0 0 10px 12px" id="hf-zones">
+          <div style="border-left:.5px solid rgba(46,44,42,.15);padding:0 0 10px 12px">
             <div style="font-family:DM Mono,monospace;font-size:8px;color:#9E9B95;letter-spacing:.05em;text-transform:uppercase;margin-bottom:7px">HF-Zonen</div>
             <div class="zr"><span class="zl">Z5</span><div class="zb"><div class="zf" id="hz5" style="width:0%"></div><div class="zd"></div></div><span class="zp" id="hp5">&#8212;</span></div>
             <div class="zr"><span class="zl">Z4</span><div class="zb"><div class="zf" id="hz4" style="width:0%"></div><div class="zd"></div></div><span class="zp" id="hp4">&#8212;</span></div>
@@ -317,16 +312,21 @@ body{background:var(--bg);font-family:"DM Sans",sans-serif;color:var(--black);fo
       <div class="sec"><span class="secl">Route &amp; H&#246;henprofil</span><div class="secln"></div></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:2px;margin-bottom:2px">
 
-        <!-- LEAFLET KARTE -->
-        <div style="height:340px;position:relative" id="map-container">
+        <!-- KARTE — statisch, kein Drag/Zoom -->
+        <div style="height:340px;position:relative">
           <div id="map" style="width:100%;height:100%"></div>
+          <!-- Overlay beim Laden -->
           <div id="map-overlay" style="position:absolute;inset:0;background:var(--black);display:flex;align-items:center;justify-content:center;z-index:500;pointer-events:none">
             <div style="font-family:DM Mono,monospace;font-size:9px;color:rgba(240,237,230,.3);letter-spacing:.1em">ROUTE WIRD GELADEN...</div>
           </div>
-          <!-- CAIRN Label über Karte -->
+          <!-- CAIRN Label -->
           <div style="position:absolute;top:10px;left:10px;z-index:600;background:rgba(26,25,24,.85);padding:4px 10px;pointer-events:none">
             <div style="font-family:DM Mono,monospace;font-size:8px;color:rgba(232,216,74,.6);letter-spacing:.12em">ROUTE</div>
           </div>
+          <!-- Öffnen Button -->
+          <button onclick="openMapFullscreen()" style="position:absolute;bottom:10px;right:10px;z-index:600;background:var(--black);border:.5px solid rgba(240,237,230,.2);color:#F0EDE6;font-family:DM Mono,monospace;font-size:8px;padding:6px 12px;cursor:pointer;letter-spacing:.1em;display:flex;align-items:center;gap:6px">
+            <i class="ti ti-arrows-maximize" style="font-size:11px"></i> ÖFFNEN
+          </button>
         </div>
 
         <!-- HÖHENPROFIL -->
@@ -341,7 +341,7 @@ body{background:var(--bg);font-family:"DM Sans",sans-serif;color:var(--black);fo
         </div>
       </div>
 
-      <!-- PACE CHART -->
+      <!-- PACE -->
       <div class="sec"><span class="secl">Pace</span><div class="secln"></div></div>
       <div style="margin-bottom:2px">
         <div class="card" style="padding-bottom:20px">
@@ -354,7 +354,12 @@ body{background:var(--bg);font-family:"DM Sans",sans-serif;color:var(--black);fo
 
       <!-- SPLITS -->
       <button class="stog" onclick="tSpl()"><span>Splits</span><span id="sarr">&#9660;</span></button>
-      <div class="scnt" id="scnt"><table class="stbl"><thead><tr><th>KM</th><th>PACE</th><th>HF</th><th>H&#214;HE</th><th>KAD</th><th>ZONE</th></tr></thead><tbody id="stbd"></tbody></table></div>
+      <div class="scnt" id="scnt">
+        <table class="stbl">
+          <thead><tr><th>KM</th><th>PACE</th><th>HF</th><th>H&#214;HE</th><th>KAD</th><th>ZONE</th></tr></thead>
+          <tbody id="stbd"></tbody>
+        </table>
+      </div>
 
       <!-- GELERNT -->
       <div class="sec"><span class="secl">Was ich mitnehme</span><div class="secln"></div></div>
@@ -362,15 +367,15 @@ body{background:var(--bg);font-family:"DM Sans",sans-serif;color:var(--black);fo
 
       <!-- EMPFEHLUNG -->
       <div class="sec"><span class="secl">Was ich tun w&#252;rde</span><div class="secln"></div></div>
-      <div class="rblock" id="rec-block">
+      <div class="rblock">
         <div class="rlbl">Coach &#183; Empfehlung</div>
         <div class="rh" id="rec-headline">Wird geladen...</div>
         <div class="rbox" id="rec-box" style="display:none">
-          <div class="rblbl" id="rec-box-label">N&#196;CHSTE SESSION</div>
+          <div class="rblbl">N&#196;CHSTE SESSION</div>
           <div class="rbtxt" id="rec-box-text">&#8212;</div>
         </div>
         <div class="tagrow" id="rec-tags"></div>
-        <div style="margin-top:20px;padding-top:14px;border-top:.5px solid rgba(240,237,230,.07)" id="rec-closing" style="display:none">
+        <div style="margin-top:20px;padding-top:14px;border-top:.5px solid rgba(240,237,230,.07);display:none" id="rec-closing">
           <div style="font-family:DM Mono,monospace;font-size:8px;color:rgba(240,237,230,.18);letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px">Schlussgedanke</div>
           <div style="color:rgba(240,237,230,.4);font-size:13px;line-height:1.78;font-style:italic" id="rec-closing-text"></div>
         </div>
@@ -382,11 +387,13 @@ body{background:var(--bg);font-family:"DM Sans",sans-serif;color:var(--black);fo
 <script>
 var trainingId = new URLSearchParams(window.location.search).get('id');
 var activityData = null;
-var leafletMap = null;
+var smallMap = null;
+var fullMap = null;
+var gpsPoints = [];
 
 function closePop(){document.getElementById("popup").classList.remove("open")}
 function openFb(){document.getElementById("popup").classList.remove("open");document.getElementById("sfb").classList.add("on");document.getElementById("san").classList.remove("on");window.scrollTo(0,0)}
-function openAn(){document.getElementById("sfb").classList.remove("on");document.getElementById("san").classList.add("on");window.scrollTo(0,0);loadAnalysis();initMap()}
+function openAn(){document.getElementById("sfb").classList.remove("on");document.getElementById("san").classList.add("on");window.scrollTo(0,0);loadAnalysis();initSmallMap()}
 function sg(btn){btn.parentElement.querySelectorAll("button").forEach(b=>b.classList.remove("sel"));btn.classList.add("sel")}
 function tSpl(){const c=document.getElementById("scnt"),a=document.getElementById("sarr");c.classList.toggle("open");a.textContent=c.classList.contains("open")?"▲":"▼"}
 
@@ -406,22 +413,12 @@ function calcTime(durMin) {
 }
 function setEl(id, val) { var el = document.getElementById(id); if (el) el.textContent = val; }
 
-// HF Zonen
-var HF_ZONES = [
-  {z:'Z5', min:172, max:999},
-  {z:'Z4', min:162, max:171},
-  {z:'Z3', min:153, max:161},
-  {z:'Z2', min:145, max:152},
-  {z:'Z1', min:0,   max:144}
-];
-
 function buildHFZones(splits) {
   var counts = {Z1:0,Z2:0,Z3:0,Z4:0,Z5:0};
   var total = 0;
   splits.forEach(function(s) {
     if (!s.hr) return;
-    var hr = parseInt(s.hr);
-    total++;
+    var hr = parseInt(s.hr); total++;
     if (hr >= 172) counts.Z5++;
     else if (hr >= 162) counts.Z4++;
     else if (hr >= 153) counts.Z3++;
@@ -429,30 +426,18 @@ function buildHFZones(splits) {
     else counts.Z1++;
   });
   if (total === 0) return;
-
   var zones = ['Z1','Z2','Z3','Z4','Z5'];
-  var maxPct = 0;
-  var dominantZone = 'Z2';
+  var maxPct = 0, dominantZone = 'Z2';
+  zones.forEach(function(z) { var pct = Math.round(counts[z]/total*100); if (pct > maxPct) { maxPct=pct; dominantZone=z; } });
   zones.forEach(function(z) {
-    var pct = Math.round(counts[z] / total * 100);
-    if (pct > maxPct) { maxPct = pct; dominantZone = z; }
-  });
-
-  zones.forEach(function(z) {
-    var pct = Math.round(counts[z] / total * 100);
+    var pct = Math.round(counts[z]/total*100);
     var zn = z.toLowerCase();
-    var barEl = document.getElementById('h' + zn);
-    var pctEl = document.getElementById('hp' + zn[1]);
-    var lblEl = document.getElementById('h' + zn + 'lbl');
-    if (barEl) {
-      barEl.style.width = pct + '%';
-      barEl.style.background = (z === dominantZone) ? 'var(--accent)' : 'var(--mid)';
-    }
-    if (pctEl) {
-      pctEl.textContent = pct + '%';
-      if (z === dominantZone) { pctEl.classList.add('acc'); }
-    }
-    if (lblEl && z === dominantZone) lblEl.classList.add('act');
+    var barEl = document.getElementById('h'+zn);
+    var pctEl = document.getElementById('hp'+zn[1]);
+    var lblEl = document.getElementById('h'+zn+'lbl');
+    if (barEl) { barEl.style.width=pct+'%'; barEl.style.background=(z===dominantZone)?'var(--accent)':'var(--mid)'; }
+    if (pctEl) { pctEl.textContent=pct+'%'; if(z===dominantZone) pctEl.classList.add('acc'); }
+    if (lblEl && z===dominantZone) lblEl.classList.add('act');
   });
 }
 
@@ -461,164 +446,150 @@ function buildPaceChart(splits) {
   if (!chartEl) return;
   var fullSplits = splits.filter(function(s) { return s.distance_km >= 0.9 && s.pace; });
   if (fullSplits.length === 0) return;
-
-  var paces = fullSplits.map(function(s) {
-    var p = s.pace.split(':');
-    return parseInt(p[0]) * 60 + parseInt(p[1]);
+  var paces = fullSplits.map(function(s) { var p=s.pace.split(':'); return parseInt(p[0])*60+parseInt(p[1]); });
+  var minPace = Math.min.apply(null,paces), maxPace = Math.max.apply(null,paces);
+  var avgPaceSec = Math.round(paces.reduce(function(a,b){return a+b},0)/paces.length);
+  var yTop = maxPace+15, yBot = minPace-15;
+  function fmtPace(s){return Math.floor(s/60)+':'+String(s%60).padStart(2,'0')}
+  var w=400,h=120,padL=32,padB=16,chartH=h-padB;
+  var barW = Math.max(4, Math.floor((w-padL)/fullSplits.length)-2);
+  var bars='';
+  fullSplits.forEach(function(s,i){
+    var p=s.pace.split(':'); var paceSec=parseInt(p[0])*60+parseInt(p[1]);
+    var barH=Math.max(4,Math.round(((paceSec-yBot)/(yTop-yBot))*chartH));
+    var x=padL+i*(barW+2); var y=chartH-barH;
+    var isSlow=paceSec>avgPaceSec+15;
+    var fill=isSlow?'var(--accent-dark)':'rgba(46,44,42,.25)';
+    bars+='<rect x="'+x+'" y="'+y+'" width="'+barW+'" height="'+barH+'" fill="'+fill+'"/>';
+    bars+='<text x="'+(x+barW/2)+'" y="'+(h-2)+'" font-family="DM Mono" font-size="7" fill="#9E9B95" text-anchor="middle">'+s.split+'</text>';
   });
-
-  var minPace = Math.min.apply(null, paces);
-  var maxPace = Math.max.apply(null, paces);
-  var range = maxPace - minPace || 30;
-  var avgPaceSec = Math.round(paces.reduce(function(a,b){return a+b},0) / paces.length);
-
-  // Y-Achsen-Labels berechnen
-  var yTop = maxPace + 10;
-  var yMid = Math.round((minPace + maxPace) / 2);
-  var yBot = minPace - 10;
-  function fmtPace(s) { return Math.floor(s/60) + ':' + String(s%60).padStart(2,'0'); }
-
-  var w = 400, h = 120, padL = 32, padB = 16;
-  var chartH = h - padB;
-  var barW = Math.floor((w - padL) / fullSplits.length) - 2;
-
-  var bars = '';
-  fullSplits.forEach(function(s, i) {
-    var p = s.pace.split(':');
-    var paceSec = parseInt(p[0]) * 60 + parseInt(p[1]);
-    var barH = Math.max(4, Math.round(((paceSec - yBot) / (yTop - yBot)) * chartH));
-    var x = padL + i * (barW + 2);
-    var y = chartH - barH;
-    var isAvg = Math.abs(paceSec - avgPaceSec) < 5;
-    var isSlow = paceSec > avgPaceSec + 15;
-    var fill = isSlow ? 'var(--accent-dark)' : (isAvg ? 'rgba(46,44,42,.35)' : 'rgba(46,44,42,.2)');
-    bars += '<rect x="' + x + '" y="' + y + '" width="' + barW + '" height="' + barH + '" fill="' + fill + '"/>';
-    bars += '<text x="' + (x + barW/2) + '" y="' + (h-2) + '" font-family="DM Mono" font-size="7" fill="#9E9B95" text-anchor="middle">' + s.split + '</text>';
-  });
-
-  // Durchschnittslinie
-  var avgY = chartH - Math.round(((avgPaceSec - yBot) / (yTop - yBot)) * chartH);
-  var avgLine = '<line x1="' + padL + '" y1="' + avgY + '" x2="' + w + '" y2="' + avgY + '" stroke="var(--accent)" stroke-width="1" stroke-dasharray="3 2" opacity=".5"/>';
-  avgLine += '<text x="' + w + '" y="' + (avgY - 3) + '" font-family="DM Mono" font-size="6" fill="rgba(232,216,74,.6)" text-anchor="end">Ø ' + fmtPace(avgPaceSec) + '</text>';
-
-  // Y-Achse
-  var yAxis = '<text x="' + (padL-3) + '" y="8" font-family="DM Mono" font-size="6" fill="#9E9B95" text-anchor="end">' + fmtPace(yTop) + '</text>';
-  yAxis += '<text x="' + (padL-3) + '" y="' + (chartH/2+3) + '" font-family="DM Mono" font-size="6" fill="#9E9B95" text-anchor="end">' + fmtPace(yMid) + '</text>';
-
-  // Hilfslinien
-  var grid = '<line x1="' + padL + '" y1="0" x2="' + w + '" y2="0" stroke="rgba(158,155,149,.15)" stroke-width=".5"/>';
-  grid += '<line x1="' + padL + '" y1="' + Math.round(chartH/2) + '" x2="' + w + '" y2="' + Math.round(chartH/2) + '" stroke="rgba(158,155,149,.1)" stroke-width=".5"/>';
-
-  chartEl.innerHTML = '<svg width="100%" viewBox="0 0 ' + w + ' ' + h + '">' + grid + bars + avgLine + yAxis + '</svg>';
+  var avgY=chartH-Math.round(((avgPaceSec-yBot)/(yTop-yBot))*chartH);
+  var avgLine='<line x1="'+padL+'" y1="'+avgY+'" x2="'+w+'" y2="'+avgY+'" stroke="var(--accent)" stroke-width="1" stroke-dasharray="3 2" opacity=".6"/>';
+  avgLine+='<text x="'+w+'" y="'+(avgY-3)+'" font-family="DM Mono" font-size="6" fill="rgba(232,216,74,.7)" text-anchor="end">Ø '+fmtPace(avgPaceSec)+'</text>';
+  var grid='<line x1="'+padL+'" y1="0" x2="'+w+'" y2="0" stroke="rgba(158,155,149,.15)" stroke-width=".5"/>';
+  grid+='<line x1="'+padL+'" y1="'+Math.round(chartH/2)+'" x2="'+w+'" y2="'+Math.round(chartH/2)+'" stroke="rgba(158,155,149,.1)" stroke-width=".5"/>';
+  var yAxis='<text x="'+(padL-3)+'" y="8" font-family="DM Mono" font-size="6" fill="#9E9B95" text-anchor="end">'+fmtPace(yTop)+'</text>';
+  yAxis+='<text x="'+(padL-3)+'" y="'+(chartH/2+3)+'" font-family="DM Mono" font-size="6" fill="#9E9B95" text-anchor="end">'+fmtPace(Math.round((yTop+yBot)/2))+'</text>';
+  chartEl.innerHTML='<svg width="100%" viewBox="0 0 '+w+' '+h+'">'+grid+bars+avgLine+yAxis+'</svg>';
 }
 
 function buildElevationChart(splits) {
   var elevEl = document.getElementById('elev-chart');
   if (!elevEl) return;
-
-  var elevations = splits.map(function(s) { return s.elevation || 0; });
-  var totalUp = 0, totalDown = 0;
-  elevations.forEach(function(e) { if (e > 0) totalUp += e; else totalDown += Math.abs(e); });
-
-  setEl('elev-up', '+' + Math.round(totalUp) + ' m');
-  setEl('elev-down', '−' + Math.round(totalDown) + ' m');
-
-  if (elevations.every(function(e) { return e === 0; })) {
-    elevEl.innerHTML = '<div style="font-family:DM Mono,monospace;font-size:9px;color:#9E9B95">Keine Höhendaten verfügbar</div>';
+  var elevations = splits.map(function(s){return s.elevation||0;});
+  var totalUp=0, totalDown=0;
+  elevations.forEach(function(e){if(e>0)totalUp+=e;else totalDown+=Math.abs(e);});
+  setEl('elev-up','+'+Math.round(totalUp)+' m');
+  setEl('elev-down','−'+Math.round(totalDown)+' m');
+  if (elevations.every(function(e){return e===0;})) {
+    elevEl.innerHTML='<div style="font-family:DM Mono,monospace;font-size:9px;color:#9E9B95">Keine Höhendaten verfügbar</div>';
     return;
   }
-
-  var cumElev = [0];
-  elevations.forEach(function(e) { cumElev.push(cumElev[cumElev.length-1] + e); });
-
-  var minE = Math.min.apply(null, cumElev);
-  var maxE = Math.max.apply(null, cumElev);
-  var rangeE = maxE - minE || 1;
-
-  var w = 400, h = 160;
-  var pts = cumElev.map(function(e, i) {
-    var x = Math.round(i / (cumElev.length-1) * w);
-    var y = Math.round(h - 20 - ((e - minE) / rangeE) * (h - 30));
-    return x + ',' + y;
+  var cumElev=[0];
+  elevations.forEach(function(e){cumElev.push(cumElev[cumElev.length-1]+e);});
+  var minE=Math.min.apply(null,cumElev), maxE=Math.max.apply(null,cumElev), rangeE=maxE-minE||1;
+  var w=400,h=160;
+  var pts=cumElev.map(function(e,i){
+    var x=Math.round(i/(cumElev.length-1)*w);
+    var y=Math.round(h-20-((e-minE)/rangeE)*(h-30));
+    return x+','+y;
   }).join(' ');
-
-  var polyPts = '0,' + h + ' ' + pts + ' ' + w + ',' + h;
-
-  elevEl.innerHTML = '<svg width="100%" viewBox="0 0 ' + w + ' ' + h + '" preserveAspectRatio="none">' +
-    '<polygon points="' + polyPts + '" fill="rgba(46,44,42,.1)"/>' +
-    '<polyline points="' + pts + '" fill="none" stroke="var(--black)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>' +
-    '<text x="0" y="' + (h-2) + '" font-family="DM Mono" font-size="7" fill="#9E9B95">1</text>' +
-    '<text x="' + w + '" y="' + (h-2) + '" font-family="DM Mono" font-size="7" fill="#9E9B95" text-anchor="end">' + splits.length + '</text>' +
+  var polyPts='0,'+h+' '+pts+' '+w+','+h;
+  elevEl.innerHTML='<svg width="100%" viewBox="0 0 '+w+' '+h+'" preserveAspectRatio="none">'+
+    '<polygon points="'+polyPts+'" fill="rgba(46,44,42,.1)"/>'+
+    '<polyline points="'+pts+'" fill="none" stroke="var(--black)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>'+
+    '<text x="0" y="'+(h-2)+'" font-family="DM Mono" font-size="7" fill="#9E9B95">1</text>'+
+    '<text x="'+w+'" y="'+(h-2)+'" font-family="DM Mono" font-size="7" fill="#9E9B95" text-anchor="end">'+splits.length+'</text>'+
     '</svg>';
 }
 
-// ─── LEAFLET KARTE ───
-var mapInitialized = false;
-function initMap() {
-  if (mapInitialized || !trainingId) return;
-  mapInitialized = true;
+// ─── HILFSFUNKTION: Route auf Karte zeichnen ───
+function drawRoute(map, points) {
+  var latlngs = points.map(function(p){return [p.lat, p.lon];});
+  L.polyline(latlngs, {color:'#E8D84A', weight:2.5, opacity:.85, lineJoin:'round'}).addTo(map);
+  var dotIcon = function(color) {
+    return L.divIcon({
+      className:'',
+      html:'<div style="width:8px;height:8px;background:'+color+';border:1.5px solid #1A1918;border-radius:50%"></div>',
+      iconSize:[8,8], iconAnchor:[4,4]
+    });
+  };
+  L.marker(latlngs[0], {icon:dotIcon('#E8D84A')}).addTo(map);
+  L.marker(latlngs[latlngs.length-1], {icon:dotIcon('#9E9B95')}).addTo(map);
+  var bounds = L.latLngBounds(latlngs);
+  map.fitBounds(bounds, {padding:[24,24]});
+}
 
-  // Karte initialisieren
-  leafletMap = L.map('map', {
+// ─── KLEINE KARTE (statisch, kein Drag/Zoom) ───
+var smallMapInitialized = false;
+function initSmallMap() {
+  if (smallMapInitialized || !trainingId) return;
+  smallMapInitialized = true;
+
+  smallMap = L.map('map', {
     zoomControl: false,
     attributionControl: false,
-    scrollWheelZoom: false
+    dragging: false,
+    scrollWheelZoom: false,
+    doubleClickZoom: false,
+    touchZoom: false,
+    keyboard: false,
+    boxZoom: false
   });
 
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 18
-  }).addTo(leafletMap);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom:18}).addTo(smallMap);
 
-  // GPS Daten laden
   fetch('https://web-production-297f2.up.railway.app/api/activity/' + trainingId + '/gps')
-    .then(function(r) { return r.json(); })
-    .then(function(data) {
+    .then(function(r){return r.json();})
+    .then(function(data){
       var overlay = document.getElementById('map-overlay');
-
       if (data.status !== 'ok' || !data.points || data.points.length === 0) {
-        if (overlay) overlay.innerHTML = '<div style="font-family:DM Mono,monospace;font-size:9px;color:rgba(240,237,230,.2);letter-spacing:.1em">KEINE GPS-DATEN</div>';
+        if (overlay) overlay.innerHTML='<div style="font-family:DM Mono,monospace;font-size:9px;color:rgba(240,237,230,.2);letter-spacing:.1em">KEINE GPS-DATEN</div>';
         return;
       }
-
-      // Route zeichnen
-      var latlngs = data.points.map(function(p) { return [p.lat, p.lon]; });
-
-      // Linie — CAIRN Stil: Accent-gelb, dünn
-      L.polyline(latlngs, {
-        color: '#E8D84A',
-        weight: 2.5,
-        opacity: 0.85,
-        lineJoin: 'round'
-      }).addTo(leafletMap);
-
-      // Start / Ende Marker — minimal
-      var dotIcon = function(color) {
-        return L.divIcon({
-          className: '',
-          html: '<div style="width:8px;height:8px;background:' + color + ';border:1.5px solid #1A1918;border-radius:50%"></div>',
-          iconSize: [8,8],
-          iconAnchor: [4,4]
-        });
-      };
-
-      L.marker(latlngs[0], {icon: dotIcon('#E8D84A')}).addTo(leafletMap);
-      L.marker(latlngs[latlngs.length-1], {icon: dotIcon('#9E9B95')}).addTo(leafletMap);
-
-      // Karte auf Route zentrieren
-      var bounds = L.latLngBounds(latlngs);
-      leafletMap.fitBounds(bounds, {padding: [24, 24]});
-
-      // Overlay ausblenden
-      if (overlay) overlay.style.display = 'none';
-
-      // Karte nach Resize neu zeichnen
-      setTimeout(function() { leafletMap.invalidateSize(); }, 100);
+      gpsPoints = data.points;
+      drawRoute(smallMap, gpsPoints);
+      if (overlay) overlay.style.display='none';
+      setTimeout(function(){smallMap.invalidateSize();},100);
     })
-    .catch(function() {
+    .catch(function(){
       var overlay = document.getElementById('map-overlay');
-      if (overlay) overlay.innerHTML = '<div style="font-family:DM Mono,monospace;font-size:9px;color:rgba(240,237,230,.2);letter-spacing:.1em">GPS NICHT VERFÜGBAR</div>';
+      if (overlay) overlay.innerHTML='<div style="font-family:DM Mono,monospace;font-size:9px;color:rgba(240,237,230,.2);letter-spacing:.1em">GPS NICHT VERFÜGBAR</div>';
     });
 }
+
+// ─── FULLSCREEN KARTE ───
+function openMapFullscreen() {
+  document.getElementById('map-fullscreen').classList.add('open');
+
+  if (!fullMap) {
+    fullMap = L.map('map-full', {
+      zoomControl: true,
+      attributionControl: false
+    });
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom:18}).addTo(fullMap);
+  }
+
+  setTimeout(function(){
+    fullMap.invalidateSize();
+    if (gpsPoints.length > 0) {
+      // Route neu zeichnen falls noch nicht gemacht
+      fullMap.eachLayer(function(layer){
+        if (layer instanceof L.Polyline || layer instanceof L.Marker) fullMap.removeLayer(layer);
+      });
+      drawRoute(fullMap, gpsPoints);
+    }
+  }, 100);
+}
+
+function closeMapFullscreen() {
+  document.getElementById('map-fullscreen').classList.remove('open');
+}
+
+// ESC zum Schliessen
+document.addEventListener('keydown', function(e){
+  if (e.key === 'Escape') closeMapFullscreen();
+});
 
 function loadActivity() {
   if (!trainingId) {
@@ -628,25 +599,23 @@ function loadActivity() {
   }
 
   fetch('https://web-production-297f2.up.railway.app/api/activity/' + trainingId)
-    .then(function(r) { return r.json(); })
-    .then(function(data) {
+    .then(function(r){return r.json();})
+    .then(function(data){
       if (data.status !== 'ok') return;
       var a = data.activity;
       activityData = a;
 
       var elevMatch = a.name.match(/\+(\d+)m/);
-      var elevStr = elevMatch ? '+' + elevMatch[1] + ' m' : '—';
+      var elevStr = elevMatch ? '+'+elevMatch[1]+' m' : '—';
 
       var pace = calcPace(a.distance_km, a.duration_min);
       if (data.splits && data.splits.length > 1) {
-        var fullSplits = data.splits.filter(function(s) { return s.distance_km >= 0.9; });
+        var fullSplits = data.splits.filter(function(s){return s.distance_km >= 0.9;});
         if (fullSplits.length > 0) {
-          var totalPaceSec = 0;
-          fullSplits.forEach(function(s) {
-            if (s.pace) { var parts = s.pace.split(':'); totalPaceSec += parseInt(parts[0])*60 + parseInt(parts[1]); }
-          });
-          var avgPaceSec = Math.round(totalPaceSec / fullSplits.length);
-          pace = Math.floor(avgPaceSec/60) + ':' + String(avgPaceSec%60).padStart(2,'0') + '/km';
+          var totalPaceSec=0;
+          fullSplits.forEach(function(s){if(s.pace){var parts=s.pace.split(':');totalPaceSec+=parseInt(parts[0])*60+parseInt(parts[1]);}});
+          var avgPaceSec=Math.round(totalPaceSec/fullSplits.length);
+          pace=Math.floor(avgPaceSec/60)+':'+String(avgPaceSec%60).padStart(2,'0')+'/km';
         }
       }
 
@@ -655,67 +624,54 @@ function loadActivity() {
       var dateStr = a.date;
       var typeStr = a.type + ' · ' + dateStr;
 
-      // Popup
       setEl('pop-title', name);
       setEl('pop-sub', typeStr);
-      document.getElementById('pop-dist').innerHTML = a.distance_km.toFixed(1) + '<span class="pm-unit">km</span>';
-      document.getElementById('pop-time').innerHTML = time.replace(' h','') + '<span class="pm-unit">h</span>';
-      document.getElementById('pop-pace').innerHTML = pace.replace('/km','') + '<span class="pm-unit">min/km</span>';
-      document.getElementById('pop-hr').innerHTML = (a.avg_hr || '—') + '<span class="pm-unit">bpm</span>';
+      document.getElementById('pop-dist').innerHTML = a.distance_km.toFixed(1)+'<span class="pm-unit">km</span>';
+      document.getElementById('pop-time').innerHTML = time.replace(' h','')+'<span class="pm-unit">h</span>';
+      document.getElementById('pop-pace').innerHTML = pace.replace('/km','')+'<span class="pm-unit">min/km</span>';
+      document.getElementById('pop-hr').innerHTML = (a.avg_hr||'—')+'<span class="pm-unit">bpm</span>';
 
-      // Screens
-      setEl('fb-sub', name + ' · ' + dateStr);
+      setEl('fb-sub', name+' · '+dateStr);
       setEl('an-type', typeStr);
       setEl('an-title', name);
-
-      // Hero
       setEl('hero-km', a.distance_km.toFixed(1));
       setEl('hero-name', name);
       setEl('hero-time', time);
       setEl('hero-pace', pace);
-      setEl('hero-hr', (a.avg_hr || '—') + ' bpm');
+      setEl('hero-hr', (a.avg_hr||'—')+' bpm');
       setEl('hero-elev', elevStr);
+      setEl('pace-avg', pace.replace('/km',''));
 
-      // Splits Tabelle
       var tb = document.getElementById("stbd");
       if (tb) {
         if (data.splits && data.splits.length > 0) {
-          tb.innerHTML = '';
-          data.splits.forEach(function(s) {
-            var tr = document.createElement("tr");
-            var elev = s.elevation > 0 ? '+' + s.elevation.toFixed(0) : (s.elevation < 0 ? s.elevation.toFixed(0) : '—');
-            tr.innerHTML = '<td>' + s.split + '</td><td>' + (s.pace||'—') + '</td><td>' + (s.hr||'—') + '</td><td>' + elev + '</td><td>—</td><td>—</td>';
+          tb.innerHTML='';
+          data.splits.forEach(function(s){
+            var tr=document.createElement("tr");
+            var elev=s.elevation>0?'+'+s.elevation.toFixed(0):(s.elevation<0?s.elevation.toFixed(0):'—');
+            tr.innerHTML='<td>'+s.split+'</td><td>'+(s.pace||'—')+'</td><td>'+(s.hr||'—')+'</td><td>'+elev+'</td><td>—</td><td>—</td>';
             tb.appendChild(tr);
           });
         } else {
-          tb.innerHTML = '<tr><td colspan="6" style="color:#6B6860;font-family:DM Mono,monospace;font-size:9px;padding:12px">Keine Split-Daten verfügbar</td></tr>';
+          tb.innerHTML='<tr><td colspan="6" style="color:#6B6860;font-family:DM Mono,monospace;font-size:9px;padding:12px">Keine Split-Daten verfügbar</td></tr>';
         }
       }
 
-      // Schnellste/Langsamste Splits
       if (data.splits && data.splits.length > 1) {
-        var fullSpl = data.splits.filter(function(s) { return s.distance_km >= 0.9 && s.pace; });
+        var fullSpl=data.splits.filter(function(s){return s.distance_km>=0.9&&s.pace;});
         if (fullSpl.length > 0) {
-          var sorted = fullSpl.slice().sort(function(a,b) {
-            var ap = a.pace.split(':'); var bp = b.pace.split(':');
-            return (parseInt(ap[0])*60+parseInt(ap[1])) - (parseInt(bp[0])*60+parseInt(bp[1]));
-          });
-          var fastest = sorted[0]; var slowest = sorted[sorted.length-1];
-          // Pace Summary
-          setEl('pace-best', 'Schnellste: Km ' + fastest.split + ' · ' + fastest.pace + '/km   Langsamste: Km ' + slowest.split + ' · ' + slowest.pace + '/km');
+          var sorted=fullSpl.slice().sort(function(a,b){var ap=a.pace.split(':');var bp=b.pace.split(':');return (parseInt(ap[0])*60+parseInt(ap[1]))-(parseInt(bp[0])*60+parseInt(bp[1]));});
+          setEl('pace-best','Schnellste: Km '+sorted[0].split+' · '+sorted[0].pace+'/km   Langsamste: Km '+sorted[sorted.length-1].split+' · '+sorted[sorted.length-1].pace+'/km');
         }
       }
 
-      setEl('pace-avg', pace.replace('/km',''));
-
-      // Charts
       if (data.splits && data.splits.length > 1) buildPaceChart(data.splits);
       if (data.splits && data.splits.length > 0) buildHFZones(data.splits);
       if (data.splits && data.splits.length > 0) buildElevationChart(data.splits);
 
       document.getElementById("popup").classList.add("open");
     })
-    .catch(function() {
+    .catch(function(){
       document.getElementById("popup").classList.remove("open");
       document.getElementById("san").classList.add("on");
     });
@@ -727,56 +683,44 @@ function loadAnalysis() {
   analysisLoaded = true;
 
   fetch('https://web-production-297f2.up.railway.app/api/activity/' + trainingId + '/analyse')
-    .then(function(r) { return r.json(); })
-    .then(function(data) {
+    .then(function(r){return r.json();})
+    .then(function(data){
       if (data.status !== 'ok') return;
       var a = data.analysis;
 
-      var summaryEl = document.getElementById('coach-summary');
-      var meaningEl = document.getElementById('coach-meaning');
-      var obsEl = document.getElementById('coach-observations');
+      var summaryEl=document.getElementById('coach-summary');
+      var meaningEl=document.getElementById('coach-meaning');
+      var obsEl=document.getElementById('coach-observations');
 
-      if (summaryEl && a.summary) summaryEl.innerHTML = '<strong>' + a.summary + '</strong>';
-      if (meaningEl && a.meaning) meaningEl.textContent = a.meaning;
-      var meaningBlock = document.getElementById('coach-meaning-block');
-      if (meaningBlock && a.meaning) meaningBlock.textContent = a.meaning;
+      if (summaryEl && a.summary) summaryEl.innerHTML='<strong>'+a.summary+'</strong>';
+      if (meaningEl && a.meaning) meaningEl.textContent=a.meaning;
+      var meaningBlock=document.getElementById('coach-meaning-block');
+      if (meaningBlock && a.meaning) meaningBlock.textContent=a.meaning;
 
       if (obsEl && a.observations) {
-        obsEl.innerHTML = '';
-        a.observations.forEach(function(obs) {
-          var li = document.createElement('li');
-          li.className = 'tw';
-          li.innerHTML = '<span class="twd">—</span><span class="twt">' + obs + '</span>';
+        obsEl.innerHTML='';
+        a.observations.forEach(function(obs){
+          var li=document.createElement('li');li.className='tw';
+          li.innerHTML='<span class="twd">—</span><span class="twt">'+obs+'</span>';
           obsEl.appendChild(li);
         });
         if (a.closing) {
-          var li = document.createElement('li');
-          li.className = 'tw';
-          li.innerHTML = '<span class="twd">—</span><span class="twt hi" style="font-style:italic">' + a.closing + '</span>';
+          var li=document.createElement('li');li.className='tw';
+          li.innerHTML='<span class="twd">—</span><span class="twt hi" style="font-style:italic">'+a.closing+'</span>';
           obsEl.appendChild(li);
         }
       }
 
       if (a.recommendation) setEl('rec-headline', a.recommendation);
-      if (a.next_session) {
-        setEl('rec-box-text', a.next_session);
-        document.getElementById('rec-box').style.display = 'block';
-      }
-      if (a.closing) {
-        setEl('rec-closing-text', a.closing);
-        document.getElementById('rec-closing').style.display = 'block';
-      }
+      if (a.next_session) { setEl('rec-box-text', a.next_session); document.getElementById('rec-box').style.display='block'; }
+      if (a.closing) { setEl('rec-closing-text', a.closing); document.getElementById('rec-closing').style.display='block'; }
 
-      var tagsEl = document.getElementById('rec-tags');
+      var tagsEl=document.getElementById('rec-tags');
       if (tagsEl && a.tags && a.tags.length > 0) {
-        tagsEl.innerHTML = a.tags.map(function(t) {
-          return '<span class="tag ' + (t.type || '') + '">' + t.label + '</span>';
-        }).join('');
+        tagsEl.innerHTML=a.tags.map(function(t){return '<span class="tag '+(t.type||'")>'+t.label+'</span>';}).join('');
       }
     })
-    .catch(function() {
-      setEl('coach-summary', 'Analyse konnte nicht geladen werden.');
-    });
+    .catch(function(){ setEl('coach-summary','Analyse konnte nicht geladen werden.'); });
 }
 
 loadActivity();
