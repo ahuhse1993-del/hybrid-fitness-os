@@ -544,6 +544,25 @@ def get_gps(training_id):
         import traceback
         return jsonify({"status": "error", "message": str(e), "trace": traceback.format_exc()}), 500
 
+@app.route('/api/activity/<int:training_id>/hr', methods=['GET'])
+def get_hr(training_id):
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT timestamp_ms, heart_rate
+            FROM hr_tracks
+            WHERE training_id = %s
+            ORDER BY point_index
+        """, (training_id,))
+        rows = cur.fetchall()
+        conn.close()
+        points = [{"ts": r[0], "hr": r[1]} for r in rows]
+        return jsonify({"status": "ok", "points": points})
+    except Exception as e:
+        import traceback
+        return jsonify({"status": "error", "message": str(e), "trace": traceback.format_exc()}), 500
+
 @app.route('/api/new-activities', methods=['GET'])
 def new_activities():
     try:
