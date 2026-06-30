@@ -85,13 +85,17 @@ body{background:var(--bg);font-family:"DM Sans",sans-serif;color:var(--black);fo
 .secl{font-family:"DM Mono",monospace;font-size:9px;color:#9E9B95;letter-spacing:.12em;flex-shrink:0;text-transform:uppercase}
 .secln{flex:1;height:.5px;background:rgba(46,44,42,.16)}
 .card{background:#E8E4DC;padding:13px 12px 10px}
-.stog{width:100%;background:#E8E4DC;border:none;border-bottom:.5px solid rgba(46,44,42,.12);padding:12px 16px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;margin-bottom:2px;font-family:"DM Mono",monospace;font-size:10px;color:#6B6860;letter-spacing:.06em;text-transform:uppercase}
-.scnt{display:none;background:#E8E4DC;padding:0 16px 12px;margin-bottom:2px;overflow-x:auto}
+.stog{width:100%;background:var(--black);border:none;padding:14px 16px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;margin-bottom:2px;font-family:"DM Mono",monospace;font-size:10px;color:#F0EDE6;letter-spacing:.08em;text-transform:uppercase}
+.stog:hover{background:#2E2C2A}
+.stog span:first-child{font-weight:500}
+.stog #sarr{color:var(--accent)}
+.scnt{display:none;background:#1A1918;padding:0 16px 16px;margin-bottom:2px;overflow-x:auto}
 .scnt.open{display:block}
 .stbl{width:100%;border-collapse:collapse;font-family:"DM Mono",monospace;font-size:11px;min-width:520px}
-.stbl th{font-family:"DM Mono",monospace;font-size:8px;color:#9E9B95;padding:8px 6px 6px;text-align:left;font-weight:400;border-bottom:.5px solid rgba(46,44,42,.15);white-space:nowrap}
-.stbl td{padding:5px 6px;border-bottom:.5px solid rgba(158,155,149,.1);white-space:nowrap}
+.stbl th{font-family:"DM Mono",monospace;font-size:8px;color:rgba(232,216,74,.5);padding:10px 6px 8px;text-align:left;font-weight:400;border-bottom:.5px solid rgba(240,237,230,.12);white-space:nowrap;letter-spacing:.05em;text-transform:uppercase}
+.stbl td{padding:7px 6px;border-bottom:.5px solid rgba(240,237,230,.06);white-space:nowrap;color:#F0EDE6}
 .stbl tr:last-child td{border-bottom:none}
+.stbl tr:hover td{background:rgba(240,237,230,.03)}
 .lblock{background:#E8E4DC;padding:16px 16px 14px;margin-bottom:2px}
 .llbl{font-family:"DM Mono",monospace;font-size:9px;color:#6B6860;letter-spacing:.1em;text-transform:uppercase;margin-bottom:10px}
 .ltxt{font-size:13px;color:var(--mid);line-height:1.72;border-left:2px solid var(--black);padding-left:12px}
@@ -115,14 +119,14 @@ body{background:var(--bg);font-family:"DM Sans",sans-serif;color:var(--black);fo
 .map-close-btn{position:absolute;top:16px;right:16px;z-index:1100;background:var(--black);border:.5px solid rgba(240,237,230,.2);color:#F0EDE6;font-family:"DM Mono",monospace;font-size:9px;padding:8px 16px;cursor:pointer;letter-spacing:.1em}
 .map-close-btn:hover{background:var(--accent);color:var(--black);border-color:var(--accent)}
 /* TRAIL METRICS */
-.trail-block{background:#E8E4DC;padding:16px;margin-bottom:2px}
+.trail-block{background:var(--black);padding:18px 16px 20px;margin-bottom:2px}
 .trail-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:0;margin-top:12px}
 .trail-cell{padding:0 12px}
-.trail-cell+.trail-cell{border-left:.5px solid rgba(46,44,42,.15)}
+.trail-cell+.trail-cell{border-left:.5px solid rgba(240,237,230,.12)}
 .trail-cell:first-child{padding-left:0}
-.tc-lbl{font-family:"DM Mono",monospace;font-size:8px;color:#9E9B95;letter-spacing:.05em;text-transform:uppercase;margin-bottom:4px}
-.tc-val{font-family:"DM Mono",monospace;font-size:20px;font-weight:500;line-height:1}
-.tc-unit{font-family:"DM Mono",monospace;font-size:9px;color:#9E9B95;margin-left:2px;font-weight:400}
+.tc-lbl{font-family:"DM Mono",monospace;font-size:8px;color:rgba(232,216,74,.5);letter-spacing:.05em;text-transform:uppercase;margin-bottom:5px}
+.tc-val{font-family:"DM Mono",monospace;font-size:22px;font-weight:500;line-height:1;color:#F0EDE6}
+.tc-unit{font-family:"DM Mono",monospace;font-size:9px;color:rgba(240,237,230,.4);margin-left:2px;font-weight:400}
 </style>
 </head>
 <body>
@@ -323,7 +327,7 @@ body{background:var(--bg);font-family:"DM Sans",sans-serif;color:var(--black);fo
       <!-- TRAIL METRICS -->
       <div class="sec" id="trail-sec" style="display:none"><span class="secl">Trail-Kennzahlen</span><div class="secln"></div></div>
       <div class="trail-block" id="trail-block" style="display:none">
-        <div class="llbl" style="margin-bottom:0">Aus GPS-Daten berechnet</div>
+        <div style="font-family:'DM Mono',monospace;font-size:9px;color:rgba(232,216,74,.5);letter-spacing:.1em;text-transform:uppercase;margin-bottom:0">Aus GPS-Daten berechnet</div>
         <div class="trail-grid">
           <div class="trail-cell"><div class="tc-lbl">Aufstieg</div><div class="tc-val" id="trail-up">&#8212;<span class="tc-unit">m</span></div></div>
           <div class="trail-cell"><div class="tc-lbl">Abstieg</div><div class="tc-val" id="trail-down">&#8212;<span class="tc-unit">m</span></div></div>
