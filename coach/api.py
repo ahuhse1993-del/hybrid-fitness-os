@@ -71,7 +71,7 @@ def save_checkin():
             if already_trained:
                 try:
                     req0 = urllib.request.Request(
-                        "https://api.github.com/repos/ahuhske1993-del/hybrid-fitness-os/actions/workflows/garmin_sync.yml/dispatches",
+                        "https://api.github.com/repos/ahuhse1993-del/hybrid-fitness-os/actions/workflows/garmin_sync.yml/dispatches",
                         data=b'{"ref":"main"}',
                         headers=headers,
                         method="POST"
@@ -82,7 +82,7 @@ def save_checkin():
                     pass
 
             req = urllib.request.Request(
-                "https://api.github.com/repos/ahuhske1993-del/hybrid-fitness-os/actions/workflows/health_sync.yml/dispatches",
+                "https://api.github.com/repos/ahuhse1993-del/hybrid-fitness-os/actions/workflows/health_sync.yml/dispatches",
                 data=b'{"ref":"main"}',
                 headers=headers,
                 method="POST"
@@ -91,7 +91,7 @@ def save_checkin():
             time.sleep(5)
 
             req2 = urllib.request.Request(
-                "https://api.github.com/repos/ahuhske1993-del/hybrid-fitness-os/actions/workflows/health_sync.yml/runs?per_page=1",
+                "https://api.github.com/repos/ahuhse1993-del/hybrid-fitness-os/actions/workflows/health_sync.yml/runs?per_page=1",
                 headers=headers
             )
             resp = urllib.request.urlopen(req2, timeout=10)
@@ -101,7 +101,7 @@ def save_checkin():
             for _ in range(12):
                 time.sleep(5)
                 req3 = urllib.request.Request(
-                    f"https://api.github.com/repos/ahuhske1993-del/hybrid-fitness-os/actions/runs/{run_id}",
+                    f"https://api.github.com/repos/ahuhse1993-del/hybrid-fitness-os/actions/runs/{run_id}",
                     headers=headers
                 )
                 resp3 = urllib.request.urlopen(req3, timeout=10)
@@ -281,158 +281,6 @@ def get_plan():
         conn.close()
 
         type_match = {
-            'Easy Run': ['Run'],
-            'Recovery Run': ['Run'],
-            'Long Run': ['Run', 'TrailRun'],
-            'Trail Run': ['TrailRun', 'Run'],
-            'Intervalle': ['Run'],
-            'Tempo Run': ['Run'],
-            'Threshold Run': ['Run'],
-            'Progression Run': ['Run'],
-            'Race Pace Run': ['Run'],
-            'Hill Repeats': ['Run', 'TrailRun'],
-            'Strides': ['Run'],
-            'Krafttraining': ['WeightTraining'],
-            'Mobilität': ['WeightTraining'],
-        }
-
-        actual_by_date = {}
-        for r in actual_rows:
-            d = str(r[0])
-            if d not in actual_by_date:
-                actual_by_date[d] = []
-            actual_by_date[d].append({
-                "type": r[1],
-                "name": r[2] or r[1],
-                "duration_min": r[3],
-                "distance_km": float(r[4]) if r[4] else 0,
-                "avg_hr": r[5],
-                "training_id": r[6],
-            })
-
-        plan = []
-        matched_training_ids = set()
-
-        for r in plan_rows:
-            week_date = str(r[1])
-            day_of_week = r[2]
-            session_type = r[3]
-            item_date = date.fromisoformat(week_date) + timedelta(days=day_of_week - 1)
-            item_date_str = str(item_date)
-            is_past = item_date <= today
-
-            item = {
-                "id": r[0],
-                "week_date": week_date,
-                "day_of_week": day_of_week,
-                "session_type": session_type,
-                "session_zone": r[4],
-                "duration_min": r[5],
-                "distance_km": float(r[6]) if r[6] else 0,
-                "notes": r[7] or "",
-                "is_done": False,
-                "is_mismatch": False,
-                "actual_type": None,
-                "actual_name": None,
-                "actual_km": 0,
-                "actual_min": 0,
-                "actual_hr": None,
-                "training_id": None
-            }
-
-            if is_past and item_date_str in actual_by_date:
-                expected_types = type_match.get(session_type, [])
-                for actual in actual_by_date[item_date_str]:
-                    if actual["training_id"] not in matched_training_ids:
-                        matched = actual["type"] in expected_types
-                        item["is_done"] = True
-                        item["is_mismatch"] = not matched
-                        item["actual_type"] = actual["type"]
-                        item["actual_name"] = actual["name"]
-                        item["actual_km"] = actual["distance_km"]
-                        item["actual_min"] = actual["duration_min"]
-                        item["actual_hr"] = actual["avg_hr"]
-                        item["training_id"] = actual["training_id"]
-                        matched_training_ids.add(actual["training_id"])
-                        break
-
-            plan.append(item)
-
-        for d_str, activities in actual_by_date.items():
-            for actual in activities:
-                if actual["training_id"] not in matched_training_ids:
-                    act_date = date.fromisoformat(d_str)
-                    act_monday = act_date - timedelta(days=act_date.weekday())
-                    day_of_week = act_date.isoweekday()
-                    plan.append({
-                        "id": -actual["training_id"],
-                        "week_date": str(act_monday),
-                        "day_of_week": day_of_week,
-                        "session_type": actual["type"],
-                        "session_zone": "",
-                        "duration_min": actual["duration_min"],
-                        "distance_km": actual["distance_km"],
-                        "notes": actual["name"],
-                        "is_done": True,
-                        "is_mismatch": False,
-                        "is_spontaneous": True,
-                        "actual_type": actual["type"],
-                        "actual_name": actual["name"],
-                        "actual_km": actual["distance_km"],
-                        "actual_min": actual["duration_min"],
-                        "actual_hr": actual["avg_hr"],
-                        "training_id": actual["training_id"]
-                    })
-                    matched_training_ids.add(actual["training_id"])
-
-        return jsonify({"status": "ok", "plan": plan})
-
-    except Exception as e:
-        import traceback
-        return jsonify({"status": "error", "message": str(e), "trace": traceback.format_exc()}), 500
-
-@app.route('/api/plan/month', methods=['GET'])
-def get_plan_month():
-    try:
-        conn = get_db()
-        cur = conn.cursor()
-        today = get_today()
-
-        year = request.args.get('year', default=today.year, type=int)
-        month = request.args.get('month', default=today.month, type=int)
-
-        # Ersten und letzten Tag des Monats
-        first_day = date(year, month, 1)
-        if month == 12:
-            last_day = date(year + 1, 1, 1) - timedelta(days=1)
-        else:
-            last_day = date(year, month + 1, 1) - timedelta(days=1)
-
-        # Kalender-Fenster: Montag der ersten Woche bis Sonntag der letzten Woche
-        cal_start = first_day - timedelta(days=first_day.weekday())
-        cal_end = last_day + timedelta(days=6 - last_day.weekday())
-
-        # Plan-Einträge
-        cur.execute("""
-            SELECT id, week_date, day_of_week, session_type, session_zone,
-                   duration_min, distance_km, notes
-            FROM training_plan
-            WHERE week_date >= %s AND week_date <= %s
-            ORDER BY week_date, day_of_week
-        """, (cal_start, cal_end))
-        plan_rows = cur.fetchall()
-
-        # Echte Aktivitäten
-        cur.execute("""
-            SELECT date, type, notes, duration_minutes, distance_km, heart_rate_avg, id
-            FROM trainings
-            WHERE date >= %s AND date <= %s
-            ORDER BY date
-        """, (cal_start, cal_end))
-        actual_rows = cur.fetchall()
-        conn.close()
-
-        type_match = {
             'Easy Run': ['Run'], 'Recovery Run': ['Run'],
             'Long Run': ['Run', 'TrailRun'], 'Trail Run': ['TrailRun', 'Run'],
             'Intervalle': ['Run'], 'Tempo Run': ['Run'], 'Threshold Run': ['Run'],
@@ -454,7 +302,7 @@ def get_plan_month():
             })
 
         plan = []
-        matched_ids = set()
+        matched_training_ids = set()
 
         for r in plan_rows:
             week_date = str(r[1])
@@ -465,67 +313,137 @@ def get_plan_month():
             is_past = item_date <= today
 
             item = {
-                "id": r[0], "date": item_date_str,
-                "week_date": week_date, "day_of_week": day_of_week,
+                "id": r[0], "week_date": week_date, "day_of_week": day_of_week,
                 "session_type": session_type, "session_zone": r[4],
-                "duration_min": r[5],
-                "distance_km": float(r[6]) if r[6] else 0,
-                "notes": r[7] or "",
-                "is_done": False, "is_mismatch": False,
-                "actual_name": None, "actual_km": 0,
-                "actual_type": None, "training_id": None
+                "duration_min": r[5], "distance_km": float(r[6]) if r[6] else 0,
+                "notes": r[7] or "", "is_done": False, "is_mismatch": False,
+                "actual_type": None, "actual_name": None,
+                "actual_km": 0, "actual_min": 0, "actual_hr": None, "training_id": None
             }
 
             if is_past and item_date_str in actual_by_date:
-                expected = type_match.get(session_type, [])
+                expected_types = type_match.get(session_type, [])
                 for actual in actual_by_date[item_date_str]:
-                    if actual["training_id"] not in matched_ids:
+                    if actual["training_id"] not in matched_training_ids:
                         item["is_done"] = True
-                        item["is_mismatch"] = actual["type"] not in expected
+                        item["is_mismatch"] = actual["type"] not in expected_types
+                        item["actual_type"] = actual["type"]
                         item["actual_name"] = actual["name"]
                         item["actual_km"] = actual["distance_km"]
-                        item["actual_type"] = actual["type"]
+                        item["actual_min"] = actual["duration_min"]
+                        item["actual_hr"] = actual["avg_hr"]
                         item["training_id"] = actual["training_id"]
-                        matched_ids.add(actual["training_id"])
+                        matched_training_ids.add(actual["training_id"])
                         break
 
             plan.append(item)
 
-        # Spontane Aktivitäten
         for d_str, activities in actual_by_date.items():
             for actual in activities:
-                if actual["training_id"] not in matched_ids:
+                if actual["training_id"] not in matched_training_ids:
+                    act_date = date.fromisoformat(d_str)
+                    act_monday = act_date - timedelta(days=act_date.weekday())
                     plan.append({
                         "id": -actual["training_id"],
-                        "date": d_str,
-                        "week_date": None, "day_of_week": None,
-                        "session_type": actual["type"],
-                        "session_zone": "", "duration_min": actual["duration_min"],
+                        "week_date": str(act_monday),
+                        "day_of_week": act_date.isoweekday(),
+                        "session_type": actual["type"], "session_zone": "",
+                        "duration_min": actual["duration_min"],
                         "distance_km": actual["distance_km"],
-                        "notes": actual["name"],
-                        "is_done": True, "is_mismatch": False, "is_spontaneous": True,
-                        "actual_name": actual["name"],
-                        "actual_km": actual["distance_km"],
-                        "actual_type": actual["type"],
-                        "training_id": actual["training_id"]
+                        "notes": actual["name"], "is_done": True,
+                        "is_mismatch": False, "is_spontaneous": True,
+                        "actual_type": actual["type"], "actual_name": actual["name"],
+                        "actual_km": actual["distance_km"], "actual_min": actual["duration_min"],
+                        "actual_hr": actual["avg_hr"], "training_id": actual["training_id"]
                     })
-                    matched_ids.add(actual["training_id"])
+                    matched_training_ids.add(actual["training_id"])
+
+        return jsonify({"status": "ok", "plan": plan})
+
+    except Exception as e:
+        import traceback
+        return jsonify({"status": "error", "message": str(e), "trace": traceback.format_exc()}), 500
+
+@app.route('/api/activities/month', methods=['GET'])
+def get_month():
+    try:
+        today = get_today()
+        year = request.args.get('year', default=today.year, type=int)
+        month = request.args.get('month', default=today.month, type=int)
+
+        first_day = date(year, month, 1)
+        last_day = date(year + 1, 1, 1) - timedelta(days=1) if month == 12 else date(year, month + 1, 1) - timedelta(days=1)
+        view_start = first_day - timedelta(days=first_day.weekday())
+        view_end = last_day + timedelta(days=(6 - last_day.weekday()))
+
+        conn = get_db()
+        cur = conn.cursor()
+
+        cur.execute("""
+            SELECT date, type, notes, duration_minutes, distance_km, heart_rate_avg, id
+            FROM trainings
+            WHERE date >= %s AND date <= %s
+            ORDER BY date
+        """, (view_start, view_end))
+        actual_rows = cur.fetchall()
+
+        cur.execute("""
+            SELECT week_date, day_of_week, session_type, session_zone, duration_min, distance_km, notes, id
+            FROM training_plan
+            WHERE week_date >= %s AND week_date <= %s
+            ORDER BY week_date, day_of_week
+        """, (view_start, view_end))
+        plan_rows = cur.fetchall()
+
+        conn.close()
+
+        actual_by_date = {}
+        for r in actual_rows:
+            d = str(r[0])
+            if d not in actual_by_date:
+                actual_by_date[d] = []
+            actual_by_date[d].append({
+                "type": r[1],
+                "name": (r[2] or r[1]).split(' | ')[0],
+                "duration_min": r[3],
+                "distance_km": float(r[4]) if r[4] else 0,
+                "avg_hr": r[5],
+                "training_id": r[6],
+                "is_done": True
+            })
+
+        plan_by_date = {}
+        for r in plan_rows:
+            week_date = date.fromisoformat(str(r[0]))
+            plan_date = str(week_date + timedelta(days=r[1] - 1))
+            if plan_date not in plan_by_date:
+                plan_by_date[plan_date] = []
+            plan_by_date[plan_date].append({
+                "session_type": r[2],
+                "session_zone": r[3] or "",
+                "duration_min": r[4],
+                "distance_km": float(r[5]) if r[5] else 0,
+                "notes": (r[6] or "").split(' · ')[0],
+                "plan_id": r[7],
+                "is_done": False
+            })
 
         return jsonify({
             "status": "ok",
-            "plan": plan,
-            "cal_start": str(cal_start),
-            "cal_end": str(cal_end),
             "year": year,
             "month": month,
-            "today": str(today)
+            "view_start": str(view_start),
+            "view_end": str(view_end),
+            "today": str(today),
+            "actual": actual_by_date,
+            "plan": plan_by_date
         })
 
     except Exception as e:
         import traceback
         return jsonify({"status": "error", "message": str(e), "trace": traceback.format_exc()}), 500
 
-
+@app.route('/api/plan/update', methods=['POST'])
 def update_plan():
     try:
         data = request.get_json()
@@ -558,12 +476,10 @@ def check_plan():
         prompt = 'Du bist CAIRN Coach. Pruefe diese Wochenstruktur.\n\n'
         prompt += 'Wochenplan:\n' + '\n'.join(lines) + '\n\n'
         prompt += 'REGELN:\n'
-        prompt += '1. Nach Unterkörper-Krafttraining darf NICHT direkt eine Qualitaetssession folgen. Mindestens ein Ruhetag oder Easy Run dazwischen.\n'
+        prompt += '1. Nach Unterkörper-Krafttraining darf NICHT direkt eine Qualitaetssession folgen.\n'
         prompt += '2. Nicht mehr als 2 harte Sessions hintereinander.\n'
         prompt += '3. Nach Long Run kein hartes Training direkt danach.\n\n'
-        prompt += 'Sprich wie ein erfahrener Bergfuehrer. Ruhig, direkt, menschlich.\n'
-        prompt += 'Max 2 Saetze.\n\n'
-        prompt += 'Antworte NUR mit JSON, kein Markdown:\n'
+        prompt += 'Max 2 Saetze. Antworte NUR mit JSON:\n'
         prompt += '{"ok": true, "message": "Kurzes Feedback auf Deutsch"}'
 
         client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
@@ -599,14 +515,10 @@ def get_activity(training_id):
             return jsonify({"status": "error", "message": "Nicht gefunden"}), 404
 
         activity = {
-            "id": row[0],
-            "date": str(row[1]),
-            "type": row[2],
-            "name": row[3] or row[2],
-            "duration_min": row[4],
+            "id": row[0], "date": str(row[1]), "type": row[2],
+            "name": row[3] or row[2], "duration_min": row[4],
             "distance_km": float(row[5]) if row[5] else 0,
-            "avg_hr": row[6],
-            "garmin_id": row[7]
+            "avg_hr": row[6], "garmin_id": row[7]
         }
 
         cur.execute("""
@@ -615,16 +527,11 @@ def get_activity(training_id):
         """, (training_id,))
         splits = []
         for s in cur.fetchall():
-            pace_min = None
-            if s[2]:
-                pace_min = f"{s[2] // 60}:{str(s[2] % 60).zfill(2)}"
+            pace_min = f"{s[2]//60}:{str(s[2]%60).zfill(2)}" if s[2] else None
             splits.append({
-                "split": s[0],
-                "distance_km": float(s[1]) if s[1] else 0,
-                "pace": pace_min,
-                "hr": s[3],
-                "elevation": float(s[4]) if s[4] else 0,
-                "cadence": s[5]
+                "split": s[0], "distance_km": float(s[1]) if s[1] else 0,
+                "pace": pace_min, "hr": s[3],
+                "elevation": float(s[4]) if s[4] else 0, "cadence": s[5]
             })
 
         conn.close()
@@ -667,10 +574,8 @@ def get_gps(training_id):
         conn = get_db()
         cur = conn.cursor()
         cur.execute("""
-            SELECT lat, lon, elevation
-            FROM gps_tracks
-            WHERE training_id = %s
-            ORDER BY point_index
+            SELECT lat, lon, elevation FROM gps_tracks
+            WHERE training_id = %s ORDER BY point_index
         """, (training_id,))
         rows = cur.fetchall()
         conn.close()
@@ -686,10 +591,8 @@ def get_hr(training_id):
         conn = get_db()
         cur = conn.cursor()
         cur.execute("""
-            SELECT timestamp_ms, heart_rate
-            FROM hr_tracks
-            WHERE training_id = %s
-            ORDER BY point_index
+            SELECT timestamp_ms, heart_rate FROM hr_tracks
+            WHERE training_id = %s ORDER BY point_index
         """, (training_id,))
         rows = cur.fetchall()
         conn.close()
@@ -709,21 +612,17 @@ def new_activities():
             SELECT id, date, type, notes, distance_km, duration_minutes, analysis_done
             FROM trainings
             WHERE date = %s AND analysis_done = FALSE
-            ORDER BY id DESC
-            LIMIT 5
+            ORDER BY id DESC LIMIT 5
         """, (today,))
         rows = cur.fetchall()
         conn.close()
         activities = []
         for r in rows:
             activities.append({
-                "id": r[0],
-                "date": str(r[1]),
-                "type": r[2],
+                "id": r[0], "date": str(r[1]), "type": r[2],
                 "name": r[3] or r[2],
                 "distance_km": float(r[4]) if r[4] else 0,
-                "duration_min": r[5] or 0,
-                "analysis_done": r[6] or False
+                "duration_min": r[5] or 0, "analysis_done": r[6] or False
             })
         return jsonify({"status": "ok", "activities": activities})
     except Exception as e:
@@ -799,109 +698,12 @@ def trigger_sync():
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
-@app.route('/api/activities/month', methods=['GET'])
-def get_month():
-    try:
-        today = get_today()
-        year = request.args.get('year', default=today.year, type=int)
-        month = request.args.get('month', default=today.month, type=int)
-
-        # Ersten und letzten Tag des Monats
-        first_day = date(year, month, 1)
-        if month == 12:
-            last_day = date(year + 1, 1, 1) - timedelta(days=1)
-        else:
-            last_day = date(year, month + 1, 1) - timedelta(days=1)
-
-        # Erster Montag der Ansicht (kann im Vormonat liegen)
-        view_start = first_day - timedelta(days=first_day.weekday())
-        # Letzter Sonntag der Ansicht (kann im Folgemonat liegen)
-        view_end = last_day + timedelta(days=(6 - last_day.weekday()))
-
-        conn = get_db()
-        cur = conn.cursor()
-
-        # Echte Aktivitäten im Ansichts-Zeitraum
-        cur.execute("""
-            SELECT date, type, notes, duration_minutes, distance_km, heart_rate_avg, id
-            FROM trainings
-            WHERE date >= %s AND date <= %s
-            ORDER BY date
-        """, (view_start, view_end))
-        actual_rows = cur.fetchall()
-
-        # Geplante Sessions im Ansichts-Zeitraum
-        cur.execute("""
-            SELECT week_date, day_of_week, session_type, session_zone, duration_min, distance_km, notes, id
-            FROM training_plan
-            WHERE week_date >= %s AND week_date <= %s
-            ORDER BY week_date, day_of_week
-        """, (view_start, view_end))
-        plan_rows = cur.fetchall()
-
-        conn.close()
-
-        # Aktivitäten nach Datum gruppieren
-        actual_by_date = {}
-        for r in actual_rows:
-            d = str(r[0])
-            if d not in actual_by_date:
-                actual_by_date[d] = []
-            actual_by_date[d].append({
-                "type": r[1],
-                "name": (r[2] or r[1]).split(' | ')[0],
-                "duration_min": r[3],
-                "distance_km": float(r[4]) if r[4] else 0,
-                "avg_hr": r[5],
-                "training_id": r[6],
-                "is_done": True
-            })
-
-        # Plan nach Datum gruppieren
-        plan_by_date = {}
-        for r in plan_rows:
-            week_date = date.fromisoformat(str(r[0]))
-            day_offset = r[1] - 1  # day_of_week Mo=1
-            plan_date = str(week_date + timedelta(days=day_offset))
-            if plan_date not in plan_by_date:
-                plan_by_date[plan_date] = []
-            plan_by_date[plan_date].append({
-                "session_type": r[2],
-                "session_zone": r[3] or "",
-                "duration_min": r[4],
-                "distance_km": float(r[5]) if r[5] else 0,
-                "notes": (r[6] or "").split(' · ')[0],
-                "plan_id": r[7],
-                "is_done": False
-            })
-
-        return jsonify({
-            "status": "ok",
-            "year": year,
-            "month": month,
-            "view_start": str(view_start),
-            "view_end": str(view_end),
-            "today": str(today),
-            "actual": actual_by_date,
-            "plan": plan_by_date
-        })
-
-    except Exception as e:
-        import traceback
-        return jsonify({"status": "error", "message": str(e), "trace": traceback.format_exc()}), 500
-
-
+@app.route('/api/health', methods=['GET'])
+def health():
     return jsonify({"status": "ok", "date": str(get_today())})
 
 @app.route('/api/cron/health-sync', methods=['GET', 'POST'])
 def cron_health_sync():
-    """
-    Reliable external cron entry point (e.g. cron-job.org).
-    Checks if today's health data is already complete.
-    If not, triggers the GitHub Actions health_sync.yml workflow.
-    GitHub's own schedule trigger is unreliable on low-traffic repos,
-    so this endpoint exists as the dependable trigger.
-    """
     try:
         today = get_today()
         conn = get_db()
@@ -929,12 +731,11 @@ def cron_health_sync():
             method="POST"
         )
         urllib.request.urlopen(req, timeout=10)
-
         return jsonify({"status": "ok", "message": "Sync triggered", "triggered": True})
 
-@app.route('/api/health', methods=['GET'])
-def health():
-    return jsonify({"status": "ok", "date": str(get_today())})
+    except Exception as e:
+        import traceback
+        return jsonify({"status": "error", "message": str(e), "trace": traceback.format_exc()}), 500
 
 if __name__ == '__main__':
     port = int(os.getenv("PORT", 5002))
