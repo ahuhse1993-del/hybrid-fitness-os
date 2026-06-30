@@ -46,6 +46,7 @@ def generate_morning_brief(athlete_feedback: dict = None) -> dict:
 Your entire coaching philosophy, communication style and decision framework is defined in the knowledge documents below.
 
 Read them carefully. Every response must comply with them.
+This includes any length constraints defined for specific output formats.
 
 {knowledge}
 
@@ -59,7 +60,7 @@ OUTPUT RULE:
 Return ONLY a JSON object. No markdown fences. No preamble.
 Structure:
 {{
-  "brief": "The full morning brief as markdown text",
+  "brief": "The morning brief as plain text, following the length and structure rules defined in the knowledge documents above",
   "suggestion": "One-line suggestion if plan change is recommended, else empty string",
   "session_type": "Recommended session type if change, else empty string",
   "session_zone": "Zone if relevant, else empty string",
@@ -68,16 +69,7 @@ Structure:
   "replan_needed": true or false
 }}
 
-The "brief" field should be the complete morning brief as the documents describe:
-- Coach Opening
-- Today's Assessment  
-- Today's Objective
-- One Important Insight
-- Today's Focus
-
-Write it as flowing text. Not bullet points. Not headers.
-The athlete reads this first thing in the morning.
-Make it count."""
+The "brief" field is plain text. No headers, no bullet points, no markdown formatting inside it."""
 
     user_prompt = f"""Here is today's athlete data:
 
@@ -90,7 +82,7 @@ Write today's Morning Brief for Alexander."""
 
     message = client.messages.create(
         model="claude-sonnet-4-6",
-        max_tokens=1200,
+        max_tokens=600,
         messages=[{"role": "user", "content": user_prompt}],
         system=system_prompt,
     )
