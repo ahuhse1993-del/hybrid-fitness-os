@@ -510,6 +510,21 @@ def analyse_activity(training_id):
         import traceback
         return jsonify({"status": "error", "message": str(e), "trace": traceback.format_exc()}), 500
 
+@app.route('/api/activity/<int:training_id>/chat', methods=['POST'])
+def activity_chat(training_id):
+    try:
+        from coach.workout_chat import generate_chat_reply
+        data = request.get_json(force=True)
+        message = data.get('message', '')
+        history = data.get('history', [])
+        if not message:
+            return jsonify({"status": "error", "message": "Keine Nachricht"}), 400
+        reply = generate_chat_reply(training_id, message, history)
+        return jsonify({"status": "ok", "reply": reply})
+    except Exception as e:
+        import traceback
+        return jsonify({"status": "error", "message": str(e), "trace": traceback.format_exc()}), 500
+
 @app.route('/api/activity/<int:training_id>/gps', methods=['GET'])
 def get_gps(training_id):
     try:

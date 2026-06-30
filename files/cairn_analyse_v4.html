@@ -339,13 +339,13 @@ body{background:var(--bg);font-family:"DM Sans",sans-serif;color:var(--black);fo
         <div class="card" style="padding-bottom:20px">
           <div class="lbl" style="margin-bottom:4px">Pace pro km</div>
           <div style="font-family:DM Mono,monospace;font-size:18px;font-weight:500;line-height:1;margin-bottom:2px" id="pace-avg">&#8212; <span style="font-size:9px;color:#9E9B95;font-weight:400">min/km &#216;</span></div>
-          <div style="font-family:DM Mono,monospace;font-size:9px;color:var(--accent);margin-bottom:4px" id="pace-best">&#8212;</div>
+          <div style="font-family:DM Mono,monospace;font-size:9px;color:var(--black);margin-bottom:4px" id="pace-best">&#8212;</div>
           <div id="pace-chart" style="margin-top:12px"></div>
         </div>
         <div class="card" style="padding-bottom:20px">
           <div class="lbl" style="margin-bottom:4px">Kadenz pro km</div>
           <div style="font-family:DM Mono,monospace;font-size:18px;font-weight:500;line-height:1;margin-bottom:2px" id="cad-avg">&#8212; <span style="font-size:9px;color:#9E9B95;font-weight:400">spm &#216;</span></div>
-          <div style="font-family:DM Mono,monospace;font-size:9px;color:var(--accent);margin-bottom:4px" id="cad-range">&#8212;</div>
+          <div style="font-family:DM Mono,monospace;font-size:9px;color:var(--black);margin-bottom:4px" id="cad-range">&#8212;</div>
           <div id="cad-chart" style="margin-top:12px"></div>
         </div>
       </div>
@@ -365,7 +365,7 @@ body{background:var(--bg);font-family:"DM Sans",sans-serif;color:var(--black);fo
       <button class="stog" onclick="tSpl()"><span>Splits</span><span id="sarr">&#9660;</span></button>
       <div class="scnt" id="scnt">
         <table class="stbl">
-          <thead><tr><th>SPLIT</th><th>PACE</th><th>HF &#216;</th><th>HM</th><th>KADENZ</th><th>ANSTIEG</th></tr></thead>
+          <thead><tr><th>SPLIT</th><th>PACE</th><th>HF &#216;</th><th>HM</th><th>KADENZ</th><th>STEIGUNG</th></tr></thead>
           <tbody id="stbd"></tbody>
         </table>
       </div>
@@ -373,18 +373,12 @@ body{background:var(--bg);font-family:"DM Sans",sans-serif;color:var(--black);fo
       <div class="sec"><span class="secl">Was ich mitnehme</span><div class="secln"></div></div>
       <div class="lblock"><div class="llbl">Heute gelernt</div><div class="ltxt" id="coach-meaning-block">Analyse wird geladen...</div></div>
 
-      <div class="sec"><span class="secl">Was ich tun w&#252;rde</span><div class="secln"></div></div>
-      <div class="rblock">
-        <div class="rlbl">Coach &#183; Empfehlung</div>
-        <div class="rh" id="rec-headline">Wird geladen...</div>
-        <div class="rbox" id="rec-box" style="display:none">
-          <div class="rblbl">N&#196;CHSTE SESSION</div>
-          <div class="rbtxt" id="rec-box-text">&#8212;</div>
-        </div>
-        <div class="tagrow" id="rec-tags"></div>
-        <div style="margin-top:20px;padding-top:14px;border-top:.5px solid rgba(240,237,230,.07);display:none" id="rec-closing">
-          <div style="font-family:DM Mono,monospace;font-size:8px;color:rgba(240,237,230,.18);letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px">Schlussgedanke</div>
-          <div style="color:rgba(240,237,230,.4);font-size:13px;line-height:1.78;font-style:italic" id="rec-closing-text"></div>
+      <div class="sec"><span class="secl">Mit dem Coach sprechen</span><div class="secln"></div></div>
+      <div class="rblock" style="padding:16px">
+        <div id="chat-messages" style="display:flex;flex-direction:column;gap:12px;margin-bottom:14px;max-height:340px;overflow-y:auto"></div>
+        <div style="display:flex;gap:8px">
+          <input type="text" id="chat-input" placeholder="Frag den Coach zu diesem Lauf..." style="flex:1;background:rgba(240,237,230,.06);border:.5px solid rgba(240,237,230,.15);padding:11px 12px;font-family:'DM Sans',sans-serif;font-size:13px;color:#F0EDE6;outline:none">
+          <button onclick="sendChatMessage()" style="background:var(--accent);border:none;color:var(--black);font-family:'DM Mono',monospace;font-size:10px;padding:0 18px;cursor:pointer;letter-spacing:.08em;font-weight:500">SENDEN</button>
         </div>
       </div>
     </div>
@@ -433,7 +427,6 @@ function buildVerticalBarChart(elId, splits, valueFn, formatFn, opts) {
   var chartEl = document.getElementById(elId);
   if (!chartEl) return;
   opts = opts || {};
-  var inverse = opts.inverse || false; // bei Pace: niedrigerer Wert = besser/höher im Chart
 
   var fs = splits.filter(function(s){ return valueFn(s) !== null && valueFn(s) !== undefined; });
   if (fs.length === 0) { chartEl.innerHTML = '<div style="font-family:DM Mono,monospace;font-size:9px;color:#9E9B95">Keine Daten</div>'; return; }
@@ -442,24 +435,51 @@ function buildVerticalBarChart(elId, splits, valueFn, formatFn, opts) {
   var minV = Math.min.apply(null, values);
   var maxV = Math.max.apply(null, values);
   var range = (maxV - minV) || 1;
+  var yBot = minV - range * 0.1;
+  var yTop = maxV + range * 0.1;
+  var yRange = yTop - yBot;
 
-  var w = 280, h = 130, padL = 4, padB = 16, cH = h - padB;
-  var bW = Math.max(3, Math.floor((w - padL) / fs.length) - 2);
+  var w = 300, h = 150, padL = 30, padB = 16, padT = 4;
+  var cW = w - padL, cH = h - padT - padB;
+  var bW = Math.max(3, Math.floor(cW / fs.length) - 2);
 
+  var pid = 'vb_' + elId + '_' + Date.now();
   var bars = '';
+  var labels = '';
+
   fs.forEach(function(s, i) {
     var v = valueFn(s);
-    var normalized = (v - minV) / range; // 0..1
-    var barH = Math.max(3, Math.round(normalized * cH * 0.85) + cH * 0.15);
+    var normalized = (v - yBot) / yRange;
+    var barTopY = padT + cH - normalized * cH;
+    var barH = cH - (barTopY - padT);
     var x = padL + i * (bW + 2);
-    var y = cH - barH;
-    bars += '<rect x="'+x+'" y="'+y+'" width="'+bW+'" height="'+barH+'" fill="rgba(46,44,42,.55)"/>';
+
+    // Solid bar (value)
+    bars += '<rect x="'+x+'" y="'+barTopY+'" width="'+bW+'" height="'+barH+'" fill="rgba(46,44,42,.6)"/>';
+    // Dotted pattern above bar (empty space)
+    if (barTopY > padT) {
+      bars += '<rect x="'+x+'" y="'+padT+'" width="'+bW+'" height="'+(barTopY-padT)+'" fill="url(#'+pid+')"/>';
+    }
     if (fs.length <= 25 || i % 2 === 0) {
-      bars += '<text x="'+(x+bW/2)+'" y="'+(h-3)+'" font-family="DM Mono" font-size="6.5" fill="#9E9B95" text-anchor="middle">'+s.split+'</text>';
+      labels += '<text x="'+(x+bW/2)+'" y="'+(h-3)+'" font-family="DM Mono" font-size="7" fill="var(--black)" text-anchor="middle">'+s.split+'</text>';
     }
   });
 
-  chartEl.innerHTML = '<svg width="100%" viewBox="0 0 '+w+' '+h+'">'+bars+'</svg>';
+  // Y-axis labels (3 steps)
+  var yLabels = '';
+  for (var i = 0; i <= 2; i++) {
+    var val = yBot + (yRange * i / 2);
+    var y = padT + cH - (i/2) * cH;
+    var labelText = opts.formatY ? opts.formatY(val) : Math.round(val);
+    yLabels += '<text x="'+(padL-4)+'" y="'+(y+3)+'" font-family="DM Mono" font-size="6.5" fill="var(--black)" text-anchor="end">'+labelText+'</text>';
+  }
+
+  var svg = '<svg width="100%" viewBox="0 0 '+w+' '+h+'" xmlns="http://www.w3.org/2000/svg">';
+  svg += '<defs><pattern id="'+pid+'" x="0" y="0" width="4" height="4" patternUnits="userSpaceOnUse"><circle cx="1" cy="1" r="0.8" fill="rgba(46,44,42,.22)"/></pattern></defs>';
+  svg += bars + yLabels + labels;
+  svg += '</svg>';
+
+  chartEl.innerHTML = svg;
 }
 
 function haversine(lat1,lon1,lat2,lon2){
@@ -598,6 +618,15 @@ function buildHFChartFull(splits) {
   hfEl.innerHTML = svg;
 }
 
+function maybeShowTrailBlock() {
+  if (!activityData || !window.lastGpsResult) return;
+  if (activityData.type === 'TrailRun') {
+    document.getElementById('trail-sec').style.display = 'flex';
+    document.getElementById('trail-block').style.display = 'block';
+    buildTrailMetrics(window.lastGpsResult, activityData.duration_min);
+  }
+}
+
 function buildTrailMetrics(gpsData, durationMin) {
   if (!gpsData || gpsData.totalUp === undefined) return;
   setEl('trail-up', '+' + Math.round(gpsData.totalUp));
@@ -658,15 +687,8 @@ function initSmallMap(){
 
       var gpsResult = buildElevationFromGPS(gpsPoints);
       calcMaxGrade(gpsPoints);
-
-      if (activityData) {
-        var isTrail = activityData.type === 'TrailRun';
-        if (isTrail) {
-          document.getElementById('trail-sec').style.display = 'flex';
-          document.getElementById('trail-block').style.display = 'block';
-          buildTrailMetrics(gpsResult, activityData.duration_min);
-        }
-      }
+      window.lastGpsResult = gpsResult;
+      maybeShowTrailBlock();
     })
     .catch(function(){
       var overlay=document.getElementById('map-overlay');
@@ -730,12 +752,12 @@ function loadActivity(){
             var elev=s.elevation>0?'+'+s.elevation.toFixed(0):(s.elevation<0?s.elevation.toFixed(0):'—');
             var hr = s.hr || '—';
             var cad = s.cadence ? s.cadence : '—';
-            var zone = '—';
-            if (s.hr) {
-              var h = s.hr;
-              zone = h>=172?'Z5':h>=162?'Z4':h>=153?'Z3':h>=145?'Z2':'Z1';
+            var grade = '—';
+            if (s.elevation !== undefined && s.distance_km > 0) {
+              var g = (s.elevation / (s.distance_km * 1000)) * 100;
+              grade = (g > 0 ? '+' : '') + g.toFixed(1) + '%';
             }
-            tr.innerHTML='<td>Km '+s.split+'</td><td>'+(s.pace||'—')+'</td><td>'+hr+'</td><td>'+elev+'m</td><td>'+cad+'</td><td>'+zone+'</td>';
+            tr.innerHTML='<td>Km '+s.split+'</td><td>'+(s.pace||'—')+'</td><td>'+hr+'</td><td>'+elev+'m</td><td>'+cad+'</td><td>'+grade+'</td>';
             tb.appendChild(tr);
           });
         } else {
@@ -759,6 +781,11 @@ function loadActivity(){
           if (!s.pace) return null;
           var p = s.pace.split(':');
           return parseInt(p[0])*60+parseInt(p[1]);
+        }, null, {
+          formatY: function(v) {
+            var sec = Math.round(v);
+            return Math.floor(sec/60)+':'+String(sec%60).padStart(2,'0');
+          }
         });
       }
 
@@ -776,6 +803,8 @@ function loadActivity(){
 
       // HF Chart volle Breite
       if (data.splits && data.splits.length > 0) buildHFChartFull(data.splits);
+
+      maybeShowTrailBlock();
 
       document.getElementById("popup").classList.add("open");
     })
@@ -800,13 +829,98 @@ function loadAnalysis(){
         a.observations.forEach(function(obs){var li=document.createElement('li');li.className='tw';li.innerHTML='<span class="twd">—</span><span class="twt">'+obs+'</span>';oEl.appendChild(li);});
         if(a.closing){var li=document.createElement('li');li.className='tw';li.innerHTML='<span class="twd">—</span><span class="twt hi" style="font-style:italic">'+a.closing+'</span>';oEl.appendChild(li);}
       }
-      if(a.recommendation)setEl('rec-headline',a.recommendation);
-      if(a.next_session){setEl('rec-box-text',a.next_session);document.getElementById('rec-box').style.display='block';}
-      if(a.closing){setEl('rec-closing-text',a.closing);document.getElementById('rec-closing').style.display='block';}
-      var tEl=document.getElementById('rec-tags');
+      if(a.recommendation){
+        var ol = document.getElementById('coach-observations');
+        if (ol) {
+          var li=document.createElement('li');li.className='tw';
+          li.innerHTML='<span class="twd">→</span><span class="twt hi">'+a.recommendation+'</span>';
+          ol.appendChild(li);
+        }
+      }
+      var tEl=document.getElementById('rec-tags-chat');
       if(tEl&&a.tags&&a.tags.length>0)tEl.innerHTML=a.tags.map(function(t){return '<span class="tag '+(t.type||'')+'">'+t.label+'</span>';}).join('');
+
+      initChat(a);
     })
     .catch(function(){setEl('coach-summary','Analyse konnte nicht geladen werden.');});
+}
+
+var chatHistory = [];
+var chatAnalysisContext = null;
+
+function initChat(analysis) {
+  chatAnalysisContext = analysis;
+  var msgEl = document.getElementById('chat-messages');
+  if (!msgEl) return;
+  msgEl.innerHTML = '<div style="font-size:13px;color:rgba(240,237,230,.55);line-height:1.7;padding:10px 0">Frag mich, was du zu diesem Lauf wissen willst &#8212; warum die Pace bei Km 10 eingebrochen ist, was es f&#252;r das n&#228;chste Training bedeutet, oder was auch immer dich besch&#228;ftigt.</div>';
+
+  var tagsHtml = '';
+  if (analysis.tags && analysis.tags.length > 0) {
+    tagsHtml = '<div class="tagrow" id="rec-tags-chat" style="margin-bottom:14px"></div>';
+    msgEl.insertAdjacentHTML('beforebegin', tagsHtml);
+    var tEl = document.getElementById('rec-tags-chat');
+    if (tEl) tEl.innerHTML = analysis.tags.map(function(t){return '<span class="tag '+(t.type||'')+'">'+t.label+'</span>';}).join('');
+  }
+}
+
+function appendChatMessage(role, text) {
+  var msgEl = document.getElementById('chat-messages');
+  if (!msgEl) return;
+  var isUser = role === 'user';
+  var div = document.createElement('div');
+  div.style.cssText = isUser
+    ? 'align-self:flex-end;max-width:85%;background:rgba(232,216,74,.12);border:.5px solid rgba(232,216,74,.2);padding:9px 13px;font-size:13px;color:#F0EDE6;line-height:1.6'
+    : 'align-self:flex-start;max-width:85%;background:rgba(240,237,230,.05);padding:9px 13px;font-size:13px;color:rgba(240,237,230,.85);line-height:1.6';
+  div.textContent = text;
+  msgEl.appendChild(div);
+  msgEl.scrollTop = msgEl.scrollHeight;
+}
+
+function sendChatMessage() {
+  var input = document.getElementById('chat-input');
+  var text = input.value.trim();
+  if (!text || !trainingId) return;
+
+  appendChatMessage('user', text);
+  chatHistory.push({role: 'user', content: text});
+  input.value = '';
+
+  var msgEl = document.getElementById('chat-messages');
+  var loadingDiv = document.createElement('div');
+  loadingDiv.id = 'chat-loading';
+  loadingDiv.style.cssText = 'align-self:flex-start;font-family:DM Mono,monospace;font-size:10px;color:rgba(240,237,230,.3);padding:6px 0';
+  loadingDiv.textContent = 'Coach antwortet...';
+  msgEl.appendChild(loadingDiv);
+  msgEl.scrollTop = msgEl.scrollHeight;
+
+  fetch('https://web-production-297f2.up.railway.app/api/activity/' + trainingId + '/chat', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({message: text, history: chatHistory})
+  })
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      var loading = document.getElementById('chat-loading');
+      if (loading) loading.remove();
+      if (data.status === 'ok' && data.reply) {
+        appendChatMessage('coach', data.reply);
+        chatHistory.push({role: 'assistant', content: data.reply});
+      } else {
+        appendChatMessage('coach', 'Da ist etwas schiefgelaufen. Versuch es nochmal.');
+      }
+    })
+    .catch(function(){
+      var loading = document.getElementById('chat-loading');
+      if (loading) loading.remove();
+      appendChatMessage('coach', 'Verbindung fehlgeschlagen. Versuch es nochmal.');
+    });
+}
+
+var chatInputEl = document.getElementById('chat-input');
+if (chatInputEl) {
+  chatInputEl.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') sendChatMessage();
+  });
 }
 
 loadActivity();
