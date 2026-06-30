@@ -784,13 +784,10 @@ body{background:var(--bg);font-family:'DM Sans',sans-serif;color:var(--black);fo
   <div class="plan-outer">
     <div class="plan-head">
       <div style="display:flex;align-items:center;gap:10px">
-        <button onclick="shiftWeeks(-4)" style="background:transparent;border:.5px solid var(--black);color:var(--black);width:24px;height:24px;cursor:pointer;font-family:'DM Mono',monospace;font-size:11px;display:flex;align-items:center;justify-content:center" title="4 Wochen zurück">&#8249;</button>
-        <div class="plan-lbl" id="plan-range-lbl">4-WOCHEN-AUSBLICK</div>
-        <button onclick="shiftWeeks(4)" style="background:transparent;border:.5px solid var(--black);color:var(--black);width:24px;height:24px;cursor:pointer;font-family:'DM Mono',monospace;font-size:11px;display:flex;align-items:center;justify-content:center" title="4 Wochen vor">&#8250;</button>
-        <button onclick="resetWeeks()" id="plan-today-btn" style="display:none;background:transparent;border:none;color:var(--accent-dark);cursor:pointer;font-family:'DM Mono',monospace;font-size:8px;letter-spacing:.08em;text-decoration:underline">HEUTE</button>
-      </div>
-      <div class="kwtabs" id="kwtabs">
-        <div class="kwt on" onclick="filterWeek('all',this)">ALLE</div>
+        <button onclick="shiftMonth(-1)" style="background:transparent;border:.5px solid var(--black);color:var(--black);width:24px;height:24px;cursor:pointer;font-family:'DM Mono',monospace;font-size:11px;display:flex;align-items:center;justify-content:center">&#8249;</button>
+        <div class="plan-lbl" id="plan-range-lbl">KALENDER</div>
+        <button onclick="shiftMonth(1)" style="background:transparent;border:.5px solid var(--black);color:var(--black);width:24px;height:24px;cursor:pointer;font-family:'DM Mono',monospace;font-size:11px;display:flex;align-items:center;justify-content:center">&#8250;</button>
+        <button onclick="resetMonth()" id="plan-today-btn" style="display:none;background:transparent;border:none;color:var(--accent-dark);cursor:pointer;font-family:'DM Mono',monospace;font-size:8px;letter-spacing:.08em;text-decoration:underline">HEUTE</button>
       </div>
     </div>
     <div id="calendar-body">
@@ -1305,46 +1302,144 @@ function getWeekNumber(d) {
   return Math.ceil((((date - yearStart) / 86400000) + 1)/7);
 }
 
-var weekOffset = 0;
+var calYear = new Date().getFullYear();
+var calMonth = new Date().getMonth() + 1; // 1-12
+var initialYear = calYear;
+var initialMonth = calMonth;
 
-function loadPlan() {
-  fetch('https://web-production-297f2.up.railway.app/api/plan?offset_weeks=' + weekOffset)
-    .then(function(r) { return r.json(); })
-    .then(function(data) {
-      planData = data.plan;
-      renderCalendar();
-      updatePlanRangeLabel();
-    })
-    .catch(function() {
-      document.getElementById('calendar-body').innerHTML =
-        '<div style="padding:28px;font-family:\'DM Mono\',monospace;font-size:9px;color:var(--stone)">Plan konnte nicht geladen werden.</div>';
-    });
-}
+var MONTHS_DE = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
+var DAYS_DE = ['MO','DI','MI','DO','FR','SA','SO'];
 
-function shiftWeeks(delta) {
-  weekOffset += delta;
+var TYPE_CLASS = {
+  'Krafttraining':'gym','Easy Run':'easy','Recovery Run':'easy',
+  'Long Run':'long','Trail Run':'long','Intervalle':'quality',
+  'Tempo Run':'quality','Threshold Run':'quality','Progression Run':'run',
+  'Race Pace Run':'quality','Hill Repeats':'quality','Strides':'run',
+  'Mobilität':'gym','Rest Day':'rest',
+  'Run':'easy','TrailRun':'long','WeightTraining':'gym','Other':'rest'
+};
+
+function shiftMonth(delta) {
+  calMonth += delta;
+  if (calMonth > 12) { calMonth = 1; calYear++; }
+  if (calMonth < 1) { calMonth = 12; calYear--; }
   loadPlan();
 }
 
-function resetWeeks() {
-  weekOffset = 0;
+function resetMonth() {
+  calYear = initialYear;
+  calMonth = initialMonth;
   loadPlan();
 }
 
 function updatePlanRangeLabel() {
   var lbl = document.getElementById('plan-range-lbl');
   var todayBtn = document.getElementById('plan-today-btn');
-  if (!lbl) return;
-  if (weekOffset === 0) {
-    lbl.textContent = '4-WOCHEN-AUSBLICK';
-    if (todayBtn) todayBtn.style.display = 'none';
-  } else {
-    var monday = new Date();
-    monday.setDate(monday.getDate() - monday.getDay() + (monday.getDay()===0?-6:1) + weekOffset*7);
-    var kw = getWeekNumber(monday);
-    lbl.textContent = 'AB KW ' + kw + (weekOffset > 0 ? ' (VORAUS)' : ' (VERGANGEN)');
-    if (todayBtn) todayBtn.style.display = 'inline';
+  if (lbl) lbl.textContent = MONTHS_DE[calMonth-1].toUpperCase() + ' ' + calYear;
+  if (todayBtn) todayBtn.style.display = (calYear === initialYear && calMonth === initialMonth) ? 'none' : 'inline';
+}
+
+var weekOffset = 0;
+function shiftWeeks(d){shiftMonth(d>0?1:-1);}
+function resetWeeks(){resetMonth();}
+
+function loadPlan() {
+  fetch('https://web-production-297f2.up.railway.app/api/activities/month?year='+calYear+'&month='+calMonth)
+    .then(function(r){return r.json();})
+    .then(function(data){
+      renderMonthCalendar(data);
+      updatePlanRangeLabel();
+    })
+    .catch(function(){
+      document.getElementById('calendar-body').innerHTML =
+        '<div style="padding:28px;font-family:\'DM Mono\',monospace;font-size:9px;color:var(--stone)">Plan konnte nicht geladen werden.</div>';
+    });
+}
+
+function renderMonthCalendar(data) {
+  var today = data.today;
+  var viewStart = new Date(data.view_start + 'T12:00:00');
+  var viewEnd = new Date(data.view_end + 'T12:00:00');
+  var actual = data.actual || {};
+  var plan = data.plan || {};
+
+  // Wochenreihen berechnen
+  var weeks = [];
+  var cur = new Date(viewStart);
+  while (cur <= viewEnd) {
+    var week = [];
+    for (var d = 0; d < 7; d++) {
+      week.push(new Date(cur));
+      cur.setDate(cur.getDate() + 1);
+    }
+    weeks.push(week);
   }
+
+  var html = '';
+
+  // Header: Wochentage
+  html += '<div style="display:grid;grid-template-columns:36px repeat(7,1fr);border-bottom:1px solid var(--black)">';
+  html += '<div style="padding:6px;font-family:\'DM Mono\',monospace;font-size:8px;color:var(--stone);border-right:.5px solid rgba(46,44,42,.12)">KW</div>';
+  DAYS_DE.forEach(function(d){
+    html += '<div style="padding:6px 8px;font-family:\'DM Mono\',monospace;font-size:8px;color:var(--stone);letter-spacing:.04em">'+d+'</div>';
+  });
+  html += '</div>';
+
+  // Wochen
+  weeks.forEach(function(week) {
+    var kw = getWeekNumber(week[0]);
+    html += '<div style="display:grid;grid-template-columns:36px repeat(7,1fr);border-bottom:.5px solid rgba(46,44,42,.15);min-height:90px">';
+    html += '<div style="padding:8px 4px;font-family:\'DM Mono\',monospace;font-size:8px;color:var(--stone);border-right:.5px solid rgba(46,44,42,.12);display:flex;align-items:flex-start;justify-content:center">'+kw+'</div>';
+
+    week.forEach(function(day) {
+      var dateStr = day.toISOString().split('T')[0];
+      var isToday = dateStr === today;
+      var isCurrentMonth = (day.getMonth() + 1) === calMonth;
+      var isPast = dateStr < today;
+
+      var cellBg = isToday ? 'background:var(--black)' :
+                   !isCurrentMonth ? 'background:rgba(46,44,42,.04)' : '';
+      var dayNumColor = isToday ? 'color:var(--accent)' :
+                        !isCurrentMonth ? 'color:rgba(46,44,42,.25)' : 'color:var(--black)';
+
+      html += '<div style="padding:6px 6px 4px;border-left:.5px solid rgba(46,44,42,.12);vertical-align:top;'+cellBg+'">';
+      html += '<div style="font-family:\'DM Mono\',monospace;font-size:11px;font-weight:500;margin-bottom:4px;'+dayNumColor+'">'+day.getDate()+'</div>';
+
+      // Echte Aktivitäten
+      if (actual[dateStr]) {
+        actual[dateStr].forEach(function(a) {
+          var cls = TYPE_CLASS[a.type] || 'run';
+          var dist = a.distance_km > 0 ? a.distance_km.toFixed(1)+' km' : (a.duration_min ? a.duration_min+' min' : '');
+          html += '<div class="tc '+cls+(isPast?' done':'')+'" style="margin-bottom:3px;cursor:pointer" onclick="window.location=\'/analyse?id='+a.training_id+'\'">';
+          html += '<div class="tc-name" style="font-size:10px">'+a.name+'</div>';
+          if (dist) html += '<div class="tc-meta">'+dist+'</div>';
+          html += '</div>';
+        });
+      }
+
+      // Geplante Sessions (nur wenn keine echte Aktivität)
+      if (!actual[dateStr] && plan[dateStr]) {
+        plan[dateStr].forEach(function(p) {
+          if (p.session_type === 'Rest Day') {
+            html += '<div class="tc rest"><div class="tc-name">REST</div></div>';
+          } else {
+            var cls = TYPE_CLASS[p.session_type] || 'run';
+            var dist = p.distance_km > 0 ? p.distance_km.toFixed(0)+' km' : (p.duration_min ? p.duration_min+' min' : '');
+            html += '<div class="tc '+cls+(isPast?' done':'')+'">';
+            html += '<div class="tc-tag" style="font-family:\'DM Mono\',monospace;font-size:7px;letter-spacing:.06em;margin-bottom:2px">'+(p.session_zone||p.session_type)+'</div>';
+            html += '<div class="tc-name" style="font-size:10px">'+(p.notes||p.session_type)+'</div>';
+            if (dist) html += '<div class="tc-meta">'+dist+'</div>';
+            html += '</div>';
+          }
+        });
+      }
+
+      html += '</div>';
+    });
+    html += '</div>';
+  });
+
+  document.getElementById('calendar-body').innerHTML = html;
 }
 
 function renderCalendar() {
@@ -1894,8 +1989,7 @@ function loadDashboard() {
         document.getElementById('dash-bb-bar').style.width = health.body_battery + '%';
       }
 
-      // Kalender neu rendern mit echten Wochendaten
-      if (planData.length > 0) renderCalendar();
+      // Kalender wird bereits via loadPlan/renderMonthCalendar aktualisiert
     })
     .catch(function() {});
 }
