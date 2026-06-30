@@ -474,7 +474,7 @@ def get_activity(training_id):
         }
 
         cur.execute("""
-            SELECT split_number, distance_km, pace_seconds, heart_rate_avg, elevation_gain
+            SELECT split_number, distance_km, pace_seconds, heart_rate_avg, elevation_gain, cadence_avg
             FROM splits WHERE training_id = %s ORDER BY split_number
         """, (training_id,))
         splits = []
@@ -487,7 +487,8 @@ def get_activity(training_id):
                 "distance_km": float(s[1]) if s[1] else 0,
                 "pace": pace_min,
                 "hr": s[3],
-                "elevation": float(s[4]) if s[4] else 0
+                "elevation": float(s[4]) if s[4] else 0,
+                "cadence": s[5]
             })
 
         conn.close()
