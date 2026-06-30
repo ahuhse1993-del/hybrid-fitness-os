@@ -585,7 +585,7 @@ function buildElevationFromGPS(points) {
   }
   xLabels += '<text x="'+(padL+cW)+'" y="'+(padT+cH+16)+'" font-family="DM Mono" font-size="7" fill="#9E9B95" text-anchor="end">'+totalKm.toFixed(1)+'</text>';
 
-  var svg = '<svg width="100%" viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">';
+  var svg = '<svg width="100%" viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg" id="elev-svg" style="cursor:crosshair">';
   svg += '<defs><pattern id="'+pid+'" x="0" y="0" width="4" height="4" patternUnits="userSpaceOnUse"><circle cx="1" cy="1" r="0.8" fill="rgba(46,44,42,.18)"/></pattern></defs>';
   svg += '<rect x="'+padL+'" y="'+padT+'" width="'+cW+'" height="'+cH+'" fill="#E8E4DC"/>';
   svg += yLabels + xLabels;
@@ -596,13 +596,121 @@ function buildElevationFromGPS(points) {
   svg += '<polyline points="'+polyline+'" fill="none" stroke="rgba(46,44,42,.85)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>';
   svg += '<line x1="'+padL+'" y1="'+(padT+cH)+'" x2="'+(padL+cW)+'" y2="'+(padT+cH)+'" stroke="rgba(46,44,42,.2)" stroke-width=".5"/>';
   svg += '<line x1="'+padL+'" y1="'+padT+'" x2="'+padL+'" y2="'+(padT+cH)+'" stroke="rgba(46,44,42,.2)" stroke-width=".5"/>';
+  svg += '<g id="elev-hover-group" style="display:none">';
+  svg += '<line id="elev-hover-line" x1="0" y1="'+padT+'" x2="0" y2="'+(padT+cH)+'" stroke="var(--accent-dark)" stroke-width="1"/>';
+  svg += '<circle id="elev-hover-dot" cx="0" cy="0" r="3.5" fill="var(--accent-dark)" stroke="#fff" stroke-width="1.2"/>';
+  svg += '</g>';
   svg += '</svg>';
+  svg += '<div id="elev-tooltip" style="display:none;position:absolute;background:var(--black);color:#F0EDE6;font-family:DM Mono,monospace;font-size:9px;padding:6px 10px;pointer-events:none;white-space:nowrap;z-index:50"></div>';
+  elevEl.style.position = 'relative';
   elevEl.innerHTML = svg;
+
+  // Geometrie für Hover speichern
+  window.elevChartGeometry = {
+    points: points, cumDist: cumDist, totalKm: totalKm,
+    W: W, H: H, padL: padL, padR: padR, padT: padT, padB: padB, cW: cW, cH: cH,
+    eBot: eBot, eRange: eRange
+  };
+  attachElevHoverListeners();
 
   return {totalUp: totalUp, totalDown: totalDown, totalKm: totalKm};
 }
 
-// ─── HF CHART — volle Breite, Stil wie Höhenprofil ───
+function attachElevHoverListeners() {
+  var svgEl = document.getElementById('elev-svg');
+  var tooltipEl = document.getElementById('elev-tooltip');
+  var hoverGroup = document.getElementById('elev-hover-group');
+  var hoverLine = document.getElementById('elev-hover-line');
+  var hoverDot = document.getElementById('elev-hover-dot');
+  if (!svgEl) return;
+
+  svgEl.addEventListener('mousemove', function(e) {
+    var geo = window.elevChartGeometry;
+    if (!geo) return;
+    var rect = svgEl.getBoundingClientRect();
+    var scaleX = geo.W / rect.width;
+    var svgX = (e.clientX - rect.left) * scaleX;
+
+    if (svgX < geo.padL || svgX > geo.padL + geo.cW) {
+      hoverGroup.style.display = 'none';
+      tooltipEl.style.display = 'none';
+      hideMapHoverMarker();
+      return;
+    }
+
+    // Distanz an dieser X-Position
+    var distRatio = (svgX - geo.padL) / geo.cW;
+    var targetDist = distRatio * geo.cumDist[geo.cumDist.length - 1];
+
+    // Nächsten Punkt-Index finden (binäre Suche wäre schneller, aber bei ~2000 Punkten reicht linear)
+    var idx = 0;
+    for (var i = 0; i < geo.cumDist.length; i++) {
+      if (geo.cumDist[i] >= targetDist) { idx = i; break; }
+      idx = i;
+    }
+
+    var point = geo.points[idx];
+    var distKm = geo.cumDist[idx] / 1000;
+    var y = geo.padT + geo.cH - ((point.ele - geo.eBot) / geo.eRange) * geo.cH;
+
+    hoverLine.setAttribute('x1', svgX); hoverLine.setAttribute('x2', svgX);
+    hoverDot.setAttribute('cx', svgX); hoverDot.setAttribute('cy', y);
+    hoverGroup.style.display = 'block';
+
+    // Steigung über kleines Fenster berechnen
+    var grade = 0;
+    var winSize = 10;
+    var i0 = Math.max(0, idx - winSize), i1 = Math.min(geo.points.length - 1, idx + winSize);
+    if (i1 > i0) {
+      var dDist = geo.cumDist[i1] - geo.cumDist[i0];
+      var dEle = geo.points[i1].ele - geo.points[i0].ele;
+      if (dDist > 1) grade = (dEle / dDist) * 100;
+    }
+
+    tooltipEl.innerHTML =
+      '<div style="color:var(--accent);font-weight:500;margin-bottom:2px">' + distKm.toFixed(1) + ' km</div>' +
+      '<div>' + Math.round(point.ele) + ' m &middot; ' + (grade>0?'+':'') + grade.toFixed(1) + '%</div>';
+    tooltipEl.style.display = 'block';
+
+    var tooltipX = svgX / geo.W * elevEl_width();
+    var leftPos = Math.min(Math.max(tooltipX - 40, 4), elevEl_width() - 110);
+    tooltipEl.style.left = leftPos + 'px';
+    tooltipEl.style.top = '4px';
+
+    showMapHoverMarker(point);
+  });
+
+  svgEl.addEventListener('mouseleave', function() {
+    hoverGroup.style.display = 'none';
+    tooltipEl.style.display = 'none';
+    hideMapHoverMarker();
+  });
+}
+
+function elevEl_width() {
+  var el = document.getElementById('elev-chart');
+  return el ? el.getBoundingClientRect().width : 300;
+}
+
+var mapHoverMarker = null;
+function showMapHoverMarker(point) {
+  if (!smallMap) return;
+  if (!mapHoverMarker) {
+    mapHoverMarker = L.circleMarker([point.lat, point.lon], {
+      radius: 5, color: '#1A1918', weight: 1.5, fillColor: '#E8D84A', fillOpacity: 1
+    }).addTo(smallMap);
+  } else {
+    mapHoverMarker.setLatLng([point.lat, point.lon]);
+  }
+}
+function hideMapHoverMarker() {
+  if (mapHoverMarker && smallMap) {
+    smallMap.removeLayer(mapHoverMarker);
+    mapHoverMarker = null;
+  }
+}
+
+
 function buildHFChartFull(splits) {
   // Fallback bei fehlenden granulären Daten
   var hfEl = document.getElementById('hf-chart');
