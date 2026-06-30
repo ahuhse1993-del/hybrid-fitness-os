@@ -86,11 +86,11 @@ body{background:var(--bg);font-family:"DM Sans",sans-serif;color:var(--black);fo
 .secln{flex:1;height:.5px;background:rgba(46,44,42,.16)}
 .card{background:#E8E4DC;padding:13px 12px 10px}
 .stog{width:100%;background:#E8E4DC;border:none;border-bottom:.5px solid rgba(46,44,42,.12);padding:12px 16px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;margin-bottom:2px;font-family:"DM Mono",monospace;font-size:10px;color:#6B6860;letter-spacing:.06em;text-transform:uppercase}
-.scnt{display:none;background:#E8E4DC;padding:0 16px 12px;margin-bottom:2px}
+.scnt{display:none;background:#E8E4DC;padding:0 16px 12px;margin-bottom:2px;overflow-x:auto}
 .scnt.open{display:block}
-.stbl{width:100%;border-collapse:collapse;font-family:"DM Mono",monospace;font-size:11px;table-layout:fixed}
-.stbl th{font-family:"DM Mono",monospace;font-size:8px;color:#9E9B95;padding:8px 6px 6px;text-align:left;font-weight:400;border-bottom:.5px solid rgba(46,44,42,.15)}
-.stbl td{padding:5px 6px;border-bottom:.5px solid rgba(158,155,149,.1)}
+.stbl{width:100%;border-collapse:collapse;font-family:"DM Mono",monospace;font-size:11px;min-width:520px}
+.stbl th{font-family:"DM Mono",monospace;font-size:8px;color:#9E9B95;padding:8px 6px 6px;text-align:left;font-weight:400;border-bottom:.5px solid rgba(46,44,42,.15);white-space:nowrap}
+.stbl td{padding:5px 6px;border-bottom:.5px solid rgba(158,155,149,.1);white-space:nowrap}
 .stbl tr:last-child td{border-bottom:none}
 .lblock{background:#E8E4DC;padding:16px 16px 14px;margin-bottom:2px}
 .llbl{font-family:"DM Mono",monospace;font-size:9px;color:#6B6860;letter-spacing:.1em;text-transform:uppercase;margin-bottom:10px}
@@ -114,6 +114,15 @@ body{background:var(--bg);font-family:"DM Sans",sans-serif;color:var(--black);fo
 .map-fullscreen-inner{width:100%;height:100%}
 .map-close-btn{position:absolute;top:16px;right:16px;z-index:1100;background:var(--black);border:.5px solid rgba(240,237,230,.2);color:#F0EDE6;font-family:"DM Mono",monospace;font-size:9px;padding:8px 16px;cursor:pointer;letter-spacing:.1em}
 .map-close-btn:hover{background:var(--accent);color:var(--black);border-color:var(--accent)}
+/* TRAIL METRICS */
+.trail-block{background:#E8E4DC;padding:16px;margin-bottom:2px}
+.trail-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:0;margin-top:12px}
+.trail-cell{padding:0 12px}
+.trail-cell+.trail-cell{border-left:.5px solid rgba(46,44,42,.15)}
+.trail-cell:first-child{padding-left:0}
+.tc-lbl{font-family:"DM Mono",monospace;font-size:8px;color:#9E9B95;letter-spacing:.05em;text-transform:uppercase;margin-bottom:4px}
+.tc-val{font-family:"DM Mono",monospace;font-size:20px;font-weight:500;line-height:1}
+.tc-unit{font-family:"DM Mono",monospace;font-size:9px;color:#9E9B95;margin-left:2px;font-weight:400}
 </style>
 </head>
 <body>
@@ -288,7 +297,6 @@ body{background:var(--bg);font-family:"DM Sans",sans-serif;color:var(--black);fo
 
       <div class="sec"><span class="secl">Route &amp; H&#246;henprofil</span><div class="secln"></div></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:2px;margin-bottom:2px">
-
         <div style="height:340px;position:relative">
           <div id="map" style="width:100%;height:100%"></div>
           <div id="map-overlay" style="position:absolute;inset:0;background:var(--black);display:flex;align-items:center;justify-content:center;z-index:500;pointer-events:none">
@@ -301,18 +309,10 @@ body{background:var(--bg);font-family:"DM Sans",sans-serif;color:var(--black);fo
             <i class="ti ti-arrows-maximize" style="font-size:11px"></i> &#214;FFNEN
           </button>
         </div>
-
-        <!-- HÖHENPROFIL — GPS-basiert -->
         <div style="height:340px;background:#E8E4DC;display:flex;flex-direction:column;padding:12px 12px 0 12px">
           <div style="display:flex;gap:20px;margin-bottom:10px;flex-shrink:0">
-            <div>
-              <div style="font-family:DM Mono,monospace;font-size:8px;color:#9E9B95;text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px">Aufstieg</div>
-              <div style="font-family:DM Mono,monospace;font-size:18px;font-weight:500" id="elev-up">&#8212;</div>
-            </div>
-            <div>
-              <div style="font-family:DM Mono,monospace;font-size:8px;color:#9E9B95;text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px">Abstieg</div>
-              <div style="font-family:DM Mono,monospace;font-size:18px;font-weight:500" id="elev-down">&#8212;</div>
-            </div>
+            <div><div style="font-family:DM Mono,monospace;font-size:8px;color:#9E9B95;text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px">Aufstieg</div><div style="font-family:DM Mono,monospace;font-size:18px;font-weight:500" id="elev-up">&#8212;</div></div>
+            <div><div style="font-family:DM Mono,monospace;font-size:8px;color:#9E9B95;text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px">Abstieg</div><div style="font-family:DM Mono,monospace;font-size:18px;font-weight:500" id="elev-down">&#8212;</div></div>
           </div>
           <div id="elev-chart" style="flex:1;min-height:0">
             <div style="font-family:DM Mono,monospace;font-size:9px;color:#9E9B95;padding-top:8px">Wird geladen...</div>
@@ -320,20 +320,52 @@ body{background:var(--bg);font-family:"DM Sans",sans-serif;color:var(--black);fo
         </div>
       </div>
 
-      <div class="sec"><span class="secl">Pace</span><div class="secln"></div></div>
-      <div style="margin-bottom:2px">
+      <!-- TRAIL METRICS -->
+      <div class="sec" id="trail-sec" style="display:none"><span class="secl">Trail-Kennzahlen</span><div class="secln"></div></div>
+      <div class="trail-block" id="trail-block" style="display:none">
+        <div class="llbl" style="margin-bottom:0">Aus GPS-Daten berechnet</div>
+        <div class="trail-grid">
+          <div class="trail-cell"><div class="tc-lbl">Aufstieg</div><div class="tc-val" id="trail-up">&#8212;<span class="tc-unit">m</span></div></div>
+          <div class="trail-cell"><div class="tc-lbl">Abstieg</div><div class="tc-val" id="trail-down">&#8212;<span class="tc-unit">m</span></div></div>
+          <div class="trail-cell"><div class="tc-lbl">&#216; Steigung</div><div class="tc-val" id="trail-avg-grade">&#8212;<span class="tc-unit">%</span></div></div>
+          <div class="trail-cell"><div class="tc-lbl">Max. Steigung</div><div class="tc-val" id="trail-max-grade">&#8212;<span class="tc-unit">%</span></div></div>
+          <div class="trail-cell"><div class="tc-lbl">&#216; Vertikalgeschw.</div><div class="tc-val" id="trail-vert-speed">&#8212;<span class="tc-unit">m/h</span></div></div>
+        </div>
+      </div>
+
+      <!-- PACE + KADENZ -->
+      <div class="sec"><span class="secl">Pace &amp; Kadenz</span><div class="secln"></div></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:2px;margin-bottom:2px">
         <div class="card" style="padding-bottom:20px">
           <div class="lbl" style="margin-bottom:4px">Pace pro km</div>
           <div style="font-family:DM Mono,monospace;font-size:18px;font-weight:500;line-height:1;margin-bottom:2px" id="pace-avg">&#8212; <span style="font-size:9px;color:#9E9B95;font-weight:400">min/km &#216;</span></div>
           <div style="font-family:DM Mono,monospace;font-size:9px;color:var(--accent);margin-bottom:4px" id="pace-best">&#8212;</div>
           <div id="pace-chart" style="margin-top:12px"></div>
         </div>
+        <div class="card" style="padding-bottom:20px">
+          <div class="lbl" style="margin-bottom:4px">Kadenz pro km</div>
+          <div style="font-family:DM Mono,monospace;font-size:18px;font-weight:500;line-height:1;margin-bottom:2px" id="cad-avg">&#8212; <span style="font-size:9px;color:#9E9B95;font-weight:400">spm &#216;</span></div>
+          <div style="font-family:DM Mono,monospace;font-size:9px;color:var(--accent);margin-bottom:4px" id="cad-range">&#8212;</div>
+          <div id="cad-chart" style="margin-top:12px"></div>
+        </div>
+      </div>
+
+      <!-- HF CHART VOLLE BREITE -->
+      <div class="sec"><span class="secl">Herzfrequenz</span><div class="secln"></div></div>
+      <div style="margin-bottom:2px">
+        <div style="height:200px;background:#E8E4DC;padding:12px">
+          <div style="display:flex;gap:20px;margin-bottom:6px">
+            <div><div style="font-family:DM Mono,monospace;font-size:8px;color:#9E9B95;text-transform:uppercase;letter-spacing:.05em">&#216; HF</div><div style="font-family:DM Mono,monospace;font-size:16px;font-weight:500" id="hf-avg-chart">&#8212;</div></div>
+            <div><div style="font-family:DM Mono,monospace;font-size:8px;color:#9E9B95;text-transform:uppercase;letter-spacing:.05em">Max HF</div><div style="font-family:DM Mono,monospace;font-size:16px;font-weight:500" id="hf-max-chart">&#8212;</div></div>
+          </div>
+          <div id="hf-chart"></div>
+        </div>
       </div>
 
       <button class="stog" onclick="tSpl()"><span>Splits</span><span id="sarr">&#9660;</span></button>
       <div class="scnt" id="scnt">
         <table class="stbl">
-          <thead><tr><th>KM</th><th>PACE</th><th>HF</th><th>H&#214;HE</th><th>KAD</th><th>ZONE</th></tr></thead>
+          <thead><tr><th>SPLIT</th><th>PACE</th><th>HF &#216;</th><th>HM</th><th>KADENZ</th><th>ANSTIEG</th></tr></thead>
           <tbody id="stbd"></tbody>
         </table>
       </div>
@@ -365,6 +397,7 @@ var activityData = null;
 var smallMap = null;
 var fullMap = null;
 var gpsPoints = [];
+var lastSplits = [];
 
 function closePop(){document.getElementById("popup").classList.remove("open")}
 function openFb(){document.getElementById("popup").classList.remove("open");document.getElementById("sfb").classList.add("on");document.getElementById("san").classList.remove("on");window.scrollTo(0,0)}
@@ -395,47 +428,50 @@ function buildHFZones(splits){
   });
 }
 
-function buildPaceChart(splits){
-  var chartEl=document.getElementById('pace-chart');if(!chartEl)return;
-  var fs=splits.filter(function(s){return s.distance_km>=0.9&&s.pace;});if(fs.length===0)return;
-  var paces=fs.map(function(s){var p=s.pace.split(':');return parseInt(p[0])*60+parseInt(p[1]);});
-  var minP=Math.min.apply(null,paces),maxP=Math.max.apply(null,paces);
-  var avgP=Math.round(paces.reduce(function(a,b){return a+b},0)/paces.length);
-  var yTop=maxP+15,yBot=minP-15;
-  function fP(s){return Math.floor(s/60)+':'+String(s%60).padStart(2,'0')}
-  var w=400,h=120,padL=32,padB=16,cH=h-padB,bW=Math.max(4,Math.floor((w-padL)/fs.length)-2);
-  var bars='';
-  fs.forEach(function(s,i){
-    var p=s.pace.split(':'),pSec=parseInt(p[0])*60+parseInt(p[1]);
-    var bH=Math.max(4,Math.round(((pSec-yBot)/(yTop-yBot))*cH));
-    var x=padL+i*(bW+2),y=cH-bH;
-    var fill=pSec>avgP+15?'var(--accent-dark)':'rgba(46,44,42,.25)';
-    bars+='<rect x="'+x+'" y="'+y+'" width="'+bW+'" height="'+bH+'" fill="'+fill+'"/>';
-    bars+='<text x="'+(x+bW/2)+'" y="'+(h-2)+'" font-family="DM Mono" font-size="7" fill="#9E9B95" text-anchor="middle">'+s.split+'</text>';
+// ─── VERTIKALE BALKEN — generisch für Pace/Kadenz, Stil wie HF-Zonen ───
+function buildVerticalBarChart(elId, splits, valueFn, formatFn, opts) {
+  var chartEl = document.getElementById(elId);
+  if (!chartEl) return;
+  opts = opts || {};
+  var inverse = opts.inverse || false; // bei Pace: niedrigerer Wert = besser/höher im Chart
+
+  var fs = splits.filter(function(s){ return valueFn(s) !== null && valueFn(s) !== undefined; });
+  if (fs.length === 0) { chartEl.innerHTML = '<div style="font-family:DM Mono,monospace;font-size:9px;color:#9E9B95">Keine Daten</div>'; return; }
+
+  var values = fs.map(valueFn);
+  var minV = Math.min.apply(null, values);
+  var maxV = Math.max.apply(null, values);
+  var range = (maxV - minV) || 1;
+
+  var w = 280, h = 130, padL = 4, padB = 16, cH = h - padB;
+  var bW = Math.max(3, Math.floor((w - padL) / fs.length) - 2);
+
+  var bars = '';
+  fs.forEach(function(s, i) {
+    var v = valueFn(s);
+    var normalized = (v - minV) / range; // 0..1
+    var barH = Math.max(3, Math.round(normalized * cH * 0.85) + cH * 0.15);
+    var x = padL + i * (bW + 2);
+    var y = cH - barH;
+    bars += '<rect x="'+x+'" y="'+y+'" width="'+bW+'" height="'+barH+'" fill="rgba(46,44,42,.55)"/>';
+    if (fs.length <= 25 || i % 2 === 0) {
+      bars += '<text x="'+(x+bW/2)+'" y="'+(h-3)+'" font-family="DM Mono" font-size="6.5" fill="#9E9B95" text-anchor="middle">'+s.split+'</text>';
+    }
   });
-  var avgY=cH-Math.round(((avgP-yBot)/(yTop-yBot))*cH);
-  var avgLine='<line x1="'+padL+'" y1="'+avgY+'" x2="'+w+'" y2="'+avgY+'" stroke="var(--accent)" stroke-width="1" stroke-dasharray="3 2" opacity=".6"/>';
-  avgLine+='<text x="'+w+'" y="'+(avgY-3)+'" font-family="DM Mono" font-size="6" fill="rgba(232,216,74,.7)" text-anchor="end">Ø '+fP(avgP)+'</text>';
-  var grid='<line x1="'+padL+'" y1="0" x2="'+w+'" y2="0" stroke="rgba(158,155,149,.15)" stroke-width=".5"/>';
-  grid+='<line x1="'+padL+'" y1="'+Math.round(cH/2)+'" x2="'+w+'" y2="'+Math.round(cH/2)+'" stroke="rgba(158,155,149,.1)" stroke-width=".5"/>';
-  var yAxis='<text x="'+(padL-3)+'" y="8" font-family="DM Mono" font-size="6" fill="#9E9B95" text-anchor="end">'+fP(yTop)+'</text>';
-  yAxis+='<text x="'+(padL-3)+'" y="'+(cH/2+3)+'" font-family="DM Mono" font-size="6" fill="#9E9B95" text-anchor="end">'+fP(Math.round((yTop+yBot)/2))+'</text>';
-  chartEl.innerHTML='<svg width="100%" viewBox="0 0 '+w+' '+h+'">'+grid+bars+avgLine+yAxis+'</svg>';
+
+  chartEl.innerHTML = '<svg width="100%" viewBox="0 0 '+w+' '+h+'">'+bars+'</svg>';
 }
 
-// ─── HAVERSINE DISTANZ ───
 function haversine(lat1,lon1,lat2,lon2){
   var R=6371000,dLat=(lat2-lat1)*Math.PI/180,dLon=(lon2-lon1)*Math.PI/180;
   var a=Math.sin(dLat/2)*Math.sin(dLat/2)+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)*Math.sin(dLon/2);
   return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
 }
 
-// ─── HÖHENPROFIL aus GPS ───
 function buildElevationFromGPS(points) {
   var elevEl = document.getElementById('elev-chart');
   if (!elevEl || !points || points.length < 2) return;
 
-  // Distanz pro Punkt berechnen
   var cumDist = [0];
   for (var i = 1; i < points.length; i++) {
     var d = haversine(points[i-1].lat, points[i-1].lon, points[i].lat, points[i].lon);
@@ -443,7 +479,6 @@ function buildElevationFromGPS(points) {
   }
   var totalKm = cumDist[cumDist.length-1] / 1000;
 
-  // Aufstieg/Abstieg berechnen
   var totalUp = 0, totalDown = 0;
   for (var i = 1; i < points.length; i++) {
     var diff = points[i].ele - points[i-1].ele;
@@ -453,53 +488,35 @@ function buildElevationFromGPS(points) {
   setEl('elev-up', '+' + Math.round(totalUp) + ' m');
   setEl('elev-down', '−' + Math.round(totalDown) + ' m');
 
-  // Chart dimensionen
-  var W = 600, H = 200;
-  var padL = 42, padR = 12, padT = 12, padB = 28;
+  var W = 600, H = 200, padL = 42, padR = 12, padT = 12, padB = 28;
   var cW = W - padL - padR, cH = H - padT - padB;
 
-  // Elevation range
   var eles = points.map(function(p){return p.ele;});
-  var minE = Math.min.apply(null, eles);
-  var maxE = Math.max.apply(null, eles);
-  var rangeE = maxE - minE || 1;
+  var minE = Math.min.apply(null, eles), maxE = Math.max.apply(null, eles), rangeE = maxE - minE || 1;
+  var eBot = minE - rangeE * 0.05, eTop = maxE + rangeE * 0.08, eRange = eTop - eBot;
 
-  // Padding oben/unten
-  var eBot = minE - rangeE * 0.05;
-  var eTop = maxE + rangeE * 0.08;
-  var eRange = eTop - eBot;
-
-  // Dezimieren: max 500 Punkte für Performance
   var step = Math.max(1, Math.floor(points.length / 500));
   var pts = [];
   for (var i = 0; i < points.length; i += step) {
     var x = padL + (cumDist[i] / cumDist[cumDist.length-1]) * cW;
     var y = padT + cH - ((points[i].ele - eBot) / eRange) * cH;
-    pts.push({x: Math.round(x*10)/10, y: Math.round(y*10)/10, ele: points[i].ele, dist: cumDist[i]/1000});
+    pts.push({x: Math.round(x*10)/10, y: Math.round(y*10)/10});
   }
-  // Letzten Punkt sicherstellen
   var last = points.length - 1;
-  pts.push({x: padL+cW, y: padT+cH-((points[last].ele-eBot)/eRange)*cH, ele: points[last].ele, dist: totalKm});
+  pts.push({x: padL+cW, y: padT+cH-((points[last].ele-eBot)/eRange)*cH});
 
   var polyline = pts.map(function(p){return p.x+','+p.y}).join(' ');
   var polygon = (padL+',')+(padT+cH)+' '+polyline+' '+(padL+cW)+','+(padT+cH);
-
-  // SVG Pattern ID eindeutig
   var pid = 'ep_'+Date.now();
 
-  // Y-Achse Labels
   var yLabels = '';
-  var ySteps = 4;
-  for (var i = 0; i <= ySteps; i++) {
-    var e = eBot + (eRange * i / ySteps);
-    var y = padT + cH - (i / ySteps) * cH;
-    if (i % 2 === 0 || ySteps <= 3) {
-      yLabels += '<text x="'+(padL-4)+'" y="'+(y+3)+'" font-family="DM Mono" font-size="7" fill="#9E9B95" text-anchor="end">'+Math.round(e)+'</text>';
-      yLabels += '<line x1="'+padL+'" y1="'+y+'" x2="'+(padL+cW)+'" y2="'+y+'" stroke="rgba(46,44,42,.08)" stroke-width=".5"/>';
-    }
+  for (var i = 0; i <= 4; i++) {
+    var e = eBot + (eRange * i / 4);
+    var y = padT + cH - (i / 4) * cH;
+    yLabels += '<text x="'+(padL-4)+'" y="'+(y+3)+'" font-family="DM Mono" font-size="7" fill="#9E9B95" text-anchor="end">'+Math.round(e)+'</text>';
+    yLabels += '<line x1="'+padL+'" y1="'+y+'" x2="'+(padL+cW)+'" y2="'+y+'" stroke="rgba(46,44,42,.08)" stroke-width=".5"/>';
   }
 
-  // X-Achse: km Labels alle 2 km
   var xLabels = '';
   var kmStep = totalKm > 15 ? 4 : totalKm > 8 ? 2 : 1;
   for (var km = 0; km <= Math.floor(totalKm); km += kmStep) {
@@ -507,66 +524,108 @@ function buildElevationFromGPS(points) {
     xLabels += '<text x="'+x+'" y="'+(padT+cH+16)+'" font-family="DM Mono" font-size="7" fill="#9E9B95" text-anchor="middle">'+km+'</text>';
     xLabels += '<line x1="'+x+'" y1="'+(padT+cH)+'" x2="'+x+'" y2="'+(padT+cH+4)+'" stroke="rgba(46,44,42,.2)" stroke-width=".5"/>';
   }
-  // Letzter km-Label
   xLabels += '<text x="'+(padL+cW)+'" y="'+(padT+cH+16)+'" font-family="DM Mono" font-size="7" fill="#9E9B95" text-anchor="end">'+totalKm.toFixed(1)+'</text>';
 
-  // SVG zusammenbauen
   var svg = '<svg width="100%" viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">';
-
-  // Pattern Definition — gepunktetes Fill oberhalb der Linie (gleich wie HF-Zonen)
-  svg += '<defs>';
-  svg += '<pattern id="'+pid+'" x="0" y="0" width="4" height="4" patternUnits="userSpaceOnUse">';
-  svg += '<circle cx="1" cy="1" r="0.8" fill="rgba(46,44,42,.18)"/>';
-  svg += '</pattern>';
-
-  // Clip path: nur oberhalb der Profil-Linie
-  svg += '<clipPath id="clip_top_'+pid+'">';
-  svg += '<polygon points="'+padL+','+padT+' '+(padL+cW)+','+padT+' '+(padL+cW)+','+(padT+cH)+' '+padL+','+(padT+cH)+'"/>';
-  svg += '</clipPath>';
-  svg += '</defs>';
-
-  // Hintergrund
+  svg += '<defs><pattern id="'+pid+'" x="0" y="0" width="4" height="4" patternUnits="userSpaceOnUse"><circle cx="1" cy="1" r="0.8" fill="rgba(46,44,42,.18)"/></pattern></defs>';
   svg += '<rect x="'+padL+'" y="'+padT+'" width="'+cW+'" height="'+cH+'" fill="#E8E4DC"/>';
-
-  // Grid + Labels
   svg += yLabels + xLabels;
-
-  // Gefüllte Fläche unterhalb — solid, hell
   svg += '<polygon points="'+polygon+'" fill="rgba(46,44,42,.07)"/>';
-
-  // Profil-Linie
   svg += '<polyline points="'+polyline+'" fill="none" stroke="rgba(46,44,42,.9)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>';
-
-  // Gepunktetes Pattern OBERHALB der Linie
-  // Trick: Rechteck von oben bis Linie mit Pattern, geclippt auf Chart-Bereich
-  // Wir zeichnen Polygon vom oberen Rand bis zur Linie
-  var topPoly = padL+','+padT+' '+(padL+cW)+','+padT+' '+pts.map(function(p){return p.x+','+p.y}).reverse().join(' ')+' '+pts.map(function(p){return p.x+','+p.y}).join(' ');
-  // Einfacher: Rechteck mit Pattern, dann Profil-Polygon als Clip "ausschneiden" von unten
-  // Beste Methode: Pattern-Polygon von Linie bis oberer Rand
   var upperPoly = pts.map(function(p){return p.x+','+p.y}).join(' ')+' '+(padL+cW)+','+padT+' '+padL+','+padT;
-  svg += '<polygon points="'+upperPoly+'" fill="url(#'+pid+')" opacity="1"/>';
-
-  // Linie nochmal drüber damit sie scharf bleibt
+  svg += '<polygon points="'+upperPoly+'" fill="url(#'+pid+')"/>';
   svg += '<polyline points="'+polyline+'" fill="none" stroke="rgba(46,44,42,.85)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>';
-
-  // Rahmen unten
   svg += '<line x1="'+padL+'" y1="'+(padT+cH)+'" x2="'+(padL+cW)+'" y2="'+(padT+cH)+'" stroke="rgba(46,44,42,.2)" stroke-width=".5"/>';
   svg += '<line x1="'+padL+'" y1="'+padT+'" x2="'+padL+'" y2="'+(padT+cH)+'" stroke="rgba(46,44,42,.2)" stroke-width=".5"/>';
-
   svg += '</svg>';
-
   elevEl.innerHTML = svg;
+
+  return {totalUp: totalUp, totalDown: totalDown, totalKm: totalKm};
 }
 
-function buildElevationChart(splits) {
-  // Fallback aus Splits wenn keine GPS-Punkte vorhanden
-  var elevEl = document.getElementById('elev-chart');
-  if (!elevEl) return;
-  var elevations = splits.map(function(s){return s.elevation||0;});
-  var totalUp=0,totalDown=0;
-  elevations.forEach(function(e){if(e>0)totalUp+=e;else totalDown+=Math.abs(e);});
-  setEl('elev-up','+'+Math.round(totalUp)+' m');
-  setEl('elev-down','−'+Math.round(totalDown)+' m');
+// ─── HF CHART — volle Breite, Stil wie Höhenprofil ───
+function buildHFChartFull(splits) {
+  var hfEl = document.getElementById('hf-chart');
+  if (!hfEl) return;
+  var fs = splits.filter(function(s){ return s.hr; });
+  if (fs.length === 0) { hfEl.innerHTML = '<div style="font-family:DM Mono,monospace;font-size:9px;color:#9E9B95">Keine HF-Daten</div>'; return; }
+
+  var hrs = fs.map(function(s){return s.hr;});
+  var minHR = Math.min.apply(null, hrs), maxHR = Math.max.apply(null, hrs);
+  setEl('hf-avg-chart', Math.round(hrs.reduce(function(a,b){return a+b},0)/hrs.length) + ' bpm');
+  setEl('hf-max-chart', maxHR + ' bpm');
+
+  var W = 1200, H = 130, padL = 36, padR = 12, padT = 8, padB = 20;
+  var cW = W - padL - padR, cH = H - padT - padB;
+  var hBot = minHR - 5, hTop = maxHR + 5, hRange = hTop - hBot || 1;
+
+  var pts = fs.map(function(s, i) {
+    var x = padL + (i / (fs.length - 1)) * cW;
+    var y = padT + cH - ((s.hr - hBot) / hRange) * cH;
+    return {x: Math.round(x*10)/10, y: Math.round(y*10)/10};
+  });
+
+  var polyline = pts.map(function(p){return p.x+','+p.y}).join(' ');
+  var polygon = (padL+',')+(padT+cH)+' '+polyline+' '+(padL+cW)+','+(padT+cH);
+
+  var yLabels = '';
+  for (var i = 0; i <= 3; i++) {
+    var v = hBot + (hRange * i / 3);
+    var y = padT + cH - (i / 3) * cH;
+    yLabels += '<text x="'+(padL-4)+'" y="'+(y+3)+'" font-family="DM Mono" font-size="7" fill="#9E9B95" text-anchor="end">'+Math.round(v)+'</text>';
+    yLabels += '<line x1="'+padL+'" y1="'+y+'" x2="'+(padL+cW)+'" y2="'+y+'" stroke="rgba(46,44,42,.08)" stroke-width=".5"/>';
+  }
+
+  var xLabels = '';
+  var step = Math.max(1, Math.floor(fs.length / 10));
+  fs.forEach(function(s, i) {
+    if (i % step === 0 || i === fs.length-1) {
+      var x = padL + (i / (fs.length-1)) * cW;
+      xLabels += '<text x="'+x+'" y="'+(padT+cH+14)+'" font-family="DM Mono" font-size="7" fill="#9E9B95" text-anchor="middle">'+s.split+'</text>';
+    }
+  });
+
+  var pid = 'hf_'+Date.now();
+  var svg = '<svg width="100%" viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">';
+  svg += '<defs><pattern id="'+pid+'" x="0" y="0" width="4" height="4" patternUnits="userSpaceOnUse"><circle cx="1" cy="1" r="0.8" fill="rgba(232,216,74,.4)"/></pattern></defs>';
+  svg += yLabels + xLabels;
+  svg += '<polygon points="'+polygon+'" fill="rgba(232,216,74,.08)"/>';
+  var upperPoly = pts.map(function(p){return p.x+','+p.y}).join(' ')+' '+(padL+cW)+','+padT+' '+padL+','+padT;
+  svg += '<polygon points="'+upperPoly+'" fill="url(#'+pid+')"/>';
+  svg += '<polyline points="'+polyline+'" fill="none" stroke="var(--accent-dark)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>';
+  svg += '<line x1="'+padL+'" y1="'+(padT+cH)+'" x2="'+(padL+cW)+'" y2="'+(padT+cH)+'" stroke="rgba(46,44,42,.2)" stroke-width=".5"/>';
+  svg += '</svg>';
+  hfEl.innerHTML = svg;
+}
+
+function buildTrailMetrics(gpsData, durationMin) {
+  if (!gpsData || gpsData.totalUp === undefined) return;
+  setEl('trail-up', '+' + Math.round(gpsData.totalUp));
+  setEl('trail-down', '−' + Math.round(gpsData.totalDown));
+
+  // Ø Steigung: Aufstieg / horizontale Distanz (nur bergauf-Anteil näherungsweise über Gesamtdistanz)
+  var avgGrade = gpsData.totalKm > 0 ? (gpsData.totalUp / (gpsData.totalKm * 1000)) * 100 : 0;
+  setEl('trail-avg-grade', avgGrade.toFixed(1));
+
+  // Max Steigung wird separat aus GPS-Segmenten berechnet (siehe calcMaxGrade)
+  // Ø Vertikalgeschwindigkeit
+  var vertSpeed = durationMin > 0 ? Math.round(gpsData.totalUp / (durationMin / 60)) : 0;
+  setEl('trail-vert-speed', vertSpeed);
+}
+
+function calcMaxGrade(points) {
+  var maxGrade = 0;
+  var windowSize = 10; // alle 10 Punkte für stabilere Werte
+  for (var i = windowSize; i < points.length; i += windowSize) {
+    var d = haversine(points[i-windowSize].lat, points[i-windowSize].lon, points[i].lat, points[i].lon);
+    if (d < 5) continue; // zu kurze Distanz ignorieren
+    var elevDiff = points[i].ele - points[i-windowSize].ele;
+    var grade = (elevDiff / d) * 100;
+    if (Math.abs(grade) > Math.abs(maxGrade) && Math.abs(grade) < 60) { // Ausreisser >60% ignorieren
+      maxGrade = grade;
+    }
+  }
+  setEl('trail-max-grade', maxGrade.toFixed(0));
 }
 
 function drawRoute(map,points){
@@ -596,8 +655,18 @@ function initSmallMap(){
       drawRoute(smallMap,gpsPoints);
       if(overlay)overlay.style.display='none';
       setTimeout(function(){smallMap.invalidateSize();},100);
-      // Höhenprofil aus GPS bauen
-      buildElevationFromGPS(gpsPoints);
+
+      var gpsResult = buildElevationFromGPS(gpsPoints);
+      calcMaxGrade(gpsPoints);
+
+      if (activityData) {
+        var isTrail = activityData.type === 'TrailRun';
+        if (isTrail) {
+          document.getElementById('trail-sec').style.display = 'flex';
+          document.getElementById('trail-block').style.display = 'block';
+          buildTrailMetrics(gpsResult, activityData.duration_min);
+        }
+      }
     })
     .catch(function(){
       var overlay=document.getElementById('map-overlay');
@@ -629,6 +698,8 @@ function loadActivity(){
     .then(function(data){
       if(data.status!=='ok')return;
       var a=data.activity;activityData=a;
+      lastSplits = data.splits || [];
+
       var elevMatch=a.name.match(/\+(\d+)m/);
       var elevStr=elevMatch?'+'+elevMatch[1]+' m':'—';
       var pace=calcPace(a.distance_km,a.duration_min);
@@ -649,6 +720,7 @@ function loadActivity(){
       setEl('hero-km',a.distance_km.toFixed(1));setEl('hero-name',name);setEl('hero-time',time);
       setEl('hero-pace',pace);setEl('hero-hr',(a.avg_hr||'—')+' bpm');setEl('hero-elev',elevStr);
       setEl('pace-avg',pace.replace('/km',''));
+
       var tb=document.getElementById("stbd");
       if(tb){
         if(data.splits&&data.splits.length>0){
@@ -656,13 +728,21 @@ function loadActivity(){
           data.splits.forEach(function(s){
             var tr=document.createElement("tr");
             var elev=s.elevation>0?'+'+s.elevation.toFixed(0):(s.elevation<0?s.elevation.toFixed(0):'—');
-            tr.innerHTML='<td>'+s.split+'</td><td>'+(s.pace||'—')+'</td><td>'+(s.hr||'—')+'</td><td>'+elev+'m</td><td>—</td><td>—</td>';
+            var hr = s.hr || '—';
+            var cad = s.cadence ? s.cadence : '—';
+            var zone = '—';
+            if (s.hr) {
+              var h = s.hr;
+              zone = h>=172?'Z5':h>=162?'Z4':h>=153?'Z3':h>=145?'Z2':'Z1';
+            }
+            tr.innerHTML='<td>Km '+s.split+'</td><td>'+(s.pace||'—')+'</td><td>'+hr+'</td><td>'+elev+'m</td><td>'+cad+'</td><td>'+zone+'</td>';
             tb.appendChild(tr);
           });
         } else {
           tb.innerHTML='<tr><td colspan="6" style="color:#6B6860;font-family:DM Mono,monospace;font-size:9px;padding:12px">Keine Split-Daten verfügbar</td></tr>';
         }
       }
+
       if(data.splits&&data.splits.length>1){
         var fs2=data.splits.filter(function(s){return s.distance_km>=0.9&&s.pace;});
         if(fs2.length>0){
@@ -670,10 +750,33 @@ function loadActivity(){
           setEl('pace-best','Schnellste: Km '+sorted[0].split+' · '+sorted[0].pace+'/km   Langsamste: Km '+sorted[sorted.length-1].split+' · '+sorted[sorted.length-1].pace+'/km');
         }
       }
-      if(data.splits&&data.splits.length>1)buildPaceChart(data.splits);
+
       if(data.splits&&data.splits.length>0)buildHFZones(data.splits);
-      // Elevation aus Splits als Fallback (wird von GPS überschrieben)
-      if(data.splits&&data.splits.length>0)buildElevationChart(data.splits);
+
+      // Pace Chart — vertikal, Stil HF-Zonen
+      if (data.splits && data.splits.length > 0) {
+        buildVerticalBarChart('pace-chart', data.splits, function(s){
+          if (!s.pace) return null;
+          var p = s.pace.split(':');
+          return parseInt(p[0])*60+parseInt(p[1]);
+        });
+      }
+
+      // Kadenz Chart
+      var hasCadence = data.splits && data.splits.some(function(s){ return s.cadence; });
+      if (hasCadence) {
+        buildVerticalBarChart('cad-chart', data.splits, function(s){ return s.cadence || null; });
+        var cads = data.splits.filter(function(s){return s.cadence;}).map(function(s){return s.cadence;});
+        var avgCad = Math.round(cads.reduce(function(a,b){return a+b},0)/cads.length);
+        setEl('cad-avg', avgCad);
+        setEl('cad-range', 'Min ' + Math.min.apply(null,cads) + ' spm · Max ' + Math.max.apply(null,cads) + ' spm');
+      } else {
+        document.getElementById('cad-chart').innerHTML = '<div style="font-family:DM Mono,monospace;font-size:9px;color:#9E9B95">Keine Kadenzdaten</div>';
+      }
+
+      // HF Chart volle Breite
+      if (data.splits && data.splits.length > 0) buildHFChartFull(data.splits);
+
       document.getElementById("popup").classList.add("open");
     })
     .catch(function(){document.getElementById("popup").classList.remove("open");document.getElementById("san").classList.add("on");});
