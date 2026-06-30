@@ -178,6 +178,14 @@ def sync_daily():
     finally:
         conn.close()
 
+    # Duplikate bereinigen — läuft immer nach dem Sync
+    if imported > 0:
+        try:
+            from data.fix_duplicates_v2 import fix_duplicates
+            fix_duplicates()
+        except Exception as e:
+            print(f"  ⚠️ Duplikat-Bereinigung Fehler: {e}")
+
     print(f"\n✅ Daily Sync fertig — Importiert: {imported}, Übersprungen: {skipped}")
 
 if __name__ == "__main__":
