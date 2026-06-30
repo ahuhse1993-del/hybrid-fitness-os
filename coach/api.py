@@ -632,6 +632,49 @@ def trigger_sync():
 def health():
     return jsonify({"status": "ok", "date": str(get_today())})
 
+@app.route('/api/cron/health-sync', methods=['GET', 'POST'])
+def cron_health_sync():
+    """
+    Reliable external cron entry point (e.g. cron-job.org).
+    Checks if today's health data is already complete.
+    If not, triggers the GitHub Actions health_sync.yml workflow.
+    GitHub's own schedule trigger is unreliable on low-traffic repos,
+    so this endpoint exists as the dependable trigger.
+    """
+    try:
+        today = get_today()
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute("SELECT health_complete FROM daily_logs WHERE date = %s", (today,))
+        row = cur.fetchone()
+        conn.close()
+
+        if row and row[0]:
+            return jsonify({"status": "ok", "message": "Already complete", "triggered": False})
+
+        import urllib.request
+        github_token = os.getenv("CAIRN_GITHUB_TOKEN")
+        if not github_token:
+            return jsonify({"status": "error", "message": "No GitHub token"}), 500
+
+        req = urllib.request.Request(
+            "https://api.github.com/repos/ahuhse1993-del/hybrid-fitness-os/actions/workflows/health_sync.yml/dispatches",
+            data=b'{"ref":"main"}',
+            headers={
+                "Authorization": f"Bearer {github_token}",
+                "Accept": "application/vnd.github.v3+json",
+                "Content-Type": "application/json"
+            },
+            method="POST"
+        )
+        urllib.request.urlopen(req, timeout=10)
+
+        return jsonify({"status": "ok", "message": "Sync triggered", "triggered": True})
+
+    except Exception as e:
+        import traceback
+        return jsonify({"status": "error", "message": str(e), "trace": traceback.format_exc()}), 500
+
 if __name__ == '__main__':
     port = int(os.getenv("PORT", 5002))
     app.run(debug=False, host='0.0.0.0', port=port)
