@@ -9,6 +9,9 @@ import psycopg2
 from datetime import date, timedelta, datetime
 
 
+WEEKDAYS_DE = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag']
+
+
 def get_db():
     database_url = os.getenv("RAILWAY_DATABASE_URL") or os.getenv("DATABASE_URL")
     return psycopg2.connect(database_url)
@@ -21,6 +24,11 @@ def get_today():
         return datetime.now(zurich).date()
     except Exception:
         return (datetime.utcnow() + timedelta(hours=2)).date()
+
+
+def weekday_name(d) -> str:
+    """Gibt den deutschen Wochentagsnamen für ein date-Objekt zurück."""
+    return WEEKDAYS_DE[d.weekday()]
 
 
 def build_morning_brief_context() -> dict:
@@ -48,6 +56,7 @@ def build_morning_brief_context() -> dict:
     for row in health_rows:
         entry = {
             "date": str(row[0]),
+            "weekday": weekday_name(row[0]),
             "hrv": row[1],
             "sleep_h": float(row[2]) if row[2] else None,
             "rhr": row[3],
@@ -97,6 +106,7 @@ def build_morning_brief_context() -> dict:
     for row in training_rows:
         recent_trainings.append({
             "date": str(row[0]),
+            "weekday": weekday_name(row[0]),
             "type": row[1],
             "name": row[2] or row[1],
             "duration_min": row[3],
@@ -119,6 +129,7 @@ def build_morning_brief_context() -> dict:
 
     return {
         "today": str(today),
+        "today_weekday": weekday_name(today),
         "athlete": {
             "name": "Alexander",
             "type": "Hybrid athlete — Trail Running + Strength Training",
@@ -140,7 +151,7 @@ def format_context_for_prompt(context: dict) -> str:
     """
     lines = []
     lines.append(f"## Athlete\nName: {context['athlete']['name']}\nType: {context['athlete']['type']}")
-    lines.append(f"## Date\n{context['today']}")
+    lines.append(f"## Date\n{context['today']} ({context.get('today_weekday', '')})")
 
     # Health today
     h = context.get('today_health')
@@ -160,7 +171,7 @@ def format_context_for_prompt(context: dict) -> str:
     if context.get('recent_health'):
         lines.append("## Recent Health (last 3 days)")
         for rh in context['recent_health']:
-            parts = [rh['date']]
+            parts = [f"{rh['date']} ({rh.get('weekday','')})"]
             if rh.get('hrv'): parts.append(f"HRV {rh['hrv']} ms")
             if rh.get('sleep_h'): parts.append(f"Sleep {rh['sleep_h']} h")
             if rh.get('rhr'): parts.append(f"RHR {rh['rhr']} bpm")
@@ -180,9 +191,9 @@ def format_context_for_prompt(context: dict) -> str:
 
     # Recent trainings
     if context.get('recent_trainings'):
-        lines.append("## Recent Trainings (last 7 days)")
+        lines.append("## Recent Trainings (last 7 days) — use the weekday name shown, do not calculate it yourself")
         for t in context['recent_trainings']:
-            parts = [t['date'], t['type']]
+            parts = [f"{t['date']} ({t.get('weekday','')})", t['type']]
             if t.get('distance_km'): parts.append(f"{t['distance_km']} km")
             if t.get('duration_min'): parts.append(f"{t['duration_min']} min")
             if t.get('avg_hr'): parts.append(f"HF {t['avg_hr']} bpm")
