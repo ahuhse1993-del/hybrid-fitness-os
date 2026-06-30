@@ -374,11 +374,11 @@ body{background:var(--bg);font-family:"DM Sans",sans-serif;color:var(--black);fo
       <div class="lblock"><div class="llbl">Heute gelernt</div><div class="ltxt" id="coach-meaning-block">Analyse wird geladen...</div></div>
 
       <div class="sec"><span class="secl">Mit dem Coach sprechen</span><div class="secln"></div></div>
-      <div class="rblock" style="padding:16px">
+      <div style="background:#E8E4DC;padding:16px;margin-bottom:2px">
         <div id="chat-messages" style="display:flex;flex-direction:column;gap:12px;margin-bottom:14px;max-height:340px;overflow-y:auto"></div>
         <div style="display:flex;gap:8px">
-          <input type="text" id="chat-input" placeholder="Frag den Coach zu diesem Lauf..." style="flex:1;background:rgba(240,237,230,.06);border:.5px solid rgba(240,237,230,.15);padding:11px 12px;font-family:'DM Sans',sans-serif;font-size:13px;color:#F0EDE6;outline:none">
-          <button onclick="sendChatMessage()" style="background:var(--accent);border:none;color:var(--black);font-family:'DM Mono',monospace;font-size:10px;padding:0 18px;cursor:pointer;letter-spacing:.08em;font-weight:500">SENDEN</button>
+          <input type="text" id="chat-input" placeholder="Frag den Coach zu diesem Lauf..." style="flex:1;background:var(--bg);border:.5px solid rgba(46,44,42,.25);padding:11px 12px;font-family:'DM Sans',sans-serif;font-size:13px;color:var(--black);outline:none">
+          <button onclick="sendChatMessage()" style="background:var(--black);border:none;color:var(--accent);font-family:'DM Mono',monospace;font-size:10px;padding:0 18px;cursor:pointer;letter-spacing:.08em;font-weight:500">SENDEN</button>
         </div>
       </div>
     </div>
@@ -852,7 +852,7 @@ function initChat(analysis) {
   chatAnalysisContext = analysis;
   var msgEl = document.getElementById('chat-messages');
   if (!msgEl) return;
-  msgEl.innerHTML = '<div style="font-size:13px;color:rgba(240,237,230,.55);line-height:1.7;padding:10px 0">Frag mich, was du zu diesem Lauf wissen willst &#8212; warum die Pace bei Km 10 eingebrochen ist, was es f&#252;r das n&#228;chste Training bedeutet, oder was auch immer dich besch&#228;ftigt.</div>';
+  msgEl.innerHTML = '<div style="font-size:13px;color:var(--mid);line-height:1.7;padding:10px 0">Frag mich, was du zu diesem Lauf wissen willst &#8212; warum die Pace bei Km 10 eingebrochen ist, was es f&#252;r das n&#228;chste Training bedeutet, oder was auch immer dich besch&#228;ftigt.</div>';
 
   var tagsHtml = '';
   if (analysis.tags && analysis.tags.length > 0) {
@@ -869,8 +869,8 @@ function appendChatMessage(role, text) {
   var isUser = role === 'user';
   var div = document.createElement('div');
   div.style.cssText = isUser
-    ? 'align-self:flex-end;max-width:85%;background:rgba(232,216,74,.12);border:.5px solid rgba(232,216,74,.2);padding:9px 13px;font-size:13px;color:#F0EDE6;line-height:1.6'
-    : 'align-self:flex-start;max-width:85%;background:rgba(240,237,230,.05);padding:9px 13px;font-size:13px;color:rgba(240,237,230,.85);line-height:1.6';
+    ? 'align-self:flex-end;max-width:85%;background:rgba(232,216,74,.35);border:.5px solid rgba(140,127,10,.3);padding:9px 13px;font-size:13px;color:var(--black);line-height:1.6'
+    : 'align-self:flex-start;max-width:85%;background:var(--bg);border:.5px solid rgba(46,44,42,.1);padding:9px 13px;font-size:13px;color:var(--mid);line-height:1.6';
   div.textContent = text;
   msgEl.appendChild(div);
   msgEl.scrollTop = msgEl.scrollHeight;
@@ -888,7 +888,7 @@ function sendChatMessage() {
   var msgEl = document.getElementById('chat-messages');
   var loadingDiv = document.createElement('div');
   loadingDiv.id = 'chat-loading';
-  loadingDiv.style.cssText = 'align-self:flex-start;font-family:DM Mono,monospace;font-size:10px;color:rgba(240,237,230,.3);padding:6px 0';
+  loadingDiv.style.cssText = 'align-self:flex-start;font-family:DM Mono,monospace;font-size:10px;color:#9E9B95;padding:6px 0';
   loadingDiv.textContent = 'Coach antwortet...';
   msgEl.appendChild(loadingDiv);
   msgEl.scrollTop = msgEl.scrollHeight;
