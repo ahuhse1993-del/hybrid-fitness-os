@@ -569,57 +569,89 @@ function buildElevationFromGPS(points) {
 
 // ─── HF CHART — volle Breite, Stil wie Höhenprofil ───
 function buildHFChartFull(splits) {
+  // Fallback bei fehlenden granulären Daten
   var hfEl = document.getElementById('hf-chart');
   if (!hfEl) return;
   var fs = splits.filter(function(s){ return s.hr; });
   if (fs.length === 0) { hfEl.innerHTML = '<div style="font-family:DM Mono,monospace;font-size:9px;color:#9E9B95">Keine HF-Daten</div>'; return; }
-
   var hrs = fs.map(function(s){return s.hr;});
+  setEl('hf-avg-chart', Math.round(hrs.reduce(function(a,b){return a+b},0)/hrs.length) + ' bpm');
+  setEl('hf-max-chart', Math.max.apply(null, hrs) + ' bpm');
+  hfEl.innerHTML = '<div style="font-family:DM Mono,monospace;font-size:9px;color:#9E9B95">Lade granulare Daten...</div>';
+}
+
+function buildHFChartFromSeries(hrPoints, totalDistanceKm) {
+  var hfEl = document.getElementById('hf-chart');
+  if (!hfEl || !hrPoints || hrPoints.length < 2) return;
+
+  var hrs = hrPoints.map(function(p){ return p.hr; });
   var minHR = Math.min.apply(null, hrs), maxHR = Math.max.apply(null, hrs);
   setEl('hf-avg-chart', Math.round(hrs.reduce(function(a,b){return a+b},0)/hrs.length) + ' bpm');
   setEl('hf-max-chart', maxHR + ' bpm');
 
-  var W = 1200, H = 130, padL = 36, padR = 12, padT = 8, padB = 20;
+  var W = 1200, H = 200, padL = 42, padR = 12, padT = 12, padB = 28;
   var cW = W - padL - padR, cH = H - padT - padB;
   var hBot = minHR - 5, hTop = maxHR + 5, hRange = hTop - hBot || 1;
 
-  var pts = fs.map(function(s, i) {
-    var x = padL + (i / (fs.length - 1)) * cW;
-    var y = padT + cH - ((s.hr - hBot) / hRange) * cH;
+  // X-Achse basiert auf Zeit-Anteil (gleichmässig verteilt über die Aktivität)
+  var step = Math.max(1, Math.floor(hrPoints.length / 600));
+  var sampled = [];
+  for (var i = 0; i < hrPoints.length; i += step) sampled.push(hrPoints[i]);
+  if (sampled[sampled.length-1] !== hrPoints[hrPoints.length-1]) sampled.push(hrPoints[hrPoints.length-1]);
+
+  var pts = sampled.map(function(p, i) {
+    var x = padL + (i / (sampled.length - 1)) * cW;
+    var y = padT + cH - ((p.hr - hBot) / hRange) * cH;
     return {x: Math.round(x*10)/10, y: Math.round(y*10)/10};
   });
 
   var polyline = pts.map(function(p){return p.x+','+p.y}).join(' ');
   var polygon = (padL+',')+(padT+cH)+' '+polyline+' '+(padL+cW)+','+(padT+cH);
+  var pid = 'hf_'+Date.now();
 
   var yLabels = '';
-  for (var i = 0; i <= 3; i++) {
-    var v = hBot + (hRange * i / 3);
-    var y = padT + cH - (i / 3) * cH;
-    yLabels += '<text x="'+(padL-4)+'" y="'+(y+3)+'" font-family="DM Mono" font-size="7" fill="#9E9B95" text-anchor="end">'+Math.round(v)+'</text>';
+  for (var i = 0; i <= 4; i++) {
+    var v = hBot + (hRange * i / 4);
+    var y = padT + cH - (i / 4) * cH;
+    yLabels += '<text x="'+(padL-4)+'" y="'+(y+3)+'" font-family="DM Mono" font-size="7" fill="var(--black)" text-anchor="end">'+Math.round(v)+'</text>';
     yLabels += '<line x1="'+padL+'" y1="'+y+'" x2="'+(padL+cW)+'" y2="'+y+'" stroke="rgba(46,44,42,.08)" stroke-width=".5"/>';
   }
 
   var xLabels = '';
-  var step = Math.max(1, Math.floor(fs.length / 10));
-  fs.forEach(function(s, i) {
-    if (i % step === 0 || i === fs.length-1) {
-      var x = padL + (i / (fs.length-1)) * cW;
-      xLabels += '<text x="'+x+'" y="'+(padT+cH+14)+'" font-family="DM Mono" font-size="7" fill="#9E9B95" text-anchor="middle">'+s.split+'</text>';
-    }
-  });
+  var kmStep = totalDistanceKm > 15 ? 4 : totalDistanceKm > 8 ? 2 : 1;
+  for (var km = 0; km <= Math.floor(totalDistanceKm); km += kmStep) {
+    var x = padL + (km / totalDistanceKm) * cW;
+    xLabels += '<text x="'+x+'" y="'+(padT+cH+16)+'" font-family="DM Mono" font-size="7" fill="var(--black)" text-anchor="middle">'+km+'</text>';
+    xLabels += '<line x1="'+x+'" y1="'+(padT+cH)+'" x2="'+x+'" y2="'+(padT+cH+4)+'" stroke="rgba(46,44,42,.2)" stroke-width=".5"/>';
+  }
+  xLabels += '<text x="'+(padL+cW)+'" y="'+(padT+cH+16)+'" font-family="DM Mono" font-size="7" fill="var(--black)" text-anchor="end">'+totalDistanceKm.toFixed(1)+'</text>';
 
-  var pid = 'hf_'+Date.now();
-  var svg = '<svg width="100%" viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">';
-  svg += '<defs><pattern id="'+pid+'" x="0" y="0" width="4" height="4" patternUnits="userSpaceOnUse"><circle cx="1" cy="1" r="0.8" fill="rgba(232,216,74,.4)"/></pattern></defs>';
+  var svg = '<svg width="100%" viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">';
+  svg += '<defs><pattern id="'+pid+'" x="0" y="0" width="4" height="4" patternUnits="userSpaceOnUse"><circle cx="1" cy="1" r="0.8" fill="rgba(46,44,42,.18)"/></pattern></defs>';
+  svg += '<rect x="'+padL+'" y="'+padT+'" width="'+cW+'" height="'+cH+'" fill="#E8E4DC"/>';
   svg += yLabels + xLabels;
-  svg += '<polygon points="'+polygon+'" fill="rgba(232,216,74,.08)"/>';
+  svg += '<polygon points="'+polygon+'" fill="rgba(46,44,42,.07)"/>';
+  svg += '<polyline points="'+polyline+'" fill="none" stroke="rgba(46,44,42,.9)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>';
   var upperPoly = pts.map(function(p){return p.x+','+p.y}).join(' ')+' '+(padL+cW)+','+padT+' '+padL+','+padT;
   svg += '<polygon points="'+upperPoly+'" fill="url(#'+pid+')"/>';
-  svg += '<polyline points="'+polyline+'" fill="none" stroke="var(--accent-dark)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>';
+  svg += '<polyline points="'+polyline+'" fill="none" stroke="rgba(46,44,42,.85)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>';
   svg += '<line x1="'+padL+'" y1="'+(padT+cH)+'" x2="'+(padL+cW)+'" y2="'+(padT+cH)+'" stroke="rgba(46,44,42,.2)" stroke-width=".5"/>';
+  svg += '<line x1="'+padL+'" y1="'+padT+'" x2="'+padL+'" y2="'+(padT+cH)+'" stroke="rgba(46,44,42,.2)" stroke-width=".5"/>';
   svg += '</svg>';
+
   hfEl.innerHTML = svg;
+}
+
+function loadGranularHR() {
+  if (!trainingId || !activityData) return;
+  fetch('https://web-production-297f2.up.railway.app/api/activity/' + trainingId + '/hr')
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      if (data.status === 'ok' && data.points && data.points.length > 1) {
+        buildHFChartFromSeries(data.points, activityData.distance_km);
+      }
+    })
+    .catch(function(){});
 }
 
 function maybeShowTrailBlock() {
@@ -805,8 +837,9 @@ function loadActivity(){
         document.getElementById('cad-chart').innerHTML = '<div style="font-family:DM Mono,monospace;font-size:9px;color:#9E9B95">Keine Kadenzdaten</div>';
       }
 
-      // HF Chart volle Breite
+      // HF Chart volle Breite — erst Fallback aus Splits, dann granulare Daten nachladen
       if (data.splits && data.splits.length > 0) buildHFChartFull(data.splits);
+      loadGranularHR();
 
       maybeShowTrailBlock();
 
