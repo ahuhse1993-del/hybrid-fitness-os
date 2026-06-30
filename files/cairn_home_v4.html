@@ -783,7 +783,12 @@ body{background:var(--bg);font-family:'DM Sans',sans-serif;color:var(--black);fo
   <!-- KALENDER -->
   <div class="plan-outer">
     <div class="plan-head">
-      <div class="plan-lbl">4-WOCHEN-AUSBLICK</div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <button onclick="shiftWeeks(-4)" style="background:transparent;border:.5px solid var(--black);color:var(--black);width:24px;height:24px;cursor:pointer;font-family:'DM Mono',monospace;font-size:11px;display:flex;align-items:center;justify-content:center" title="4 Wochen zurück">&#8249;</button>
+        <div class="plan-lbl" id="plan-range-lbl">4-WOCHEN-AUSBLICK</div>
+        <button onclick="shiftWeeks(4)" style="background:transparent;border:.5px solid var(--black);color:var(--black);width:24px;height:24px;cursor:pointer;font-family:'DM Mono',monospace;font-size:11px;display:flex;align-items:center;justify-content:center" title="4 Wochen vor">&#8250;</button>
+        <button onclick="resetWeeks()" id="plan-today-btn" style="display:none;background:transparent;border:none;color:var(--accent-dark);cursor:pointer;font-family:'DM Mono',monospace;font-size:8px;letter-spacing:.08em;text-decoration:underline">HEUTE</button>
+      </div>
       <div class="kwtabs" id="kwtabs">
         <div class="kwt on" onclick="filterWeek('all',this)">ALLE</div>
       </div>
@@ -1300,17 +1305,46 @@ function getWeekNumber(d) {
   return Math.ceil((((date - yearStart) / 86400000) + 1)/7);
 }
 
+var weekOffset = 0;
+
 function loadPlan() {
-  fetch('https://web-production-297f2.up.railway.app/api/plan')
+  fetch('https://web-production-297f2.up.railway.app/api/plan?offset_weeks=' + weekOffset)
     .then(function(r) { return r.json(); })
     .then(function(data) {
       planData = data.plan;
       renderCalendar();
+      updatePlanRangeLabel();
     })
     .catch(function() {
       document.getElementById('calendar-body').innerHTML =
         '<div style="padding:28px;font-family:\'DM Mono\',monospace;font-size:9px;color:var(--stone)">Plan konnte nicht geladen werden.</div>';
     });
+}
+
+function shiftWeeks(delta) {
+  weekOffset += delta;
+  loadPlan();
+}
+
+function resetWeeks() {
+  weekOffset = 0;
+  loadPlan();
+}
+
+function updatePlanRangeLabel() {
+  var lbl = document.getElementById('plan-range-lbl');
+  var todayBtn = document.getElementById('plan-today-btn');
+  if (!lbl) return;
+  if (weekOffset === 0) {
+    lbl.textContent = '4-WOCHEN-AUSBLICK';
+    if (todayBtn) todayBtn.style.display = 'none';
+  } else {
+    var monday = new Date();
+    monday.setDate(monday.getDate() - monday.getDay() + (monday.getDay()===0?-6:1) + weekOffset*7);
+    var kw = getWeekNumber(monday);
+    lbl.textContent = 'AB KW ' + kw + (weekOffset > 0 ? ' (VORAUS)' : ' (VERGANGEN)');
+    if (todayBtn) todayBtn.style.display = 'inline';
+  }
 }
 
 function renderCalendar() {
