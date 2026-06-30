@@ -412,17 +412,51 @@ function calcTime(durMin){if(!durMin)return '—';var h=Math.floor(durMin/60),m=
 function setEl(id,val){var el=document.getElementById(id);if(el)el.textContent=val}
 
 function buildHFZones(splits){
+  // Fallback: grobe Berechnung aus Splits (wird von buildHFZonesFromSeries überschrieben sobald verfügbar)
   var counts={Z1:0,Z2:0,Z3:0,Z4:0,Z5:0},total=0;
   splits.forEach(function(s){if(!s.hr)return;var hr=parseInt(s.hr);total++;if(hr>=172)counts.Z5++;else if(hr>=162)counts.Z4++;else if(hr>=153)counts.Z3++;else if(hr>=145)counts.Z2++;else counts.Z1++;});
   if(total===0)return;
+  applyHFZonePercentages(counts, total);
+}
+
+function buildHFZonesFromSeries(hrPoints){
+  if (!hrPoints || hrPoints.length < 2) return;
+
+  // Zeit pro Zone berechnen — Sekunden zwischen aufeinanderfolgenden Punkten
+  var timeInZone = {Z1:0,Z2:0,Z3:0,Z4:0,Z5:0};
+  var totalTime = 0;
+
+  function zoneOf(hr){
+    if (hr >= 172) return 'Z5';
+    if (hr >= 162) return 'Z4';
+    if (hr >= 153) return 'Z3';
+    if (hr >= 145) return 'Z2';
+    return 'Z1';
+  }
+
+  for (var i = 1; i < hrPoints.length; i++) {
+    var prev = hrPoints[i-1], cur = hrPoints[i];
+    if (!prev.ts || !cur.ts) continue;
+    var dtSec = (cur.ts - prev.ts) / 1000;
+    if (dtSec <= 0 || dtSec > 60) continue; // Ausreisser/Lücken ignorieren
+    var z = zoneOf(prev.hr);
+    timeInZone[z] += dtSec;
+    totalTime += dtSec;
+  }
+
+  if (totalTime === 0) return;
+  applyHFZonePercentages(timeInZone, totalTime);
+}
+
+function applyHFZonePercentages(counts, total){
   var zones=['Z1','Z2','Z3','Z4','Z5'],maxPct=0,dom='Z2';
   zones.forEach(function(z){var p=Math.round(counts[z]/total*100);if(p>maxPct){maxPct=p;dom=z;}});
   zones.forEach(function(z){
     var pct=Math.round(counts[z]/total*100),zn=z.toLowerCase();
     var barEl=document.getElementById('h'+zn),pctEl=document.getElementById('hp'+zn[1]),lblEl=document.getElementById('h'+zn+'lbl');
     if(barEl){barEl.style.width=pct+'%';barEl.style.background=(z===dom)?'var(--accent)':'var(--mid)';}
-    if(pctEl){pctEl.textContent=pct+'%';if(z===dom)pctEl.classList.add('acc');}
-    if(lblEl&&z===dom)lblEl.classList.add('act');
+    if(pctEl){pctEl.textContent=pct+'%';pctEl.classList.remove('acc');if(z===dom)pctEl.classList.add('acc');}
+    if(lblEl){lblEl.classList.remove('act');if(z===dom)lblEl.classList.add('act');}
   });
 }
 
@@ -649,6 +683,7 @@ function loadGranularHR() {
     .then(function(data){
       if (data.status === 'ok' && data.points && data.points.length > 1) {
         buildHFChartFromSeries(data.points, activityData.distance_km);
+        buildHFZonesFromSeries(data.points);
       }
     })
     .catch(function(){});
