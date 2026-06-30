@@ -258,7 +258,9 @@ def get_plan():
         conn = get_db()
         cur = conn.cursor()
         today = get_today()
-        monday = today - timedelta(days=today.weekday())
+
+        offset_weeks = request.args.get('offset_weeks', default=0, type=int)
+        monday = today - timedelta(days=today.weekday()) + timedelta(weeks=offset_weeks)
 
         cur.execute("""
             SELECT id, week_date, day_of_week, session_type, session_zone,
@@ -274,7 +276,7 @@ def get_plan():
             FROM trainings
             WHERE date >= %s AND date <= %s
             ORDER BY date
-        """, (monday, today))
+        """, (monday, max(today, monday + timedelta(weeks=4))))
         actual_rows = cur.fetchall()
         conn.close()
 
