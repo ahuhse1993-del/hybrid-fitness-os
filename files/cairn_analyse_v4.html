@@ -492,15 +492,18 @@ function buildVerticalBarChart(elId, splits, valueFn, formatFn, opts) {
     var barTopY = padT + cH - normalized * cH;
     var barH = cH - (barTopY - padT);
     var x = padL + i * (bW + 2);
+    var displayVal = opts.formatY ? opts.formatY(v) : Math.round(v);
 
+    // Hit area (volle Höhe) für Hover, unsichtbar
+    bars += '<rect class="vb-hit" x="'+x+'" y="'+padT+'" width="'+bW+'" height="'+cH+'" fill="transparent" data-split="'+s.split+'" data-value="'+displayVal+'" style="cursor:crosshair"/>';
     // Solid bar (value)
-    bars += '<rect x="'+x+'" y="'+barTopY+'" width="'+bW+'" height="'+barH+'" fill="rgba(46,44,42,.6)"/>';
+    bars += '<rect x="'+x+'" y="'+barTopY+'" width="'+bW+'" height="'+barH+'" fill="rgba(46,44,42,.6)" style="pointer-events:none"/>';
     // Dotted pattern above bar (empty space)
     if (barTopY > padT) {
-      bars += '<rect x="'+x+'" y="'+padT+'" width="'+bW+'" height="'+(barTopY-padT)+'" fill="url(#'+pid+')"/>';
+      bars += '<rect x="'+x+'" y="'+padT+'" width="'+bW+'" height="'+(barTopY-padT)+'" fill="url(#'+pid+')" style="pointer-events:none"/>';
     }
     if (fs.length <= 25 || i % 2 === 0) {
-      labels += '<text x="'+(x+bW/2)+'" y="'+(h-3)+'" font-family="DM Mono" font-size="7" fill="var(--black)" text-anchor="middle">'+s.split+'</text>';
+      labels += '<text x="'+(x+bW/2)+'" y="'+(h-3)+'" font-family="DM Mono" font-size="7" fill="var(--black)" text-anchor="middle" style="pointer-events:none">'+s.split+'</text>';
     }
   });
 
@@ -510,15 +513,45 @@ function buildVerticalBarChart(elId, splits, valueFn, formatFn, opts) {
     var val = yBot + (yRange * i / 2);
     var y = padT + cH - (i/2) * cH;
     var labelText = opts.formatY ? opts.formatY(val) : Math.round(val);
-    yLabels += '<text x="'+(padL-4)+'" y="'+(y+3)+'" font-family="DM Mono" font-size="6.5" fill="var(--black)" text-anchor="end">'+labelText+'</text>';
+    yLabels += '<text x="'+(padL-4)+'" y="'+(y+3)+'" font-family="DM Mono" font-size="6.5" fill="var(--black)" text-anchor="end" style="pointer-events:none">'+labelText+'</text>';
   }
 
-  var svg = '<svg width="100%" viewBox="0 0 '+w+' '+h+'" xmlns="http://www.w3.org/2000/svg">';
+  var svg = '<svg width="100%" viewBox="0 0 '+w+' '+h+'" xmlns="http://www.w3.org/2000/svg" id="'+elId+'-svg">';
   svg += '<defs><pattern id="'+pid+'" x="0" y="0" width="4" height="4" patternUnits="userSpaceOnUse"><circle cx="1" cy="1" r="0.8" fill="rgba(46,44,42,.22)"/></pattern></defs>';
   svg += bars + yLabels + labels;
   svg += '</svg>';
+  svg += '<div class="bar-tooltip" id="'+elId+'-tooltip" style="display:none;position:absolute;background:var(--black);color:#F0EDE6;font-family:DM Mono,monospace;font-size:9px;padding:5px 9px;pointer-events:none;white-space:nowrap;z-index:50"></div>';
 
+  chartEl.style.position = 'relative';
   chartEl.innerHTML = svg;
+
+  attachBarHoverListeners(elId, opts.unitLabel || '');
+}
+
+function attachBarHoverListeners(elId, unitLabel) {
+  var chartEl = document.getElementById(elId);
+  var tooltipEl = document.getElementById(elId + '-tooltip');
+  if (!chartEl || !tooltipEl) return;
+
+  var hits = chartEl.querySelectorAll('.vb-hit');
+  hits.forEach(function(hit) {
+    hit.addEventListener('mouseenter', function() {
+      var split = hit.getAttribute('data-split');
+      var value = hit.getAttribute('data-value');
+      tooltipEl.innerHTML = '<span style="color:var(--accent);font-weight:500">Km '+split+'</span> &middot; '+value+(unitLabel?' '+unitLabel:'');
+      tooltipEl.style.display = 'block';
+    });
+    hit.addEventListener('mousemove', function(e) {
+      var rect = chartEl.getBoundingClientRect();
+      var x = e.clientX - rect.left;
+      var left = Math.min(Math.max(x - 30, 4), rect.width - 90);
+      tooltipEl.style.left = left + 'px';
+      tooltipEl.style.top = '4px';
+    });
+    hit.addEventListener('mouseleave', function() {
+      tooltipEl.style.display = 'none';
+    });
+  });
 }
 
 function haversine(lat1,lon1,lat2,lon2){
@@ -769,7 +802,7 @@ function buildHFChartFromSeries(hrPoints, totalDistanceKm) {
   }
   xLabels += '<text x="'+(padL+cW)+'" y="'+(padT+cH+16)+'" font-family="DM Mono" font-size="7" fill="var(--black)" text-anchor="end">'+totalDistanceKm.toFixed(1)+'</text>';
 
-  var svg = '<svg width="100%" height="100%" viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">';
+  var svg = '<svg width="100%" height="100%" viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg" id="hf-svg" style="cursor:crosshair">';
   svg += '<defs><pattern id="'+pid+'" x="0" y="0" width="4" height="4" patternUnits="userSpaceOnUse"><circle cx="1" cy="1" r="0.8" fill="rgba(46,44,42,.18)"/></pattern></defs>';
   svg += '<rect x="'+padL+'" y="'+padT+'" width="'+cW+'" height="'+cH+'" fill="#E8E4DC"/>';
   svg += yLabels + xLabels;
@@ -780,9 +813,71 @@ function buildHFChartFromSeries(hrPoints, totalDistanceKm) {
   svg += '<polyline points="'+polyline+'" fill="none" stroke="rgba(46,44,42,.85)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>';
   svg += '<line x1="'+padL+'" y1="'+(padT+cH)+'" x2="'+(padL+cW)+'" y2="'+(padT+cH)+'" stroke="rgba(46,44,42,.2)" stroke-width=".5"/>';
   svg += '<line x1="'+padL+'" y1="'+padT+'" x2="'+padL+'" y2="'+(padT+cH)+'" stroke="rgba(46,44,42,.2)" stroke-width=".5"/>';
+  svg += '<g id="hf-hover-group" style="display:none">';
+  svg += '<line id="hf-hover-line" x1="0" y1="'+padT+'" x2="0" y2="'+(padT+cH)+'" stroke="var(--accent-dark)" stroke-width="1"/>';
+  svg += '<circle id="hf-hover-dot" cx="0" cy="0" r="3.5" fill="var(--accent-dark)" stroke="#fff" stroke-width="1.2"/>';
+  svg += '</g>';
   svg += '</svg>';
+  svg += '<div id="hf-tooltip" style="display:none;position:absolute;background:var(--black);color:#F0EDE6;font-family:DM Mono,monospace;font-size:9px;padding:6px 10px;pointer-events:none;white-space:nowrap;z-index:50"></div>';
 
+  hfEl.style.position = 'relative';
   hfEl.innerHTML = svg;
+
+  window.hfChartGeometry = {
+    sampled: sampled, totalDistanceKm: totalDistanceKm,
+    W: W, H: H, padL: padL, padT: padT, cW: cW, cH: cH, hBot: hBot, hRange: hRange
+  };
+  attachHfHoverListeners();
+}
+
+function attachHfHoverListeners() {
+  var svgEl = document.getElementById('hf-svg');
+  var tooltipEl = document.getElementById('hf-tooltip');
+  var hoverGroup = document.getElementById('hf-hover-group');
+  var hoverLine = document.getElementById('hf-hover-line');
+  var hoverDot = document.getElementById('hf-hover-dot');
+  if (!svgEl) return;
+
+  svgEl.addEventListener('mousemove', function(e) {
+    var geo = window.hfChartGeometry;
+    if (!geo) return;
+    var rect = svgEl.getBoundingClientRect();
+    var scaleX = geo.W / rect.width;
+    var svgX = (e.clientX - rect.left) * scaleX;
+
+    if (svgX < geo.padL || svgX > geo.padL + geo.cW) {
+      hoverGroup.style.display = 'none';
+      tooltipEl.style.display = 'none';
+      return;
+    }
+
+    var ratio = (svgX - geo.padL) / geo.cW;
+    var idx = Math.round(ratio * (geo.sampled.length - 1));
+    idx = Math.max(0, Math.min(geo.sampled.length - 1, idx));
+    var point = geo.sampled[idx];
+    var distKm = ratio * geo.totalDistanceKm;
+    var y = geo.padT + geo.cH - ((point.hr - geo.hBot) / geo.hRange) * geo.cH;
+
+    hoverLine.setAttribute('x1', svgX); hoverLine.setAttribute('x2', svgX);
+    hoverDot.setAttribute('cx', svgX); hoverDot.setAttribute('cy', y);
+    hoverGroup.style.display = 'block';
+
+    tooltipEl.innerHTML =
+      '<span style="color:var(--accent);font-weight:500">' + distKm.toFixed(1) + ' km</span> &middot; ' + point.hr + ' bpm';
+    tooltipEl.style.display = 'block';
+
+    var hfEl = document.getElementById('hf-chart');
+    var elWidth = hfEl ? hfEl.getBoundingClientRect().width : 600;
+    var tooltipX = (svgX / geo.W) * elWidth;
+    var leftPos = Math.min(Math.max(tooltipX - 40, 4), elWidth - 110);
+    tooltipEl.style.left = leftPos + 'px';
+    tooltipEl.style.top = '4px';
+  });
+
+  svgEl.addEventListener('mouseleave', function() {
+    hoverGroup.style.display = 'none';
+    tooltipEl.style.display = 'none';
+  });
 }
 
 function loadGranularHR() {
@@ -965,14 +1060,15 @@ function loadActivity(){
           formatY: function(v) {
             var sec = Math.round(v);
             return Math.floor(sec/60)+':'+String(sec%60).padStart(2,'0');
-          }
+          },
+          unitLabel: 'min/km'
         });
       }
 
       // Kadenz Chart
       var hasCadence = data.splits && data.splits.some(function(s){ return s.cadence; });
       if (hasCadence) {
-        buildVerticalBarChart('cad-chart', data.splits, function(s){ return s.cadence || null; });
+        buildVerticalBarChart('cad-chart', data.splits, function(s){ return s.cadence || null; }, null, {unitLabel: 'spm'});
         var cads = data.splits.filter(function(s){return s.cadence;}).map(function(s){return s.cadence;});
         var avgCad = Math.round(cads.reduce(function(a,b){return a+b},0)/cads.length);
         setEl('cad-avg', avgCad);
