@@ -80,7 +80,7 @@ body{background:var(--bg);font-family:"DM Sans",sans-serif;color:var(--black);fo
 .zf{height:100%;background:var(--mid)}
 .zd{flex:1;height:100%;background-image:var(--dl);background-size:4px 4px}
 .zp{font-family:"DM Mono",monospace;font-size:9px;width:24px;text-align:right;flex-shrink:0;color:#6B6860}
-.zp.acc{color:var(--accent);font-weight:500}
+.zp.acc{color:var(--black);font-weight:700}
 .sec{display:flex;align-items:center;gap:10px;padding:13px 16px 9px}
 .secl{font-family:"DM Mono",monospace;font-size:9px;color:#9E9B95;letter-spacing:.12em;flex-shrink:0;text-transform:uppercase}
 .secln{flex:1;height:.5px;background:rgba(46,44,42,.16)}
@@ -357,12 +357,12 @@ body{background:var(--bg);font-family:"DM Sans",sans-serif;color:var(--black);fo
       <!-- HF CHART VOLLE BREITE -->
       <div class="sec"><span class="secl">Herzfrequenz</span><div class="secln"></div></div>
       <div style="margin-bottom:2px">
-        <div style="height:200px;background:#E8E4DC;padding:12px">
+        <div style="background:#E8E4DC;padding:12px">
           <div style="display:flex;gap:20px;margin-bottom:6px">
             <div><div style="font-family:DM Mono,monospace;font-size:8px;color:#9E9B95;text-transform:uppercase;letter-spacing:.05em">&#216; HF</div><div style="font-family:DM Mono,monospace;font-size:16px;font-weight:500" id="hf-avg-chart">&#8212;</div></div>
             <div><div style="font-family:DM Mono,monospace;font-size:8px;color:#9E9B95;text-transform:uppercase;letter-spacing:.05em">Max HF</div><div style="font-family:DM Mono,monospace;font-size:16px;font-weight:500" id="hf-max-chart">&#8212;</div></div>
           </div>
-          <div id="hf-chart"></div>
+          <div id="hf-chart" style="height:180px;overflow:hidden"></div>
         </div>
       </div>
 
@@ -422,7 +422,6 @@ function buildHFZones(splits){
 function buildHFZonesFromSeries(hrPoints){
   if (!hrPoints || hrPoints.length < 2) return;
 
-  // Zeit pro Zone berechnen — Sekunden zwischen aufeinanderfolgenden Punkten
   var timeInZone = {Z1:0,Z2:0,Z3:0,Z4:0,Z5:0};
   var totalTime = 0;
 
@@ -438,8 +437,10 @@ function buildHFZonesFromSeries(hrPoints){
     var prev = hrPoints[i-1], cur = hrPoints[i];
     if (!prev.ts || !cur.ts) continue;
     var dtSec = (cur.ts - prev.ts) / 1000;
-    if (dtSec <= 0 || dtSec > 60) continue; // Ausreisser/Lücken ignorieren
-    var z = zoneOf(prev.hr);
+    if (dtSec <= 0 || dtSec > 120) continue;
+    // Durchschnitt von prev/cur HR für die Zonen-Zuordnung des Segments
+    var avgHr = (prev.hr + cur.hr) / 2;
+    var z = zoneOf(avgHr);
     timeInZone[z] += dtSec;
     totalTime += dtSec;
   }
@@ -660,7 +661,7 @@ function buildHFChartFromSeries(hrPoints, totalDistanceKm) {
   }
   xLabels += '<text x="'+(padL+cW)+'" y="'+(padT+cH+16)+'" font-family="DM Mono" font-size="7" fill="var(--black)" text-anchor="end">'+totalDistanceKm.toFixed(1)+'</text>';
 
-  var svg = '<svg width="100%" viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">';
+  var svg = '<svg width="100%" height="100%" viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">';
   svg += '<defs><pattern id="'+pid+'" x="0" y="0" width="4" height="4" patternUnits="userSpaceOnUse"><circle cx="1" cy="1" r="0.8" fill="rgba(46,44,42,.18)"/></pattern></defs>';
   svg += '<rect x="'+padL+'" y="'+padT+'" width="'+cW+'" height="'+cH+'" fill="#E8E4DC"/>';
   svg += yLabels + xLabels;
