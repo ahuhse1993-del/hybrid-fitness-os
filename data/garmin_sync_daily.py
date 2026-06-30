@@ -145,6 +145,14 @@ def sync_daily():
                 except Exception as e:
                     print(f"     ⚠️ Splits Fehler: {e}")
 
+                # Granulare Herzfrequenz-Zeitreihe importieren
+                try:
+                    from data.garmin_import_hr import import_hr_for_activity
+                    import_hr_for_activity(client, training_id, int(garmin_id))
+                    print(f"     HR-Zeitreihe importiert")
+                except Exception as e:
+                    print(f"     ⚠️ HR Fehler: {e}")
+
             except Exception as e:
                 print(f"  ❌ Fehler bei {name}: {e}")
                 conn.rollback()
