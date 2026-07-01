@@ -602,9 +602,32 @@ body{background:var(--bg);font-family:'DM Sans',sans-serif;color:var(--black);fo
   </div>
 </div>
 
-<!-- ═══════════════════════════════════
-     HAUPTSEITE
-═══════════════════════════════════ -->
+<!-- ÜBUNGS-POPUP (Krafttraining) -->
+<div class="card-popup" id="exercise-popup" onclick="if(event.target===this)closeExercisePopup()">
+  <div class="cp-box" style="max-height:80vh;overflow-y:auto;width:min(520px,calc(100vw - 32px))">
+    <div class="cp-kicker">CAIRN · KRAFTTRAINING</div>
+    <div class="cp-title" id="ex-title">—</div>
+    <div id="ex-list" style="margin-top:14px"></div>
+    <div class="cp-btns" style="margin-top:16px">
+      <button class="cp-btn-secondary" onclick="closeExercisePopup()">SCHLIESSEN</button>
+    </div>
+  </div>
+</div>
+
+<!-- PLAN-POPUP (zukünftige Sessions) -->
+<div class="card-popup" id="plan-popup" onclick="if(event.target===this)closePlanPopup()">
+  <div class="cp-box" style="width:min(480px,calc(100vw - 32px))">
+    <div class="cp-kicker">CAIRN · GEPLANTE EINHEIT</div>
+    <div class="cp-title" id="plan-popup-title">—</div>
+    <div class="cp-date" id="plan-popup-date">—</div>
+    <div class="cp-stats" id="plan-popup-stats"></div>
+    <div class="cp-btns" style="margin-top:16px">
+      <button class="cp-btn-secondary" onclick="closePlanPopup()">SCHLIESSEN</button>
+    </div>
+  </div>
+</div>
+
+
 <div class="pg">
 <div class="sb">
   <div class="sb-logo">CAIRN</div>
@@ -1343,7 +1366,62 @@ var weekOffset = 0;
 function shiftWeeks(d){shiftMonth(d>0?1:-1);}
 function resetWeeks(){resetMonth();}
 
-function loadPlan() {
+// ── ÜBUNGS-POPUP ──
+function openExercisePopup(trainingId, name) {
+  document.getElementById('ex-title').textContent = name;
+  document.getElementById('ex-list').innerHTML = '<div style="font-family:\'DM Mono\',monospace;font-size:9px;color:var(--stone);letter-spacing:.1em">LÄDT...</div>';
+  document.getElementById('exercise-popup').classList.add('open');
+
+  fetch('https://web-production-297f2.up.railway.app/api/activity/' + trainingId + '/exercises')
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      if (data.status !== 'ok' || data.exercises.length === 0) {
+        document.getElementById('ex-list').innerHTML = '<div style="font-family:\'DM Mono\',monospace;font-size:9px;color:var(--stone)">Keine Übungsdaten verfügbar</div>';
+        return;
+      }
+      var html = '';
+      data.exercises.forEach(function(ex) {
+        html += '<div style="padding:10px 0;border-bottom:.5px solid rgba(46,44,42,.1)">';
+        html += '<div style="font-family:\'DM Mono\',monospace;font-size:11px;font-weight:500;color:var(--black);margin-bottom:4px">'+ex.name+'</div>';
+        var meta = [];
+        if (ex.sets) meta.push(ex.sets + ' Sätze');
+        if (ex.reps) meta.push(ex.reps + ' Wdh');
+        if (ex.weight_kg) meta.push(ex.weight_kg + ' kg');
+        html += '<div style="font-family:\'DM Mono\',monospace;font-size:9px;color:var(--stone)">'+meta.join(' · ')+'</div>';
+        html += '</div>';
+      });
+      document.getElementById('ex-list').innerHTML = html;
+    })
+    .catch(function(){
+      document.getElementById('ex-list').innerHTML = '<div style="font-family:\'DM Mono\',monospace;font-size:9px;color:var(--stone)">Fehler beim Laden</div>';
+    });
+}
+
+function closeExercisePopup() {
+  document.getElementById('exercise-popup').classList.remove('open');
+}
+
+// ── PLAN-POPUP ──
+function openPlanPopup(sessionType, sessionZone, notes, dist, dateStr) {
+  var months = ['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
+  var d = new Date(dateStr);
+  var days = ['So','Mo','Di','Mi','Do','Fr','Sa'];
+  var dateFormatted = days[d.getDay()] + ', ' + d.getDate() + '. ' + months[d.getMonth()] + ' ' + d.getFullYear();
+
+  document.getElementById('plan-popup-title').textContent = notes || sessionType;
+  document.getElementById('plan-popup-date').textContent = dateFormatted;
+  var stats = '';
+  if (sessionZone) stats += '<span style="font-family:\'DM Mono\',monospace;font-size:10px;background:var(--black);color:var(--accent);padding:3px 8px;margin-right:6px">'+sessionZone+'</span>';
+  if (dist) stats += '<span style="font-family:\'DM Mono\',monospace;font-size:11px;color:var(--stone)">'+dist+'</span>';
+  document.getElementById('plan-popup-stats').innerHTML = stats || '<span style="font-family:\'DM Mono\',monospace;font-size:9px;color:var(--stone)">'+sessionType+'</span>';
+  document.getElementById('plan-popup').classList.add('open');
+}
+
+function closePlanPopup() {
+  document.getElementById('plan-popup').classList.remove('open');
+}
+
+
   fetch('https://web-production-297f2.up.railway.app/api/activities/month?year='+calYear+'&month='+calMonth)
     .then(function(r){return r.json();})
     .then(function(data){
@@ -1410,7 +1488,11 @@ function renderMonthCalendar(data) {
         actual[dateStr].forEach(function(a) {
           var cls = TYPE_CLASS[a.type] || 'run';
           var dist = a.distance_km > 0 ? a.distance_km.toFixed(1)+' km' : (a.duration_min ? a.duration_min+' min' : '');
-          html += '<div class="tc '+cls+(isPast?' done':'')+'" style="margin-bottom:3px;cursor:pointer" onclick="window.location=\'/analyse?id='+a.training_id+'\'">';
+          var isStrength = a.type === 'WeightTraining';
+          var clickFn = isStrength
+            ? 'openExercisePopup('+a.training_id+',\''+a.name+'\')'
+            : 'window.location=\'/analyse?id='+a.training_id+'\'';
+          html += '<div class="tc '+cls+(isPast?' done':'')+'" style="margin-bottom:3px;cursor:pointer" onclick="'+clickFn+'">';
           html += '<div class="tc-name" style="font-size:10px">'+a.name+'</div>';
           if (dist) html += '<div class="tc-meta">'+dist+'</div>';
           html += '</div>';
@@ -1425,7 +1507,7 @@ function renderMonthCalendar(data) {
           } else {
             var cls = TYPE_CLASS[p.session_type] || 'run';
             var dist = p.distance_km > 0 ? p.distance_km.toFixed(0)+' km' : (p.duration_min ? p.duration_min+' min' : '');
-            html += '<div class="tc '+cls+(isPast?' done':'')+'">';
+            html += '<div class="tc '+cls+(isPast?' done':'')+'" style="cursor:pointer" onclick="openPlanPopup(\''+p.session_type+'\',\''+p.session_zone+'\',\''+p.notes+'\',\''+dist+'\',\''+dateStr+'\')">';
             html += '<div class="tc-tag" style="font-family:\'DM Mono\',monospace;font-size:7px;letter-spacing:.06em;margin-bottom:2px">'+(p.session_zone||p.session_type)+'</div>';
             html += '<div class="tc-name" style="font-size:10px">'+(p.notes||p.session_type)+'</div>';
             if (dist) html += '<div class="tc-meta">'+dist+'</div>';
