@@ -629,6 +629,34 @@ def new_activities():
         import traceback
         return jsonify({"status": "error", "message": str(e), "trace": traceback.format_exc()}), 500
 
+@app.route('/api/activity/<int:training_id>/exercises', methods=['GET'])
+def get_exercises(training_id):
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT exercise_index, exercise_name, sets, reps_per_set, weight_kg_per_set, notes
+            FROM hevy_exercises
+            WHERE training_id = %s
+            ORDER BY exercise_index
+        """, (training_id,))
+        rows = cur.fetchall()
+        conn.close()
+        exercises = []
+        for r in rows:
+            exercises.append({
+                "index": r[0],
+                "name": r[1],
+                "sets": r[2],
+                "reps": r[3],
+                "weight_kg": r[4],
+                "notes": r[5]
+            })
+        return jsonify({"status": "ok", "exercises": exercises})
+    except Exception as e:
+        import traceback
+        return jsonify({"status": "error", "message": str(e), "trace": traceback.format_exc()}), 500
+
 @app.route('/api/activity/<int:training_id>/mark-analysed', methods=['POST'])
 def mark_analysed(training_id):
     try:
