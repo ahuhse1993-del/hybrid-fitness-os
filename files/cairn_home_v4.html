@@ -1367,6 +1367,16 @@ function shiftWeeks(d){shiftMonth(d>0?1:-1);}
 function resetWeeks(){resetMonth();}
 
 // ── ÜBUNGS-POPUP ──
+function handleActivityClick(el) {
+  var id = el.dataset.id;
+  var isStrength = el.dataset.strength === '1';
+  if (isStrength) {
+    openExercisePopup(id, el.dataset.name);
+  } else {
+    window.location = '/analyse?id=' + id;
+  }
+}
+
 function openExercisePopup(trainingId, name) {
   document.getElementById('ex-title').textContent = name;
   document.getElementById('ex-list').innerHTML = '<div style="font-family:\'DM Mono\',monospace;font-size:9px;color:var(--stone);letter-spacing:.1em">LÄDT...</div>';
@@ -1503,11 +1513,8 @@ function renderMonthCalendar(data) {
           var cls = TYPE_CLASS[a.type] || 'run';
           var dist = a.distance_km > 0 ? a.distance_km.toFixed(1)+' km' : (a.duration_min ? a.duration_min+' min' : '');
           var isStrength = a.type === 'WeightTraining';
-          var clickFn = isStrength
-            ? 'openExercisePopup('+a.training_id+',this.dataset.name)'
-            : 'window.location=\'/analyse?id='+a.training_id+'\'';
           var safeName = (a.name||'').replace(/"/g,'&quot;');
-          html += '<div class="tc '+cls+(isPast?' done':'')+'" style="margin-bottom:3px;cursor:pointer" data-name="'+safeName+'" onclick="'+clickFn+'">';
+          html += '<div class="tc '+cls+(isPast?' done':'')+'" style="margin-bottom:3px;cursor:pointer" data-name="'+safeName+'" data-id="'+a.training_id+'" data-strength="'+(isStrength?'1':'0')+'" onclick="handleActivityClick(this)">';
           html += '<div class="tc-name" style="font-size:10px">'+a.name+'</div>';
           if (dist) html += '<div class="tc-meta">'+dist+'</div>';
           html += '</div>';
