@@ -1444,7 +1444,7 @@ function closePlanPopup() {
   document.getElementById('plan-popup').classList.remove('open');
 }
 
-
+function loadPlan() {
   fetch('https://web-production-297f2.up.railway.app/api/activities/month?year='+calYear+'&month='+calMonth)
     .then(function(r){return r.json();})
     .then(function(data){
