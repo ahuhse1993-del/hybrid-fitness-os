@@ -1402,6 +1402,13 @@ function closeExercisePopup() {
 }
 
 // ── PLAN-POPUP ──
+function openPlanPopupFromEl(el) {
+  try {
+    var d = JSON.parse(el.dataset.plan.replace(/&quot;/g,'"'));
+    openPlanPopup(d.type, d.zone, d.notes, d.dist, d.date);
+  } catch(e) {}
+}
+
 function openPlanPopup(sessionType, sessionZone, notes, dist, dateStr) {
   var months = ['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
   var d = new Date(dateStr);
@@ -1490,9 +1497,10 @@ function renderMonthCalendar(data) {
           var dist = a.distance_km > 0 ? a.distance_km.toFixed(1)+' km' : (a.duration_min ? a.duration_min+' min' : '');
           var isStrength = a.type === 'WeightTraining';
           var clickFn = isStrength
-            ? 'openExercisePopup('+a.training_id+',\''+a.name+'\')'
+            ? 'openExercisePopup('+a.training_id+',this.dataset.name)'
             : 'window.location=\'/analyse?id='+a.training_id+'\'';
-          html += '<div class="tc '+cls+(isPast?' done':'')+'" style="margin-bottom:3px;cursor:pointer" onclick="'+clickFn+'">';
+          var safeName = (a.name||'').replace(/"/g,'&quot;');
+          html += '<div class="tc '+cls+(isPast?' done':'')+'" style="margin-bottom:3px;cursor:pointer" data-name="'+safeName+'" onclick="'+clickFn+'">';
           html += '<div class="tc-name" style="font-size:10px">'+a.name+'</div>';
           if (dist) html += '<div class="tc-meta">'+dist+'</div>';
           html += '</div>';
@@ -1507,7 +1515,8 @@ function renderMonthCalendar(data) {
           } else {
             var cls = TYPE_CLASS[p.session_type] || 'run';
             var dist = p.distance_km > 0 ? p.distance_km.toFixed(0)+' km' : (p.duration_min ? p.duration_min+' min' : '');
-            html += '<div class="tc '+cls+(isPast?' done':'')+'" style="cursor:pointer" onclick="openPlanPopup(\''+p.session_type+'\',\''+p.session_zone+'\',\''+p.notes+'\',\''+dist+'\',\''+dateStr+'\')">';
+            var planData = JSON.stringify({type: p.session_type, zone: p.session_zone, notes: p.notes, dist: dist, date: dateStr}).replace(/"/g,'&quot;');
+            html += '<div class="tc '+cls+(isPast?' done':'')+'" style="cursor:pointer" data-plan="'+planData+'" onclick="openPlanPopupFromEl(this)">';
             html += '<div class="tc-tag" style="font-family:\'DM Mono\',monospace;font-size:7px;letter-spacing:.06em;margin-bottom:2px">'+(p.session_zone||p.session_type)+'</div>';
             html += '<div class="tc-name" style="font-size:10px">'+(p.notes||p.session_type)+'</div>';
             if (dist) html += '<div class="tc-meta">'+dist+'</div>';
