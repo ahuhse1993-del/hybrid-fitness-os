@@ -1223,7 +1223,7 @@ function openCardPopup(dataStr) {
     }
 
     btns.innerHTML =
-      '<button class="cp-btn-primary" onclick="window.location.href=\'/analyse?id=' + (item.training_id || '') + '\'">' +
+      '<button class="cp-btn-primary" data-tid="' + (item.training_id || '') + '" onclick="window.location.href=\u0027/analyse?id=\u0027+this.dataset.tid">' +
       'ANALYSE \u00d6FFNEN \u2192</button>' +
       '<button class="cp-btn-secondary" onclick="closeCardPopup()">SCHLIESSEN</button>';
   } else {
@@ -1734,7 +1734,7 @@ function renderCalendar() {
           (isDraggable ? 'draggable="true" ' +
           'ondragstart="onDragStart(event,' + item.id + ',\'' + item.week_date + '\',' + item.day_of_week + ')" ' +
           'ondragend="onDragEnd(event)" ' : '') +
-          'onclick="openCardPopup(\'' + cardData + '\')" ' +
+          'data-card="' + cardData + '" onclick="openCardPopup(this.dataset.card)" ' +
           'style="cursor:pointer">' +
           indicator +
           '<div class="tc-tag">' + category + '</div>' +
@@ -1768,7 +1768,7 @@ function renderCalendar() {
     // Pending changes Button
     var hasPending = pendingChanges[weekDate] && Object.keys(pendingChanges[weekDate]).length > 0;
     var pendingBtn = hasPending ?
-      '<button onclick="checkWeekChanges(\'' + weekDate + '\')" style="' +
+      '<button data-wd="' + weekDate + '" onclick="checkWeekChanges(this.dataset.wd)" style="' +
       'background:var(--accent);border:none;color:var(--black);font-family:\'DM Mono\',monospace;' +
       'font-size:8px;letter-spacing:.1em;padding:6px 12px;cursor:pointer;margin-top:10px;width:100%;font-weight:500">' +
       'ÄNDERUNGEN PRÜFEN →</button>' : '';
@@ -1980,8 +1980,8 @@ function showPlanCheckResult(check, weekDate) {
     '<div style="font-family:\'DM Mono\',monospace;font-size:10px;color:' + borderColor + ';letter-spacing:.14em;margin-bottom:12px">' + icon + ' CAIRN · ' + title + '</div>' +
     '<div style="font-size:14px;color:' + textColor + ';line-height:1.65;margin-bottom:20px">' + check.message + '</div>' +
     '<div style="display:flex;gap:10px">' +
-    '<button onclick="confirmPlanChanges(\'' + weekDate + '\')" style="background:var(--accent);border:none;color:var(--black);font-family:\'DM Mono\',monospace;font-size:9px;padding:10px 20px;cursor:pointer;letter-spacing:.1em;font-weight:500">ÜBERNEHMEN ✓</button>' +
-    '<button onclick="discardPlanChanges(\'' + weekDate + '\')" style="background:transparent;border:.5px solid var(--stone);color:var(--stone);font-family:\'DM Mono\',monospace;font-size:9px;padding:10px 16px;cursor:pointer">VERWERFEN</button>' +
+    '<button data-wd="' + weekDate + '" onclick="confirmPlanChanges(this.dataset.wd)" style="background:var(--accent);border:none;color:var(--black);font-family:\'DM Mono\',monospace;font-size:9px;padding:10px 20px;cursor:pointer;letter-spacing:.1em;font-weight:500">ÜBERNEHMEN ✓</button>' +
+    '<button data-wd="' + weekDate + '" onclick="discardPlanChanges(this.dataset.wd)" style="background:transparent;border:.5px solid var(--stone);color:var(--stone);font-family:\'DM Mono\',monospace;font-size:9px;padding:10px 16px;cursor:pointer">VERWERFEN</button>' +
     '</div></div>';
 
   document.body.appendChild(popup);
