@@ -1402,6 +1402,12 @@ function closeExercisePopup() {
 }
 
 // ── PLAN-POPUP ──
+function openPlanPopupByIdx(idx) {
+  var d = window._planItems && window._planItems[idx];
+  if (!d) return;
+  openPlanPopup(d.type, d.zone, d.notes, d.dist, d.date);
+}
+
 function openPlanPopupFromEl(el) {
   try {
     var d = JSON.parse(el.dataset.plan.replace(/&quot;/g,'"'));
@@ -1442,6 +1448,7 @@ function closePlanPopup() {
 }
 
 function renderMonthCalendar(data) {
+  window._planItems = []; // Reset für neue Render-Runde
   var today = data.today;
   var viewStart = new Date(data.view_start + 'T12:00:00');
   var viewEnd = new Date(data.view_end + 'T12:00:00');
@@ -1515,8 +1522,10 @@ function renderMonthCalendar(data) {
           } else {
             var cls = TYPE_CLASS[p.session_type] || 'run';
             var dist = p.distance_km > 0 ? p.distance_km.toFixed(0)+' km' : (p.duration_min ? p.duration_min+' min' : '');
-            var planData = JSON.stringify({type: p.session_type, zone: p.session_zone, notes: p.notes, dist: dist, date: dateStr}).replace(/"/g,'&quot;');
-            html += '<div class="tc '+cls+(isPast?' done':'')+'" style="cursor:pointer" data-plan="'+planData+'" onclick="openPlanPopupFromEl(this)">';
+            var planIdx = window._planItems ? window._planItems.length : 0;
+            if (!window._planItems) window._planItems = [];
+            window._planItems.push({type: p.session_type, zone: p.session_zone||'', notes: p.notes||'', dist: dist, date: dateStr});
+            html += '<div class="tc '+cls+(isPast?' done':'')+'" style="cursor:pointer" onclick="openPlanPopupByIdx('+planIdx+')">';
             html += '<div class="tc-tag" style="font-family:\'DM Mono\',monospace;font-size:7px;letter-spacing:.06em;margin-bottom:2px">'+(p.session_zone||p.session_type)+'</div>';
             html += '<div class="tc-name" style="font-size:10px">'+(p.notes||p.session_type)+'</div>';
             if (dist) html += '<div class="tc-meta">'+dist+'</div>';
