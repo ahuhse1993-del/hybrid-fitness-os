@@ -783,10 +783,22 @@ function openTodayDay(dateStr) {
         var zone = s.session_zone || '';
         var notes = s.notes || '';
         var isQuality = type === 'INTERVALS' || type === 'TEMPO' || type === 'THRESHOLD';
-        h += '<div style="font-size:22px;font-weight:300;letter-spacing:-.02em;margin-bottom:4px;color:var(--black)">' + escHtml(name) + '</div>';
-        h += '<div style="font-family:DM Mono,monospace;font-size:9px;color:var(--stone);margin-bottom:16px">' + escHtml(type) + (dist ? ' · ' + dist : '') + (zone ? ' · ' + zone : '') + '</div>';
-        if (notes && notes !== name) {
-          h += '<div style="background:rgba(46,44,42,.05);padding:12px;font-size:13px;color:var(--mid);line-height:1.65;margin-bottom:16px">' + escHtml(notes) + '</div>';
+        var borderCol = isQuality ? 'var(--accent)' : 'var(--stone)';
+        h = h.replace('border-top:3px solid var(--stone)', 'border-top:3px solid ' + borderCol);
+        h += '<div style="font-size:22px;font-weight:300;letter-spacing:-.02em;margin-bottom:4px;color:var(--black)">' + escHtml(type) + '</div>';
+        h += '<div style="font-family:DM Mono,monospace;font-size:9px;color:var(--stone);margin-bottom:16px">' + (dist ? dist : '') + (zone ? ' · ' + zone : '') + '</div>';
+        if (notes) {
+          var phases = notes.split(' · ').filter(function(p) { return p.trim(); });
+          if (phases.length > 1) {
+            phases.forEach(function(phase) {
+              var isMain = phase.match(/^\d+/) || phase.toLowerCase().includes('intervall') || phase.toLowerCase().includes('tempo');
+              var borderPh = isMain ? 'var(--accent)' : 'rgba(46,44,42,.2)';
+              h += '<div style="border-left:2px solid ' + borderPh + ';padding:8px 12px;margin-bottom:6px;font-size:13px;color:var(--mid);line-height:1.5">' + escHtml(phase.trim()) + '</div>';
+            });
+            h += '<div style="margin-top:8px;margin-bottom:16px"></div>';
+          } else {
+            h += '<div style="background:rgba(46,44,42,.05);padding:12px;font-size:13px;color:var(--mid);line-height:1.65;margin-bottom:16px">' + escHtml(notes) + '</div>';
+          }
         }
         h += '<div style="font-size:12px;color:var(--stone);margin-bottom:16px">Verschieben und umplanen im Plan-Reiter.</div>';
       }
