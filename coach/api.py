@@ -29,6 +29,10 @@ def home():
 def analyse():
     return send_file(os.path.join(os.path.dirname(__file__), '..', 'files', 'cairn_analyse_v4.html'))
 
+@app.route('/mobile')
+def mobile():
+    return send_file(os.path.join(os.path.dirname(__file__), '..', 'files', 'cairn_home_mobile.html'))
+
 @app.route('/api/checkin', methods=['POST'])
 def save_checkin():
     data = request.get_json()
@@ -438,6 +442,78 @@ def get_month():
             "actual": actual_by_date,
             "plan": plan_by_date
         })
+
+    except Exception as e:
+        import traceback
+        return jsonify({"status": "error", "message": str(e), "trace": traceback.format_exc()}), 500
+
+@app.route('/api/activities/recent', methods=['GET'])
+def get_recent_activities():
+    try:
+        limit = request.args.get('limit', default=50, type=int)
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT id, date, type, notes, distance_km, duration_minutes
+            FROM trainings
+            ORDER BY date DESC
+            LIMIT %s
+        """, (limit,))
+        rows = cur.fetchall()
+        conn.close()
+        activities = []
+        for r in rows:
+            activities.append({
+                "training_id": r[0],
+                "date": str(r[1]),
+                "type": r[2],
+                "name": (r[3] or r[2]).split(' | ')[0],
+                "distance_km": float(r[4]) if r[4] else 0,
+                "duration_min": r[5] or 0
+            })
+        return jsonify({"status": "ok", "activities": activities})
+    except Exception as e:
+        import traceback
+        return jsonify({"status": "error", "message": str(e), "trace": traceback.format_exc()}), 500
+
+@app.route('/api/coach-chat', methods=['POST'])
+def coach_chat():
+    try:
+        import anthropic
+        data = request.get_json(force=True)
+        messages = data.get('messages', [])
+        page = data.get('page', 'today')
+
+        page_context = {
+            'today': 'Der Athlet befindet sich auf der Today-Seite. Kontext: Morning Brief, heutige Session, Befinden.',
+            'plan': 'Der Athlet befindet sich auf der Plan-Seite. Kontext: Wochenplan, Umplanung, Trainingsstruktur.',
+            'activities': 'Der Athlet befindet sich auf der Activities-Seite. Kontext: Vergangene Aktivitäten, Analyse.',
+            'athlete': 'Der Athlet befindet sich auf der Athlete-Seite. Kontext: Profil, Langzeitziele, Schuhe, Schema.',
+            'coach': 'Der Athlet hat den Coach direkt geöffnet. Allgemeines Coaching.'
+        }
+
+        system = """Du bist CAIRN, ein erfahrener Endurance Coach.
+Sprich wie ein ruhiger, erfahrener Bergführer. Nie wie Software.
+Kurze Sätze. Direkt. Menschlich. Auf Augenhöhe.
+Nie: 'Readiness Score', 'approved', 'freigegeben', 'Algorithmus'.
+Immer: Beobachtung, Einordnung, klare Empfehlung.
+
+""" + page_context.get(page, '')
+
+        clean_messages = [m for m in messages if m.get('role') in ['user', 'assistant'] and m.get('content', '').strip()]
+
+        if not clean_messages:
+            return jsonify({"status": "ok", "reply": "Ich bin da. Was liegt an?"})
+
+        client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+        response = client.messages.create(
+            model="claude-sonnet-4-6",
+            max_tokens=300,
+            system=system,
+            messages=clean_messages
+        )
+        reply = response.content[0].text
+        return jsonify({"status": "ok", "reply": reply})
 
     except Exception as e:
         import traceback
