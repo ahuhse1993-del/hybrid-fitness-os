@@ -924,8 +924,9 @@ function showNoPlanState() {
 
 function loadPlanPage() {
   planLoaded = true;
+  var listEl = document.getElementById('plan-days-list');
+  if (listEl) listEl.innerHTML = '<div style="padding:24px 16px;font-family:DM Mono,monospace;font-size:9px;color:var(--stone)">PLAN WIRD GELADEN...</div>';
 
-  // Zuerst prüfen ob Plan existiert
   fetch(BASE + '/api/plan/status')
     .then(function(r) { return r.json(); })
     .then(function(data) {
@@ -933,9 +934,9 @@ function loadPlanPage() {
         showNoPlanState();
         return;
       }
-      // Plan existiert – normal laden
-      loadPlanWeek();
-    }).catch(function() { loadPlanWeek(); });
+      planData = data.plan;
+      loadPlanFull();
+    }).catch(function() { showNoPlanState(); });
 }
 
 function loadPlanWeek() {
