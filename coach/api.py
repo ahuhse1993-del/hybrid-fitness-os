@@ -226,13 +226,19 @@ Erstelle Wochen {week_from} bis {week_to}. day_of_week: 1=Mo bis 7=So. Rest Days
                 if hasattr(block, 'text'):
                     raw += block.text
             raw = raw.replace('```json', '').replace('```', '').strip()
+            # JSON aus dem Text extrahieren - suche nach { "weeks": [
+            if not raw.startswith('{'):
+                import re
+                json_match = re.search(r'\{[\s\S]*"weeks"[\s\S]*\}', raw)
+                if json_match:
+                    raw = json_match.group(0)
             try:
                 part_json = json.loads(raw)
                 all_weeks.extend(part_json.get('weeks', []))
+                print(f"OK weeks {week_from}-{week_to}: {len(part_json.get('weeks', []))} weeks")
             except Exception as parse_err:
-                # Wenn JSON-Parse fehlschlägt, trotzdem weitermachen
-                import traceback as tb
                 print(f"JSON parse error for weeks {week_from}-{week_to}: {parse_err}")
+                print(f"Raw start: {raw[:200]}")
                 continue
 
         plan_json = {"weeks": all_weeks}
