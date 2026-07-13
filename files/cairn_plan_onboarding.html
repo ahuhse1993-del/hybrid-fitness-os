@@ -567,13 +567,24 @@ function buildWeekStructure() {
   });
 
   // 3. Quality Session platzieren
-  // Regeln: nicht direkt nach Unterkörper-Kraft, nicht direkt vor/nach Long Run, nicht am ersten Tag
+  // Anker: Long Run. Quality idealerweise 2-3 Tage davor.
+  // Regeln: nicht direkt vor/nach Long Run, nicht nach Unterkörper-Kraft
   var qualityPlaced = 0;
-  // Erst vorwärts suchen
-  for (var d = 1; d <= 7 && qualityPlaced < planData.quality_sessions; d++) {
+  var lr = planData.long_run_day;
+  // Suchordnung: 2 Tage vor LR, 3 Tage vor LR, 4 Tage vor LR, dann Rest
+  var searchOrder = [];
+  for (var offset = 2; offset <= 5; offset++) {
+    var candidate = ((lr - 1 - offset + 7) % 7) + 1;
+    searchOrder.push(candidate);
+  }
+  for (var d = 1; d <= 7; d++) {
+    if (searchOrder.indexOf(d) === -1) searchOrder.push(d);
+  }
+
+  for (var i = 0; i < searchOrder.length && qualityPlaced < planData.quality_sessions; i++) {
+    var d = searchOrder[i];
     if (structure[d]) continue;
     var prev = structure[d-1] || {};
-    var prev2 = structure[d-2] || {};
     var next = structure[d+1] || {};
     var afterLower = prev.label === 'KRAFT UB';
     var afterLong = prev.label === 'LONG RUN';
@@ -583,12 +594,13 @@ function buildWeekStructure() {
       qualityPlaced++;
     }
   }
-  // Falls kein Platz gefunden: lockerer versuchen (nur direkt nach Long Run vermeiden)
+  // Fallback: nur Long Run direkt vermeiden
   if (qualityPlaced < planData.quality_sessions) {
-    for (var d = 1; d <= 7 && qualityPlaced < planData.quality_sessions; d++) {
+    for (var i = 0; i < searchOrder.length && qualityPlaced < planData.quality_sessions; i++) {
+      var d = searchOrder[i];
       if (structure[d]) continue;
       var prev = structure[d-1] || {};
-      if (prev.label !== 'LONG RUN' && prev.label !== 'KRAFT UB') {
+      if (prev.label !== 'LONG RUN') {
         structure[d] = {type:'Quality Session', label:'QUALITY'};
         qualityPlaced++;
       }
