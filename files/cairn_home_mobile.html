@@ -814,8 +814,53 @@ function openTodayDay(dateStr) {
 // PLAN PAGE
 function shiftPlanWeek(d) { planWeekOffset += d; loadPlanPage(); }
 
+function showNoPlanState() {
+  var weekNav = document.querySelector('.week-nav');
+  if (weekNav) weekNav.style.display = 'none';
+  var weekStats = document.querySelector('#page-plan > div:nth-child(2)');
+  if (weekStats) weekStats.style.display = 'none';
+  var el = document.getElementById('plan-days-list');
+  if (!el) return;
+  var btn = document.createElement('button');
+  btn.onclick = function() { window.location.href = '/plan-setup'; };
+  btn.style.cssText = 'margin-top:8px;padding:16px 32px;background:var(--black);border:none;color:var(--bg);font-family:DM Mono,monospace;font-size:10px;letter-spacing:.14em;cursor:pointer;font-weight:500';
+  btn.textContent = 'PLAN ERSTELLEN';
+  var wrap = document.createElement('div');
+  wrap.style.cssText = 'padding:40px 20px;display:flex;flex-direction:column;align-items:center;text-align:center;gap:20px';
+  var icon = document.createElement('div');
+  icon.style.cssText = 'width:64px;height:64px;border:.5px solid rgba(46,44,42,.2);display:flex;align-items:center;justify-content:center';
+  icon.innerHTML = '<svg width="28" height="28" viewBox="0 0 28 28" fill="none"><line x1="14" y1="0" x2="14" y2="28" stroke="rgba(46,44,42,.3)" stroke-width="1"/><line x1="0" y1="14" x2="28" y2="14" stroke="rgba(46,44,42,.3)" stroke-width="1"/><circle cx="14" cy="14" r="8" stroke="rgba(46,44,42,.3)" stroke-width="1" fill="none"/><circle cx="14" cy="14" r="2" fill="rgba(46,44,42,.4)"/></svg>';
+  var title = document.createElement('div');
+  title.style.cssText = 'font-size:20px;font-weight:300;color:var(--black);line-height:1.4';
+  title.textContent = 'Kein aktiver Plan.';
+  var sub = document.createElement('div');
+  sub.style.cssText = 'font-size:14px;color:var(--stone);line-height:1.65;max-width:260px';
+  sub.textContent = 'Der Coach erstellt dir einen strukturierten Trainingsplan auf dein Ziel zugeschnitten.';
+  wrap.appendChild(icon);
+  wrap.appendChild(title);
+  wrap.appendChild(sub);
+  wrap.appendChild(btn);
+  el.innerHTML = '';
+  el.appendChild(wrap);
+}
+
 function loadPlanPage() {
   planLoaded = true;
+
+  // Zuerst prüfen ob Plan existiert
+  fetch(BASE + '/api/plan/status')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (!data.has_plan) {
+        showNoPlanState();
+        return;
+      }
+      // Plan existiert – normal laden
+      loadPlanWeek();
+    }).catch(function() { loadPlanWeek(); });
+}
+
+function loadPlanWeek() {
   var now = new Date();
   var monday = new Date(now);
   var dow = monday.getDay();
