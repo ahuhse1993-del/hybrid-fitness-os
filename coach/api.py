@@ -9,13 +9,6 @@ load_dotenv()
 app = Flask(__name__)
 CORS(app)
 
-@app.after_request
-def no_cache(response):
-    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
-    response.headers['Pragma'] = 'no-cache'
-    response.headers['Expires'] = '0'
-    return response
-    
 def get_today():
     try:
         import pytz
@@ -434,7 +427,7 @@ def get_month():
                 "session_zone": r[3] or "",
                 "duration_min": r[4],
                 "distance_km": float(r[5]) if r[5] else 0,
-                "notes": (r[6] or "").split(' · ')[0],
+                "notes": r[6] or "",
                 "plan_id": r[7],
                 "is_done": False
             })
