@@ -729,7 +729,9 @@ function loadTodayWeek() {
           var s = sessions[0];
           var rawType = s.type || s.session_type || '';
           var type = TYPE_MAP[rawType] || rawType.toUpperCase();
-          var name = (s.name || s.notes || rawType || '').split(' | ')[0].split(' · ')[0];
+          var rawName = (s.name || s.notes || rawType || '').split(' | ')[0];
+          var nameParts = rawName.split(' · ').filter(function(p){ return p.trim() && !p.toLowerCase().startsWith('warm-up') && !p.toLowerCase().startsWith('cool down'); });
+          var name = nameParts.length ? nameParts[0].trim() : type;
           var dist = s.distance_km > 0 ? s.distance_km.toFixed(1) + ' km' : (s.duration_min ? s.duration_min + ' min' : '');
           var isDone = isPast && actual[dateStr];
           var isQuality = type === 'INTERVALS' || type === 'TEMPO' || type === 'THRESHOLD';
@@ -919,11 +921,55 @@ function selRej(el) { document.querySelectorAll('.rej-opt').forEach(function(x) 
 function sendReject() { document.getElementById('ov-reject').classList.remove('open'); }
 function closeReject() { document.getElementById('ov-reject').classList.remove('open'); }
 
+// HEUTE SESSION AUS WOCHENPLAN LADEN
+function loadTodaySession() {
+  var now = new Date();
+  var year = now.getFullYear();
+  var month = now.getMonth() + 1;
+  fetch(BASE + '/api/activities/month?year=' + year + '&month=' + month)
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      var todayDate = data.today;
+      var plan = data.plan || {};
+      var actual = data.actual || {};
+      var sessions = plan[todayDate] || actual[todayDate] || [];
+      var nameEl = document.getElementById('session-name');
+      var distEl = document.getElementById('session-dist');
+      var zoneEl = document.getElementById('session-zone');
+      var durEl = document.getElementById('session-dur');
+      var labelEl = document.getElementById('session-illus-label');
+      if (!sessions.length) {
+        if (nameEl) nameEl.textContent = 'Rest Day';
+        if (distEl) distEl.textContent = '—';
+        if (zoneEl) zoneEl.textContent = '—';
+        if (durEl) durEl.textContent = '—';
+        if (labelEl) labelEl.textContent = 'REST';
+      } else {
+        var s = sessions[0];
+        var rawType = s.type || s.session_type || '';
+        var type = TYPE_MAP[rawType] || rawType;
+        var notes = s.notes || '';
+        // Sauberer Name: ersten Teil ohne "Warm-Up" etc.
+        var parts = notes.split(' · ').filter(function(p) { return p.trim() && !p.toLowerCase().startsWith('warm-up') && !p.toLowerCase().startsWith('cool down'); });
+        var name = parts.length ? parts[0].trim() : type;
+        var dist = s.distance_km > 0 ? s.distance_km.toFixed(1) + ' km' : '';
+        var dur = s.duration_min > 0 ? s.duration_min + ' min' : '';
+        var zone = s.session_zone || '';
+        if (nameEl) nameEl.textContent = name || type;
+        if (distEl) distEl.textContent = dist || '—';
+        if (zoneEl) zoneEl.textContent = zone || '—';
+        if (durEl) durEl.textContent = dur || '—';
+        if (labelEl) labelEl.textContent = type;
+      }
+    }).catch(function() {});
+}
+
 // START
 if (lastCheckin === TODAY_STR) { loadMorningBrief(); }
 loadDashboard();
 loadNewActivities();
 loadTodayWeek();
+loadTodaySession();
 </script>
 </body>
 </html>
