@@ -557,9 +557,15 @@ function buildWeekStructure() {
 
   // Bestimme ob Oberkörper oder Unterkörper: 
   // Tage VOR Long Run = Oberkörper, Tage NACH Long Run = Unterkörper
+  var upperCount = 0;
   strengthDays.forEach(function(d) {
-    if (d === longRunDay) return; // Long Run Tag hat Vorrang
-    var isUpper = d < longRunDay;
+    if (d === longRunDay) return;
+    // Abwechselnd Oberkörper / Unterkörper
+    // Aber: Tag direkt nach Long Run immer Unterkörper (Beine erholen sich)
+    var dayAfterLong = (longRunDay % 7) + 1;
+    var isLowerForced = (d === dayAfterLong);
+    var isUpper = isLowerForced ? false : (upperCount % 2 === 0);
+    if (!isLowerForced) upperCount++;
     structure[d] = {
       type: isUpper ? 'Krafttraining · Oberkörper' : 'Krafttraining · Unterkörper',
       label: isUpper ? 'KRAFT OB' : 'KRAFT UB'
