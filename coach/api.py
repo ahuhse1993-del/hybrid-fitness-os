@@ -75,7 +75,7 @@ def analyse_gpx():
     Gibt Streckenkennzahlen zurück die in den Plan-Prompt fliessen.
     """
     try:
-        from data.gpx_parser import parse_gpx
+        import sys, os; sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..")); from data.gpx_parser import parse_gpx
 
         gpx_content = None
 
@@ -124,100 +124,83 @@ def generate_plan():
         total_weeks = data.get('total_weeks', 16)
         phases = data.get('phases', [])
 
-        from knowledge.loader import load_plan_generation_knowledge
-        knowledge = load_plan_generation_knowledge()
+        # Nur die essenziellen Docs für Plan-Generierung laden
+        from knowledge.loader import load_knowledge
+        knowledge = load_knowledge('plan_generation')
         day_names = ['', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag']
 
-        prompt = f"""Du bist CAIRN Coach. Erstelle einen strukturierten Trainingsplan.
+        # Wochen in zwei Hälften aufteilen um Timeout zu vermeiden
+        half = total_weeks // 2
+        week_ranges = [(1, half), (half + 1, total_weeks)] if total_weeks > 10 else [(1, total_weeks)]
 
-DEINE WISSENSBASIS (halte dich strikt daran):
-{knowledge}
+        all_weeks = []
+        client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 
 
-ATHLETENPROFIL:
-- Ziel: {goal_type}
-- Rennen: {race_name} ({race_type})
-- Renndatum: {race_date}
-- Renndistanz: {race_distance_km if race_distance_km else 'nicht angegeben'} km
-- Trainingstage pro Woche: {days_per_week}
-- Long Run Tag: {day_names[long_run_day]}
-- Quality Sessions pro Woche: {quality_sessions}
-- Kraft-Sessions pro Woche: {strength_sessions}
-- Planlänge: {total_weeks} Wochen
-- Phasen: {json.dumps(phases)}
-{f"""
+        for (week_from, week_to) in week_ranges:
+            weeks_in_range = week_to - week_from + 1
+
+            # Phase für diesen Block bestimmen
+            phase_context = []
+            for ph in phases:
+                phase_context.append(f"{ph.get('name','').upper()}: {ph.get('weeks',0)} Wochen")
+
+            gpx_context = ""
+            if gpx_data:
+                gpx_context = f"""
 STRECKENPROFIL (GPX-Analyse):
 - Distanz: {gpx_data.get('distance_km')} km
 - Höhenmeter aufwärts: {gpx_data.get('elevation_gain_m')} m
-- Höhenmeter abwärts: {gpx_data.get('elevation_loss_m')} m
 - Höhenmeter pro km: {gpx_data.get('gain_per_km')} m/km
-- Max. Steigung: {gpx_data.get('max_grade_pct')} %
 - Profil: {gpx_data.get('profile_de')}
-
-Berücksichtige das Streckenprofil bei der Planung:
-- Bei {gpx_data.get('gain_per_km', 0)} m/km Höhenmetern: spezifisches Hill-Training einplanen
-- Long Runs sollten das Gelände simulieren
-- Kraft-Training mit Fokus auf Steilheit und Abstieg
-""" if gpx_data else ""}
-
-REGELN:
-1. Long Run immer an Tag {long_run_day} ({day_names[long_run_day]})
-2. Nie 2 harte Sessions direkt hintereinander
-3. Nach Long Run: Ruhe oder Easy
-4. Kraft nicht direkt vor Quality
-5. Jede Woche hat 1-2 Rest Days
-6. Volumen steigt 10% pro Woche in Build-Phase
-7. Deload-Woche alle 4 Wochen (Volumen -20%)
-8. Trail Run = RPE-basiert, keine Pace-Angaben
-9. Krafttraining: Oberkörper A/B und Unterkörper A/B abwechseln
-
-SESSION-TYPEN erlaubt:
-- Easy Run (Z1-Z2, RPE 1-4)
-- Trail Run (Z1-Z2, RPE 1-5)
-- Long Run (Z1-Z2, RPE 1-5)
-- Progression Run (Z2-Z3, RPE 4-6)
-- Tempo Run (Z3-Z4, RPE 6-7)
-- Intervalle (Z4-Z5, RPE 7-9)
-- Hill Repeats (Z3-Z5, RPE 6-8)
-- Krafttraining (Oberkörper A/B, Unterkörper A/B)
-- Mobilität
-- Rest Day
-
-ANTWORT NUR ALS JSON:
-{{
-  "weeks": [
-    {{
-      "week_number": 1,
-      "phase": "base",
-      "total_km": 40,
-      "sessions": [
-        {{
-          "day_of_week": 1,
-          "session_type": "Easy Run",
-          "session_zone": "Z1-Z2",
-          "distance_km": 8,
-          "duration_min": 55,
-          "notes": "Easy Run Z1-Z2 · RPE 1-3 · Konversationstempo halten"
-        }}
-      ]
-    }}
-  ]
-}}
-
-Erstelle alle {total_weeks} Wochen. day_of_week: 1=Mo, 2=Di, 3=Mi, 4=Do, 5=Fr, 6=Sa, 7=So.
-Rest Days NICHT als Session eintragen – einfach weglassen.
+- Max. Steigung: {gpx_data.get('max_grade_pct')} %
 """
 
-        client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
-        message = client.messages.create(
-            model="claude-sonnet-4-6",
-            max_tokens=8000,
-            messages=[{"role": "user", "content": prompt}]
-        )
+            prompt = f"""Du bist CAIRN Coach. Erstelle Woche {week_from} bis {week_to} eines {total_weeks}-Wochen Trainingsplans.
 
-        raw = message.content[0].text.strip()
-        raw = raw.replace('```json', '').replace('```', '').strip()
-        plan_json = json.loads(raw)
+ATHLETENPROFIL:
+- Ziel: {goal_type}
+- Rennen: {race_name} ({race_type}) · {race_distance_km if race_distance_km else '?'} km
+- Renndatum: {race_date}
+- Trainingstage pro Woche: {days_per_week}
+- Long Run Tag: {day_names[long_run_day]} (Tag {long_run_day})
+- Quality Sessions pro Woche: {quality_sessions}
+- Kraft-Sessions pro Woche: {strength_sessions}
+- Gesamtplan: {total_weeks} Wochen · Phasen: {', '.join(phase_context)}
+{gpx_context}
+REGELN:
+1. Long Run IMMER an Tag {long_run_day} ({day_names[long_run_day]})
+2. Nie 2 harte Sessions direkt hintereinander
+3. Nach Long Run: Rest oder Easy
+4. Kraft nicht direkt vor Quality
+5. Deload alle 4 Wochen (Volumen -20%)
+6. Trail Run = RPE-basiert, keine Pace
+
+SESSION-TYPEN: Easy Run, Trail Run, Long Run, Progression Run, Tempo Run, Intervalle, Hill Repeats, Krafttraining (Oberkörper A/B oder Unterkörper A/B), Mobilität
+
+NUR JSON, keine Erklärung:
+{{"weeks": [{{"week_number": {week_from}, "phase": "base", "total_km": 40, "sessions": [{{"day_of_week": 1, "session_type": "Easy Run", "session_zone": "Z1-Z2", "distance_km": 8, "duration_min": 55, "notes": "Easy Run Z1-Z2 · RPE 1-3"}}]}}]}}
+
+Erstelle Wochen {week_from} bis {week_to}. day_of_week: 1=Mo bis 7=So. Rest Days weglassen."""
+
+            message = client.messages.create(
+                model="claude-sonnet-4-6",
+                max_tokens=8000,
+                messages=[{"role": "user", "content": prompt}]
+            )
+
+            raw = message.content[0].text.strip()
+            raw = raw.replace('```json', '').replace('```', '').strip()
+            try:
+                part_json = json.loads(raw)
+                all_weeks.extend(part_json.get('weeks', []))
+            except Exception as parse_err:
+                # Wenn JSON-Parse fehlschlägt, trotzdem weitermachen
+                import traceback as tb
+                print(f"JSON parse error for weeks {week_from}-{week_to}: {parse_err}")
+                continue
+
+        plan_json = {"weeks": all_weeks}
 
         # In DB speichern
         conn = get_db()
