@@ -21,7 +21,7 @@ html,body{height:100%;background:var(--black);font-family:'DM Sans',sans-serif;c
   padding:0 20px;z-index:100;
 }
 .topbar-kicker{font-family:'DM Mono',monospace;font-size:8px;color:rgba(232,216,74,.5);letter-spacing:.18em}
-.topbar-title{font-family:'DM Mono',monospace;font-size:10px;color:rgba(240,237,230,.4);letter-spacing:.1em}
+.topbar-title{font-family:'DM Mono',monospace;font-size:10px;color:rgba(240,237,230,.85);letter-spacing:.1em}
 
 /* PROGRESS BAR */
 .progress-wrap{position:fixed;top:56px;left:0;right:0;height:2px;background:rgba(240,237,230,.08);z-index:100}
@@ -40,7 +40,7 @@ html,body{height:100%;background:var(--black);font-family:'DM Sans',sans-serif;c
 .step-kicker{font-family:'DM Mono',monospace;font-size:8px;color:rgba(232,216,74,.45);letter-spacing:.18em;margin-bottom:16px}
 .step-question{font-size:26px;font-weight:300;line-height:1.35;letter-spacing:-.02em;margin-bottom:8px;color:#F0EDE6}
 .step-question b{font-weight:500}
-.step-sub{font-size:13px;color:rgba(240,237,230,.4);line-height:1.6;margin-bottom:32px}
+.step-sub{font-size:13px;color:rgba(240,237,230,.85);line-height:1.6;margin-bottom:32px}
 
 /* OPTIONS */
 .options{display:flex;flex-direction:column;gap:10px;margin-bottom:32px}
@@ -58,25 +58,25 @@ html,body{height:100%;background:var(--black);font-family:'DM Sans',sans-serif;c
 .option-icon{width:36px;height:36px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
 .option-text{flex:1}
 .option-title{font-size:15px;font-weight:400;color:#F0EDE6;margin-bottom:2px}
-.option-desc{font-size:12px;color:rgba(240,237,230,.35)}
+.option-desc{font-size:12px;color:rgba(240,237,230,.85)}
 .option-check{width:16px;height:16px;border:.5px solid rgba(240,237,230,.2);flex-shrink:0;display:flex;align-items:center;justify-content:center}
 .option.sel .option-check{background:var(--accent);border-color:var(--accent)}
 .option.sel .option-check::after{content:'✓';font-size:10px;color:var(--black);font-weight:700}
 
 /* DAYS GRID */
-.days-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-bottom:32px}
+.days-grid{display:flex;gap:8px;margin-bottom:32px;flex-wrap:nowrap}
 .day-btn{
-  display:flex;flex-direction:column;align-items:center;gap:4px;
-  padding:12px 4px;border:.5px solid rgba(240,237,230,.12);
-  cursor:pointer;transition:all .15s;
+  flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;
+  padding:16px 4px;border:.5px solid rgba(240,237,230,.12);
+  cursor:pointer;transition:all .15s;min-height:64px;
 }
 .day-btn.sel{border-color:var(--accent);background:rgba(232,216,74,.08)}
 .day-btn.disabled{opacity:.3;pointer-events:none}
-.day-name{font-family:'DM Mono',monospace;font-size:8px;color:rgba(240,237,230,.4);letter-spacing:.08em}
-.day-btn.sel .day-name{color:var(--accent)}
+.day-name{font-family:'DM Mono',monospace;font-size:8px;color:rgba(240,237,230,.85);letter-spacing:.08em}
+.day-btn.sel .day-name{color:var(--accent);font-weight:500}
 
 /* NUMBER PICKER */
-.number-picker{display:flex;align-items:center;gap:16px;margin-bottom:32px}
+.number-picker{display:flex;align-items:center;justify-content:center;gap:16px;margin-bottom:32px}
 .np-btn{
   width:44px;height:44px;border:.5px solid rgba(240,237,230,.2);
   background:transparent;color:#F0EDE6;font-size:20px;cursor:pointer;
@@ -84,7 +84,7 @@ html,body{height:100%;background:var(--black);font-family:'DM Sans',sans-serif;c
 }
 .np-btn:active{background:rgba(240,237,230,.08)}
 .np-val{font-family:'DM Mono',monospace;font-size:36px;color:var(--accent);font-weight:500;min-width:60px;text-align:center}
-.np-unit{font-family:'DM Mono',monospace;font-size:10px;color:rgba(240,237,230,.3);letter-spacing:.1em}
+.np-unit{font-family:'DM Mono',monospace;font-size:10px;color:rgba(240,237,230,.7);letter-spacing:.1em}
 
 /* INPUT */
 .text-input{
@@ -95,14 +95,14 @@ html,body{height:100%;background:var(--black);font-family:'DM Sans',sans-serif;c
   outline:none;margin-bottom:32px;
   -webkit-appearance:none;
 }
-.text-input::placeholder{color:rgba(240,237,230,.2)}
+.text-input::placeholder{color:rgba(240,237,230,.6)}
 .date-input{
   width:100%;background:rgba(240,237,230,.06);
   border:.5px solid rgba(240,237,230,.15);
   padding:14px 16px;color:#F0EDE6;
   font-family:'DM Mono',monospace;font-size:14px;
   outline:none;margin-bottom:32px;
-  -webkit-appearance:none;
+  -webkit-appearance:none;box-sizing:border-box;max-width:100%;
 }
 
 /* SUMMARY */
@@ -111,14 +111,14 @@ html,body{height:100%;background:var(--black);font-family:'DM Sans',sans-serif;c
   display:flex;justify-content:space-between;align-items:center;
   padding:14px 0;border-bottom:.5px solid rgba(240,237,230,.08);
 }
-.summary-label{font-family:'DM Mono',monospace;font-size:9px;color:rgba(240,237,230,.3);letter-spacing:.14em}
+.summary-label{font-family:'DM Mono',monospace;font-size:9px;color:rgba(240,237,230,.7);letter-spacing:.14em}
 .summary-value{font-size:14px;color:#F0EDE6}
 
 /* PHASE PREVIEW */
 .phase-preview{display:flex;gap:0;margin-bottom:32px;border:.5px solid rgba(240,237,230,.1)}
 .phase-block{flex:1;padding:12px 8px;text-align:center;border-right:.5px solid rgba(240,237,230,.08)}
 .phase-block:last-child{border-right:none}
-.phase-name{font-family:'DM Mono',monospace;font-size:7px;color:rgba(240,237,230,.3);letter-spacing:.1em;margin-bottom:4px}
+.phase-name{font-family:'DM Mono',monospace;font-size:7px;color:rgba(240,237,230,.7);letter-spacing:.1em;margin-bottom:4px}
 .phase-weeks{font-family:'DM Mono',monospace;font-size:13px;color:#F0EDE6}
 .phase-block.active-phase .phase-name{color:var(--accent)}
 .phase-block.active-phase .phase-weeks{color:var(--accent)}
@@ -132,21 +132,21 @@ html,body{height:100%;background:var(--black);font-family:'DM Sans',sans-serif;c
 }
 .btn-back{
   width:44px;height:50px;background:transparent;
-  border:.5px solid rgba(240,237,230,.15);color:rgba(240,237,230,.4);
+  border:.5px solid rgba(240,237,230,.15);color:rgba(240,237,230,.85);
   font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;
 }
 .btn-next{
   flex:1;height:50px;background:rgba(240,237,230,.1);border:none;
-  color:rgba(240,237,230,.3);font-family:'DM Mono',monospace;
+  color:rgba(240,237,230,.7);font-family:'DM Mono',monospace;
   font-size:10px;letter-spacing:.14em;cursor:pointer;
   transition:all .2s;pointer-events:none;
 }
-.btn-next.ready{background:var(--accent);color:var(--black);font-weight:500;pointer-events:all}
+.btn-next.ready{background:var(--accent);color:var(--black);font-weight:500;pointer-events:all;text-align:center}
 .btn-generate{
   flex:1;height:50px;background:var(--accent);border:none;
   color:var(--black);font-family:'DM Mono',monospace;
-  font-size:10px;letter-spacing:.14em;cursor:pointer;font-weight:500;
-  display:none;
+  font-size:12px;letter-spacing:.14em;cursor:pointer;font-weight:500;
+  display:none;align-items:center;justify-content:center;
 }
 
 /* GENERATING SCREEN */
@@ -158,10 +158,10 @@ html,body{height:100%;background:var(--black);font-family:'DM Sans',sans-serif;c
 .generating.show{display:flex}
 .gen-kicker{font-family:'DM Mono',monospace;font-size:8px;color:rgba(232,216,74,.45);letter-spacing:.18em;margin-bottom:24px}
 .gen-title{font-size:24px;font-weight:300;color:#F0EDE6;margin-bottom:8px}
-.gen-sub{font-size:13px;color:rgba(240,237,230,.4);margin-bottom:48px;line-height:1.6}
+.gen-sub{font-size:13px;color:rgba(240,237,230,.85);margin-bottom:48px;line-height:1.6}
 .gen-bar-wrap{width:100%;max-width:280px;height:2px;background:rgba(240,237,230,.08);margin-bottom:16px}
 .gen-bar{height:100%;background:var(--accent);width:0%;transition:width .3s ease}
-.gen-status{font-family:'DM Mono',monospace;font-size:9px;color:rgba(240,237,230,.3);letter-spacing:.1em}
+.gen-status{font-family:'DM Mono',monospace;font-size:9px;color:rgba(240,237,230,.7);letter-spacing:.1em}
 </style>
 </head>
 <body>
@@ -246,7 +246,7 @@ html,body{height:100%;background:var(--black);font-family:'DM Sans',sans-serif;c
       <input class="text-input" id="race-name" placeholder="Rennenname (z.B. Zürich Marathon)" oninput="checkStep2()">
     </div>
     <div id="race-date-wrap" style="display:none">
-      <div style="font-family:'DM Mono',monospace;font-size:9px;color:rgba(240,237,230,.3);letter-spacing:.14em;margin-bottom:10px">RENNDATUM</div>
+      <div style="font-family:'DM Mono',monospace;font-size:9px;color:rgba(240,237,230,.7);letter-spacing:.14em;margin-bottom:10px">RENNDATUM</div>
       <input class="date-input" type="date" id="race-date" onchange="checkStep2()">
     </div>
   </div>
@@ -262,7 +262,7 @@ html,body{height:100%;background:var(--black);font-family:'DM Sans',sans-serif;c
       <button class="np-btn" onclick="changeNum('days',1)">+</button>
       <div class="np-unit">TAGE</div>
     </div>
-    <div style="font-family:'DM Mono',monospace;font-size:9px;color:rgba(240,237,230,.25);letter-spacing:.1em;line-height:1.8">
+    <div style="font-family:'DM Mono',monospace;font-size:9px;color:rgba(240,237,230,.7);letter-spacing:.1em;line-height:1.8">
       3 TAGE · Einsteiger / wenig Zeit<br>
       4–5 TAGE · Intermediär<br>
       6 TAGE · Erfahren / viel Zeit
@@ -296,7 +296,7 @@ html,body{height:100%;background:var(--black);font-family:'DM Sans',sans-serif;c
       <button class="np-btn" onclick="changeNum('quality',1)">+</button>
       <div class="np-unit">PRO WOCHE</div>
     </div>
-    <div style="font-family:'DM Mono',monospace;font-size:9px;color:rgba(240,237,230,.25);letter-spacing:.1em;line-height:1.8">
+    <div style="font-family:'DM Mono',monospace;font-size:9px;color:rgba(240,237,230,.7);letter-spacing:.1em;line-height:1.8">
       1 · Konservativ, weniger Verletzungsrisiko<br>
       2 · Standard für Intermediär / Fortgeschrittene<br>
       3+ · Nur für sehr Erfahrene
@@ -314,7 +314,7 @@ html,body{height:100%;background:var(--black);font-family:'DM Sans',sans-serif;c
       <button class="np-btn" onclick="changeNum('strength',1)">+</button>
       <div class="np-unit">PRO WOCHE</div>
     </div>
-    <div style="font-family:'DM Mono',monospace;font-size:9px;color:rgba(240,237,230,.25);letter-spacing:.1em;line-height:1.8">
+    <div style="font-family:'DM Mono',monospace;font-size:9px;color:rgba(240,237,230,.7);letter-spacing:.1em;line-height:1.8">
       1 · Minimal, Fokus auf Laufen<br>
       2 · Empfohlen für Hybrid-Athleten<br>
       3 · Intensiver Hybridansatz
@@ -330,10 +330,10 @@ html,body{height:100%;background:var(--black);font-family:'DM Sans',sans-serif;c
     <div class="summary-rows" id="summary-rows"></div>
 
     <!-- Phasen Preview -->
-    <div style="font-family:'DM Mono',monospace;font-size:8px;color:rgba(240,237,230,.3);letter-spacing:.14em;margin-bottom:10px">TRAININGSPLAN · PHASEN</div>
+    <div style="font-family:'DM Mono',monospace;font-size:8px;color:rgba(240,237,230,.7);letter-spacing:.14em;margin-bottom:10px">TRAININGSPLAN · PHASEN</div>
     <div class="phase-preview" id="phase-preview"></div>
 
-    <div style="font-size:12px;color:rgba(240,237,230,.3);line-height:1.7;margin-top:16px">
+    <div style="font-size:12px;color:rgba(240,237,230,.7);line-height:1.7;margin-top:16px">
       Der Coach passt den Plan laufend an — basierend auf deinen Daten, deinem Befinden und deiner Progression.
     </div>
   </div>
