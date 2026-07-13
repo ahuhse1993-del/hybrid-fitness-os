@@ -205,10 +205,15 @@ Erstelle Wochen {week_from} bis {week_to}. day_of_week: 1=Mo bis 7=So. Rest Days
             message = client.messages.create(
                 model="claude-sonnet-4-6",
                 max_tokens=8000,
+                tools=[{"type": "web_search_20250305", "name": "web_search"}],
                 messages=[{"role": "user", "content": prompt}]
             )
 
-            raw = message.content[0].text.strip()
+            # Text aus allen Content-Blöcken zusammensetzen (inkl. nach Web Search)
+            raw = ""
+            for block in message.content:
+                if hasattr(block, 'text'):
+                    raw += block.text
             raw = raw.replace('```json', '').replace('```', '').strip()
             try:
                 part_json = json.loads(raw)

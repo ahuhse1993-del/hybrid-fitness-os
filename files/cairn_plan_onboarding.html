@@ -173,9 +173,13 @@ html,body{height:100%;background:var(--black);font-family:'DM Sans',sans-serif;c
 <div class="generating" id="generating">
   <div class="gen-kicker">CAIRN · PLAN GENERATOR</div>
   <div class="gen-title">Dein Plan wird erstellt.</div>
-  <div class="gen-sub">Der Coach analysiert dein Profil und berechnet die optimale Trainingsstruktur.</div>
+  <div class="gen-sub">Der Coach recherchiert aktuelle Trainingswissenschaft und baut deinen Plan. Das dauert ca. 3–5 Minuten.</div>
   <div class="gen-bar-wrap"><div class="gen-bar" id="gen-bar"></div></div>
-  <div class="gen-status" id="gen-status">PHASEN WERDEN BERECHNET...</div>
+  <div class="gen-status" id="gen-status">COACH STARTET...</div>
+  <div style="margin-top:32px;font-family:DM Mono,monospace;font-size:8px;color:rgba(240,237,230,.2);letter-spacing:.1em;text-align:center;line-height:2">
+    DU MACHST DAS NUR ALLE PAAR WOCHEN.<br>
+    NIMM DIR EINEN KAFFEE.
+  </div>
 </div>
 
 <div class="main">
@@ -543,11 +547,52 @@ function toggleStrengthDay(el, day) {
   }
 }
 
-// ── WOCHENSTRUKTUR BERECHNEN ──
+// ── WOCHENSTRUKTUR VORSCHAU ──
+// Echte Struktur wird vom Coach via Knowledge-Base generiert
 function buildWeekStructure() {
-  var structure = {};
+  planData.week_structure = null;
+  return {};
+}
 
-  // 1. Long Run Tag fest setzen
+function renderWeekStructure() {
+  var el = document.getElementById('week-structure-preview');
+  if (!el) return;
+  var DAY_NAMES = ['','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag','Sonntag'];
+  var strengthDays = planData.strength_days || [];
+  var lr = planData.long_run_day;
+
+  var html = '';
+
+  // Long Run
+  html += '<div style="display:flex;align-items:center;gap:12px;padding:11px 14px;border-bottom:.5px solid rgba(240,237,230,.06);background:rgba(240,237,230,.04)">';
+  html += '<div style="font-family:DM Mono,monospace;font-size:9px;color:rgba(240,237,230,.35);width:24px">' + DAY_NAMES[lr].substring(0,2).toUpperCase() + '</div>';
+  html += '<div style="font-family:DM Mono,monospace;font-size:7px;padding:3px 8px;border:.5px solid rgba(240,237,230,.2);color:#F0EDE6;letter-spacing:.08em;min-width:60px;text-align:center">LONG RUN</div>';
+  html += '<div style="font-size:14px;color:rgba(240,237,230,.8);font-weight:300">Long Run</div>';
+  html += '</div>';
+
+  // Krafttage
+  strengthDays.forEach(function(d) {
+    html += '<div style="display:flex;align-items:center;gap:12px;padding:11px 14px;border-bottom:.5px solid rgba(240,237,230,.06)">';
+    html += '<div style="font-family:DM Mono,monospace;font-size:9px;color:rgba(240,237,230,.35);width:24px">' + DAY_NAMES[d].substring(0,2).toUpperCase() + '</div>';
+    html += '<div style="font-family:DM Mono,monospace;font-size:7px;padding:3px 8px;border:.5px solid rgba(240,237,230,.1);color:rgba(240,237,230,.6);letter-spacing:.08em;min-width:60px;text-align:center">KRAFT</div>';
+    html += '<div style="font-size:14px;color:rgba(240,237,230,.8);font-weight:300">Krafttraining — Split durch Coach</div>';
+    html += '</div>';
+  });
+
+  // Coach Info
+  html += '<div style="padding:12px 14px;font-size:13px;color:rgba(240,237,230,.4);line-height:1.7">';
+  html += planData.quality_sessions + 'x Quality · ' + (planData.days_per_week - 1 - strengthDays.length) + 'x Easy/Trail — Platzierung durch Coach';
+  html += '</div>';
+  html += '<div style="padding:8px 14px 12px;font-family:DM Mono,monospace;font-size:8px;color:rgba(240,237,230,.2);letter-spacing:.08em;line-height:1.8">';
+  html += 'KEINE HARTE SESSION NACH LONG RUN · KEIN UNTERKÖRPER VOR QUALITY';
+  html += '</div>';
+
+  el.innerHTML = html;
+}
+
+// Dummy - wird nicht mehr verwendet aber buildSummary ruft es noch auf
+function _buildWeekStructureOld() {
+  var structure = {};
   structure[planData.long_run_day] = {type:'Long Run', label:'LONG RUN'};
 
   // 2. Krafttage setzen
@@ -712,9 +757,8 @@ function buildSummary() {
     return '<div class="summary-row"><div class="summary-label">' + r.label + '</div><div class="summary-value">' + r.value + '</div></div>';
   }).join('');
 
-  // Wochenstruktur berechnen und anzeigen
-  var structure = buildWeekStructure();
-  renderWeekStructure(structure);
+  // Wochenstruktur Vorschau
+  renderWeekStructure();
 
   document.getElementById('phase-preview').innerHTML = phases.map(function(p) {
     return '<div class="phase-block"><div class="phase-name">' + p.name + '</div><div class="phase-weeks">' + p.weeks + ' W</div></div>';
@@ -892,12 +936,17 @@ function generatePlan() {
   var bar = document.getElementById('gen-bar');
   var status = document.getElementById('gen-status');
   var steps = [
-    [10,'PROFIL WIRD ANALYSIERT...'],
-    [30,'PHASEN WERDEN BERECHNET...'],
-    [55,'WÖCHENTLICHE STRUKTUR WIRD ERSTELLT...'],
-    [75,'EINHEITEN WERDEN GENERIERT...'],
-    [90,'PLAN WIRD GESPEICHERT...'],
-    [100,'PLAN LÄDT — EINEN MOMENT...']
+    [5, 'COACH LIEST DEIN PROFIL...'],
+    [12, 'AKTUELLE STUDIEN WERDEN RECHERCHIERT...'],
+    [20, 'HYBRID-TRAINING PRINZIPIEN WERDEN GELADEN...'],
+    [30, 'OPTIMALE WOCHENSTRUKTUR WIRD BERECHNET...'],
+    [42, 'ERSTE PLANHÄLFTE WIRD GENERIERT...'],
+    [55, 'PHASENÜBERGÄNGE WERDEN BERECHNET...'],
+    [65, 'ZWEITE PLANHÄLFTE WIRD GENERIERT...'],
+    [78, 'DELOAD-WOCHEN WERDEN EINGEPLANT...'],
+    [88, 'QUALITÄT WIRD GEPRÜFT...'],
+    [95, 'PLAN WIRD GESPEICHERT...'],
+    [100, 'PLAN LÄDT — EINEN MOMENT...']
   ];
   var i = 0;
   function tick() {
@@ -905,7 +954,7 @@ function generatePlan() {
       bar.style.width = steps[i][0] + '%';
       status.textContent = steps[i][1];
       i++;
-      setTimeout(tick, 1200);
+      setTimeout(tick, i < steps.length ? 18000 : 3000);
     }
   }
   tick();
