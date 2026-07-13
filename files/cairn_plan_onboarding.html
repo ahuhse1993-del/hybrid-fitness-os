@@ -324,20 +324,28 @@ html,body{height:100%;background:var(--black);font-family:'DM Sans',sans-serif;c
 
   <!-- SCHRITT 6: KRAFT -->
   <div class="step" id="step-6">
-    <div class="step-kicker">SCHRITT 6 VON 7</div>
-    <div class="step-question">Wie viele <b>Krafteinheiten</b> pro Woche?</div>
-    <div class="step-sub">Kraft ist fundamental für Trail Runner. Beugt Verletzungen vor.</div>
-    <div class="number-picker">
+    <div class="step-kicker">SCHRITT 6 VON 8</div>
+    <div class="step-question">Wann <b>Krafttraining?</b></div>
+    <div class="step-sub">Wie viele Einheiten und an welchen Tagen.</div>
+
+    <div class="number-picker" style="margin-bottom:12px">
       <button class="np-btn" onclick="changeNum('strength',-1)">−</button>
       <div class="np-val" id="strength-val">2</div>
       <button class="np-btn" onclick="changeNum('strength',1)">+</button>
     </div>
-    <div class="np-unit" style="text-align:center;margin-bottom:24px">PRO WOCHE</div>
-    <div class="np-hint">
-      1 · Minimal, Fokus auf Laufen<br>
-      2 · Empfohlen für Hybrid-Athleten<br>
-      3 · Intensiver Hybridansatz
+    <div class="np-unit" style="text-align:center;margin-bottom:28px">EINHEITEN PRO WOCHE</div>
+
+    <div style="font-family:'DM Mono',monospace;font-size:9px;color:rgba(240,237,230,.5);letter-spacing:.14em;margin-bottom:14px">AN WELCHEN TAGEN?</div>
+    <div class="days-list" id="strength-days-list">
+      <div class="day-btn" data-day="1" onclick="toggleStrengthDay(this,1)"><div class="day-label">Montag</div><div class="day-check"></div></div>
+      <div class="day-btn" data-day="2" onclick="toggleStrengthDay(this,2)"><div class="day-label">Dienstag</div><div class="day-check"></div></div>
+      <div class="day-btn" data-day="3" onclick="toggleStrengthDay(this,3)"><div class="day-label">Mittwoch</div><div class="day-check"></div></div>
+      <div class="day-btn" data-day="4" onclick="toggleStrengthDay(this,4)"><div class="day-label">Donnerstag</div><div class="day-check"></div></div>
+      <div class="day-btn" data-day="5" onclick="toggleStrengthDay(this,5)"><div class="day-label">Freitag</div><div class="day-check"></div></div>
+      <div class="day-btn" data-day="6" onclick="toggleStrengthDay(this,6)"><div class="day-label">Samstag</div><div class="day-check"></div></div>
+      <div class="day-btn" data-day="7" onclick="toggleStrengthDay(this,7)"><div class="day-label">Sonntag</div><div class="day-check"></div></div>
     </div>
+    <div id="strength-day-hint" style="font-family:'DM Mono',monospace;font-size:9px;color:rgba(240,237,230,.35);letter-spacing:.1em;margin-top:12px">BITTE TAGE WÄHLEN</div>
   </div>
 
   <!-- SCHRITT 7: STARTDATUM -->
@@ -505,15 +513,13 @@ function getPhases(totalWeeks) {
 function toggleStrengthDay(el, day) {
   var idx = planData.strength_days.indexOf(day);
   if (idx === -1) {
+    // Wenn max erreicht: ältesten abwählen
     if (planData.strength_days.length >= planData.strength_sessions) {
-      // Max erreicht – ältesten entfernen
       var oldest = planData.strength_days.shift();
       document.querySelectorAll('#strength-days-list .day-btn').forEach(function(b) {
-        if (parseInt(b.dataset && b.dataset.day) === oldest) b.classList.remove('sel');
-      });
-      // Alle Buttons prüfen
-      document.querySelectorAll('#strength-days-list .day-btn').forEach(function(b, i) {
-        if (planData.strength_days.indexOf(i+1) === -1) b.classList.remove('sel');
+        if (parseInt(b.getAttribute('data-day')) === oldest) {
+          b.classList.remove('sel');
+        }
       });
     }
     planData.strength_days.push(day);
@@ -523,11 +529,13 @@ function toggleStrengthDay(el, day) {
     el.classList.remove('sel');
   }
   planData.strength_days.sort(function(a,b){return a-b;});
-  var hint = document.getElementById('strength-day-hint');
   var DAY_NAMES = ['','MO','DI','MI','DO','FR','SA','SO'];
-  if (hint) hint.textContent = planData.strength_days.length > 0
-    ? planData.strength_days.map(function(d){return DAY_NAMES[d];}).join(' · ')
-    : 'BITTE TAGE WÄHLEN';
+  var hint = document.getElementById('strength-day-hint');
+  if (hint) {
+    hint.textContent = planData.strength_days.length > 0
+      ? planData.strength_days.map(function(d){return DAY_NAMES[d];}).join(' · ')
+      : 'BITTE TAGE WÄHLEN';
+  }
   if (planData.strength_days.length === planData.strength_sessions) {
     document.getElementById('btn-next').classList.add('ready');
   } else {
@@ -537,48 +545,56 @@ function toggleStrengthDay(el, day) {
 
 // ── WOCHENSTRUKTUR BERECHNEN ──
 function buildWeekStructure() {
-  var DAY_NAMES_FULL = ['','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag','Sonntag'];
   var structure = {};
 
-  // Long Run Tag setzen
-  structure[planData.long_run_day] = {type:'Long Run', label:'LONG RUN', color:'rgba(46,44,42,.6)'};
+  // 1. Long Run Tag fest setzen
+  structure[planData.long_run_day] = {type:'Long Run', label:'LONG RUN'};
 
-  // Krafttage setzen
-  // Oberkörper vor/nach Quality, Unterkörper an anderen Tagen
+  // 2. Krafttage setzen
+  // Erste Krafttage = Oberkörper (vor Quality), letzte = Unterkörper (nach Long Run)
   var strengthDays = planData.strength_days.slice().sort(function(a,b){return a-b;});
-  var upperIdx = 0;
+  var longRunDay = planData.long_run_day;
+
+  // Bestimme ob Oberkörper oder Unterkörper: 
+  // Tage VOR Long Run = Oberkörper, Tage NACH Long Run = Unterkörper
   strengthDays.forEach(function(d) {
-    if (structure[d]) return; // Long Run Tag – skip
-    // Oberkörper an geraden Positionen, Unterkörper an ungeraden
-    var isUpper = (upperIdx % 2 === 0);
-    structure[d] = {type: isUpper ? 'Krafttraining (Oberkörper)' : 'Krafttraining (Unterkörper)', label: isUpper ? 'KRAFT OB' : 'KRAFT UB', color:'rgba(46,44,42,.4)'};
-    upperIdx++;
+    if (d === longRunDay) return; // Long Run Tag hat Vorrang
+    var isUpper = d < longRunDay;
+    structure[d] = {
+      type: isUpper ? 'Krafttraining · Oberkörper' : 'Krafttraining · Unterkörper',
+      label: isUpper ? 'KRAFT OB' : 'KRAFT UB'
+    };
   });
 
-  // Quality Sessions – nicht direkt nach Unterkörper, nicht direkt vor Long Run
+  // 3. Quality Session platzieren
+  // Regel: nicht direkt nach Unterkörper-Kraft, nicht direkt vor Long Run
   var qualityPlaced = 0;
-  var qualityTarget = planData.quality_sessions;
-  for (var d = 1; d <= 7 && qualityPlaced < qualityTarget; d++) {
+  for (var d = 1; d <= 7 && qualityPlaced < planData.quality_sessions; d++) {
     if (structure[d]) continue;
     var prev = structure[d-1];
     var next = structure[d+1];
-    var prevIsLower = prev && prev.label === 'KRAFT UB';
-    var nextIsLong = next && next.label === 'LONG RUN';
-    if (!prevIsLower && !nextIsLong) {
-      structure[d] = {type:'Quality Session', label:'QUALITY', color:'var(--accent)'};
+    var afterLower = prev && prev.label === 'KRAFT UB';
+    var beforeLong = next && next.label === 'LONG RUN';
+    var afterLong = prev && prev.label === 'LONG RUN';
+    if (!afterLower && !beforeLong && !afterLong) {
+      structure[d] = {type:'Quality Session', label:'QUALITY'};
       qualityPlaced++;
     }
   }
 
-  // Restliche Tage: Easy Run oder Rest
-  var runDaysLeft = planData.days_per_week - Object.keys(structure).length;
+  // 4. Restliche Lauftage und Rest Days
+  // Gesamte Sessions: Long Run (1) + Kraft + Quality + Easy Runs + Rest
+  var usedDays = Object.keys(structure).length;
+  var totalSessions = planData.days_per_week; // inkl. Kraft
+  var easyRunsNeeded = totalSessions - usedDays;
+
   for (var d = 1; d <= 7; d++) {
     if (structure[d]) continue;
-    if (runDaysLeft > 0) {
-      structure[d] = {type:'Easy Run', label:'EASY', color:'rgba(46,44,42,.3)'};
-      runDaysLeft--;
+    if (easyRunsNeeded > 0) {
+      structure[d] = {type:'Easy Run', label:'EASY'};
+      easyRunsNeeded--;
     } else {
-      structure[d] = {type:'Rest Day', label:'REST', color:'rgba(46,44,42,.15)'};
+      structure[d] = {type:'Rest Day', label:'REST'};
     }
   }
 
@@ -590,15 +606,31 @@ function renderWeekStructure(structure) {
   var DAY_NAMES_FULL = ['','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag','Sonntag'];
   var el = document.getElementById('week-structure-preview');
   if (!el) return;
+  var LABEL_COLORS = {
+    'LONG RUN': '#F0EDE6',
+    'QUALITY': 'var(--accent)',
+    'KRAFT OB': 'rgba(240,237,230,.6)',
+    'KRAFT UB': 'rgba(240,237,230,.6)',
+    'EASY': 'rgba(240,237,230,.4)',
+    'REST': 'rgba(240,237,230,.2)'
+  };
+  var LABEL_BG = {
+    'LONG RUN': 'rgba(240,237,230,.12)',
+    'QUALITY': 'rgba(232,216,74,.12)',
+    'KRAFT OB': 'rgba(240,237,230,.06)',
+    'KRAFT UB': 'rgba(240,237,230,.06)',
+    'EASY': 'transparent',
+    'REST': 'transparent'
+  };
   var html = '';
   for (var d = 1; d <= 7; d++) {
-    var s = structure[d] || {type:'Rest Day', label:'REST', color:'rgba(46,44,42,.15)'};
-    var isLong = s.label === 'LONG RUN';
-    var isQuality = s.label === 'QUALITY';
-    var bg = isLong ? 'rgba(46,44,42,.08)' : (isQuality ? 'rgba(232,216,74,.06)' : 'transparent');
-    html += '<div style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:.5px solid rgba(240,237,230,.06);background:'+bg+'">';
-    html += '<div style="font-family:DM Mono,monospace;font-size:9px;color:rgba(240,237,230,.4);width:28px">'+DAY_NAMES_FULL[d].substring(0,2).toUpperCase()+'</div>';
-    html += '<div style="font-family:DM Mono,monospace;font-size:8px;padding:2px 8px;background:rgba(240,237,230,.06);color:'+s.color+';letter-spacing:.08em;flex-shrink:0">'+s.label+'</div>';
+    var s = structure[d] || {type:'Rest Day', label:'REST'};
+    var lc = LABEL_COLORS[s.label] || 'rgba(240,237,230,.4)';
+    var lb = LABEL_BG[s.label] || 'transparent';
+    var rowBg = s.label === 'LONG RUN' ? 'rgba(240,237,230,.04)' : (s.label === 'QUALITY' ? 'rgba(232,216,74,.04)' : 'transparent');
+    html += '<div style="display:flex;align-items:center;gap:12px;padding:11px 14px;border-bottom:.5px solid rgba(240,237,230,.06);background:'+rowBg+'">';
+    html += '<div style="font-family:DM Mono,monospace;font-size:9px;color:rgba(240,237,230,.35);width:24px">'+DAY_NAMES_FULL[d].substring(0,2).toUpperCase()+'</div>';
+    html += '<div style="font-family:DM Mono,monospace;font-size:7px;padding:3px 8px;background:'+lb+';border:.5px solid rgba(240,237,230,.1);color:'+lc+';letter-spacing:.08em;flex-shrink:0;min-width:60px;text-align:center">'+s.label+'</div>';
     html += '<div style="font-size:14px;color:rgba(240,237,230,.8);font-weight:300">'+s.type+'</div>';
     html += '</div>';
   }
