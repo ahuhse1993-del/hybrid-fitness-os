@@ -14,60 +14,23 @@
   --nav-h:56px;--top-h:58px;
 }
 html,body{height:100%;overflow:hidden;background:var(--bg);font-family:'DM Sans',sans-serif;color:var(--black);font-size:14px}
-
-/* ══ PAGES ══ */
-.page{
-  display:none;position:fixed;
-  top:var(--top-h);left:0;right:0;
-  bottom:calc(var(--nav-h) + env(safe-area-inset-bottom));
-  overflow-y:auto;-webkit-overflow-scrolling:touch;
-  background:var(--bg);
-}
+.page{display:none;position:fixed;top:var(--top-h);left:0;right:0;bottom:calc(var(--nav-h) + env(safe-area-inset-bottom));overflow-y:auto;-webkit-overflow-scrolling:touch;background:var(--bg)}
 .page.active{display:block}
-
-/* ══ TOPBAR ══ */
-.topbar{
-  position:fixed;top:0;left:0;right:0;
-  height:var(--top-h);
-  background:var(--bg);
-  border-bottom:1px solid var(--black);
-  display:flex;align-items:stretch;
-  z-index:200;
-}
+.topbar{position:fixed;top:0;left:0;right:0;height:var(--top-h);background:var(--bg);border-bottom:1px solid var(--black);display:flex;align-items:stretch;z-index:200}
 .topbar-text{flex:1;padding:10px 16px;display:flex;flex-direction:column;justify-content:center}
 .topbar-date{font-family:'DM Mono',monospace;font-size:8px;color:var(--stone);letter-spacing:.14em}
 .topbar-title{font-family:'DM Mono',monospace;font-size:11px;color:var(--mid);letter-spacing:.1em}
-.coach-btn{
-  width:58px;background:var(--accent);border:none;border-left:1px solid var(--black);
-  display:flex;align-items:center;justify-content:center;cursor:pointer;
-  flex-shrink:0;
-}
+.coach-btn{width:58px;background:var(--accent);border:none;border-left:1px solid var(--black);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0}
 .coach-btn:active{background:var(--accent-mid)}
-
-/* ══ BOTTOM NAV ══ */
-.bottom-nav{
-  position:fixed;bottom:0;left:0;right:0;
-  height:calc(var(--nav-h) + env(safe-area-inset-bottom));
-  background:var(--black);z-index:200;
-  display:flex;align-items:flex-start;
-}
+.bottom-nav{position:fixed;bottom:0;left:0;right:0;height:calc(var(--nav-h) + env(safe-area-inset-bottom));background:var(--black);z-index:200;display:flex;align-items:flex-start}
 .nav-inner{display:flex;width:100%;height:var(--nav-h)}
-.nav-item{
-  flex:1;display:flex;align-items:center;justify-content:center;
-  cursor:pointer;position:relative;gap:5px;
-}
+.nav-item{flex:1;display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;gap:5px}
 .nav-item-lbl{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.1em;color:#4A4846;text-transform:uppercase}
 .nav-item.on .nav-item-lbl{color:#F0EDE6}
 .nav-item.on::before{content:'';display:block;width:2px;height:12px;background:var(--accent);flex-shrink:0}
-
-/* ══ UTILS ══ */
-.d-bar{height:8px;display:flex;width:100%}
-.d-fill{height:100%;background:var(--black)}
-.d-rest{flex:1;height:100%;background-image:var(--dot);background-size:4px 4px}
 .kicker{font-family:'DM Mono',monospace;font-size:8px;color:var(--stone);letter-spacing:.14em;margin-bottom:6px}
-.section{border-bottom:.5px solid var(--black);padding:16px}
 
-/* ══ CHECK-IN ══ */
+/* CHECK-IN */
 .checkin-backdrop{display:none;position:fixed;inset:0;background:rgba(26,25,24,.65);z-index:500;align-items:center;justify-content:center;padding:20px}
 .checkin-backdrop.open{display:flex}
 .checkin-box{background:var(--black);width:100%;max-width:420px;border-top:3px solid var(--accent);padding:28px 20px;max-height:80vh;overflow-y:auto}
@@ -79,13 +42,9 @@ html,body{height:100%;overflow:hidden;background:var(--bg);font-family:'DM Sans'
 .mood-slider{-webkit-appearance:none;width:100%;height:2px;background:rgba(240,237,230,.15);outline:none;border-radius:0;cursor:pointer;display:block}
 .mood-slider::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:22px;background:var(--accent);border-radius:0}
 .mood-value{font-family:'DM Mono',monospace;font-size:28px;color:var(--accent);margin-top:10px;margin-bottom:20px;font-weight:500}
-.ci-notes{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:20px}
-.ci-note{padding:8px 12px;border:.5px solid rgba(240,237,230,.1);color:rgba(240,237,230,.3);font-family:'DM Mono',monospace;font-size:9px;cursor:pointer;background:transparent;transition:all .15s}
-.ci-note.sel{border-color:rgba(232,216,74,.35);color:var(--accent)}
-.ci-submit{width:100%;padding:14px;background:rgba(240,237,230,.08);border:.5px solid rgba(240,237,230,.15);color:rgba(240,237,230,.3);font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.12em;cursor:pointer;transition:all .2s;pointer-events:none}
-.ci-submit.ready{background:var(--accent);border-color:var(--accent);color:var(--black);font-weight:500;pointer-events:all}
+.ci-submit{width:100%;padding:14px;background:var(--accent);border:none;color:var(--black);font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.12em;cursor:pointer;font-weight:500}
 
-/* ══ COACH CHAT OVERLAY ══ */
+/* COACH OVERLAY */
 .coach-overlay{display:none;position:fixed;inset:0;background:rgba(26,25,24,.75);z-index:400;align-items:flex-end}
 .coach-overlay.open{display:flex}
 .coach-sheet{background:var(--black);width:100%;height:75vh;border-top:3px solid var(--accent);display:flex;flex-direction:column;padding-bottom:env(safe-area-inset-bottom)}
@@ -103,32 +62,28 @@ html,body{height:100%;overflow:hidden;background:var(--bg);font-family:'DM Sans'
 .coach-input-wrap{padding:12px 16px;border-top:.5px solid rgba(240,237,230,.1);display:flex;gap:8px;align-items:flex-end;flex-shrink:0}
 .coach-input{flex:1;background:rgba(240,237,230,.08);border:.5px solid rgba(240,237,230,.15);padding:10px 12px;color:#F0EDE6;font-family:'DM Sans',sans-serif;font-size:13px;outline:none;resize:none;min-height:40px;max-height:100px;line-height:1.5}
 .coach-send{background:var(--accent);border:none;color:var(--black);width:36px;height:36px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:16px}
-.coach-send:disabled{opacity:.4;cursor:default}
 
-/* ══ TODAY PAGE ══ */
-.cb-illus-wrap{width:90px;background:#E8E5DD;border-left:.5px solid var(--black);display:flex;flex-direction:column;flex-shrink:0}
-.cb-illus-state{font-family:'DM Mono',monospace;font-size:7px;letter-spacing:.12em;color:var(--stone);padding:8px;border-bottom:.5px solid rgba(46,44,42,.12)}
-.cb-illus-art{flex:1;display:flex;align-items:center;justify-content:center;padding:10px}
-.athlete-echo{display:none;align-items:center;gap:8px;padding:6px 10px;background:rgba(46,44,42,.05);border-left:2px solid rgba(46,44,42,.2);font-size:11px;color:var(--stone);margin-bottom:10px}
-.ae-lbl{font-family:'DM Mono',monospace;font-size:7px;color:var(--stone);letter-spacing:.1em}
+/* TODAY */
 .cb-decision{font-size:16px;font-weight:300;line-height:1.6;letter-spacing:-.01em;color:var(--black)}
-.cb-decision b{font-weight:500}
-.cb-quote{font-size:13px;font-weight:300;font-style:italic;color:var(--mid);border-left:2px solid var(--accent);padding:6px 12px;margin-bottom:12px;line-height:1.55}
-.cb-why-items{display:flex;flex-direction:column;gap:5px;margin-bottom:0}
-.cb-why-item{display:flex;align-items:flex-start;gap:8px;font-size:12px;color:var(--mid);line-height:1.45}
+.cb-quote{font-size:13px;font-weight:300;font-style:italic;color:var(--mid);border-left:2px solid var(--accent);padding:6px 12px;line-height:1.55;margin-top:12px}
+.cb-why-item{display:flex;align-items:flex-start;gap:8px;font-size:12px;color:var(--mid);line-height:1.45;margin-bottom:5px}
 .cb-why-item::before{content:'';width:3px;height:3px;border-radius:50%;background:var(--stone);flex-shrink:0;margin-top:6px}
 .adapt-block{background:var(--black);border-left:3px solid var(--accent);padding:14px 16px;display:none;align-items:center;justify-content:space-between;gap:12px;cursor:pointer}
 .adapt-block.show{display:flex}
 .adapt-label{font-family:'DM Mono',monospace;font-size:8px;color:var(--accent);letter-spacing:.12em;margin-bottom:3px}
 .adapt-desc{font-size:12px;color:#F0EDE6}
 .adapt-btn-sm{background:var(--accent);border:none;color:var(--black);font-family:'DM Mono',monospace;font-size:9px;padding:7px 12px;cursor:pointer;letter-spacing:.1em;font-weight:500;flex-shrink:0}
+.athlete-echo{display:none;align-items:center;gap:8px;padding:8px 16px;background:rgba(46,44,42,.05);border-bottom:.5px solid rgba(46,44,42,.08);font-size:11px;color:var(--stone)}
+.ae-lbl{font-family:'DM Mono',monospace;font-size:7px;color:var(--stone);letter-spacing:.1em}
+.analyse-bar{display:none;background:var(--black);border-left:3px solid var(--accent);padding:10px 16px;align-items:center;justify-content:space-between;gap:10px}
+.analyse-bar.show{display:flex}
 
-/* ══ PLAN PAGE ══ */
+/* PLAN PAGE */
 .week-nav{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:.5px solid var(--black);position:sticky;top:0;background:var(--bg);z-index:10}
 .week-nav-btn{background:transparent;border:.5px solid var(--black);color:var(--black);width:32px;height:32px;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center}
 .week-nav-lbl{font-family:'DM Mono',monospace;font-size:10px;color:var(--black);letter-spacing:.08em}
 .plan-day{border-bottom:.5px solid var(--black)}
-.plan-day-head{display:flex;align-items:center;gap:12px;padding:10px 16px;background:var(--bg)}
+.plan-day-head{display:flex;align-items:center;gap:12px;padding:12px 16px;background:var(--bg)}
 .plan-day-name{font-family:'DM Mono',monospace;font-size:9px;color:var(--stone);letter-spacing:.1em;width:24px}
 .plan-day-date{font-family:'DM Mono',monospace;font-size:20px;font-weight:300;color:var(--mid);width:28px}
 .plan-day-head.today-day{background:var(--black)}
@@ -146,34 +101,24 @@ html,body{height:100%;overflow:hidden;background:var(--bg);font-family:'DM Sans'
 .badge-rest{color:rgba(46,44,42,.3);border:.5px dashed rgba(46,44,42,.2)}
 .badge-quality{background:var(--accent);color:var(--black)}
 
-/* ══ ACTIVITIES PAGE ══ */
+/* ACTIVITIES */
 .activity-item{display:flex;align-items:center;gap:12px;padding:14px 16px;border-bottom:.5px solid var(--black);cursor:pointer}
 .activity-item:active{background:#E8E4DC}
 .activity-type-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
-.dot-run{background:var(--mid)}
-.dot-long{background:var(--accent-dark)}
-.dot-quality{background:var(--accent)}
-.dot-gym{background:var(--stone)}
-.dot-easy{background:#9E9B95}
+.dot-run{background:var(--mid)}.dot-long{background:var(--accent-dark)}.dot-quality{background:var(--accent)}.dot-gym{background:var(--stone)}.dot-easy{background:#9E9B95}
 .activity-info{flex:1}
 .activity-name{font-size:13px;color:var(--black);font-weight:400;margin-bottom:2px}
 .activity-meta{font-family:'DM Mono',monospace;font-size:9px;color:var(--stone);letter-spacing:.06em}
 .activity-km{font-family:'DM Mono',monospace;font-size:13px;color:var(--mid);font-weight:500;flex-shrink:0}
 
-/* ══ ATHLETE PAGE ══ */
+/* ATHLETE */
 .athlete-section{border-bottom:.5px solid var(--black);padding:16px}
 .athlete-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:.5px solid rgba(46,44,42,.08)}
 .athlete-row:last-child{border-bottom:none}
 .athlete-row-lbl{font-family:'DM Mono',monospace;font-size:9px;color:var(--stone);letter-spacing:.1em}
 .athlete-row-val{font-size:13px;color:var(--black)}
-.shoe-item{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:.5px solid rgba(46,44,42,.08)}
-.shoe-item:last-child{border-bottom:none}
-.shoe-name{font-size:13px;color:var(--black);margin-bottom:2px}
-.shoe-meta{font-family:'DM Mono',monospace;font-size:9px;color:var(--stone)}
-.shoe-bar-wrap{margin-top:4px}
-.shoe-warn{color:var(--accent-dark);font-family:'DM Mono',monospace;font-size:8px}
 
-/* ══ OVERLAYS ══ */
+/* OVERLAYS */
 .overlay{display:none;position:fixed;inset:0;background:rgba(26,25,24,.75);z-index:400;align-items:flex-end}
 .overlay.open{display:flex}
 .ov-sheet{background:var(--bg);width:100%;border-top:3px solid var(--accent);padding:24px 16px;padding-bottom:calc(24px + env(safe-area-inset-bottom));max-height:90vh;overflow-y:auto}
@@ -195,7 +140,6 @@ html,body{height:100%;overflow:hidden;background:var(--bg);font-family:'DM Sans'
 .ov-btn{width:100%;padding:14px;font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.1em;cursor:pointer;margin-bottom:8px;border:none}
 .ov-btn.primary{background:var(--accent);color:var(--black);font-weight:500}
 .ov-btn.secondary{background:transparent;border:.5px solid var(--stone);color:var(--mid)}
-
 .ov-reject{display:none;position:fixed;inset:0;background:rgba(26,25,24,.75);z-index:410;align-items:flex-end}
 .ov-reject.open{display:flex}
 .rej-sheet{background:var(--bg);width:100%;border-top:2px solid var(--stone);padding:24px 16px;padding-bottom:calc(24px + env(safe-area-inset-bottom));max-height:90vh;overflow-y:auto}
@@ -205,16 +149,9 @@ html,body{height:100%;overflow:hidden;background:var(--bg);font-family:'DM Sans'
 .rej-opt.sel{background:var(--mid);color:var(--bg);border-color:var(--black)}
 .rej-note{width:100%;min-height:60px;background:#E8E4DC;border:.5px solid rgba(46,44,42,.18);padding:10px;font-family:'DM Sans',sans-serif;font-size:13px;color:var(--mid);resize:none;outline:none;margin-bottom:10px}
 .rej-footer{font-family:'DM Mono',monospace;font-size:8px;color:var(--stone);line-height:1.6;margin-bottom:12px}
-
 .ov-confirm{display:none;position:fixed;inset:0;background:rgba(26,25,24,.75);z-index:420;align-items:center;justify-content:center}
 .ov-confirm.open{display:flex}
-
-/* ANALYSE BAR */
-.analyse-bar{display:none;background:var(--black);border-left:3px solid var(--accent);padding:10px 16px;align-items:center;justify-content:space-between;gap:10px}
-.analyse-bar.show{display:flex}
-
 @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
-.spinning{animation:spin 1s linear infinite}
 </style>
 </head>
 <body>
@@ -228,15 +165,15 @@ html,body{height:100%;overflow:hidden;background:var(--bg);font-family:'DM Sans'
     <div class="ci-q">WIE F&Uuml;HLST DU DICH HEUTE?</div>
     <input type="range" class="mood-slider" id="mood-slider" min="1" max="10" value="5" step="1" oninput="updateMoodSlider(this.value)">
     <div style="display:flex;justify-content:space-between;margin-top:8px;margin-bottom:4px">
-      <span style="font-family:'DM Mono',monospace;font-size:8px;color:rgba(240,237,230,.25);letter-spacing:.1em">ERSCHÖPFT</span>
+      <span style="font-family:'DM Mono',monospace;font-size:8px;color:rgba(240,237,230,.25);letter-spacing:.1em">ERSCH&Ouml;PFT</span>
       <span style="font-family:'DM Mono',monospace;font-size:8px;color:rgba(240,237,230,.25);letter-spacing:.1em">FRISCH</span>
     </div>
     <div class="mood-value" id="mood-value">5</div>
-    <button class="ci-submit ready" id="ci-submit" onclick="submitCheckin()">SO F&Uuml;HLE ICH MICH &rarr;</button>
+    <button class="ci-submit" onclick="submitCheckin()">SO F&Uuml;HLE ICH MICH &rarr;</button>
   </div>
 </div>
 
-<!-- COACH CHAT OVERLAY -->
+<!-- COACH OVERLAY -->
 <div class="coach-overlay" id="coach-overlay">
   <div class="coach-sheet">
     <div class="coach-sheet-head">
@@ -254,12 +191,12 @@ html,body{height:100%;overflow:hidden;background:var(--bg);font-family:'DM Sans'
     </div>
     <div class="coach-input-wrap">
       <textarea class="coach-input" id="coach-input" placeholder="Schreib dem Coach..." rows="1" oninput="autoResize(this)"></textarea>
-      <button class="coach-send" id="coach-send-btn" onclick="sendCoachMessage()">&#x2192;</button>
+      <button class="coach-send" onclick="sendCoachMessage()">&#x2192;</button>
     </div>
   </div>
 </div>
 
-<!-- REPLAN OVERLAY -->
+<!-- REPLAN -->
 <div class="overlay" id="ov-replan">
   <div class="ov-sheet">
     <div class="ov-kicker">CAIRN &middot; EINE IDEE</div>
@@ -276,7 +213,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);font-family:'DM Sans'
   </div>
 </div>
 
-<!-- REJECT OVERLAY -->
+<!-- REJECT -->
 <div class="ov-reject" id="ov-reject">
   <div class="rej-sheet">
     <div class="rej-learn">&#x21BA; CAIRN LERNT VON DIR</div>
@@ -322,9 +259,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);font-family:'DM Sans'
   </button>
 </div>
 
-<!-- ═══════════════════════
-     PAGE: TODAY
-═══════════════════════ -->
+<!-- PAGE: TODAY -->
 <div class="page active" id="page-today">
 
   <!-- Analyse Bar -->
@@ -339,21 +274,15 @@ html,body{height:100%;overflow:hidden;background:var(--bg);font-family:'DM Sans'
 
   <!-- 1. MORNING BRIEF -->
   <div style="border-bottom:.5px solid var(--black)">
-
-    <!-- Athlete Echo -->
-    <div class="athlete-echo" id="athlete-echo" style="margin:0;border-left:none;border-bottom:.5px solid rgba(46,44,42,.08);padding:8px 16px">
+    <div class="athlete-echo" id="athlete-echo">
       <span class="ae-lbl">DU &middot;</span>
       <span id="echo-text"></span>
     </div>
-
-    <!-- Coach Text – volle Breite, grosser Text -->
     <div style="padding:20px 16px 16px">
       <div style="font-family:'DM Mono',monospace;font-size:8px;color:var(--stone);letter-spacing:.14em;margin-bottom:14px">CAIRN &middot; MORNING BRIEF</div>
       <div class="cb-decision" id="cb-decision"><span style="color:var(--stone);font-size:13px;font-family:'DM Mono',monospace">Coach l&auml;dt...</span></div>
-      <div class="cb-quote" id="cb-quote" style="display:none;margin-top:14px"></div>
+      <div class="cb-quote" id="cb-quote" style="display:none"></div>
     </div>
-
-    <!-- Adapt Block -->
     <div class="adapt-block" id="adapt-block" onclick="openReplan()">
       <div>
         <div class="adapt-label">EINE IDEE VON MIR</div>
@@ -365,108 +294,83 @@ html,body{height:100%;overflow:hidden;background:var(--bg);font-family:'DM Sans'
 
   <!-- 2. TODAY'S SESSION -->
   <div style="border-bottom:.5px solid var(--black);display:flex">
-
-    <!-- Illustration links – quadratisch, Session-Typ -->
     <div style="width:110px;flex-shrink:0;background:var(--cal-bg);border-right:.5px solid var(--black);display:flex;flex-direction:column">
       <div style="font-family:'DM Mono',monospace;font-size:7px;letter-spacing:.1em;color:var(--stone);padding:7px 8px;border-bottom:.5px solid rgba(46,44,42,.12)" id="session-illus-label">SESSION</div>
-      <div style="flex:1;display:flex;align-items:center;justify-content:center;padding:12px;aspect-ratio:1">
-        <!-- Platzhalter – wird später durch Katalog-Grafik ersetzt -->
+      <div style="flex:1;display:flex;align-items:center;justify-content:center;padding:12px">
         <svg width="70" height="70" viewBox="0 0 100 100" fill="none">
-          <!-- Stipple-artiger Platzhalter -->
           <rect x="2" y="2" width="96" height="96" stroke="rgba(46,44,42,.12)" stroke-width=".5" fill="none" stroke-dasharray="2 2"/>
-          <circle cx="50" cy="38" r="16" stroke="rgba(46,44,42,.2)" stroke-width="1" fill="none"/>
-          <line x1="50" y1="54" x2="50" y2="75" stroke="rgba(46,44,42,.2)" stroke-width="1"/>
-          <line x1="34" y1="63" x2="50" y2="54" stroke="rgba(46,44,42,.2)" stroke-width="1"/>
-          <line x1="66" y1="63" x2="50" y2="54" stroke="rgba(46,44,42,.2)" stroke-width="1"/>
-          <line x1="42" y1="80" x2="50" y2="75" stroke="rgba(46,44,42,.2)" stroke-width="1"/>
-          <line x1="58" y1="80" x2="50" y2="75" stroke="rgba(46,44,42,.2)" stroke-width="1"/>
+          <circle cx="50" cy="38" r="14" stroke="rgba(46,44,42,.2)" stroke-width="1" fill="none"/>
+          <line x1="50" y1="52" x2="50" y2="72" stroke="rgba(46,44,42,.2)" stroke-width="1"/>
+          <line x1="35" y1="62" x2="50" y2="52" stroke="rgba(46,44,42,.2)" stroke-width="1"/>
+          <line x1="65" y1="62" x2="50" y2="52" stroke="rgba(46,44,42,.2)" stroke-width="1"/>
+          <line x1="42" y1="80" x2="50" y2="72" stroke="rgba(46,44,42,.2)" stroke-width="1"/>
+          <line x1="58" y1="80" x2="50" y2="72" stroke="rgba(46,44,42,.2)" stroke-width="1"/>
           <text x="50" y="95" font-family="DM Mono" font-size="6" fill="rgba(46,44,42,.2)" text-anchor="middle" letter-spacing="2">ILLUS.</text>
         </svg>
       </div>
     </div>
-
-    <!-- Session Info rechts -->
     <div style="flex:1;padding:14px 16px;background-image:var(--dot);background-size:6px 6px">
       <div style="font-family:'DM Mono',monospace;font-size:8px;color:var(--mid);letter-spacing:.14em;margin-bottom:6px">TODAY'S SESSION</div>
       <div style="font-size:20px;font-weight:300;letter-spacing:-.02em;margin-bottom:12px;line-height:1.2" id="session-name">—</div>
       <div style="display:flex;flex-direction:column;gap:6px">
-        <div style="display:flex;justify-content:space-between">
-          <span style="font-family:'DM Mono',monospace;font-size:8px;color:var(--stone);letter-spacing:.1em">DISTANZ</span>
-          <span style="font-family:'DM Mono',monospace;font-size:12px;font-weight:500" id="session-dist">—</span>
-        </div>
-        <div style="display:flex;justify-content:space-between">
-          <span style="font-family:'DM Mono',monospace;font-size:8px;color:var(--stone);letter-spacing:.1em">ZONE</span>
-          <span style="font-family:'DM Mono',monospace;font-size:12px;font-weight:500" id="session-zone">—</span>
-        </div>
-        <div style="display:flex;justify-content:space-between">
-          <span style="font-family:'DM Mono',monospace;font-size:8px;color:var(--stone);letter-spacing:.1em">DAUER</span>
-          <span style="font-family:'DM Mono',monospace;font-size:12px;font-weight:500" id="session-dur">—</span>
-        </div>
+        <div style="display:flex;justify-content:space-between"><span style="font-family:'DM Mono',monospace;font-size:8px;color:var(--stone);letter-spacing:.1em">DISTANZ</span><span style="font-family:'DM Mono',monospace;font-size:12px;font-weight:500" id="session-dist">—</span></div>
+        <div style="display:flex;justify-content:space-between"><span style="font-family:'DM Mono',monospace;font-size:8px;color:var(--stone);letter-spacing:.1em">ZONE</span><span style="font-family:'DM Mono',monospace;font-size:12px;font-weight:500" id="session-zone">—</span></div>
+        <div style="display:flex;justify-content:space-between"><span style="font-family:'DM Mono',monospace;font-size:8px;color:var(--stone);letter-spacing:.1em">DAUER</span><span style="font-family:'DM Mono',monospace;font-size:12px;font-weight:500" id="session-dur">—</span></div>
       </div>
     </div>
   </div>
 
-  <!-- 3. WOCHENÜBERSICHT – read only -->
-  <div style="border-bottom:.5px solid var(--black)" id="today-week-overview">
+  <!-- 3. WOCHENÜBERSICHT -->
+  <div style="border-bottom:.5px solid var(--black)">
     <div style="padding:10px 16px;border-bottom:.5px solid var(--black);display:flex;justify-content:space-between;align-items:center">
       <div style="font-family:'DM Mono',monospace;font-size:8px;color:var(--stone);letter-spacing:.14em">DIESE WOCHE</div>
       <div style="font-family:'DM Mono',monospace;font-size:8px;color:var(--stone)" id="today-week-kw">KW —</div>
     </div>
-    <div id="today-week-days" style="display:flex;flex-direction:column">
-      <div style="padding:16px;font-family:'DM Mono',monospace;font-size:9px;color:var(--stone)">Wird geladen...</div>
-    </div>
+    <div id="today-week-days"></div>
   </div>
 
   <!-- 4. HEALTH SNAPSHOT -->
   <div style="background:var(--black);padding:16px">
     <div style="font-family:'DM Mono',monospace;font-size:8px;color:rgba(240,237,230,.3);letter-spacing:.14em;margin-bottom:12px">HEALTH SNAPSHOT</div>
     <div style="display:flex;flex-direction:column;gap:8px">
-      <!-- HRV -->
       <div style="display:flex;align-items:center;gap:10px">
-        <div style="font-family:'DM Mono',monospace;font-size:8px;color:rgba(240,237,230,.3);letter-spacing:.08em;width:46px">HRV</div>
-        <div style="flex:1;height:8px;display:flex;position:relative">
+        <div style="font-family:'DM Mono',monospace;font-size:8px;color:rgba(240,237,230,.3);width:46px">HRV</div>
+        <div style="flex:1;height:8px;position:relative;display:flex">
           <div style="position:absolute;inset:0;background-image:radial-gradient(circle,rgba(240,237,230,.08) 1px,transparent 1px);background-size:4px 4px"></div>
-          <div id="dash-hrv-bar-v" style="height:100%;background:rgba(240,237,230,.6);position:relative;z-index:1;width:0%;transition:width .6s ease"></div>
+          <div id="dash-hrv-bar" style="height:100%;background:rgba(240,237,230,.6);position:relative;z-index:1;width:0%;transition:width .6s ease"></div>
         </div>
         <div style="font-family:'DM Mono',monospace;font-size:12px;color:#F0EDE6;font-weight:500;width:52px;text-align:right" id="dash-hrv">—</div>
         <div style="font-family:'DM Mono',monospace;font-size:7px;color:rgba(240,237,230,.25);width:18px">ms</div>
       </div>
-      <!-- SCHLAF -->
       <div style="display:flex;align-items:center;gap:10px">
-        <div style="font-family:'DM Mono',monospace;font-size:8px;color:rgba(240,237,230,.3);letter-spacing:.08em;width:46px">SCHLAF</div>
-        <div style="flex:1;height:8px;display:flex;position:relative">
+        <div style="font-family:'DM Mono',monospace;font-size:8px;color:rgba(240,237,230,.3);width:46px">SCHLAF</div>
+        <div style="flex:1;height:8px;position:relative;display:flex">
           <div style="position:absolute;inset:0;background-image:radial-gradient(circle,rgba(240,237,230,.08) 1px,transparent 1px);background-size:4px 4px"></div>
-          <div id="dash-sleep-bar-v" style="height:100%;background:rgba(240,237,230,.6);position:relative;z-index:1;width:0%;transition:width .6s ease"></div>
+          <div id="dash-sleep-bar" style="height:100%;background:rgba(240,237,230,.6);position:relative;z-index:1;width:0%;transition:width .6s ease"></div>
         </div>
         <div style="font-family:'DM Mono',monospace;font-size:12px;color:#F0EDE6;font-weight:500;width:52px;text-align:right" id="dash-sleep">—</div>
         <div style="font-family:'DM Mono',monospace;font-size:7px;color:rgba(240,237,230,.25);width:18px">h</div>
       </div>
-      <!-- PULS -->
       <div style="display:flex;align-items:center;gap:10px">
-        <div style="font-family:'DM Mono',monospace;font-size:8px;color:rgba(240,237,230,.3);letter-spacing:.08em;width:46px">PULS</div>
-        <div style="flex:1;height:8px;display:flex;position:relative">
+        <div style="font-family:'DM Mono',monospace;font-size:8px;color:rgba(240,237,230,.3);width:46px">PULS</div>
+        <div style="flex:1;height:8px;position:relative;display:flex">
           <div style="position:absolute;inset:0;background-image:radial-gradient(circle,rgba(240,237,230,.08) 1px,transparent 1px);background-size:4px 4px"></div>
-          <div id="dash-rhr-bar-v" style="height:100%;background:rgba(240,237,230,.6);position:relative;z-index:1;width:0%;transition:width .6s ease"></div>
+          <div id="dash-rhr-bar" style="height:100%;background:rgba(240,237,230,.6);position:relative;z-index:1;width:0%;transition:width .6s ease"></div>
         </div>
         <div style="font-family:'DM Mono',monospace;font-size:12px;color:#F0EDE6;font-weight:500;width:52px;text-align:right" id="dash-rhr">—</div>
         <div style="font-family:'DM Mono',monospace;font-size:7px;color:rgba(240,237,230,.25);width:18px">bpm</div>
       </div>
     </div>
   </div>
-
 </div>
 
-<!-- ═══════════════════════
-     PAGE: PLAN
-═══════════════════════ -->
+<!-- PAGE: PLAN -->
 <div class="page" id="page-plan">
   <div class="week-nav">
     <button class="week-nav-btn" onclick="shiftPlanWeek(-1)">&#8249;</button>
     <div class="week-nav-lbl" id="plan-week-lbl">DIESE WOCHE</div>
     <button class="week-nav-btn" onclick="shiftPlanWeek(1)">&#8250;</button>
   </div>
-
-  <!-- Wochenübersicht -->
   <div style="padding:12px 16px;border-bottom:.5px solid var(--black);background:var(--cal-bg)">
     <div style="display:flex;gap:16px">
       <div><div style="font-family:'DM Mono',monospace;font-size:7px;color:var(--stone);letter-spacing:.1em">KILOMETER</div><div style="font-family:'DM Mono',monospace;font-size:16px" id="plan-week-km">—</div></div>
@@ -474,16 +378,12 @@ html,body{height:100%;overflow:hidden;background:var(--bg);font-family:'DM Sans'
       <div><div style="font-family:'DM Mono',monospace;font-size:7px;color:var(--stone);letter-spacing:.1em">PHASE</div><div style="font-family:'DM Mono',monospace;font-size:16px;color:var(--accent-dark)">AUFBAU</div></div>
     </div>
   </div>
-
-  <!-- Tage der Woche -->
   <div id="plan-days-list">
     <div style="padding:24px 16px;font-family:'DM Mono',monospace;font-size:9px;color:var(--stone)">PLAN WIRD GELADEN...</div>
   </div>
 </div>
 
-<!-- ═══════════════════════
-     PAGE: ACTIVITIES
-═══════════════════════ -->
+<!-- PAGE: ACTIVITIES -->
 <div class="page" id="page-activities">
   <div style="padding:12px 16px;border-bottom:.5px solid var(--black);background:var(--cal-bg)">
     <div style="font-family:'DM Mono',monospace;font-size:9px;color:var(--stone);letter-spacing:.1em">ALLE AKTIVIT&Auml;TEN</div>
@@ -493,15 +393,13 @@ html,body{height:100%;overflow:hidden;background:var(--bg);font-family:'DM Sans'
   </div>
 </div>
 
-<!-- ═══════════════════════
-     PAGE: COACH (CHAT)
-═══════════════════════ -->
+<!-- PAGE: COACH -->
 <div class="page" id="page-coach" style="flex-direction:column">
   <div style="padding:12px 16px;border-bottom:.5px solid var(--black);background:var(--cal-bg)">
     <div style="font-family:'DM Mono',monospace;font-size:9px;color:var(--stone);letter-spacing:.1em">COACH &middot; CHAT</div>
     <div style="font-size:12px;color:var(--mid);margin-top:2px">Der Coach kennt deinen Plan, deine Ziele und deine Historie.</div>
   </div>
-  <div style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:12px" id="coach-page-messages">
+  <div style="padding:16px;display:flex;flex-direction:column;gap:12px;overflow-y:auto" id="coach-page-messages">
     <div style="align-self:flex-start;max-width:85%">
       <div style="padding:10px 14px;font-size:13px;line-height:1.55;background:rgba(46,44,42,.06);border-left:2px solid var(--accent);color:var(--black)">Was liegt an?</div>
       <div style="font-family:'DM Mono',monospace;font-size:7px;color:var(--stone);letter-spacing:.08em;margin-top:4px">CAIRN</div>
@@ -513,55 +411,31 @@ html,body{height:100%;overflow:hidden;background:var(--bg);font-family:'DM Sans'
   </div>
 </div>
 
-<!-- ═══════════════════════
-     PAGE: ATHLETE
-═══════════════════════ -->
+<!-- PAGE: ATHLETE -->
 <div class="page" id="page-athlete">
   <div style="padding:12px 16px;border-bottom:.5px solid var(--black);background:var(--cal-bg)">
     <div style="font-family:'DM Mono',monospace;font-size:9px;color:var(--stone);letter-spacing:.1em">ATHLET &middot; PROFIL</div>
   </div>
-
   <div class="athlete-section">
-    <div class="kicker">PERSÖNLICH</div>
+    <div class="kicker">PER&Scaron;NLICH</div>
     <div class="athlete-row"><div class="athlete-row-lbl">NAME</div><div class="athlete-row-val">Alexander</div></div>
     <div class="athlete-row"><div class="athlete-row-lbl">GEWICHT</div><div class="athlete-row-val">— kg</div></div>
-    <div class="athlete-row"><div class="athlete-row-lbl">ALTER</div><div class="athlete-row-val">—</div></div>
-    <div class="athlete-row"><div class="athlete-row-lbl">HERZFREQUENZ MAX</div><div class="athlete-row-val">— bpm</div></div>
-  </div>
-
-  <div class="athlete-section">
-    <div class="kicker">TRAINING</div>
-    <div class="athlete-row"><div class="athlete-row-lbl">TRAININGSSCHEMA</div><div class="athlete-row-val">Hybrid Running</div></div>
-    <div class="athlete-row"><div class="athlete-row-lbl">EINHEITEN PRO WOCHE</div><div class="athlete-row-val">6</div></div>
     <div class="athlete-row"><div class="athlete-row-lbl">LAUFPACE Z2</div><div class="athlete-row-val">5:10–6:01 /km</div></div>
     <div class="athlete-row"><div class="athlete-row-lbl">N&Auml;CHSTER WETTKAMPF</div><div class="athlete-row-val" style="color:var(--accent-dark)">7 Tage</div></div>
   </div>
-
   <div class="athlete-section">
     <div class="kicker">LANGZEITZIELE</div>
-    <div style="font-size:13px;color:var(--mid);line-height:1.65;padding:8px 0">Hybrid-Athlet bleiben: Trail Running + Krafttraining. Erste 50k in 2026. Körpergewicht stabil halten.</div>
+    <div style="font-size:13px;color:var(--mid);line-height:1.65;padding:8px 0">Hybrid-Athlet bleiben. Trail Running + Krafttraining. Erste 50k in 2026.</div>
   </div>
-
   <div class="athlete-section">
     <div class="kicker">SCHUHE</div>
-    <div class="shoe-item">
-      <div style="flex:1">
-        <div class="shoe-name">Hoka Speedgoat 6</div>
-        <div class="shoe-meta">TRAIL · 487 km</div>
-        <div style="margin-top:4px;height:6px;display:flex;width:100%"><div style="height:100%;background:var(--mid);width:69.5%"></div><div style="flex:1;height:100%;background-image:var(--dot);background-size:4px 4px"></div></div>
-        <div style="font-family:'DM Mono',monospace;font-size:8px;color:var(--stone);margin-top:3px">487 / 700 km</div>
-      </div>
-    </div>
-    <div class="shoe-item">
-      <div style="flex:1">
-        <div class="shoe-name">Nike Vaporfly 3</div>
-        <div class="shoe-meta">ROAD RACE · 112 km</div>
-        <div style="margin-top:4px;height:6px;display:flex;width:100%"><div style="height:100%;background:var(--mid);width:22.4%"></div><div style="flex:1;height:100%;background-image:var(--dot);background-size:4px 4px"></div></div>
-        <div style="font-family:'DM Mono',monospace;font-size:8px;color:var(--stone);margin-top:3px">112 / 500 km</div>
-      </div>
+    <div style="padding:10px 0;border-bottom:.5px solid rgba(46,44,42,.08)">
+      <div style="font-size:13px;color:var(--black);margin-bottom:2px">Hoka Speedgoat 6</div>
+      <div style="font-family:'DM Mono',monospace;font-size:9px;color:var(--stone)">TRAIL · 487 km</div>
+      <div style="margin-top:4px;height:6px;display:flex;width:100%"><div style="height:100%;background:var(--mid);width:69.5%"></div><div style="flex:1;height:100%;background-image:var(--dot);background-size:4px 4px"></div></div>
+      <div style="font-family:'DM Mono',monospace;font-size:8px;color:var(--stone);margin-top:3px">487 / 700 km</div>
     </div>
   </div>
-
   <div style="padding:20px 16px">
     <button onclick="openCoach()" style="width:100%;padding:14px;background:var(--accent);border:none;color:var(--black);font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.12em;cursor:pointer;font-weight:500">COACH FRAGEN &rarr;</button>
   </div>
@@ -579,443 +453,462 @@ html,body{height:100%;overflow:hidden;background:var(--bg);font-family:'DM Sans'
 </nav>
 
 <script>
-const BASE='https://web-production-297f2.up.railway.app';
-const TODAY_STR=new Date().toDateString();
-const lastCheckin=localStorage.getItem('cairn_checkin_date');
+var BASE = 'https://web-production-297f2.up.railway.app';
+var TODAY_STR = new Date().toDateString();
+var lastCheckin = localStorage.getItem('cairn_checkin_date');
+var currentPage = 'today';
+var currentNewActivity = null;
+var coachHistory = [];
+var planLoaded = false;
+var activitiesLoaded = false;
+var planWeekOffset = 0;
 
-// ── CURRENT PAGE (für Coach-Kontext) ──
-var currentPage='today';
-var currentActivityId=null;
-var currentNewActivity=null;
+var pageTitles = {today:'TODAY', plan:'PLAN', activities:'ACTIVITIES', coach:'COACH', athlete:'ATHLETE'};
 
-// ── NAVIGATION ──
-var pageTitles={today:'TODAY',plan:'PLAN',activities:'ACTIVITIES',coach:'COACH',athlete:'ATHLETE'};
-function goPage(page){
-  document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active');});
-  document.querySelectorAll('.nav-item').forEach(function(n){n.classList.remove('on');});
-  var pg=document.getElementById('page-'+page);
-  var nav=document.getElementById('nav-'+page);
-  if(pg)pg.classList.add('active');
-  if(nav)nav.classList.add('on');
-  document.getElementById('topbar-title').textContent=pageTitles[page]||page.toUpperCase();
-  currentPage=page;
-  if(page==='plan'&&!planLoaded)loadPlanPage();
-  if(page==='activities'&&!activitiesLoaded)loadActivitiesPage();
+var coachContexts = {
+  today: 'Kontext: Heutige Session & Morning Brief',
+  plan: 'Kontext: Trainingsplan diese Woche',
+  activities: 'Kontext: Aktivitäten & Analyse',
+  athlete: 'Kontext: Athletenprofil, Ziele & Langzeitziele',
+  coach: 'Kontext: Allgemeines Coaching'
+};
+
+var coachOpeners = {
+  today: 'Ich sehe deinen Morning Brief. Was möchtest du zur heutigen Session besprechen?',
+  plan: 'Ich kenne deinen Wochenplan. Soll ich etwas umplanen?',
+  activities: 'Ich sehe deine Aktivitäten. Möchtest du eine Session besprechen?',
+  athlete: 'Ich kenne dein Profil und deine Langzeitziele. Was liegt an?',
+  coach: 'Ich bin da. Was liegt an?'
+};
+
+var TYPE_MAP = {
+  'Easy Run':'EASY','Recovery Run':'RECOVERY','Long Run':'LONG RUN',
+  'Trail Run':'TRAIL','Intervalle':'INTERVALS','Tempo Run':'TEMPO',
+  'Threshold Run':'THRESHOLD','Krafttraining':'STRENGTH','Mobilität':'MOBILITY',
+  'Rest Day':'REST','WeightTraining':'STRENGTH','Run':'RUN','TrailRun':'TRAIL'
+};
+
+// NAVIGATION
+function goPage(page) {
+  document.querySelectorAll('.page').forEach(function(p) { p.classList.remove('active'); });
+  document.querySelectorAll('.nav-item').forEach(function(n) { n.classList.remove('on'); });
+  var pg = document.getElementById('page-' + page);
+  var nav = document.getElementById('nav-' + page);
+  if (pg) pg.classList.add('active');
+  if (nav) nav.classList.add('on');
+  document.getElementById('topbar-title').textContent = pageTitles[page] || page.toUpperCase();
+  currentPage = page;
+  if (page === 'plan' && !planLoaded) loadPlanPage();
+  if (page === 'activities' && !activitiesLoaded) loadActivitiesPage();
 }
-var planLoaded=false,activitiesLoaded=false;
 
-// ── DATUM ──
-(function(){
-  var h=new Date().getHours();
-  var gruss=h<12?'Guten Morgen':h<18?'Guten Tag':'Guten Abend';
-  ['ci-greeting','greeting-top'].forEach(function(id){var el=document.getElementById(id);if(el)el.innerHTML=gruss+', <b>Alexander.</b>';});
-  var now=new Date();
-  var days=['SO','MO','DI','MI','DO','FR','SA'];
-  var months=['JAN','FEB','MÄR','APR','MAI','JUN','JUL','AUG','SEP','OKT','NOV','DEZ'];
-  var ciTime=document.getElementById('ci-time');
-  if(ciTime)ciTime.textContent=days[now.getDay()]+' · '+String(now.getDate()).padStart(2,'0')+' '+months[now.getMonth()]+' '+now.getFullYear()+' · '+String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
-  var topDate=document.getElementById('topbar-date');
-  if(topDate)topDate.textContent=days[now.getDay()]+' · '+String(now.getDate()).padStart(2,'0')+' '+months[now.getMonth()];
+// DATUM
+(function() {
+  var h = new Date().getHours();
+  var gruss = h < 12 ? 'Guten Morgen' : h < 18 ? 'Guten Tag' : 'Guten Abend';
+  var el1 = document.getElementById('ci-greeting');
+  var el2 = document.getElementById('topbar-date');
+  if (el1) el1.innerHTML = gruss + ', <b>Alexander.</b>';
+  var now = new Date();
+  var days = ['SO','MO','DI','MI','DO','FR','SA'];
+  var months = ['JAN','FEB','MÄR','APR','MAI','JUN','JUL','AUG','SEP','OKT','NOV','DEZ'];
+  var ciTime = document.getElementById('ci-time');
+  if (ciTime) ciTime.textContent = days[now.getDay()] + ' · ' + String(now.getDate()).padStart(2,'0') + ' ' + months[now.getMonth()] + ' ' + now.getFullYear() + ' · ' + String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
+  if (el2) el2.textContent = days[now.getDay()] + ' · ' + String(now.getDate()).padStart(2,'0') + ' ' + months[now.getMonth()];
 })();
 
-// ── CHECK-IN ──
-var selectedFeel='5';
-function updateMoodSlider(val){selectedFeel=String(parseInt(val));document.getElementById('mood-value').textContent=selectedFeel;}
-function togNote(el){el.classList.toggle('sel');}
-if(lastCheckin!==TODAY_STR){document.getElementById('checkin').classList.add('open');}
-function submitCheckin(){
-  var notes=[...document.querySelectorAll('.ci-note.sel')].map(function(x){return x.textContent.trim();}).filter(function(n){return n!=='Kein Anliegen';});
-  fetch(BASE+'/api/checkin',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({feel:selectedFeel,notes:notes})})
-    .then(function(r){return r.json();}).then(function(){loadMorningBrief();loadDashboard();loadNewActivities();}).catch(function(){loadMorningBrief();});
-  localStorage.setItem('cairn_checkin_date',TODAY_STR);
-  var echo=selectedFeel;if(notes.length)echo+=' · '+notes.join(' · ');
-  document.getElementById('echo-text').textContent=echo;
-  document.getElementById('athlete-echo').style.display='flex';
+// CHECK-IN
+var selectedFeel = '5';
+function updateMoodSlider(val) {
+  selectedFeel = String(parseInt(val));
+  document.getElementById('mood-value').textContent = selectedFeel;
+}
+if (lastCheckin !== TODAY_STR) {
+  document.getElementById('checkin').classList.add('open');
+}
+function submitCheckin() {
+  fetch(BASE + '/api/checkin', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({feel: selectedFeel, notes: []})
+  }).then(function(r) { return r.json(); }).then(function() {
+    loadMorningBrief();
+    loadDashboard();
+    loadNewActivities();
+  }).catch(function() { loadMorningBrief(); });
+  localStorage.setItem('cairn_checkin_date', TODAY_STR);
+  var echo = selectedFeel;
+  document.getElementById('echo-text').textContent = echo;
+  document.getElementById('athlete-echo').style.display = 'flex';
   document.getElementById('checkin').classList.remove('open');
 }
 
-// ── COACH OVERLAY ──
-var coachHistory=[];
-var coachContexts={
-  today:'Kontext: Heutige Session & Morning Brief',
-  plan:'Kontext: Trainingsplan diese Woche',
-  activities:'Kontext: Aktivitäten & Analyse',
-  athlete:'Kontext: Athletenprofil, Ziele & Langzeitziele',
-  coach:'Kontext: Allgemeines Coaching'
-};
-var coachOpeners={
-  today:'Ich sehe deinen Morning Brief. Was möchtest du zur heutigen Session besprechen?',
-  plan:'Ich kenne deinen Wochenplan. Soll ich etwas umplanen oder hast du eine Frage zur aktuellen Woche?',
-  activities:'Ich sehe deine Aktivitäten. Möchtest du eine bestimmte Session besprechen?',
-  athlete:'Ich kenne dein Profil und deine Langzeitziele. Was liegt an?',
-  coach:'Ich bin da. Was liegt an?'
-};
-
-function openCoach(){
-  var ctx=coachContexts[currentPage]||'';
-  var opener=coachOpeners[currentPage]||'Ich bin da. Was liegt an?';
-  document.getElementById('coach-context-lbl').textContent=ctx;
-  document.getElementById('coach-opening-msg').textContent=opener;
-  document.getElementById('coach-messages').innerHTML='<div class="msg-coach"><div class="msg-bubble">'+opener+'</div><div class="msg-meta">CAIRN</div></div>';
-  coachHistory=[{role:'user',content:'[Kontext: '+ctx+'. Der Athlet ist auf der Seite: '+currentPage+']'}];
+// COACH
+function openCoach() {
+  var ctx = coachContexts[currentPage] || '';
+  var opener = coachOpeners[currentPage] || 'Ich bin da. Was liegt an?';
+  document.getElementById('coach-context-lbl').textContent = ctx;
+  document.getElementById('coach-opening-msg').textContent = opener;
+  document.getElementById('coach-messages').innerHTML = '<div class="msg-coach"><div class="msg-bubble">' + opener + '</div><div class="msg-meta">CAIRN</div></div>';
+  coachHistory = [{role:'user', content:'[Kontext: ' + ctx + '. Seite: ' + currentPage + ']'}];
   document.getElementById('coach-overlay').classList.add('open');
-  setTimeout(function(){document.getElementById('coach-input').focus();},300);
+  setTimeout(function() { document.getElementById('coach-input').focus(); }, 300);
 }
-function closeCoach(){document.getElementById('coach-overlay').classList.remove('open');}
+function closeCoach() { document.getElementById('coach-overlay').classList.remove('open'); }
 
-function autoResize(el){el.style.height='auto';el.style.height=Math.min(el.scrollHeight,100)+'px';}
+function autoResize(el) { el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 100) + 'px'; }
 
-function sendCoachMessage(){
-  var input=document.getElementById('coach-input');
-  var msg=input.value.trim();if(!msg)return;
-  input.value='';input.style.height='auto';
-  var messages=document.getElementById('coach-messages');
-  messages.innerHTML+='<div class="msg-user"><div class="msg-bubble">'+escHtml(msg)+'</div><div class="msg-meta" style="text-align:right">DU</div></div>';
-  messages.scrollTop=messages.scrollHeight;
-  coachHistory.push({role:'user',content:msg});
-  var thinkingId='think-'+Date.now();
-  messages.innerHTML+='<div class="msg-coach" id="'+thinkingId+'"><div class="msg-bubble" style="opacity:.5">...</div></div>';
-  messages.scrollTop=messages.scrollHeight;
-  fetch(BASE+'/api/coach-chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messages:coachHistory,page:currentPage})})
-    .then(function(r){return r.json();}).then(function(data){
-      var reply=data.reply||data.message||'Ich konnte keine Antwort generieren.';
-      coachHistory.push({role:'assistant',content:reply});
-      var el=document.getElementById(thinkingId);
-      if(el)el.innerHTML='<div class="msg-bubble">'+escHtml(reply)+'</div><div class="msg-meta">CAIRN</div>';
-      messages.scrollTop=messages.scrollHeight;
-    }).catch(function(){
-      var el=document.getElementById(thinkingId);
-      if(el)el.innerHTML='<div class="msg-bubble">Verbindung unterbrochen. Versuch es gleich nochmal.</div><div class="msg-meta">CAIRN</div>';
-    });
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
-function sendCoachPageMessage(){
-  var input=document.getElementById('coach-page-input');
-  var msg=input.value.trim();if(!msg)return;
-  input.value='';input.style.height='auto';
-  var messages=document.getElementById('coach-page-messages');
-  messages.innerHTML+='<div style="align-self:flex-end;max-width:85%"><div style="padding:10px 14px;font-size:13px;line-height:1.55;background:var(--accent);color:var(--black);font-weight:500">'+escHtml(msg)+'</div><div style="font-family:\'DM Mono\',monospace;font-size:7px;color:var(--stone);letter-spacing:.08em;margin-top:4px;text-align:right">DU</div></div>';
-  messages.scrollTop=messages.scrollHeight;
-  var thinkingId='think-'+Date.now();
-  messages.innerHTML+='<div style="align-self:flex-start;max-width:85%" id="'+thinkingId+'"><div style="padding:10px 14px;font-size:13px;opacity:.5;background:rgba(46,44,42,.06);border-left:2px solid var(--accent);color:var(--black)">...</div></div>';
-  messages.scrollTop=messages.scrollHeight;
-  fetch(BASE+'/api/coach-chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messages:[{role:'user',content:msg}],page:'coach'})})
-    .then(function(r){return r.json();}).then(function(data){
-      var reply=data.reply||data.message||'—';
-      var el=document.getElementById(thinkingId);
-      if(el)el.innerHTML='<div style="padding:10px 14px;font-size:13px;line-height:1.55;background:rgba(46,44,42,.06);border-left:2px solid var(--accent);color:var(--black)">'+escHtml(reply)+'</div><div style="font-family:\'DM Mono\',monospace;font-size:7px;color:var(--stone);letter-spacing:.08em;margin-top:4px">CAIRN</div>';
-      messages.scrollTop=messages.scrollHeight;
-    }).catch(function(){});
-}
-
-function escHtml(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
-
-// ── MORNING BRIEF ──
-function loadMorningBrief(){
-  var decEl=document.getElementById('cb-decision');var quoteEl=document.getElementById('cb-quote');var whyEl=document.getElementById('cb-why-items');
-  if(decEl)decEl.innerHTML='<span style="color:var(--stone);font-size:12px;font-family:\'DM Mono\',monospace">Coach analysiert...</span>';
-  if(quoteEl){quoteEl.innerHTML='';quoteEl.style.display='none';}
-  if(whyEl)whyEl.innerHTML='';
-  fetch(BASE+'/api/morning-brief').then(function(r){return r.json();}).then(function(data){
-    if(data.status!=='ok')return;
-    var lines=data.brief.split('\n').map(function(l){return l.replace(/\*\*/g,'').replace(/^#+\s*/,'').replace(/^[-*]\s*/,'').trim();}).filter(function(l){return l.length>10;});
-    if(decEl&&lines[0])decEl.innerHTML=lines[0];
-    if(quoteEl&&lines.length>1){quoteEl.innerHTML='&ldquo;'+lines[lines.length-1]+'&rdquo;';quoteEl.style.display='block';}
-    if(whyEl&&lines.length>2)whyEl.innerHTML=lines.slice(1,lines.length-1).slice(0,4).map(function(l){return '<div class="cb-why-item">'+l+'</div>';}).join('');
-    var suggEl=document.getElementById('cb-suggestion');
-    if(suggEl&&data.suggestion){suggEl.textContent=data.suggestion;var ab=document.getElementById('adapt-block');if(ab)ab.classList.add('show');}
-    if(data.session_type)document.body.dataset.sessionType=data.session_type;
-  }).catch(function(){
-    if(decEl)decEl.innerHTML='Die letzten Tage wurden gut verarbeitet.<br><b>Heute ist ein guter Tag f\u00fcr Tempo.</b>';
-    if(quoteEl){quoteEl.innerHTML='&ldquo;Heute z\u00e4hlt Qualit\u00e4t, nicht Volumen.&rdquo;';quoteEl.style.display='block';}
-    if(whyEl)whyEl.innerHTML='<div class="cb-why-item">Schlaf war ausreichend</div><div class="cb-why-item">Belastung kontrolliert</div><div class="cb-why-item">Wettkampf in 7 Tagen</div>';
+function sendCoachMessage() {
+  var input = document.getElementById('coach-input');
+  var msg = input.value.trim();
+  if (!msg) return;
+  input.value = '';
+  input.style.height = 'auto';
+  var messages = document.getElementById('coach-messages');
+  var userDiv = '<div class="msg-user"><div class="msg-bubble">' + escHtml(msg) + '</div><div class="msg-meta" style="text-align:right">DU</div></div>';
+  messages.innerHTML += userDiv;
+  messages.scrollTop = messages.scrollHeight;
+  coachHistory.push({role: 'user', content: msg});
+  var thinkingId = 'think-' + Date.now();
+  messages.innerHTML += '<div class="msg-coach" id="' + thinkingId + '"><div class="msg-bubble" style="opacity:.5">...</div></div>';
+  messages.scrollTop = messages.scrollHeight;
+  fetch(BASE + '/api/coach-chat', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({messages: coachHistory, page: currentPage})
+  }).then(function(r) { return r.json(); }).then(function(data) {
+    var reply = data.reply || data.message || 'Ich konnte keine Antwort generieren.';
+    coachHistory.push({role: 'assistant', content: reply});
+    var el = document.getElementById(thinkingId);
+    if (el) el.innerHTML = '<div class="msg-bubble">' + escHtml(reply) + '</div><div class="msg-meta">CAIRN</div>';
+    messages.scrollTop = messages.scrollHeight;
+  }).catch(function() {
+    var el = document.getElementById(thinkingId);
+    if (el) el.innerHTML = '<div class="msg-bubble">Verbindung unterbrochen.</div><div class="msg-meta">CAIRN</div>';
   });
 }
 
-// ── DASHBOARD ──
-function loadDashboard(){
-  return fetch(BASE+'/api/dashboard').then(function(r){return r.json();}).then(function(data){
-    if(data.status!=='ok')return;
-    var health=data.health;
-    if(health.hrv){
-      document.getElementById('dash-hrv').textContent=health.hrv;
-      var hrvPct=Math.min(health.hrv/100*100,100);
-      var b=document.getElementById('dash-hrv-bar-v');if(b)b.style.width=hrvPct+'%';
-    }
-    if(health.sleep_h){
-      document.getElementById('dash-sleep').textContent=health.sleep_h;
-      var sleepPct=Math.min(health.sleep_h/9*100,100);
-      var b=document.getElementById('dash-sleep-bar-v');if(b)b.style.width=sleepPct+'%';
-    }
-    if(health.rhr){
-      document.getElementById('dash-rhr').textContent=health.rhr;
-      var rhrPct=Math.min((80-health.rhr)/40*100,100);
-      var b=document.getElementById('dash-rhr-bar-v');if(b)b.style.width=rhrPct+'%';
-    }
-    var week=data.week;
-    document.getElementById('plan-week-km').textContent=(week.km_done||'—')+' km';
-    document.getElementById('plan-week-sessions').textContent=(week.sessions_done||'—')+' / '+(week.sessions_planned||'—');
-  }).catch(function(){});
+function sendCoachPageMessage() {
+  var input = document.getElementById('coach-page-input');
+  var msg = input.value.trim();
+  if (!msg) return;
+  input.value = '';
+  input.style.height = 'auto';
+  var messages = document.getElementById('coach-page-messages');
+  messages.innerHTML += '<div style="align-self:flex-end;max-width:85%"><div style="padding:10px 14px;font-size:13px;line-height:1.55;background:var(--accent);color:var(--black);font-weight:500">' + escHtml(msg) + '</div><div style="font-family:\'DM Mono\',monospace;font-size:7px;color:var(--stone);letter-spacing:.08em;margin-top:4px;text-align:right">DU</div></div>';
+  messages.scrollTop = messages.scrollHeight;
+  var thinkingId = 'think-' + Date.now();
+  messages.innerHTML += '<div style="align-self:flex-start;max-width:85%" id="' + thinkingId + '"><div style="padding:10px 14px;font-size:13px;opacity:.5;background:rgba(46,44,42,.06);border-left:2px solid var(--accent);color:var(--black)">...</div></div>';
+  fetch(BASE + '/api/coach-chat', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({messages: [{role:'user', content: msg}], page: 'coach'})
+  }).then(function(r) { return r.json(); }).then(function(data) {
+    var reply = data.reply || data.message || '—';
+    var el = document.getElementById(thinkingId);
+    if (el) el.innerHTML = '<div style="padding:10px 14px;font-size:13px;line-height:1.55;background:rgba(46,44,42,.06);border-left:2px solid var(--accent);color:var(--black)">' + escHtml(reply) + '</div><div style="font-family:\'DM Mono\',monospace;font-size:7px;color:var(--stone);letter-spacing:.08em;margin-top:4px">CAIRN</div>';
+    messages.scrollTop = messages.scrollHeight;
+  }).catch(function() {});
 }
 
-// ── NEUE AKTIVITÄTEN ──
-function loadNewActivities(){
-  fetch(BASE+'/api/new-activities').then(function(r){return r.json();}).then(function(data){
-    if(data.status!=='ok'||!data.activities||!data.activities.length)return;
-    var a=data.activities[0];currentNewActivity=a;
-    var km=a.distance_km>0?a.distance_km.toFixed(1)+' km':'';
-    document.getElementById('analyse-bar-text').textContent=a.name.split(' | ')[0]+(km?' · '+km:'');
+// MORNING BRIEF
+function loadMorningBrief() {
+  var decEl = document.getElementById('cb-decision');
+  var quoteEl = document.getElementById('cb-quote');
+  var whyEl = document.getElementById('cb-why-items');
+  if (decEl) decEl.innerHTML = '<span style="color:var(--stone);font-size:13px;font-family:\'DM Mono\',monospace">Coach analysiert...</span>';
+  if (quoteEl) { quoteEl.innerHTML = ''; quoteEl.style.display = 'none'; }
+  fetch(BASE + '/api/morning-brief').then(function(r) { return r.json(); }).then(function(data) {
+    if (data.status !== 'ok') return;
+    var lines = data.brief.split('\n').map(function(l) {
+      return l.replace(/\*\*/g,'').replace(/^#+\s*/,'').replace(/^[-*]\s*/,'').trim();
+    }).filter(function(l) { return l.length > 10; });
+    if (decEl && lines[0]) decEl.innerHTML = lines[0];
+    if (quoteEl && lines.length > 1) { quoteEl.innerHTML = '&ldquo;' + lines[lines.length-1] + '&rdquo;'; quoteEl.style.display = 'block'; }
+    var suggEl = document.getElementById('cb-suggestion');
+    if (suggEl && data.suggestion) {
+      suggEl.textContent = data.suggestion;
+      var ab = document.getElementById('adapt-block');
+      if (ab) ab.classList.add('show');
+    }
+    if (data.session_type) document.body.dataset.sessionType = data.session_type;
+  }).catch(function() {
+    if (decEl) decEl.innerHTML = 'Die letzten Tage wurden gut verarbeitet.<br><b>Heute ist ein guter Tag.</b>';
+    if (quoteEl) { quoteEl.innerHTML = '&ldquo;Heute z\u00e4hlt Qualit\u00e4t, nicht Volumen.&rdquo;'; quoteEl.style.display = 'block'; }
+  });
+}
+
+// DASHBOARD
+function loadDashboard() {
+  return fetch(BASE + '/api/dashboard').then(function(r) { return r.json(); }).then(function(data) {
+    if (data.status !== 'ok') return;
+    var health = data.health;
+    if (health.hrv) {
+      document.getElementById('dash-hrv').textContent = health.hrv;
+      document.getElementById('dash-hrv-bar').style.width = Math.min(health.hrv / 100 * 100, 100) + '%';
+    }
+    if (health.sleep_h) {
+      document.getElementById('dash-sleep').textContent = health.sleep_h;
+      document.getElementById('dash-sleep-bar').style.width = Math.min(health.sleep_h / 9 * 100, 100) + '%';
+    }
+    if (health.rhr) {
+      document.getElementById('dash-rhr').textContent = health.rhr;
+      document.getElementById('dash-rhr-bar').style.width = Math.min((80 - health.rhr) / 40 * 100, 100) + '%';
+    }
+    var week = data.week;
+    var kmEl = document.getElementById('plan-week-km');
+    var sessEl = document.getElementById('plan-week-sessions');
+    if (kmEl) kmEl.textContent = (week.km_done || '—') + ' km';
+    if (sessEl) sessEl.textContent = (week.sessions_done || '—') + ' / ' + (week.sessions_planned || '—');
+  }).catch(function() {});
+}
+
+// NEUE AKTIVITÄTEN
+function loadNewActivities() {
+  fetch(BASE + '/api/new-activities').then(function(r) { return r.json(); }).then(function(data) {
+    if (data.status !== 'ok' || !data.activities || !data.activities.length) return;
+    var a = data.activities[0];
+    currentNewActivity = a;
+    var km = a.distance_km > 0 ? a.distance_km.toFixed(1) + ' km' : '';
+    document.getElementById('analyse-bar-text').textContent = a.name.split(' | ')[0] + (km ? ' · ' + km : '');
     document.getElementById('analyse-bar').classList.add('show');
-  }).catch(function(){});
+  }).catch(function() {});
 }
-function startAnalyse(){
-  if(!currentNewActivity)return;
-  fetch(BASE+'/api/activity/'+currentNewActivity.id+'/mark-analysed',{method:'POST'});
+function startAnalyse() {
+  if (!currentNewActivity) return;
+  fetch(BASE + '/api/activity/' + currentNewActivity.id + '/mark-analysed', {method: 'POST'});
   document.getElementById('analyse-bar').classList.remove('show');
-  window.location.href='/analyse?id='+currentNewActivity.id;
+  window.location.href = '/analyse?id=' + currentNewActivity.id;
 }
 
-// ── PLAN PAGE ──
-var planWeekOffset=0;
-function shiftPlanWeek(d){planWeekOffset+=d;loadPlanPage();}
-function loadPlanPage(){
-  planLoaded=true;
-  var now=new Date();var monday=new Date(now);
-  var dow=monday.getDay();var diff=dow===0?-6:1-dow;
-  monday.setDate(monday.getDate()+diff+(planWeekOffset*7));
-  var year=monday.getFullYear(),month=monday.getMonth()+1;
-  var MONTHS_DE=['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
-  var DAYS=['MO','DI','MI','DO','FR','SA','SO'];
-  var kw=getWeekNumber(monday);
-  var lbl=planWeekOffset===0?'KW '+kw+' · DIESE WOCHE':'KW '+kw+' · '+MONTHS_DE[monday.getMonth()];
-  document.getElementById('plan-week-lbl').textContent=lbl;
-  fetch(BASE+'/api/activities/month?year='+year+'&month='+month).then(function(r){return r.json();}).then(function(data){
-    var actual=data.actual||{};var plan=data.plan||{};var today=data.today;
-    var html='';
-    var TYPE_MAP={'Easy Run':'EASY','Recovery Run':'RECOVERY','Long Run':'LONG RUN','Trail Run':'TRAIL','Intervalle':'INTERVALS','Tempo Run':'TEMPO','Threshold Run':'THRESHOLD','Krafttraining':'STRENGTH','Mobilität':'MOBILITY','Rest Day':'REST','WeightTraining':'STRENGTH','Run':'EASY RUN','TrailRun':'TRAIL RUN'};
-    for(var d=0;d<7;d++){
-      var day=new Date(monday);day.setDate(monday.getDate()+d);
-      var dateStr=day.toISOString().split('T')[0];
-      var isToday=dateStr===today;var isPast=dateStr<today;
-      var headCls='plan-day-head'+(isToday?' today-day':'');
-      html+='<div class="plan-day"><div class="'+headCls+'">';
-      html+='<div class="plan-day-name">'+DAYS[d]+'</div>';
-      html+='<div class="plan-day-date">'+day.getDate()+'</div>';
-      var sessions=actual[dateStr]||plan[dateStr]||[];
-      if(sessions.length){
-        var s=sessions[0];var type=TYPE_MAP[s.type||s.session_type]||(s.type||s.session_type||'').toUpperCase();
-        var name=(s.name||s.notes||s.session_type||'').split(' | ')[0].split(' · ')[0];
-        var dist=s.distance_km>0?s.distance_km.toFixed(1)+' km':(s.duration_min?s.duration_min+' min':'');
-        var badge=isPast?'<span class="plan-day-badge badge-done">&#10003;</span>':(isToday?'<span class="plan-day-badge badge-quality">HEUTE</span>':'');
-        html+='<div class="plan-session"><div class="plan-session-type">'+type+'</div><div class="plan-session-name">'+escHtml(name)+'</div>'+(dist?'<div class="plan-session-meta">'+dist+'</div>':'')+'</div>'+badge;
-      } else {
-        html+='<div class="plan-session"><div class="plan-session-name" style="color:rgba(46,44,42,.3);font-size:13px">—</div></div><span class="plan-day-badge badge-rest">REST</span>';
+// WOCHENÜBERSICHT FÜR TODAY
+function getWeekNumber(d) {
+  var date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  var dayNum = date.getUTCDay() || 7;
+  date.setUTCDate(date.getUTCDate() + 4 - dayNum);
+  var yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
+  return Math.ceil((((date - yearStart) / 86400000) + 1) / 7);
+}
+
+function loadTodayWeek() {
+  var now = new Date();
+  var monday = new Date(now);
+  var dow = monday.getDay();
+  monday.setDate(monday.getDate() - (dow === 0 ? 6 : dow - 1));
+  var year = monday.getFullYear();
+  var month = monday.getMonth() + 1;
+  var kw = getWeekNumber(monday);
+  var kwEl = document.getElementById('today-week-kw');
+  if (kwEl) kwEl.textContent = 'KW ' + kw;
+  var DAYS = ['MO','DI','MI','DO','FR','SA','SO'];
+  fetch(BASE + '/api/activities/month?year=' + year + '&month=' + month)
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      var actual = data.actual || {};
+      var plan = data.plan || {};
+      var todayDate = data.today;
+      var html = '';
+      for (var d = 0; d < 7; d++) {
+        var day = new Date(monday);
+        day.setDate(monday.getDate() + d);
+        var dateStr = day.toISOString().split('T')[0];
+        var isToday = dateStr === todayDate;
+        var isPast = dateStr < todayDate;
+        var sessions = actual[dateStr] || plan[dateStr] || [];
+        var bgRow = isToday ? 'background:var(--black)' : '';
+        var dayCol = isToday ? 'color:var(--accent)' : 'color:var(--stone)';
+        var dateCol = isToday ? 'color:#F0EDE6' : 'color:var(--mid)';
+        html += '<div data-date="' + dateStr + '" onclick="openTodayDay(this.dataset.date)" style="display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:.5px solid rgba(46,44,42,.08);' + bgRow + ';cursor:pointer">';
+        html += '<div style="font-family:DM Mono,monospace;font-size:8px;letter-spacing:.1em;width:20px;' + dayCol + '">' + DAYS[d] + '</div>';
+        html += '<div style="font-family:DM Mono,monospace;font-size:13px;font-weight:300;width:22px;' + dateCol + '">' + day.getDate() + '</div>';
+        if (sessions.length) {
+          var s = sessions[0];
+          var rawType = s.type || s.session_type || '';
+          var type = TYPE_MAP[rawType] || rawType.toUpperCase();
+          var name = (s.name || s.notes || rawType || '').split(' | ')[0].split(' · ')[0];
+          var dist = s.distance_km > 0 ? s.distance_km.toFixed(1) + ' km' : (s.duration_min ? s.duration_min + ' min' : '');
+          var isDone = isPast && actual[dateStr];
+          var isQuality = type === 'INTERVALS' || type === 'TEMPO' || type === 'THRESHOLD';
+          var tagBg = isQuality ? 'var(--black)' : 'rgba(46,44,42,.1)';
+          var tagCol = isQuality ? 'var(--accent)' : (isToday ? 'rgba(240,237,230,.5)' : 'var(--stone)');
+          var nameCol = isToday ? 'color:#F0EDE6' : 'color:var(--black)';
+          var distCol = isToday ? 'color:rgba(240,237,230,.5)' : 'color:var(--stone)';
+          if (type === 'REST') {
+            html += '<div style="font-family:DM Mono,monospace;font-size:8px;color:' + (isToday ? 'rgba(240,237,230,.3)' : 'rgba(46,44,42,.25)') + ';letter-spacing:.1em">REST</div>';
+          } else {
+            html += '<div style="flex:1;display:flex;align-items:center;gap:8px">';
+            html += '<div style="font-family:DM Mono,monospace;font-size:7px;padding:2px 6px;background:' + tagBg + ';color:' + tagCol + ';letter-spacing:.08em">' + type + '</div>';
+            html += '<div style="flex:1;font-size:12px;' + nameCol + '">' + escHtml(name) + '</div>';
+            if (dist) html += '<div style="font-family:DM Mono,monospace;font-size:10px;' + distCol + '">' + dist + '</div>';
+            if (isDone) html += '<div style="font-family:DM Mono,monospace;font-size:9px;color:#4CAF50">&#10003;</div>';
+            html += '</div>';
+          }
+        } else {
+          html += '<div style="font-family:DM Mono,monospace;font-size:8px;color:' + (isToday ? 'rgba(240,237,230,.2)' : 'rgba(46,44,42,.2)') + '">&#8212;</div>';
+        }
+        html += '</div>';
       }
-      html+='</div></div>';
-    }
-    document.getElementById('plan-days-list').innerHTML=html;
-  }).catch(function(){document.getElementById('plan-days-list').innerHTML='<div style="padding:24px 16px;font-family:\'DM Mono\',monospace;font-size:9px;color:var(--stone)">Konnte nicht geladen werden.</div>';});
+      var el = document.getElementById('today-week-days');
+      if (el) el.innerHTML = html;
+    }).catch(function() {});
 }
 
-// ── ACTIVITIES PAGE ──
-function loadActivitiesPage(){
-  activitiesLoaded=true;
-  fetch(BASE+'/api/activities/recent?limit=50').then(function(r){return r.json();}).then(function(data){
-    var activities=data.activities||[];
-    if(!activities.length){document.getElementById('activities-list').innerHTML='<div style="padding:24px 16px;font-family:\'DM Mono\',monospace;font-size:9px;color:var(--stone)">Keine Aktivitäten gefunden.</div>';return;}
-    var TYPE_DOT={'Run':'dot-run','TrailRun':'dot-long','WeightTraining':'dot-gym','Easy Run':'dot-easy','Long Run':'dot-long','Intervalle':'dot-quality','Tempo Run':'dot-quality'};
-    var MONTHS=['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
-    var html='';
-    activities.forEach(function(a){
-      var dotCls=TYPE_DOT[a.type]||'dot-run';
-      var d=new Date(a.date);var dateStr=d.getDate()+'. '+MONTHS[d.getMonth()];
-      var km=a.distance_km>0?a.distance_km.toFixed(1)+' km':(a.duration_min?a.duration_min+' min':'');
-      var name=(a.name||'').split(' | ')[0];
-      html+='<div class="activity-item" onclick="window.location.href=\'/analyse?id='+a.training_id+'\'">';
-      html+='<div class="activity-type-dot '+dotCls+'"></div>';
-      html+='<div class="activity-info"><div class="activity-name">'+escHtml(name)+'</div><div class="activity-meta">'+dateStr+(a.type?' · '+a.type:'')+'</div></div>';
-      html+='<div class="activity-km">'+km+'</div>';
-      html+='</div>';
+function openTodayDay(dateStr) {
+  var existing = document.getElementById('today-day-popup');
+  if (existing) existing.remove();
+  fetch(BASE + '/api/activities/month?year=' + new Date().getFullYear() + '&month=' + (new Date().getMonth() + 1))
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      var actual = data.actual || {};
+      var plan = data.plan || {};
+      var sessions = actual[dateStr] || plan[dateStr] || [];
+      var popup = document.createElement('div');
+      popup.id = 'today-day-popup';
+      popup.style.cssText = 'position:fixed;inset:0;background:rgba(26,25,24,.75);z-index:600;display:flex;align-items:flex-end';
+      popup.onclick = function(e) { if (e.target === popup) popup.remove(); };
+      var h = '<div style="background:var(--bg);width:100%;border-top:3px solid var(--stone);padding:24px 16px;padding-bottom:calc(24px + env(safe-area-inset-bottom));max-height:80vh;overflow-y:auto">';
+      h += '<div style="font-family:DM Mono,monospace;font-size:8px;color:var(--stone);letter-spacing:.14em;margin-bottom:12px">CAIRN · EINHEIT</div>';
+      if (!sessions.length) {
+        h += '<div style="font-size:18px;font-weight:300;color:var(--mid);margin-bottom:16px">Kein Training geplant.</div>';
+      } else {
+        var s = sessions[0];
+        var rawType = s.type || s.session_type || '';
+        var type = TYPE_MAP[rawType] || rawType.toUpperCase();
+        var name = (s.name || s.notes || rawType || '').split(' | ')[0].split(' · ')[0];
+        var dist = s.distance_km > 0 ? s.distance_km.toFixed(1) + ' km' : (s.duration_min ? s.duration_min + ' min' : '');
+        var zone = s.session_zone || '';
+        var notes = s.notes || '';
+        var isQuality = type === 'INTERVALS' || type === 'TEMPO' || type === 'THRESHOLD';
+        h += '<div style="font-size:22px;font-weight:300;letter-spacing:-.02em;margin-bottom:4px;color:var(--black)">' + escHtml(name) + '</div>';
+        h += '<div style="font-family:DM Mono,monospace;font-size:9px;color:var(--stone);margin-bottom:16px">' + escHtml(type) + (dist ? ' · ' + dist : '') + (zone ? ' · ' + zone : '') + '</div>';
+        if (notes && notes !== name) {
+          h += '<div style="background:rgba(46,44,42,.05);padding:12px;font-size:13px;color:var(--mid);line-height:1.65;margin-bottom:16px">' + escHtml(notes) + '</div>';
+        }
+        h += '<div style="font-size:12px;color:var(--stone);margin-bottom:16px">Verschieben und umplanen im Plan-Reiter.</div>';
+      }
+      h += '<button onclick="document.getElementById(\'today-day-popup\').remove()" style="width:100%;padding:13px;background:var(--black);border:none;color:var(--bg);font-family:DM Mono,monospace;font-size:9px;letter-spacing:.1em;cursor:pointer">SCHLIESSEN</button>';
+      h += '</div>';
+      popup.innerHTML = h;
+      document.body.appendChild(popup);
+    }).catch(function() {});
+}
+
+// PLAN PAGE
+function shiftPlanWeek(d) { planWeekOffset += d; loadPlanPage(); }
+
+function loadPlanPage() {
+  planLoaded = true;
+  var now = new Date();
+  var monday = new Date(now);
+  var dow = monday.getDay();
+  monday.setDate(monday.getDate() - (dow === 0 ? 6 : dow - 1) + (planWeekOffset * 7));
+  var year = monday.getFullYear();
+  var month = monday.getMonth() + 1;
+  var MONTHS_DE = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
+  var DAYS = ['MO','DI','MI','DO','FR','SA','SO'];
+  var kw = getWeekNumber(monday);
+  var lbl = planWeekOffset === 0 ? 'KW ' + kw + ' · DIESE WOCHE' : 'KW ' + kw + ' · ' + MONTHS_DE[monday.getMonth()];
+  document.getElementById('plan-week-lbl').textContent = lbl;
+  fetch(BASE + '/api/activities/month?year=' + year + '&month=' + month)
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      var actual = data.actual || {};
+      var plan = data.plan || {};
+      var todayDate = data.today;
+      var html = '';
+      for (var d = 0; d < 7; d++) {
+        var day = new Date(monday);
+        day.setDate(monday.getDate() + d);
+        var dateStr = day.toISOString().split('T')[0];
+        var isToday = dateStr === todayDate;
+        var isPast = dateStr < todayDate;
+        var headCls = 'plan-day-head' + (isToday ? ' today-day' : '');
+        html += '<div class="plan-day"><div class="' + headCls + '">';
+        html += '<div class="plan-day-name">' + DAYS[d] + '</div>';
+        html += '<div class="plan-day-date">' + day.getDate() + '</div>';
+        var sessions = actual[dateStr] || plan[dateStr] || [];
+        if (sessions.length) {
+          var s = sessions[0];
+          var rawType = s.type || s.session_type || '';
+          var type = TYPE_MAP[rawType] || rawType.toUpperCase();
+          var name = (s.name || s.notes || rawType || '').split(' | ')[0].split(' · ')[0];
+          var dist = s.distance_km > 0 ? s.distance_km.toFixed(1) + ' km' : (s.duration_min ? s.duration_min + ' min' : '');
+          var badge = isPast ? '<span class="plan-day-badge badge-done">&#10003;</span>' : (isToday ? '<span class="plan-day-badge badge-quality">HEUTE</span>' : '');
+          html += '<div class="plan-session"><div class="plan-session-type">' + type + '</div><div class="plan-session-name">' + escHtml(name) + '</div>' + (dist ? '<div class="plan-session-meta">' + dist + '</div>' : '') + '</div>' + badge;
+        } else {
+          html += '<div class="plan-session"><div class="plan-session-name" style="color:rgba(46,44,42,.3);font-size:13px">—</div></div><span class="plan-day-badge badge-rest">REST</span>';
+        }
+        html += '</div></div>';
+      }
+      document.getElementById('plan-days-list').innerHTML = html;
+    }).catch(function() {
+      document.getElementById('plan-days-list').innerHTML = '<div style="padding:24px 16px;font-family:DM Mono,monospace;font-size:9px;color:var(--stone)">Konnte nicht geladen werden.</div>';
     });
-    document.getElementById('activities-list').innerHTML=html;
-  }).catch(function(){
-    document.getElementById('activities-list').innerHTML='<div style="padding:24px 16px;font-family:\'DM Mono\',monospace;font-size:9px;color:var(--stone)">Konnte nicht geladen werden.</div>';
-  });
 }
 
-// ── REPLAN ──
-function openReplan(){
-  var suggestion=document.getElementById('cb-suggestion').textContent||'—';
-  var sessionName=document.getElementById('session-name').textContent||'Geplante Einheit';
-  document.getElementById('replan-original').textContent=sessionName;
-  document.getElementById('replan-suggestion').textContent=suggestion;
+// ACTIVITIES PAGE
+function loadActivitiesPage() {
+  activitiesLoaded = true;
+  fetch(BASE + '/api/activities/recent?limit=50')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      var activities = data.activities || [];
+      if (!activities.length) {
+        document.getElementById('activities-list').innerHTML = '<div style="padding:24px 16px;font-family:DM Mono,monospace;font-size:9px;color:var(--stone)">Keine Aktivitäten gefunden.</div>';
+        return;
+      }
+      var TYPE_DOT = {'Run':'dot-run','TrailRun':'dot-long','WeightTraining':'dot-gym','Easy Run':'dot-easy','Long Run':'dot-long','Intervalle':'dot-quality','Tempo Run':'dot-quality'};
+      var MONTHS = ['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
+      var html = '';
+      activities.forEach(function(a) {
+        var dotCls = TYPE_DOT[a.type] || 'dot-run';
+        var d = new Date(a.date);
+        var dateStr = d.getDate() + '. ' + MONTHS[d.getMonth()];
+        var km = a.distance_km > 0 ? a.distance_km.toFixed(1) + ' km' : (a.duration_min ? a.duration_min + ' min' : '');
+        var name = (a.name || '').split(' | ')[0];
+        html += '<div class="activity-item" onclick="window.location.href=\'/analyse?id=' + a.training_id + '\'">';
+        html += '<div class="activity-type-dot ' + dotCls + '"></div>';
+        html += '<div class="activity-info"><div class="activity-name">' + escHtml(name) + '</div><div class="activity-meta">' + dateStr + (a.type ? ' · ' + a.type : '') + '</div></div>';
+        html += '<div class="activity-km">' + km + '</div>';
+        html += '</div>';
+      });
+      document.getElementById('activities-list').innerHTML = html;
+    }).catch(function() {
+      document.getElementById('activities-list').innerHTML = '<div style="padding:24px 16px;font-family:DM Mono,monospace;font-size:9px;color:var(--stone)">Konnte nicht geladen werden.</div>';
+    });
+}
+
+// REPLAN
+function openReplan() {
+  var suggestion = document.getElementById('cb-suggestion').textContent || '—';
+  var sessionName = document.getElementById('session-name').textContent || 'Geplante Einheit';
+  document.getElementById('replan-original').textContent = sessionName;
+  document.getElementById('replan-suggestion').textContent = suggestion;
   document.getElementById('ov-replan').classList.add('open');
 }
-function closeAll(){document.getElementById('ov-replan').classList.remove('open');document.getElementById('ov-reject').classList.remove('open');document.getElementById('ov-confirm').classList.remove('open');}
-function acceptReplan(){
-  var sessionType=document.body.dataset.sessionType||'Angepasste Einheit';
-  document.getElementById('session-name').textContent=sessionType;
-  document.getElementById('confirm-text').textContent=sessionType+' — übernommen.';
+function closeAll() {
+  document.getElementById('ov-replan').classList.remove('open');
+  document.getElementById('ov-reject').classList.remove('open');
+  document.getElementById('ov-confirm').classList.remove('open');
+}
+function acceptReplan() {
+  var sessionType = document.body.dataset.sessionType || 'Angepasste Einheit';
+  document.getElementById('session-name').textContent = sessionType;
+  document.getElementById('confirm-text').textContent = sessionType + ' — übernommen.';
   document.getElementById('ov-replan').classList.remove('open');
   document.getElementById('ov-confirm').classList.add('open');
 }
-function rejectReplan(){document.getElementById('ov-replan').classList.remove('open');document.getElementById('ov-reject').classList.add('open');}
-function selRej(el){document.querySelectorAll('.rej-opt').forEach(function(x){x.classList.remove('sel');});el.classList.add('sel');}
-function sendReject(){document.getElementById('ov-reject').classList.remove('open');}
-function closeReject(){document.getElementById('ov-reject').classList.remove('open');}
+function rejectReplan() { document.getElementById('ov-replan').classList.remove('open'); document.getElementById('ov-reject').classList.add('open'); }
+function selRej(el) { document.querySelectorAll('.rej-opt').forEach(function(x) { x.classList.remove('sel'); }); el.classList.add('sel'); }
+function sendReject() { document.getElementById('ov-reject').classList.remove('open'); }
+function closeReject() { document.getElementById('ov-reject').classList.remove('open'); }
 
-function getWeekNumber(d){var date=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));var dayNum=date.getUTCDay()||7;date.setUTCDate(date.getUTCDate()+4-dayNum);var yearStart=new Date(Date.UTC(date.getUTCFullYear(),0,1));return Math.ceil((((date-yearStart)/86400000)+1)/7);}
-
-// ── WOCHENÜBERSICHT FÜR TODAY ──
-function loadTodayWeek(){
-  var now=new Date();
-  var monday=new Date(now);
-  var dow=monday.getDay();
-  var diff=dow===0?-6:1-dow;
-  monday.setDate(monday.getDate()+diff);
-  var year=monday.getFullYear();
-  var month=monday.getMonth()+1;
-  var kw=getWeekNumber(monday);
-  var kwEl=document.getElementById('today-week-kw');
-  if(kwEl)kwEl.textContent='KW '+kw;
-  var DAYS=['MO','DI','MI','DO','FR','SA','SO'];
-  var TYPE_MAP={
-    'Easy Run':'EASY','Recovery Run':'RECOVERY','Long Run':'LONG RUN',
-    'Trail Run':'TRAIL','Intervalle':'INTERVALS','Tempo Run':'TEMPO',
-    'Threshold Run':'THRESHOLD','Krafttraining':'STRENGTH','Mobilität':'MOBILITY',
-    'Rest Day':'REST','WeightTraining':'STRENGTH','Run':'RUN','TrailRun':'TRAIL'
-  };
-  fetch(BASE+'/api/activities/month?year='+year+'&month='+month)
-    .then(function(r){return r.json();})
-    .then(function(data){
-      var actual=data.actual||{};
-      var plan=data.plan||{};
-      var today=data.today;
-      var html='';
-      for(var d=0;d<7;d++){
-        var day=new Date(monday);
-        day.setDate(monday.getDate()+d);
-        var dateStr=day.toISOString().split('T')[0];
-        var isToday=dateStr===today;
-        var isPast=dateStr<today;
-        var sessions=actual[dateStr]||plan[dateStr]||[];
-        var bgRow=isToday?'background:var(--black)':'';
-        var dayCol=isToday?'color:var(--accent)':'color:var(--stone)';
-        var dateCol=isToday?'color:#F0EDE6':'color:var(--mid)';
-        html+='<div data-date="'+dateStr+'" onclick="openTodayDay(this.dataset.date)" style="display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:.5px solid rgba(46,44,42,.08);'+bgRow+';cursor:pointer">';
-        html+='<div style="font-family:DM Mono,monospace;font-size:8px;letter-spacing:.1em;width:20px;'+dayCol+'">'+DAYS[d]+'</div>';
-        html+='<div style="font-family:DM Mono,monospace;font-size:13px;font-weight:300;width:22px;'+dateCol+'">'+day.getDate()+'</div>';
-        if(sessions.length){
-          var s=sessions[0];
-          var rawType=s.type||s.session_type||'';
-          var type=TYPE_MAP[rawType]||rawType.toUpperCase();
-          var name=(s.name||s.notes||rawType||'').split(' | ')[0].split(' · ')[0];
-          var dist=s.distance_km>0?s.distance_km.toFixed(1)+' km':(s.duration_min?s.duration_min+' min':'');
-          var isDone=isPast&&actual[dateStr];
-          var isQuality=type==='INTERVALS'||type==='TEMPO'||type==='THRESHOLD';
-          var tagBg=isQuality?'var(--black)':'rgba(46,44,42,.1)';
-          var tagCol=isQuality?'var(--accent)':(isToday?'rgba(240,237,230,.5)':'var(--stone)');
-          var nameCol=isToday?'color:#F0EDE6':'color:var(--black)';
-          var distCol=isToday?'color:rgba(240,237,230,.5)':'color:var(--stone)';
-          if(type==='REST'){
-            html+='<div style="font-family:DM Mono,monospace;font-size:8px;color:'+(isToday?'rgba(240,237,230,.3)':'rgba(46,44,42,.25)')+';letter-spacing:.1em">REST</div>';
-          } else {
-            html+='<div style="flex:1;display:flex;align-items:center;gap:8px">';
-            html+='<div style="font-family:DM Mono,monospace;font-size:7px;padding:2px 6px;background:'+tagBg+';color:'+tagCol+';letter-spacing:.08em">'+type+'</div>';
-            html+='<div style="flex:1;font-size:12px;'+nameCol+'">'+escHtml(name)+'</div>';
-            if(dist)html+='<div style="font-family:DM Mono,monospace;font-size:10px;'+distCol+'">'+dist+'</div>';
-            if(isDone)html+='<div style="font-family:DM Mono,monospace;font-size:9px;color:#4CAF50">&#10003;</div>';
-            html+='</div>';
-          }
-        } else {
-          html+='<div style="font-family:DM Mono,monospace;font-size:8px;color:'+(isToday?'rgba(240,237,230,.2)':'rgba(46,44,42,.2)')+'">&#8212;</div>';
-        }
-        html+='</div>';
-      }
-      var el=document.getElementById('today-week-days');
-      if(el)el.innerHTML=html;
-    }).catch(function(){});
-}
-
-function openTodayDay(dateStr){
-  var existing=document.getElementById('today-day-popup');
-  if(existing)existing.remove();
-  fetch(BASE+'/api/activities/month?year='+new Date().getFullYear()+'&month='+(new Date().getMonth()+1))
-    .then(function(r){return r.json();})
-    .then(function(data){
-      var actual=data.actual||{};
-      var plan=data.plan||{};
-      var sessions=actual[dateStr]||plan[dateStr]||[];
-      var popup=document.createElement('div');
-      popup.id='today-day-popup';
-      popup.style.cssText='position:fixed;inset:0;background:rgba(26,25,24,.75);z-index:600;display:flex;align-items:flex-end';
-      popup.onclick=function(e){if(e.target===popup)popup.remove();};
-      var h='<div style="background:var(--bg);width:100%;border-top:3px solid var(--stone);padding:24px 16px;padding-bottom:calc(24px + env(safe-area-inset-bottom));max-height:80vh;overflow-y:auto">';
-      h+='<div style="font-family:DM Mono,monospace;font-size:8px;color:var(--stone);letter-spacing:.14em;margin-bottom:12px">CAIRN · EINHEIT</div>';
-      if(!sessions.length){
-        h+='<div style="font-size:18px;font-weight:300;color:var(--mid);margin-bottom:16px">Kein Training geplant.</div>';
-      } else {
-        var s=sessions[0];
-        var type=s.type||s.session_type||'';
-        var name=(s.name||s.notes||type||'').split(' | ')[0].split(' · ')[0];
-        var dist=s.distance_km>0?s.distance_km.toFixed(1)+' km':(s.duration_min?s.duration_min+' min':'');
-        var zone=s.session_zone||'';
-        var notes=s.notes||'';
-        h+='<div style="font-size:22px;font-weight:300;letter-spacing:-.02em;margin-bottom:4px;color:var(--black)">'+escHtml(name)+'</div>';
-        h+='<div style="font-family:DM Mono,monospace;font-size:9px;color:var(--stone);margin-bottom:16px">'+escHtml(type)+(dist?' · '+dist:'')+(zone?' · '+zone:'')+'</div>';
-        if(notes){
-          h+='<div style="background:rgba(46,44,42,.05);padding:12px;font-size:13px;color:var(--mid);line-height:1.65;margin-bottom:16px">'+escHtml(notes)+'</div>';
-        }
-        h+='<div style="font-size:12px;color:var(--stone);margin-bottom:16px">Verschieben und umplanen im Plan-Reiter.</div>';
-      }
-      h+='<button onclick="document.getElementById('today-day-popup').remove()" style="width:100%;padding:13px;background:var(--black);border:none;color:var(--bg);font-family:DM Mono,monospace;font-size:9px;letter-spacing:.1em;cursor:pointer">SCHLIESSEN</button>';
-      h+='</div>';
-      popup.innerHTML=h;
-      document.body.appendChild(popup);
-    }).catch(function(){});
-}
-
-// ── TODAY SESSION DETAIL POPUP ──
-function openTodayDay(dateStr){
-  var existing=document.getElementById('today-day-popup');
-  if(existing)existing.remove();
-  fetch(BASE+'/api/activities/month?year='+new Date().getFullYear()+'&month='+(new Date().getMonth()+1))
-    .then(function(r){return r.json();})
-    .then(function(data){
-      var actual=data.actual||{};
-      var plan=data.plan||{};
-      var sessions=actual[dateStr]||plan[dateStr]||[];
-      var popup=document.createElement('div');
-      popup.id='today-day-popup';
-      popup.style.cssText='position:fixed;inset:0;background:rgba(26,25,24,.75);z-index:600;display:flex;align-items:flex-end';
-      popup.onclick=function(e){if(e.target===popup)popup.remove();};
-      var html='<div style="background:var(--bg);width:100%;border-top:3px solid var(--stone);padding:24px 16px;padding-bottom:calc(24px + env(safe-area-inset-bottom));max-height:80vh;overflow-y:auto">';
-      html+='<div style="font-family:DM Mono,monospace;font-size:8px;color:var(--stone);letter-spacing:.14em;margin-bottom:12px">CAIRN · EINHEIT</div>';
-      if(!sessions.length){
-        html+='<div style="font-size:18px;font-weight:300;color:var(--mid);margin-bottom:16px">Kein Training geplant.</div>';
-      } else {
-        sessions.forEach(function(s){
-          var type=s.type||s.session_type||'';
-          var name=(s.name||s.notes||type||'').split(' | ')[0].split(' · ')[0];
-          var dist=s.distance_km>0?s.distance_km.toFixed(1)+' km':(s.duration_min?s.duration_min+' min':'');
-          var zone=s.session_zone||'';
-          html+='<div style="font-size:22px;font-weight:300;letter-spacing:-.02em;margin-bottom:4px">'+name+'</div>';
-          html+='<div style="font-family:DM Mono,monospace;font-size:9px;color:var(--stone);margin-bottom:16px">'+type+(dist?' · '+dist:'')+(zone?' · '+zone:'')+'</div>';
-          if(s.notes||s.duration_min){
-            html+='<div style="background:rgba(46,44,42,.05);padding:12px;font-size:13px;color:var(--mid);line-height:1.65;margin-bottom:16px">'+(s.notes||'')+'</div>';
-          }
-        });
-        html+='<div style="font-size:12px;color:var(--stone);margin-bottom:16px">Verschieben und umplanen im Plan-Reiter.</div>';
-      }
-      html+='<button onclick="document.getElementById('today-day-popup').remove()" style="width:100%;padding:13px;background:var(--black);border:none;color:var(--bg);font-family:DM Mono,monospace;font-size:9px;letter-spacing:.1em;cursor:pointer">SCHLIESSEN</button>';
-      html+='</div>';
-      popup.innerHTML=html;
-      document.body.appendChild(popup);
-    }).catch(function(){});
-}
-
-// ── START ──
-if(lastCheckin===TODAY_STR){loadMorningBrief();}
+// START
+if (lastCheckin === TODAY_STR) { loadMorningBrief(); }
 loadDashboard();
 loadNewActivities();
 loadTodayWeek();
