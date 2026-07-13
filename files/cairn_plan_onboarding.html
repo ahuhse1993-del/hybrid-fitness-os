@@ -348,7 +348,16 @@ html,body{height:100%;background:var(--black);font-family:'DM Sans',sans-serif;c
     <div class="summary-rows" id="summary-rows"></div>
     <div class="input-label" style="margin-bottom:10px">TRAININGSPLAN · PHASEN</div>
     <div class="phase-preview" id="phase-preview"></div>
-    <div style="font-size:13px;color:rgba(240,237,230,.5);line-height:1.7;margin-top:16px">
+    <div class="input-label" style="margin-top:8px;margin-bottom:10px">PLAN STARTET AM</div>
+    <div class="date-row" style="margin-bottom:20px">
+      <input class="date-part" id="start-day" placeholder="TT" type="number" min="1" max="31" oninput="checkStartDate()">
+      <div class="date-sep">.</div>
+      <input class="date-part" id="start-month" placeholder="MM" type="number" min="1" max="12" oninput="checkStartDate()">
+      <div class="date-sep">.</div>
+      <input class="date-part" id="start-year" placeholder="JJJJ" type="number" min="2025" max="2030" oninput="checkStartDate()" style="flex:2">
+    </div>
+    <div id="start-hint" style="font-family:DM Mono,monospace;font-size:9px;color:rgba(240,237,230,.4);letter-spacing:.1em;margin-bottom:16px">STARTET IMMER AM MONTAG DER GEWÄHLTEN WOCHE</div>
+    <div style="font-size:13px;color:rgba(240,237,230,.5);line-height:1.7;margin-top:4px">
       Der Coach passt den Plan laufend an — basierend auf deinen Daten, deinem Befinden und deiner Progression.
     </div>
   </div>
@@ -377,7 +386,8 @@ var planData = {
   days_per_week: 5,
   long_run_day: 6,
   quality_sessions: 1,
-  strength_sessions: 2
+  strength_sessions: 2,
+  start_date: ''
 };
 
 function selectGoal(el, val) {
@@ -489,6 +499,7 @@ function buildSummary() {
     {label:'LONG RUN', value: DAY_NAMES[planData.long_run_day] || '—'},
     {label:'QUALITY SESSIONS', value: planData.quality_sessions + ' pro Woche'},
     {label:'KRAFTEINHEITEN', value: planData.strength_sessions + ' pro Woche'},
+    {label:'PLAN START', value: planData.start_date ? new Date(planData.start_date).toLocaleDateString('de-DE',{day:'2-digit',month:'long',year:'numeric'}) : 'Nicht gesetzt'},
   ];
 
   document.getElementById('summary-rows').innerHTML = rows.map(function(r) {
@@ -577,6 +588,25 @@ function confirmCancel() {
     + '<button onclick="document.getElementById(\'cancel-popup\').remove()" style="width:100%;padding:16px;background:transparent;border:.5px solid rgba(240,237,230,.2);color:rgba(240,237,230,.6);font-family:DM Mono,monospace;font-size:12px;letter-spacing:.14em;cursor:pointer">WEITER MACHEN</button>'
     + '</div>';
   document.body.appendChild(popup);
+}
+
+// ── STARTDATUM ──
+function checkStartDate() {
+  var d = document.getElementById('start-day').value;
+  var m = document.getElementById('start-month').value;
+  var y = document.getElementById('start-year').value;
+  if (d && m && y && y.length === 4) {
+    var dd = String(d).padStart(2,'0');
+    var mm = String(m).padStart(2,'0');
+    var raw = new Date(y + '-' + mm + '-' + dd);
+    // Auf Montag der gewählten Woche runden
+    var dow = raw.getDay();
+    var diff = dow === 0 ? -6 : 1 - dow;
+    raw.setDate(raw.getDate() + diff);
+    planData.start_date = raw.toISOString().split('T')[0];
+    var hint = document.getElementById('start-hint');
+    if (hint) hint.textContent = 'MONTAG ' + raw.toLocaleDateString('de-DE',{day:'2-digit',month:'long',year:'numeric'});
+  }
 }
 
 // ── GPX HANDLING ──
@@ -691,7 +721,8 @@ function generatePlan() {
       quality_sessions: planData.quality_sessions,
       strength_sessions: planData.strength_sessions,
       total_weeks: weeks,
-      phases: phases
+      phases: phases,
+      start_date: planData.start_date || null
     })
   }).then(function(r){ return r.json(); })
     .then(function(data){

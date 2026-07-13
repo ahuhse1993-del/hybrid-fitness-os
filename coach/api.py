@@ -123,10 +123,24 @@ def generate_plan():
         strength_sessions = data.get('strength_sessions', 2)
         total_weeks = data.get('total_weeks', 16)
         phases = data.get('phases', [])
+        start_date = data.get('start_date', None)
 
-        # Nur die essenziellen Docs für Plan-Generierung laden
-        from knowledge.loader import load_knowledge
-        knowledge = load_knowledge('plan_generation')
+        # Startdatum berechnen
+        today = get_today()
+        if start_date:
+            try:
+                start_monday = date.fromisoformat(start_date)
+                # Sicherstellen dass es ein Montag ist
+                if start_monday.weekday() != 0:
+                    start_monday = start_monday - timedelta(days=start_monday.weekday())
+            except Exception:
+                start_monday = today + timedelta(days=(7 - today.weekday()) % 7 or 7)
+        else:
+            # Nächster Montag als Default
+            days_until_monday = (7 - today.weekday()) % 7
+            if days_until_monday == 0:
+                days_until_monday = 7
+            start_monday = today + timedelta(days=days_until_monday)
         day_names = ['', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag']
 
         # Wochen in zwei Hälften aufteilen um Timeout zu vermeiden
@@ -227,13 +241,6 @@ Erstelle Wochen {week_from} bis {week_to}. day_of_week: 1=Mo bis 7=So. Rest Days
 
         # Alten training_plan löschen
         cur.execute("DELETE FROM training_plan WHERE plan_id = %s OR plan_id IS NULL", (plan_id,))
-
-        # Startdatum berechnen (nächster Montag)
-        today = get_today()
-        days_until_monday = (7 - today.weekday()) % 7
-        if days_until_monday == 0:
-            days_until_monday = 7
-        start_monday = today + timedelta(days=days_until_monday)
 
         # Sessions eintragen
         sessions_inserted = 0
