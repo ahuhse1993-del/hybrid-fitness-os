@@ -337,67 +337,135 @@ html,body{height:100%;overflow:hidden;background:var(--bg);font-family:'DM Sans'
     <button onclick="document.getElementById('analyse-bar').classList.remove('show')" style="background:transparent;border:none;color:rgba(240,237,230,.4);font-size:18px;cursor:pointer;padding:4px">&#x2715;</button>
   </div>
 
-  <!-- Coach Brief -->
-  <div style="display:flex;min-height:210px;border-bottom:.5px solid var(--black)">
-    <div style="flex:1;padding:16px;display:flex;flex-direction:column;justify-content:space-between">
-      <div>
-        <div class="kicker" style="margin-bottom:8px">CAIRN &middot; MORNING BRIEF</div>
-        <div class="athlete-echo" id="athlete-echo">
-          <span class="ae-lbl">DU &middot;</span>
-          <span id="echo-text"></span>
-        </div>
+  <!-- 1. MORNING BRIEF -->
+  <div style="border-bottom:.5px solid var(--black)">
+
+    <!-- Athlete Echo -->
+    <div class="athlete-echo" id="athlete-echo" style="margin:0;border-left:none;border-bottom:.5px solid rgba(46,44,42,.08);padding:8px 16px">
+      <span class="ae-lbl">DU &middot;</span>
+      <span id="echo-text"></span>
+    </div>
+
+    <!-- Coach Text + Illustration nebeneinander -->
+    <div style="display:flex;min-height:180px">
+      <div style="flex:1;padding:16px;display:flex;flex-direction:column;gap:10px">
+        <div style="font-family:'DM Mono',monospace;font-size:8px;color:var(--stone);letter-spacing:.14em">CAIRN &middot; MORNING BRIEF</div>
         <div class="cb-decision" id="cb-decision"><span style="color:var(--stone);font-size:12px;font-family:'DM Mono',monospace">Coach l&auml;dt...</span></div>
         <div class="cb-quote" id="cb-quote" style="display:none"></div>
-        <div class="kicker" style="margin-top:8px;margin-bottom:6px">WAS ICH SEHE</div>
-        <div class="cb-why-items" id="cb-why-items"><div class="cb-why-item" style="color:var(--stone)">Einen Moment...</div></div>
+      </div>
+      <!-- Illustration rechts oben – quadratisch, Zustand -->
+      <div style="width:100px;flex-shrink:0;background:#E8E5DD;border-left:.5px solid var(--black);display:flex;flex-direction:column">
+        <div style="font-family:'DM Mono',monospace;font-size:7px;letter-spacing:.12em;color:var(--stone);padding:7px 8px;border-bottom:.5px solid rgba(46,44,42,.12)">FOKUS</div>
+        <div style="flex:1;display:flex;align-items:center;justify-content:center;padding:12px">
+          <svg width="60" height="60" viewBox="0 0 110 110" fill="none">
+            <line x1="55" y1="0" x2="55" y2="110" stroke="rgba(46,44,42,.07)" stroke-width="1"/>
+            <line x1="0" y1="55" x2="110" y2="55" stroke="rgba(46,44,42,.07)" stroke-width="1"/>
+            <circle cx="55" cy="55" r="44" stroke="rgba(46,44,42,.1)" stroke-width="1" fill="none" stroke-dasharray="3 2"/>
+            <circle cx="55" cy="55" r="28" stroke="rgba(46,44,42,.18)" stroke-width="1" fill="none"/>
+            <circle cx="55" cy="55" r="12" stroke="rgba(46,44,42,.3)" stroke-width="1.2" fill="none"/>
+            <circle cx="55" cy="55" r="3" fill="rgba(46,44,42,.5)"/>
+            <line x1="55" y1="25" x2="55" y2="30" stroke="rgba(46,44,42,.28)" stroke-width="1"/>
+            <line x1="55" y1="80" x2="55" y2="85" stroke="rgba(46,44,42,.28)" stroke-width="1"/>
+            <line x1="25" y1="55" x2="30" y2="55" stroke="rgba(46,44,42,.28)" stroke-width="1"/>
+            <line x1="80" y1="55" x2="85" y2="55" stroke="rgba(46,44,42,.28)" stroke-width="1"/>
+          </svg>
+        </div>
       </div>
     </div>
-    <div class="cb-illus-wrap">
-      <div class="cb-illus-state">FOKUS</div>
-      <div class="cb-illus-art">
-        <svg width="60" height="60" viewBox="0 0 110 110" fill="none">
-          <line x1="55" y1="0" x2="55" y2="110" stroke="rgba(46,44,42,.07)" stroke-width="1"/>
-          <line x1="0" y1="55" x2="110" y2="55" stroke="rgba(46,44,42,.07)" stroke-width="1"/>
-          <circle cx="55" cy="55" r="48" stroke="rgba(46,44,42,.1)" stroke-width="1" fill="none" stroke-dasharray="3 2"/>
-          <circle cx="55" cy="55" r="30" stroke="rgba(46,44,42,.18)" stroke-width="1" fill="none"/>
-          <circle cx="55" cy="55" r="14" stroke="rgba(46,44,42,.3)" stroke-width="1.2" fill="none"/>
-          <circle cx="55" cy="55" r="3.5" fill="rgba(46,44,42,.5)"/>
-          <line x1="55" y1="23" x2="55" y2="29" stroke="rgba(46,44,42,.28)" stroke-width="1"/>
-          <line x1="55" y1="81" x2="55" y2="87" stroke="rgba(46,44,42,.28)" stroke-width="1"/>
-          <line x1="23" y1="55" x2="29" y2="55" stroke="rgba(46,44,42,.28)" stroke-width="1"/>
-          <line x1="81" y1="55" x2="87" y2="55" stroke="rgba(46,44,42,.28)" stroke-width="1"/>
+
+    <!-- Was ich sehe -->
+    <div style="padding:12px 16px;border-top:.5px solid rgba(46,44,42,.08)">
+      <div style="font-family:'DM Mono',monospace;font-size:8px;color:var(--stone);letter-spacing:.14em;margin-bottom:8px">WAS ICH SEHE</div>
+      <div class="cb-why-items" id="cb-why-items"><div class="cb-why-item" style="color:var(--stone)">Einen Moment...</div></div>
+    </div>
+
+    <!-- Adapt Block -->
+    <div class="adapt-block" id="adapt-block" onclick="openReplan()">
+      <div>
+        <div class="adapt-label">EINE IDEE VON MIR</div>
+        <div class="adapt-desc" id="cb-suggestion">—</div>
+      </div>
+      <button class="adapt-btn-sm">ANSEHEN &rarr;</button>
+    </div>
+  </div>
+
+  <!-- 2. TODAY'S SESSION -->
+  <div style="border-bottom:.5px solid var(--black);display:flex">
+
+    <!-- Illustration links – quadratisch, Session-Typ -->
+    <div style="width:110px;flex-shrink:0;background:var(--cal-bg);border-right:.5px solid var(--black);display:flex;flex-direction:column">
+      <div style="font-family:'DM Mono',monospace;font-size:7px;letter-spacing:.1em;color:var(--stone);padding:7px 8px;border-bottom:.5px solid rgba(46,44,42,.12)" id="session-illus-label">SESSION</div>
+      <div style="flex:1;display:flex;align-items:center;justify-content:center;padding:12px;aspect-ratio:1">
+        <!-- Platzhalter – wird später durch Katalog-Grafik ersetzt -->
+        <svg width="70" height="70" viewBox="0 0 100 100" fill="none">
+          <!-- Stipple-artiger Platzhalter -->
+          <rect x="2" y="2" width="96" height="96" stroke="rgba(46,44,42,.12)" stroke-width=".5" fill="none" stroke-dasharray="2 2"/>
+          <circle cx="50" cy="38" r="16" stroke="rgba(46,44,42,.2)" stroke-width="1" fill="none"/>
+          <line x1="50" y1="54" x2="50" y2="75" stroke="rgba(46,44,42,.2)" stroke-width="1"/>
+          <line x1="34" y1="63" x2="50" y2="54" stroke="rgba(46,44,42,.2)" stroke-width="1"/>
+          <line x1="66" y1="63" x2="50" y2="54" stroke="rgba(46,44,42,.2)" stroke-width="1"/>
+          <line x1="42" y1="80" x2="50" y2="75" stroke="rgba(46,44,42,.2)" stroke-width="1"/>
+          <line x1="58" y1="80" x2="50" y2="75" stroke="rgba(46,44,42,.2)" stroke-width="1"/>
+          <text x="50" y="95" font-family="DM Mono" font-size="6" fill="rgba(46,44,42,.2)" text-anchor="middle" letter-spacing="2">ILLUS.</text>
         </svg>
       </div>
     </div>
-  </div>
 
-  <!-- Adapt Block -->
-  <div class="adapt-block" id="adapt-block" onclick="openReplan()">
-    <div>
-      <div class="adapt-label">EINE IDEE VON MIR</div>
-      <div class="adapt-desc" id="cb-suggestion">—</div>
+    <!-- Session Info rechts -->
+    <div style="flex:1;padding:14px 16px;background-image:var(--dot);background-size:6px 6px">
+      <div style="font-family:'DM Mono',monospace;font-size:8px;color:var(--mid);letter-spacing:.14em;margin-bottom:6px">TODAY'S SESSION</div>
+      <div style="font-size:20px;font-weight:300;letter-spacing:-.02em;margin-bottom:12px;line-height:1.2" id="session-name">—</div>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <div style="display:flex;justify-content:space-between">
+          <span style="font-family:'DM Mono',monospace;font-size:8px;color:var(--stone);letter-spacing:.1em">DISTANZ</span>
+          <span style="font-family:'DM Mono',monospace;font-size:12px;font-weight:500" id="session-dist">—</span>
+        </div>
+        <div style="display:flex;justify-content:space-between">
+          <span style="font-family:'DM Mono',monospace;font-size:8px;color:var(--stone);letter-spacing:.1em">ZONE</span>
+          <span style="font-family:'DM Mono',monospace;font-size:12px;font-weight:500" id="session-zone">—</span>
+        </div>
+        <div style="display:flex;justify-content:space-between">
+          <span style="font-family:'DM Mono',monospace;font-size:8px;color:var(--stone);letter-spacing:.1em">DAUER</span>
+          <span style="font-family:'DM Mono',monospace;font-size:12px;font-weight:500" id="session-dur">—</span>
+        </div>
+      </div>
     </div>
-    <button class="adapt-btn-sm">ANSEHEN &rarr;</button>
   </div>
 
-  <!-- Today's Session -->
-  <div class="section" style="background-image:var(--dot);background-size:6px 6px">
-    <div class="kicker">TODAY'S SESSION</div>
-    <div style="font-size:20px;font-weight:300;letter-spacing:-.02em;margin-bottom:10px" id="session-name">—</div>
-    <div style="display:flex;gap:16px;flex-wrap:wrap">
-      <div><div style="font-family:'DM Mono',monospace;font-size:7px;color:var(--mid);letter-spacing:.1em">DISTANZ</div><div style="font-family:'DM Mono',monospace;font-size:12px;font-weight:500" id="session-dist">—</div></div>
-      <div><div style="font-family:'DM Mono',monospace;font-size:7px;color:var(--mid);letter-spacing:.1em">ZONE</div><div style="font-family:'DM Mono',monospace;font-size:12px;font-weight:500" id="session-zone">—</div></div>
-      <div><div style="font-family:'DM Mono',monospace;font-size:7px;color:var(--mid);letter-spacing:.1em">DAUER</div><div style="font-family:'DM Mono',monospace;font-size:12px;font-weight:500" id="session-dur">—</div></div>
-    </div>
-  </div>
-
-  <!-- Health Snapshot -->
-  <div style="padding:14px 16px;background:var(--black);border-bottom:.5px solid var(--black)">
-    <div class="kicker" style="color:rgba(240,237,230,.3)">HEALTH SNAPSHOT</div>
-    <div style="display:flex;flex-direction:column;gap:5px">
-      <div style="display:flex;align-items:center;gap:8px"><div style="font-family:'DM Mono',monospace;font-size:8px;color:rgba(240,237,230,.28);width:46px">HRV</div><div style="flex:1;height:7px;display:flex"><div style="height:100%;background:rgba(240,237,230,.6)" id="dash-hrv-bar" style="width:0%"></div><div style="flex:1;height:100%;background-image:radial-gradient(circle,rgba(240,237,230,.13) 1px,transparent 1px);background-size:4px 4px"></div></div><div style="font-family:'DM Mono',monospace;font-size:8px;color:rgba(240,237,230,.28);width:40px;text-align:right" id="dash-hrv">—</div></div>
-      <div style="display:flex;align-items:center;gap:8px"><div style="font-family:'DM Mono',monospace;font-size:8px;color:rgba(240,237,230,.28);width:46px">SCHLAF</div><div style="flex:1;height:7px;display:flex"><div style="height:100%;background:rgba(240,237,230,.6)" id="dash-sleep-bar" style="width:0%"></div><div style="flex:1;height:100%;background-image:radial-gradient(circle,rgba(240,237,230,.13) 1px,transparent 1px);background-size:4px 4px"></div></div><div style="font-family:'DM Mono',monospace;font-size:8px;color:rgba(240,237,230,.28);width:40px;text-align:right" id="dash-sleep">—</div></div>
-      <div style="display:flex;align-items:center;gap:8px"><div style="font-family:'DM Mono',monospace;font-size:8px;color:rgba(240,237,230,.28);width:46px">PULS</div><div style="flex:1;height:7px;display:flex"><div style="height:100%;background:rgba(240,237,230,.6)" id="dash-rhr-bar" style="width:0%"></div><div style="flex:1;height:100%;background-image:radial-gradient(circle,rgba(240,237,230,.13) 1px,transparent 1px);background-size:4px 4px"></div></div><div style="font-family:'DM Mono',monospace;font-size:8px;color:rgba(240,237,230,.28);width:40px;text-align:right" id="dash-rhr">—</div></div>
+  <!-- 3. HEALTH SNAPSHOT -->
+  <div style="background:var(--black);padding:16px">
+    <div style="font-family:'DM Mono',monospace;font-size:8px;color:rgba(240,237,230,.3);letter-spacing:.14em;margin-bottom:14px">HEALTH SNAPSHOT</div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px">
+      <!-- HRV -->
+      <div style="display:flex;flex-direction:column;align-items:center;gap:6px">
+        <div style="font-family:'DM Mono',monospace;font-size:7px;color:rgba(240,237,230,.3);letter-spacing:.1em">HRV</div>
+        <div style="width:100%;height:48px;position:relative;display:flex;align-items:flex-end">
+          <div style="position:absolute;bottom:0;left:0;right:0;height:100%;background-image:radial-gradient(circle,rgba(240,237,230,.08) 1px,transparent 1px);background-size:4px 4px"></div>
+          <div id="dash-hrv-bar-v" style="width:100%;background:rgba(240,237,230,.55);position:relative;z-index:1;height:0%;transition:height .6s ease"></div>
+        </div>
+        <div style="font-family:'DM Mono',monospace;font-size:13px;color:#F0EDE6;font-weight:500" id="dash-hrv">—</div>
+        <div style="font-family:'DM Mono',monospace;font-size:7px;color:rgba(240,237,230,.25)">ms</div>
+      </div>
+      <!-- SCHLAF -->
+      <div style="display:flex;flex-direction:column;align-items:center;gap:6px">
+        <div style="font-family:'DM Mono',monospace;font-size:7px;color:rgba(240,237,230,.3);letter-spacing:.1em">SCHLAF</div>
+        <div style="width:100%;height:48px;position:relative;display:flex;align-items:flex-end">
+          <div style="position:absolute;bottom:0;left:0;right:0;height:100%;background-image:radial-gradient(circle,rgba(240,237,230,.08) 1px,transparent 1px);background-size:4px 4px"></div>
+          <div id="dash-sleep-bar-v" style="width:100%;background:rgba(240,237,230,.55);position:relative;z-index:1;height:0%;transition:height .6s ease"></div>
+        </div>
+        <div style="font-family:'DM Mono',monospace;font-size:13px;color:#F0EDE6;font-weight:500" id="dash-sleep">—</div>
+        <div style="font-family:'DM Mono',monospace;font-size:7px;color:rgba(240,237,230,.25)">h</div>
+      </div>
+      <!-- PULS -->
+      <div style="display:flex;flex-direction:column;align-items:center;gap:6px">
+        <div style="font-family:'DM Mono',monospace;font-size:7px;color:rgba(240,237,230,.3);letter-spacing:.1em">PULS</div>
+        <div style="width:100%;height:48px;position:relative;display:flex;align-items:flex-end">
+          <div style="position:absolute;bottom:0;left:0;right:0;height:100%;background-image:radial-gradient(circle,rgba(240,237,230,.08) 1px,transparent 1px);background-size:4px 4px"></div>
+          <div id="dash-rhr-bar-v" style="width:100%;background:rgba(240,237,230,.55);position:relative;z-index:1;height:0%;transition:height .6s ease"></div>
+        </div>
+        <div style="font-family:'DM Mono',monospace;font-size:13px;color:#F0EDE6;font-weight:500" id="dash-rhr">—</div>
+        <div style="font-family:'DM Mono',monospace;font-size:7px;color:rgba(240,237,230,.25)">bpm</div>
+      </div>
     </div>
   </div>
 
@@ -684,9 +752,21 @@ function loadDashboard(){
   return fetch(BASE+'/api/dashboard').then(function(r){return r.json();}).then(function(data){
     if(data.status!=='ok')return;
     var health=data.health;
-    if(health.hrv){document.getElementById('dash-hrv').textContent=health.hrv+' ms';document.getElementById('dash-hrv-bar').style.width=Math.min(health.hrv/100*100,100)+'%';}
-    if(health.sleep_h){document.getElementById('dash-sleep').textContent=health.sleep_h+' h';document.getElementById('dash-sleep-bar').style.width=Math.min(health.sleep_h/9*100,100)+'%';}
-    if(health.rhr){document.getElementById('dash-rhr').textContent=health.rhr+' bpm';document.getElementById('dash-rhr-bar').style.width=Math.min((80-health.rhr)/40*100,100)+'%';}
+    if(health.hrv){
+      document.getElementById('dash-hrv').textContent=health.hrv;
+      var hrvPct=Math.min(health.hrv/100*100,100);
+      var b=document.getElementById('dash-hrv-bar-v');if(b)b.style.height=hrvPct+'%';
+    }
+    if(health.sleep_h){
+      document.getElementById('dash-sleep').textContent=health.sleep_h;
+      var sleepPct=Math.min(health.sleep_h/9*100,100);
+      var b=document.getElementById('dash-sleep-bar-v');if(b)b.style.height=sleepPct+'%';
+    }
+    if(health.rhr){
+      document.getElementById('dash-rhr').textContent=health.rhr;
+      var rhrPct=Math.min((80-health.rhr)/40*100,100);
+      var b=document.getElementById('dash-rhr-bar-v');if(b)b.style.height=rhrPct+'%';
+    }
     var week=data.week;
     document.getElementById('plan-week-km').textContent=(week.km_done||'—')+' km';
     document.getElementById('plan-week-sessions').textContent=(week.sessions_done||'—')+' / '+(week.sessions_planned||'—');
