@@ -9,6 +9,13 @@ load_dotenv()
 app = Flask(__name__)
 CORS(app)
 
+@app.after_request
+def no_cache(response):
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
+
 def get_today():
     try:
         import pytz
@@ -32,6 +39,199 @@ def analyse():
 @app.route('/mobile')
 def mobile():
     return send_file(os.path.join(os.path.dirname(__file__), '..', 'files', 'cairn_home_mobile.html'))
+
+@app.route('/plan-setup')
+def plan_setup():
+    return send_file(os.path.join(os.path.dirname(__file__), '..', 'files', 'cairn_plan_onboarding.html'))
+
+# ─── PLAN STATUS ───
+@app.route('/api/plan/status', methods=['GET'])
+def plan_status():
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute("SELECT id, name, goal_type, race_name, race_date, total_weeks, status FROM plans WHERE status = 'active' ORDER BY created_at DESC LIMIT 1")
+        row = cur.fetchone()
+        conn.close()
+        if row:
+            return jsonify({
+                "status": "ok",
+                "has_plan": True,
+                "plan": {
+                    "id": row[0], "name": row[1], "goal_type": row[2],
+                    "race_name": row[3], "race_date": str(row[4]) if row[4] else None,
+                    "total_weeks": row[5], "status": row[6]
+                }
+            })
+        return jsonify({"status": "ok", "has_plan": False})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+# ─── PLAN GENERIEREN ───
+@app.route('/api/plan/generate', methods=['POST'])
+def generate_plan():
+    try:
+        import anthropic
+        data = request.get_json(force=True)
+
+        goal_type = data.get('goal_type', 'race')
+        race_type = data.get('race_type', '')
+        race_name = data.get('race_name', '')
+        race_date = data.get('race_date', '')
+        days_per_week = data.get('days_per_week', 5)
+        long_run_day = data.get('long_run_day', 6)
+        quality_sessions = data.get('quality_sessions', 1)
+        strength_sessions = data.get('strength_sessions', 2)
+        total_weeks = data.get('total_weeks', 16)
+        phases = data.get('phases', [])
+
+        day_names = ['', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag']
+
+        prompt = f"""Du bist CAIRN Coach. Erstelle einen strukturierten Trainingsplan.
+
+ATHLETENPROFIL:
+- Ziel: {goal_type}
+- Rennen: {race_name} ({race_type})
+- Renndatum: {race_date}
+- Trainingstage pro Woche: {days_per_week}
+- Long Run Tag: {day_names[long_run_day]}
+- Quality Sessions pro Woche: {quality_sessions}
+- Kraft-Sessions pro Woche: {strength_sessions}
+- Planlänge: {total_weeks} Wochen
+- Phasen: {json.dumps(phases)}
+
+REGELN:
+1. Long Run immer an Tag {long_run_day} ({day_names[long_run_day]})
+2. Nie 2 harte Sessions direkt hintereinander
+3. Nach Long Run: Ruhe oder Easy
+4. Kraft nicht direkt vor Quality
+5. Jede Woche hat 1-2 Rest Days
+6. Volumen steigt 10% pro Woche in Build-Phase
+7. Deload-Woche alle 4 Wochen (Volumen -20%)
+8. Trail Run = RPE-basiert, keine Pace-Angaben
+9. Krafttraining: Oberkörper A/B und Unterkörper A/B abwechseln
+
+SESSION-TYPEN erlaubt:
+- Easy Run (Z1-Z2, RPE 1-4)
+- Trail Run (Z1-Z2, RPE 1-5)
+- Long Run (Z1-Z2, RPE 1-5)
+- Progression Run (Z2-Z3, RPE 4-6)
+- Tempo Run (Z3-Z4, RPE 6-7)
+- Intervalle (Z4-Z5, RPE 7-9)
+- Hill Repeats (Z3-Z5, RPE 6-8)
+- Krafttraining (Oberkörper A/B, Unterkörper A/B)
+- Mobilität
+- Rest Day
+
+ANTWORT NUR ALS JSON:
+{{
+  "weeks": [
+    {{
+      "week_number": 1,
+      "phase": "base",
+      "total_km": 40,
+      "sessions": [
+        {{
+          "day_of_week": 1,
+          "session_type": "Easy Run",
+          "session_zone": "Z1-Z2",
+          "distance_km": 8,
+          "duration_min": 55,
+          "notes": "Easy Run Z1-Z2 · RPE 1-3 · Konversationstempo halten"
+        }}
+      ]
+    }}
+  ]
+}}
+
+Erstelle alle {total_weeks} Wochen. day_of_week: 1=Mo, 2=Di, 3=Mi, 4=Do, 5=Fr, 6=Sa, 7=So.
+Rest Days NICHT als Session eintragen – einfach weglassen.
+"""
+
+        client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+        message = client.messages.create(
+            model="claude-sonnet-4-6",
+            max_tokens=8000,
+            messages=[{"role": "user", "content": prompt}]
+        )
+
+        raw = message.content[0].text.strip()
+        raw = raw.replace('```json', '').replace('```', '').strip()
+        plan_json = json.loads(raw)
+
+        # In DB speichern
+        conn = get_db()
+        cur = conn.cursor()
+
+        # Plan-Metadaten
+        cur.execute("""
+            INSERT INTO plans (name, goal_type, race_name, race_date, race_distance_km,
+                total_weeks, days_per_week, long_run_day, quality_sessions, strength_sessions, status)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'active')
+            RETURNING id
+        """, (
+            race_name or f"{goal_type} Plan {total_weeks}W",
+            goal_type, race_name,
+            race_date if race_date else None,
+            0,
+            total_weeks, days_per_week, long_run_day,
+            quality_sessions, strength_sessions
+        ))
+        plan_id = cur.fetchone()[0]
+
+        # Alten Plan archivieren
+        cur.execute("UPDATE plans SET status='archived' WHERE status='active' AND id != %s", (plan_id,))
+
+        # Alten training_plan löschen
+        cur.execute("DELETE FROM training_plan WHERE plan_id = %s OR plan_id IS NULL", (plan_id,))
+
+        # Startdatum berechnen (nächster Montag)
+        today = get_today()
+        days_until_monday = (7 - today.weekday()) % 7
+        if days_until_monday == 0:
+            days_until_monday = 7
+        start_monday = today + timedelta(days=days_until_monday)
+
+        # Sessions eintragen
+        sessions_inserted = 0
+        for week in plan_json.get('weeks', []):
+            week_num = week.get('week_number', 1)
+            phase = week.get('phase', 'base')
+            week_monday = start_monday + timedelta(weeks=week_num - 1)
+
+            for session in week.get('sessions', []):
+                cur.execute("""
+                    INSERT INTO training_plan
+                    (week_date, day_of_week, session_type, session_zone,
+                     duration_min, distance_km, notes, phase, plan_id, plan_week)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """, (
+                    week_monday,
+                    session.get('day_of_week', 1),
+                    session.get('session_type', 'Easy Run'),
+                    session.get('session_zone', ''),
+                    session.get('duration_min', 0),
+                    session.get('distance_km', 0),
+                    session.get('notes', ''),
+                    phase,
+                    plan_id,
+                    week_num
+                ))
+                sessions_inserted += 1
+
+        conn.commit()
+        conn.close()
+
+        return jsonify({
+            "status": "ok",
+            "plan_id": plan_id,
+            "weeks": len(plan_json.get('weeks', [])),
+            "sessions": sessions_inserted
+        })
+
+    except Exception as e:
+        import traceback
+        return jsonify({"status": "error", "message": str(e), "trace": traceback.format_exc()}), 500
 
 @app.route('/api/checkin', methods=['POST'])
 def save_checkin():
@@ -721,12 +921,8 @@ def get_exercises(training_id):
         exercises = []
         for r in rows:
             exercises.append({
-                "index": r[0],
-                "name": r[1],
-                "sets": r[2],
-                "reps": r[3],
-                "weight_kg": r[4],
-                "notes": r[5]
+                "index": r[0], "name": r[1], "sets": r[2],
+                "reps": r[3], "weight_kg": r[4], "notes": r[5]
             })
         return jsonify({"status": "ok", "exercises": exercises})
     except Exception as e:
