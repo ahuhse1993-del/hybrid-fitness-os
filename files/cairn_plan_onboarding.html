@@ -557,19 +557,36 @@ function buildWeekStructure() {
 
   // Bestimme ob Oberkörper oder Unterkörper: 
   // Tage VOR Long Run = Oberkörper, Tage NACH Long Run = Unterkörper
-  var upperCount = 0;
+  var validStrengthDays = strengthDays.filter(function(d){ return d !== longRunDay; });
+  var totalStrength = validStrengthDays.length;
+  // Split-Schema: OB, UB, FB, OB, UB, FB, ...
+  var splitSchema = [];
+  for (var s = 0; s < totalStrength; s++) {
+    if (totalStrength % 2 === 0) {
+      // Gerade: nur OB/UB abwechselnd
+      splitSchema.push(s % 2 === 0 ? 'OB' : 'UB');
+    } else {
+      // Ungerade: OB, UB, FB Muster
+      var pattern = ['OB','UB','FB'];
+      splitSchema.push(pattern[s % 3]);
+    }
+  }
+  var splitIdx = 0;
   strengthDays.forEach(function(d) {
     if (d === longRunDay) return;
-    // Abwechselnd Oberkörper / Unterkörper
-    // Aber: Tag direkt nach Long Run immer Unterkörper (Beine erholen sich)
+    // Tag direkt nach Long Run: immer UB
     var dayAfterLong = (longRunDay % 7) + 1;
-    var isLowerForced = (d === dayAfterLong);
-    var isUpper = isLowerForced ? false : (upperCount % 2 === 0);
-    if (!isLowerForced) upperCount++;
-    structure[d] = {
-      type: isUpper ? 'Krafttraining · Oberkörper' : 'Krafttraining · Unterkörper',
-      label: isUpper ? 'KRAFT OB' : 'KRAFT UB'
+    if (d === dayAfterLong && splitSchema[splitIdx] === 'OB') {
+      splitSchema[splitIdx] = 'UB';
+    }
+    var split = splitSchema[splitIdx] || 'OB';
+    splitIdx++;
+    var typeMap = {
+      'OB': {type:'Krafttraining · Oberkörper', label:'KRAFT OB'},
+      'UB': {type:'Krafttraining · Unterkörper', label:'KRAFT UB'},
+      'FB': {type:'Krafttraining · Full Body', label:'KRAFT FB'}
     };
+    structure[d] = typeMap[split];
   });
 
   // 3. Quality Session platzieren
@@ -642,6 +659,7 @@ function renderWeekStructure(structure) {
     'QUALITY': 'var(--accent)',
     'KRAFT OB': 'rgba(240,237,230,.6)',
     'KRAFT UB': 'rgba(240,237,230,.6)',
+    'KRAFT FB': 'rgba(240,237,230,.6)',
     'EASY': 'rgba(240,237,230,.4)',
     'REST': 'rgba(240,237,230,.2)'
   };
@@ -650,6 +668,7 @@ function renderWeekStructure(structure) {
     'QUALITY': 'rgba(232,216,74,.12)',
     'KRAFT OB': 'rgba(240,237,230,.06)',
     'KRAFT UB': 'rgba(240,237,230,.06)',
+    'KRAFT FB': 'rgba(240,237,230,.06)',
     'EASY': 'transparent',
     'REST': 'transparent'
   };
