@@ -511,11 +511,11 @@ def get_plan():
 
         cur.execute("""
             SELECT id, week_date, day_of_week, session_type, session_zone,
-                   duration_min, distance_km, notes
+                   duration_min, distance_km, notes, phase
             FROM training_plan
             WHERE week_date >= %s AND week_date < %s
             ORDER BY week_date, day_of_week
-        """, (monday, monday + timedelta(weeks=4)))
+        """, (monday - timedelta(weeks=1), monday + timedelta(weeks=52)))
         plan_rows = cur.fetchall()
 
         cur.execute("""
@@ -563,7 +563,7 @@ def get_plan():
                 "id": r[0], "week_date": week_date, "day_of_week": day_of_week,
                 "session_type": session_type, "session_zone": r[4],
                 "duration_min": r[5], "distance_km": float(r[6]) if r[6] else 0,
-                "notes": r[7] or "", "is_done": False, "is_mismatch": False,
+                "notes": r[7] or "", "phase": r[8] or "base", "is_done": False, "is_mismatch": False,
                 "actual_type": None, "actual_name": None,
                 "actual_km": 0, "actual_min": 0, "actual_hr": None, "training_id": None
             }
@@ -597,7 +597,7 @@ def get_plan():
                         "session_type": actual["type"], "session_zone": "",
                         "duration_min": actual["duration_min"],
                         "distance_km": actual["distance_km"],
-                        "notes": actual["name"], "is_done": True,
+                        "notes": actual["name"], "phase": "base", "is_done": True,
                         "is_mismatch": False, "is_spontaneous": True,
                         "actual_type": actual["type"], "actual_name": actual["name"],
                         "actual_km": actual["distance_km"], "actual_min": actual["duration_min"],
