@@ -828,14 +828,25 @@ function showNoPlanState() {
   var wrap = document.createElement('div');
   wrap.style.cssText = 'padding:40px 20px;display:flex;flex-direction:column;align-items:center;text-align:center;gap:20px';
   var icon = document.createElement('div');
-  icon.style.cssText = 'width:64px;height:64px;border:.5px solid rgba(46,44,42,.2);display:flex;align-items:center;justify-content:center';
-  icon.innerHTML = '<svg width="28" height="28" viewBox="0 0 28 28" fill="none"><line x1="14" y1="0" x2="14" y2="28" stroke="rgba(46,44,42,.3)" stroke-width="1"/><line x1="0" y1="14" x2="28" y2="14" stroke="rgba(46,44,42,.3)" stroke-width="1"/><circle cx="14" cy="14" r="8" stroke="rgba(46,44,42,.3)" stroke-width="1" fill="none"/><circle cx="14" cy="14" r="2" fill="rgba(46,44,42,.4)"/></svg>';
+  icon.style.cssText = 'width:120px;height:120px;flex-shrink:0';
+  icon.innerHTML = '<svg width="120" height="120" viewBox="0 0 120 120" fill="none">'
+    + '<rect x="1" y="1" width="118" height="118" stroke="rgba(46,44,42,.08)" stroke-width=".5" fill="none" stroke-dasharray="2 2"/>'
+    + '<line x1="0" y1="60" x2="120" y2="60" stroke="rgba(46,44,42,.06)" stroke-width=".5"/>'
+    + '<line x1="60" y1="0" x2="60" y2="120" stroke="rgba(46,44,42,.06)" stroke-width=".5"/>'
+    + '<path d="M30 90 Q45 40 60 35 Q75 30 85 55 Q92 72 105 60" stroke="rgba(46,44,42,.25)" stroke-width="1.5" fill="none" stroke-linecap="round"/>'
+    + '<path d="M30 90 Q45 40 60 35 Q75 30 85 55 Q92 72 105 60" stroke="rgba(46,44,42,.06)" stroke-width="8" fill="none" stroke-linecap="round"/>'
+    + '<circle cx="105" cy="60" r="4" fill="rgba(46,44,42,.4)"/>'
+    + '<circle cx="105" cy="60" r="8" stroke="rgba(46,44,42,.15)" stroke-width="1" fill="none"/>'
+    + '<line x1="18" y1="88" x2="42" y2="88" stroke="rgba(46,44,42,.12)" stroke-width=".5"/>'
+    + '<line x1="18" y1="92" x2="35" y2="92" stroke="rgba(46,44,42,.08)" stroke-width=".5"/>'
+    + '<text x="60" y="115" font-family="DM Mono" font-size="6" fill="rgba(46,44,42,.15)" text-anchor="middle" letter-spacing="3">BEREIT</text>'
+    + '</svg>';
   var title = document.createElement('div');
-  title.style.cssText = 'font-size:20px;font-weight:300;color:var(--black);line-height:1.4';
-  title.textContent = 'Kein aktiver Plan.';
+  title.style.cssText = 'font-size:22px;font-weight:300;color:var(--black);line-height:1.4';
+  title.textContent = 'Lass uns einen Plan bauen.';
   var sub = document.createElement('div');
-  sub.style.cssText = 'font-size:14px;color:var(--stone);line-height:1.65;max-width:260px';
-  sub.textContent = 'Der Coach erstellt dir einen strukturierten Trainingsplan auf dein Ziel zugeschnitten.';
+  sub.style.cssText = 'font-size:14px;color:var(--stone);line-height:1.7;max-width:260px';
+  sub.textContent = 'Sag mir dein Ziel. Ich baue dir einen Plan — Woche für Woche, Phase für Phase.';
   wrap.appendChild(icon);
   wrap.appendChild(title);
   wrap.appendChild(sub);
