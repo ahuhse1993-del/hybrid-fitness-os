@@ -9,6 +9,13 @@ load_dotenv()
 app = Flask(__name__)
 CORS(app)
 
+@app.after_request
+def no_cache(response):
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
+    
 def get_today():
     try:
         import pytz
