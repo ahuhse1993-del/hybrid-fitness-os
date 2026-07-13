@@ -121,6 +121,8 @@ def generate_plan():
         long_run_day = data.get('long_run_day', 6)
         quality_sessions = data.get('quality_sessions', 1)
         strength_sessions = data.get('strength_sessions', 2)
+        strength_days = data.get('strength_days', [])
+        week_structure = data.get('week_structure', None)
         total_weeks = data.get('total_weeks', 16)
         phases = data.get('phases', [])
         start_date = data.get('start_date', None)
@@ -172,8 +174,18 @@ ATHLETENPROFIL:
 - Trainingstage pro Woche: {days_per_week}
 - Long Run Tag: {day_names[long_run_day]} (Tag {long_run_day})
 - Quality Sessions pro Woche: {quality_sessions}
-- Kraft-Sessions pro Woche: {strength_sessions}
+- Kraft-Sessions pro Woche: {strength_sessions} (Tage: {', '.join([['','Mo','Di','Mi','Do','Fr','Sa','So'][d] for d in strength_days]) if strength_days else 'flexibel'})
 - Gesamtplan: {total_weeks} Wochen · Phasen: {', '.join(phase_context)}
+{f"""
+FESTE WOCHENSTRUKTUR (vom Athleten definiert, STRIKT einhalten):
+{chr(10).join([f"Tag {d}: {week_structure[str(d)]['type']}" for d in range(1,8) if str(d) in (week_structure or {})])}
+
+Diese Struktur gilt für JEDE Woche. Nur Volumen und Intensität ändern sich.
+""" if week_structure else f"""
+KRAFTTAGE: {', '.join([['','Mo','Di','Mi','Do','Fr','Sa','So'][d] for d in strength_days]) if strength_days else 'flexibel'}
+Baue eine konsistente Wochenstruktur die jede Woche gleich bleibt.
+Oberkörper-Kraft VOR Quality Sessions. Unterkörper-Kraft NACH Long Run oder an Ruhetagen.
+"""}
 {gpx_context}
 REGELN:
 1. Long Run IMMER an Tag {long_run_day} ({day_names[long_run_day]})

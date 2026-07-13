@@ -363,7 +363,11 @@ html,body{height:100%;background:var(--black);font-family:'DM Sans',sans-serif;c
     <div class="summary-rows" id="summary-rows"></div>
     <div class="input-label" style="margin-bottom:10px">TRAININGSPLAN · PHASEN</div>
     <div class="phase-preview" id="phase-preview"></div>
-    <div style="font-size:13px;color:rgba(240,237,230,.5);line-height:1.7;margin-top:4px">
+    <!-- Wochenstruktur Preview -->
+    <div style="font-family:DM Mono,monospace;font-size:8px;color:rgba(240,237,230,.5);letter-spacing:.14em;margin-bottom:10px;margin-top:8px">WÖCHENTLICHE STRUKTUR</div>
+    <div id="week-structure-preview" style="display:flex;flex-direction:column;gap:0;border:.5px solid rgba(240,237,230,.1);margin-bottom:20px"></div>
+
+    <div style="font-size:13px;color:rgba(240,237,230,.5);line-height:1.7">
       Der Coach passt den Plan laufend an — basierend auf deinen Daten, deinem Befinden und deiner Progression.
     </div>
   </div>
@@ -393,7 +397,9 @@ var planData = {
   long_run_day: 6,
   quality_sessions: 1,
   strength_sessions: 2,
+  strength_days: [],
   start_date: ''
+  ,week_structure: null
 };
 
 function selectGoal(el, val) {
@@ -458,6 +464,14 @@ function changeNum(type, delta) {
   var min = limits[type][0], max = limits[type][1];
   planData[key] = Math.max(min, Math.min(max, planData[key] + delta));
   document.getElementById(type + '-val').textContent = planData[key];
+  // Krafttage zurücksetzen wenn Anzahl geändert
+  if (type === 'strength') {
+    planData.strength_days = [];
+    document.querySelectorAll('#strength-days-list .day-btn').forEach(function(b){ b.classList.remove('sel'); });
+    var hint = document.getElementById('strength-day-hint');
+    if (hint) hint.textContent = 'BITTE TAGE WÄHLEN';
+    document.getElementById('btn-next').classList.remove('ready');
+  }
 }
 
 function getWeeks() {
@@ -487,6 +501,110 @@ function getPhases(totalWeeks) {
   ];
 }
 
+// ── KRAFTTAGE ──
+function toggleStrengthDay(el, day) {
+  var idx = planData.strength_days.indexOf(day);
+  if (idx === -1) {
+    if (planData.strength_days.length >= planData.strength_sessions) {
+      // Max erreicht – ältesten entfernen
+      var oldest = planData.strength_days.shift();
+      document.querySelectorAll('#strength-days-list .day-btn').forEach(function(b) {
+        if (parseInt(b.dataset && b.dataset.day) === oldest) b.classList.remove('sel');
+      });
+      // Alle Buttons prüfen
+      document.querySelectorAll('#strength-days-list .day-btn').forEach(function(b, i) {
+        if (planData.strength_days.indexOf(i+1) === -1) b.classList.remove('sel');
+      });
+    }
+    planData.strength_days.push(day);
+    el.classList.add('sel');
+  } else {
+    planData.strength_days.splice(idx, 1);
+    el.classList.remove('sel');
+  }
+  planData.strength_days.sort(function(a,b){return a-b;});
+  var hint = document.getElementById('strength-day-hint');
+  var DAY_NAMES = ['','MO','DI','MI','DO','FR','SA','SO'];
+  if (hint) hint.textContent = planData.strength_days.length > 0
+    ? planData.strength_days.map(function(d){return DAY_NAMES[d];}).join(' · ')
+    : 'BITTE TAGE WÄHLEN';
+  if (planData.strength_days.length === planData.strength_sessions) {
+    document.getElementById('btn-next').classList.add('ready');
+  } else {
+    document.getElementById('btn-next').classList.remove('ready');
+  }
+}
+
+// ── WOCHENSTRUKTUR BERECHNEN ──
+function buildWeekStructure() {
+  var DAY_NAMES_FULL = ['','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag','Sonntag'];
+  var structure = {};
+
+  // Long Run Tag setzen
+  structure[planData.long_run_day] = {type:'Long Run', label:'LONG RUN', color:'rgba(46,44,42,.6)'};
+
+  // Krafttage setzen
+  // Oberkörper vor/nach Quality, Unterkörper an anderen Tagen
+  var strengthDays = planData.strength_days.slice().sort(function(a,b){return a-b;});
+  var upperIdx = 0;
+  strengthDays.forEach(function(d) {
+    if (structure[d]) return; // Long Run Tag – skip
+    // Oberkörper an geraden Positionen, Unterkörper an ungeraden
+    var isUpper = (upperIdx % 2 === 0);
+    structure[d] = {type: isUpper ? 'Krafttraining (Oberkörper)' : 'Krafttraining (Unterkörper)', label: isUpper ? 'KRAFT OB' : 'KRAFT UB', color:'rgba(46,44,42,.4)'};
+    upperIdx++;
+  });
+
+  // Quality Sessions – nicht direkt nach Unterkörper, nicht direkt vor Long Run
+  var qualityPlaced = 0;
+  var qualityTarget = planData.quality_sessions;
+  for (var d = 1; d <= 7 && qualityPlaced < qualityTarget; d++) {
+    if (structure[d]) continue;
+    var prev = structure[d-1];
+    var next = structure[d+1];
+    var prevIsLower = prev && prev.label === 'KRAFT UB';
+    var nextIsLong = next && next.label === 'LONG RUN';
+    if (!prevIsLower && !nextIsLong) {
+      structure[d] = {type:'Quality Session', label:'QUALITY', color:'var(--accent)'};
+      qualityPlaced++;
+    }
+  }
+
+  // Restliche Tage: Easy Run oder Rest
+  var runDaysLeft = planData.days_per_week - Object.keys(structure).length;
+  for (var d = 1; d <= 7; d++) {
+    if (structure[d]) continue;
+    if (runDaysLeft > 0) {
+      structure[d] = {type:'Easy Run', label:'EASY', color:'rgba(46,44,42,.3)'};
+      runDaysLeft--;
+    } else {
+      structure[d] = {type:'Rest Day', label:'REST', color:'rgba(46,44,42,.15)'};
+    }
+  }
+
+  planData.week_structure = structure;
+  return structure;
+}
+
+function renderWeekStructure(structure) {
+  var DAY_NAMES_FULL = ['','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag','Sonntag'];
+  var el = document.getElementById('week-structure-preview');
+  if (!el) return;
+  var html = '';
+  for (var d = 1; d <= 7; d++) {
+    var s = structure[d] || {type:'Rest Day', label:'REST', color:'rgba(46,44,42,.15)'};
+    var isLong = s.label === 'LONG RUN';
+    var isQuality = s.label === 'QUALITY';
+    var bg = isLong ? 'rgba(46,44,42,.08)' : (isQuality ? 'rgba(232,216,74,.06)' : 'transparent');
+    html += '<div style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:.5px solid rgba(240,237,230,.06);background:'+bg+'">';
+    html += '<div style="font-family:DM Mono,monospace;font-size:9px;color:rgba(240,237,230,.4);width:28px">'+DAY_NAMES_FULL[d].substring(0,2).toUpperCase()+'</div>';
+    html += '<div style="font-family:DM Mono,monospace;font-size:8px;padding:2px 8px;background:rgba(240,237,230,.06);color:'+s.color+';letter-spacing:.08em;flex-shrink:0">'+s.label+'</div>';
+    html += '<div style="font-size:14px;color:rgba(240,237,230,.8);font-weight:300">'+s.type+'</div>';
+    html += '</div>';
+  }
+  el.innerHTML = html;
+}
+
 function buildSummary() {
   var weeks = getWeeks();
   var phases = getPhases(weeks);
@@ -511,6 +629,10 @@ function buildSummary() {
   document.getElementById('summary-rows').innerHTML = rows.map(function(r) {
     return '<div class="summary-row"><div class="summary-label">' + r.label + '</div><div class="summary-value">' + r.value + '</div></div>';
   }).join('');
+
+  // Wochenstruktur berechnen und anzeigen
+  var structure = buildWeekStructure();
+  renderWeekStructure(structure);
 
   document.getElementById('phase-preview').innerHTML = phases.map(function(p) {
     return '<div class="phase-block"><div class="phase-name">' + p.name + '</div><div class="phase-weeks">' + p.weeks + ' W</div></div>';
@@ -564,7 +686,7 @@ function showStep(n) {
   }
 
   // Steps mit Defaults sind immer ready
-  if (n === 3 || n === 4 || n === 5 || n === 6 || n === 7 || n === 8) {
+  if (n === 3 || n === 4 || n === 5 || n === 7 || n === 8) {
     nextBtn.classList.add('ready');
   } else if (n === 1) {
     if (!planData.goal_type) nextBtn.classList.remove('ready');
@@ -725,7 +847,9 @@ function generatePlan() {
       strength_sessions: planData.strength_sessions,
       total_weeks: weeks,
       phases: phases,
-      start_date: planData.start_date || null
+      start_date: planData.start_date || null,
+      strength_days: planData.strength_days || [],
+      week_structure: planData.week_structure || null
     })
   }).then(function(r){ return r.json(); })
     .then(function(data){
