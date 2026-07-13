@@ -123,10 +123,10 @@ html,body{height:100%;background:var(--black);font-family:'DM Sans',sans-serif;c
   display:flex;gap:10px;align-items:center;
 }
 .btn-back{
-  width:52px;height:56px;background:transparent;
-  border:.5px solid rgba(240,237,230,.15);color:#F0EDE6;
-  font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;
-  flex-shrink:0;
+  flex:1;height:56px;background:var(--accent);border:none;color:var(--black);
+  font-family:'DM Mono',monospace;font-size:13px;letter-spacing:.14em;
+  cursor:pointer;display:none;align-items:center;justify-content:center;
+  font-weight:500;
 }
 .btn-next{
   flex:1;height:56px;background:rgba(240,237,230,.08);border:none;
@@ -163,6 +163,7 @@ html,body{height:100%;background:var(--black);font-family:'DM Sans',sans-serif;c
 <div class="topbar">
   <div class="topbar-kicker">CAIRN</div>
   <div class="topbar-title" id="step-indicator">SCHRITT 1 VON 7</div>
+  <button onclick="confirmCancel()" style="background:transparent;border:none;color:rgba(240,237,230,.5);font-size:22px;cursor:pointer;padding:4px 0 4px 16px;line-height:1">&#x2715;</button>
 </div>
 <div class="progress-wrap">
   <div class="progress-fill" id="progress-fill" style="width:14%"></div>
@@ -323,8 +324,8 @@ html,body{height:100%;background:var(--black);font-family:'DM Sans',sans-serif;c
 </div>
 
 <!-- FOOTER -->
-<div class="footer">
-  <button class="btn-back" id="btn-back" onclick="prevStep()" style="display:none">&#8592;</button>
+<div class="footer" id="footer">
+  <button class="btn-back" id="btn-back" onclick="prevStep()" style="display:none">&#8592; ZURÜCK</button>
   <button class="btn-next ready" id="btn-next" onclick="nextStep()">WEITER &rarr;</button>
   <button class="btn-generate" id="btn-generate" onclick="generatePlan()">PLAN ERSTELLEN &rarr;</button>
 </div>
@@ -508,6 +509,27 @@ function showStep(n) {
       nextBtn.classList.remove('ready');
     }
   }
+
+  // Ab Schritt 2: Zurück-Button als gelber Button links
+  if (n > 1) {
+    backBtn.style.display = 'flex';
+  } else {
+    backBtn.style.display = 'none';
+  }
+}
+
+function confirmCancel() {
+  var popup = document.createElement('div');
+  popup.id = 'cancel-popup';
+  popup.style.cssText = 'position:fixed;inset:0;background:rgba(26,25,24,.85);z-index:300;display:flex;align-items:center;justify-content:center;padding:24px';
+  popup.innerHTML = '<div style="background:var(--black);border-top:3px solid var(--accent);padding:28px 24px;width:100%;max-width:360px">'
+    + '<div style="font-family:DM Mono,monospace;font-size:9px;color:rgba(232,216,74,.5);letter-spacing:.18em;margin-bottom:16px">CAIRN · PLAN ABBRECHEN</div>'
+    + '<div style="font-size:20px;font-weight:300;color:#F0EDE6;margin-bottom:8px">Plan erstellen abbrechen?</div>'
+    + '<div style="font-size:14px;color:rgba(240,237,230,.6);line-height:1.6;margin-bottom:28px">Deine Eingaben gehen verloren.</div>'
+    + '<button onclick="window.location.href=\'/mobile\'" style="width:100%;padding:16px;background:var(--accent);border:none;color:var(--black);font-family:DM Mono,monospace;font-size:12px;letter-spacing:.14em;cursor:pointer;font-weight:500;margin-bottom:10px">JA, ABBRECHEN</button>'
+    + '<button onclick="document.getElementById(\'cancel-popup\').remove()" style="width:100%;padding:16px;background:transparent;border:.5px solid rgba(240,237,230,.2);color:rgba(240,237,230,.6);font-family:DM Mono,monospace;font-size:12px;letter-spacing:.14em;cursor:pointer">WEITER MACHEN</button>'
+    + '</div>';
+  document.body.appendChild(popup);
 }
 
 function generatePlan() {
