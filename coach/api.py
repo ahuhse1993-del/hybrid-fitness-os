@@ -131,11 +131,17 @@ def generate_plan():
         today = get_today()
         if start_date:
             try:
-                start_monday = date.fromisoformat(start_date)
+                start_day = date.fromisoformat(start_date)
+                # Montag der Startwoche
+                start_monday = start_day - timedelta(days=start_day.weekday())
+                # Startdatum merken um erste Woche zu trimmen
+                actual_start_day = start_day.isoweekday()  # 1=Mo, 7=So
             except Exception:
-                start_monday = today + timedelta(days=1)
+                start_monday = today
+                actual_start_day = 1
         else:
-            start_monday = today + timedelta(days=1)
+            start_monday = today
+            actual_start_day = 1
         day_names = ['', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag']
 
         # Wochen in zwei Hälften aufteilen um Timeout zu vermeiden
@@ -166,6 +172,11 @@ STRECKENPROFIL (GPX-Analyse):
 """
 
             prompt = f"""Du bist CAIRN Coach. Erstelle Woche {week_from} bis {week_to} eines {total_weeks}-Wochen Trainingsplans.
+
+Nutze Web Search um aktuelle Erkenntnisse zu finden falls nötig:
+- Optimale Kraft/Lauf-Reihenfolge für Hybrid-Athleten
+- Interferenz-Effekt zwischen Kraft und Ausdauer
+- Split-Empfehlungen für Trail Runner die auch Gym machen
 
 ATHLETENPROFIL:
 - Ziel: {goal_type}
@@ -260,6 +271,10 @@ Erstelle Wochen {week_from} bis {week_to}. day_of_week: 1=Mo bis 7=So. Rest Days
             week_monday = start_monday + timedelta(weeks=week_num - 1)
 
             for session in week.get('sessions', []):
+                day_of_week = session.get('day_of_week', 1)
+                # Erste Woche: Sessions vor dem Startdatum überspringen
+                if week_num == 1 and day_of_week < actual_start_day:
+                    continue
                 cur.execute("""
                     INSERT INTO training_plan
                     (week_date, day_of_week, session_type, session_zone,
@@ -267,7 +282,7 @@ Erstelle Wochen {week_from} bis {week_to}. day_of_week: 1=Mo bis 7=So. Rest Days
                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """, (
                     week_monday,
-                    session.get('day_of_week', 1),
+                    day_of_week,
                     session.get('session_type', 'Easy Run'),
                     session.get('session_zone', ''),
                     session.get('duration_min', 0),

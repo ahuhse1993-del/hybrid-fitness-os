@@ -172,12 +172,12 @@ html,body{height:100%;background:var(--black);font-family:'DM Sans',sans-serif;c
 <!-- GENERATING -->
 <div class="generating" id="generating">
   <div class="gen-kicker">CAIRN · PLAN GENERATOR</div>
-  <div class="gen-title">Dein Plan wird erstellt.</div>
-  <div class="gen-sub">Der Coach recherchiert aktuelle Trainingswissenschaft und baut deinen Plan. Das dauert ca. 3–5 Minuten.</div>
+  <div class="gen-title">Ich baue deinen Plan.</div>
+  <div class="gen-sub">Ich schaue mir aktuelle Erkenntnisse an und baue eine Struktur die zu dir passt. Das dauert ca. 3–5 Minuten.</div>
   <div class="gen-bar-wrap"><div class="gen-bar" id="gen-bar"></div></div>
   <div class="gen-status" id="gen-status">COACH STARTET...</div>
   <div style="margin-top:32px;font-family:DM Mono,monospace;font-size:8px;color:rgba(240,237,230,.2);letter-spacing:.1em;text-align:center;line-height:2">
-    DU MACHST DAS NUR ALLE PAAR WOCHEN.<br>
+    DAS MACHST DU NUR ALLE PAAR WOCHEN.<br>
     NIMM DIR EINEN KAFFEE.
   </div>
 </div>
@@ -356,7 +356,7 @@ html,body{height:100%;background:var(--black);font-family:'DM Sans',sans-serif;c
   <div class="step" id="step-7">
     <div class="step-kicker">SCHRITT 7 VON 8</div>
     <div class="step-question">Wann <b>startest</b> du?</div>
-    <div class="step-sub">Der Plan startet an dem Tag den du wählst.</div>
+    <div class="step-sub">Wähle den Tag an dem du starten möchtest.</div>
     <div class="date-row">
       <input class="date-part" id="start-day" placeholder="TT" type="number" min="1" max="31" oninput="checkStartDate()">
       <div class="date-sep">.</div>
@@ -855,7 +855,8 @@ function checkStartDate() {
     planData.start_date = y + '-' + mm + '-' + dd;
     var raw = new Date(y + '-' + mm + '-' + dd);
     var hint = document.getElementById('start-hint');
-    if (hint) hint.textContent = raw.toLocaleDateString('de-DE',{day:'2-digit',month:'long',year:'numeric',weekday:'long'}).toUpperCase();
+    var dateStr = raw.toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
+    if (hint) hint.textContent = dateStr.toUpperCase();
     document.getElementById('btn-next').classList.add('ready');
   }
 }
@@ -936,17 +937,17 @@ function generatePlan() {
   var bar = document.getElementById('gen-bar');
   var status = document.getElementById('gen-status');
   var steps = [
-    [5, 'COACH LIEST DEIN PROFIL...'],
-    [12, 'AKTUELLE STUDIEN WERDEN RECHERCHIERT...'],
-    [20, 'HYBRID-TRAINING PRINZIPIEN WERDEN GELADEN...'],
-    [30, 'OPTIMALE WOCHENSTRUKTUR WIRD BERECHNET...'],
-    [42, 'ERSTE PLANHÄLFTE WIRD GENERIERT...'],
-    [55, 'PHASENÜBERGÄNGE WERDEN BERECHNET...'],
-    [65, 'ZWEITE PLANHÄLFTE WIRD GENERIERT...'],
-    [78, 'DELOAD-WOCHEN WERDEN EINGEPLANT...'],
-    [88, 'QUALITÄT WIRD GEPRÜFT...'],
-    [95, 'PLAN WIRD GESPEICHERT...'],
-    [100, 'PLAN LÄDT — EINEN MOMENT...']
+    [5, 'ICH LESE DEIN PROFIL...'],
+    [12, 'ICH RECHERCHIERE AKTUELLE STUDIEN...'],
+    [20, 'ICH LADE MEINE WISSENSBASIS...'],
+    [30, 'ICH BERECHNE DEINE WOCHENSTRUKTUR...'],
+    [42, 'ICH SCHREIBE DIE ERSTEN WOCHEN...'],
+    [55, 'ICH PLANE DIE PHASENÜBERGÄNGE...'],
+    [65, 'ICH SCHREIBE DIE ZWEITEN WOCHEN...'],
+    [78, 'ICH PLANE DEINE DELOAD-WOCHEN...'],
+    [88, 'ICH PRÜFE DEN PLAN NOCHMAL...'],
+    [95, 'ICH SPEICHERE DEINEN PLAN...'],
+    [100, 'FAST FERTIG...']
   ];
   var i = 0;
   function tick() {
