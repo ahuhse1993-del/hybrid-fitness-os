@@ -570,7 +570,7 @@ function buildWeekStructure() {
   // Regeln: nicht direkt nach Unterkörper-Kraft, nicht direkt vor/nach Long Run, nicht am ersten Tag
   var qualityPlaced = 0;
   // Erst vorwärts suchen
-  for (var d = 2; d <= 7 && qualityPlaced < planData.quality_sessions; d++) {
+  for (var d = 1; d <= 7 && qualityPlaced < planData.quality_sessions; d++) {
     if (structure[d]) continue;
     var prev = structure[d-1] || {};
     var prev2 = structure[d-2] || {};
@@ -585,7 +585,7 @@ function buildWeekStructure() {
   }
   // Falls kein Platz gefunden: lockerer versuchen (nur direkt nach Long Run vermeiden)
   if (qualityPlaced < planData.quality_sessions) {
-    for (var d = 2; d <= 7 && qualityPlaced < planData.quality_sessions; d++) {
+    for (var d = 1; d <= 7 && qualityPlaced < planData.quality_sessions; d++) {
       if (structure[d]) continue;
       var prev = structure[d-1] || {};
       if (prev.label !== 'LONG RUN' && prev.label !== 'KRAFT UB') {
