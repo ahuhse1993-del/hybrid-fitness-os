@@ -567,18 +567,32 @@ function buildWeekStructure() {
   });
 
   // 3. Quality Session platzieren
-  // Regel: nicht direkt nach Unterkörper-Kraft, nicht direkt vor Long Run
+  // Regeln: nicht direkt nach Unterkörper-Kraft, nicht direkt vor/nach Long Run, nicht am ersten Tag
   var qualityPlaced = 0;
-  for (var d = 1; d <= 7 && qualityPlaced < planData.quality_sessions; d++) {
+  // Erst vorwärts suchen
+  for (var d = 2; d <= 7 && qualityPlaced < planData.quality_sessions; d++) {
     if (structure[d]) continue;
-    var prev = structure[d-1];
-    var next = structure[d+1];
-    var afterLower = prev && prev.label === 'KRAFT UB';
-    var beforeLong = next && next.label === 'LONG RUN';
-    var afterLong = prev && prev.label === 'LONG RUN';
-    if (!afterLower && !beforeLong && !afterLong) {
+    var prev = structure[d-1] || {};
+    var prev2 = structure[d-2] || {};
+    var next = structure[d+1] || {};
+    var afterLower = prev.label === 'KRAFT UB';
+    var afterLong = prev.label === 'LONG RUN';
+    var twoAfterLong = prev2.label === 'LONG RUN';
+    var beforeLong = next.label === 'LONG RUN';
+    if (!afterLower && !afterLong && !twoAfterLong && !beforeLong) {
       structure[d] = {type:'Quality Session', label:'QUALITY'};
       qualityPlaced++;
+    }
+  }
+  // Falls kein Platz gefunden: lockerer versuchen (nur direkt nach Long Run vermeiden)
+  if (qualityPlaced < planData.quality_sessions) {
+    for (var d = 2; d <= 7 && qualityPlaced < planData.quality_sessions; d++) {
+      if (structure[d]) continue;
+      var prev = structure[d-1] || {};
+      if (prev.label !== 'LONG RUN') {
+        structure[d] = {type:'Quality Session', label:'QUALITY'};
+        qualityPlaced++;
+      }
     }
   }
 
