@@ -577,9 +577,8 @@ function buildWeekStructure() {
     var next = structure[d+1] || {};
     var afterLower = prev.label === 'KRAFT UB';
     var afterLong = prev.label === 'LONG RUN';
-    var twoAfterLong = prev2.label === 'LONG RUN';
     var beforeLong = next.label === 'LONG RUN';
-    if (!afterLower && !afterLong && !twoAfterLong && !beforeLong) {
+    if (!afterLower && !afterLong && !beforeLong) {
       structure[d] = {type:'Quality Session', label:'QUALITY'};
       qualityPlaced++;
     }
@@ -589,7 +588,7 @@ function buildWeekStructure() {
     for (var d = 2; d <= 7 && qualityPlaced < planData.quality_sessions; d++) {
       if (structure[d]) continue;
       var prev = structure[d-1] || {};
-      if (prev.label !== 'LONG RUN') {
+      if (prev.label !== 'LONG RUN' && prev.label !== 'KRAFT UB') {
         structure[d] = {type:'Quality Session', label:'QUALITY'};
         qualityPlaced++;
       }
