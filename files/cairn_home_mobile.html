@@ -82,6 +82,61 @@ html,body{height:100%;overflow:hidden;background:var(--bg);font-family:'DM Sans'
 .week-nav{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:.5px solid var(--black);position:sticky;top:0;background:var(--bg);z-index:10}
 .week-nav-btn{background:transparent;border:.5px solid var(--black);color:var(--black);width:32px;height:32px;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center}
 .week-nav-lbl{font-family:'DM Mono',monospace;font-size:10px;color:var(--black);letter-spacing:.08em}
+
+/* PLAN WOCHEN */
+.plan-week-block{border-bottom:.5px solid var(--black)}
+.plan-week-head{
+  display:flex;align-items:center;gap:12px;
+  padding:13px 16px;cursor:pointer;
+  background:var(--bg);transition:background .1s;
+  user-select:none;
+}
+.plan-week-head:active{background:#E8E4DC}
+.plan-week-head.current-week{background:var(--black)}
+.plan-week-head.current-week .pwh-kw{color:var(--accent)}
+.plan-week-head.current-week .pwh-title{color:#F0EDE6}
+.plan-week-head.current-week .pwh-meta{color:rgba(240,237,230,.4)}
+.pwh-kw{font-family:'DM Mono',monospace;font-size:10px;color:var(--stone);letter-spacing:.1em;width:36px;flex-shrink:0}
+.pwh-title{flex:1;font-size:14px;font-weight:300;color:var(--black)}
+.pwh-meta{font-family:'DM Mono',monospace;font-size:9px;color:var(--stone)}
+.pwh-arrow{font-size:12px;color:var(--stone);transition:transform .2s;flex-shrink:0}
+.pwh-arrow.open{transform:rotate(90deg)}
+
+.plan-week-body{display:none;border-top:.5px solid rgba(46,44,42,.08)}
+.plan-week-body.open{display:block}
+
+/* SESSION KACHEL */
+.plan-session-row{
+  display:flex;align-items:center;
+  border-bottom:.5px solid rgba(46,44,42,.06);
+  cursor:pointer;transition:background .1s;
+  position:relative;
+}
+.plan-session-row:active{background:#E8E4DC}
+.plan-session-row.dragging{opacity:.4;background:#E8E4DC}
+.plan-session-row.drag-over{background:rgba(232,216,74,.08);outline:1px dashed var(--accent)}
+.plan-session-row.done-row{opacity:.45}
+
+.psr-illus{
+  width:64px;height:64px;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+  border-right:.5px solid rgba(46,44,42,.08);
+  background:var(--cal-bg);
+}
+.psr-info{flex:1;padding:10px 12px}
+.psr-day{font-family:'DM Mono',monospace;font-size:8px;color:var(--stone);letter-spacing:.1em;margin-bottom:2px}
+.psr-type{font-size:14px;font-weight:300;color:var(--black);margin-bottom:2px}
+.psr-dist{font-family:'DM Mono',monospace;font-size:10px;color:var(--stone)}
+.psr-done{font-family:'DM Mono',monospace;font-size:9px;color:#4CAF50;flex-shrink:0;padding-right:12px}
+
+/* REST DAY */
+.plan-rest-row{
+  display:flex;align-items:center;gap:12px;
+  padding:10px 16px;
+  border-bottom:.5px solid rgba(46,44,42,.04);
+}
+.prest-day{font-family:'DM Mono',monospace;font-size:8px;color:rgba(46,44,42,.25);letter-spacing:.1em;width:24px}
+.prest-label{font-family:'DM Mono',monospace;font-size:8px;color:rgba(46,44,42,.2);letter-spacing:.1em}
 .plan-day{border-bottom:.5px solid var(--black)}
 .plan-day-head{display:flex;align-items:center;gap:12px;padding:12px 16px;background:var(--bg)}
 .plan-day-name{font-family:'DM Mono',monospace;font-size:9px;color:var(--stone);letter-spacing:.1em;width:24px}
@@ -366,20 +421,44 @@ html,body{height:100%;overflow:hidden;background:var(--bg);font-family:'DM Sans'
 
 <!-- PAGE: PLAN -->
 <div class="page" id="page-plan">
-  <div class="week-nav">
-    <button class="week-nav-btn" onclick="shiftPlanWeek(-1)">&#8249;</button>
-    <div class="week-nav-lbl" id="plan-week-lbl">DIESE WOCHE</div>
-    <button class="week-nav-btn" onclick="shiftPlanWeek(1)">&#8250;</button>
-  </div>
-  <div style="padding:12px 16px;border-bottom:.5px solid var(--black);background:var(--cal-bg)">
-    <div style="display:flex;gap:16px">
-      <div><div style="font-family:'DM Mono',monospace;font-size:7px;color:var(--stone);letter-spacing:.1em">KILOMETER</div><div style="font-family:'DM Mono',monospace;font-size:16px" id="plan-week-km">—</div></div>
-      <div><div style="font-family:'DM Mono',monospace;font-size:7px;color:var(--stone);letter-spacing:.1em">EINHEITEN</div><div style="font-family:'DM Mono',monospace;font-size:16px" id="plan-week-sessions">—</div></div>
-      <div><div style="font-family:'DM Mono',monospace;font-size:7px;color:var(--stone);letter-spacing:.1em">PHASE</div><div style="font-family:'DM Mono',monospace;font-size:16px;color:var(--accent-dark)">AUFBAU</div></div>
+  <!-- PLAN HEADER -->
+  <div id="plan-header" style="display:none;border-bottom:.5px solid var(--black)">
+    <!-- Race Info -->
+    <div style="padding:14px 16px;background:var(--black)">
+      <div style="font-family:'DM Mono',monospace;font-size:8px;color:rgba(232,216,74,.45);letter-spacing:.14em;margin-bottom:4px" id="plan-header-kicker">CAIRN · PLAN</div>
+      <div style="font-size:18px;font-weight:300;color:#F0EDE6;margin-bottom:2px" id="plan-header-name">—</div>
+      <div style="font-family:'DM Mono',monospace;font-size:9px;color:rgba(240,237,230,.4)" id="plan-header-meta">—</div>
+    </div>
+    <!-- Phase + Progress -->
+    <div style="padding:12px 16px;background:var(--cal-bg);display:flex;align-items:center;gap:16px">
+      <div style="flex:1">
+        <div style="display:flex;justify-content:space-between;margin-bottom:6px">
+          <div style="font-family:'DM Mono',monospace;font-size:9px;color:var(--stone);letter-spacing:.1em" id="plan-phase-label">BASE</div>
+          <div style="font-family:'DM Mono',monospace;font-size:9px;color:var(--stone)" id="plan-week-label">Woche 1 von 16</div>
+        </div>
+        <div style="height:3px;background:rgba(46,44,42,.1);display:flex">
+          <div id="plan-progress-bar" style="height:100%;background:var(--black);width:0%;transition:width .4s ease"></div>
+        </div>
+      </div>
+      <div style="font-family:'DM Mono',monospace;font-size:11px;color:var(--accent-dark)" id="plan-race-countdown">—</div>
     </div>
   </div>
+
+  <!-- PLAN BODY: Wochen -->
   <div id="plan-days-list">
     <div style="padding:24px 16px;font-family:'DM Mono',monospace;font-size:9px;color:var(--stone)">PLAN WIRD GELADEN...</div>
+  </div>
+</div>
+
+<!-- DRAG COACH POPUP -->
+<div id="drag-coach-popup" style="display:none;position:fixed;inset:0;background:rgba(26,25,24,.75);z-index:600;align-items:flex-end">
+  <div style="background:var(--bg);width:100%;border-top:3px solid var(--accent-dark);padding:24px 16px;padding-bottom:calc(24px + env(safe-area-inset-bottom))">
+    <div style="font-family:'DM Mono',monospace;font-size:8px;color:var(--accent-dark);letter-spacing:.14em;margin-bottom:10px">CAIRN · HINWEIS</div>
+    <div style="font-size:16px;font-weight:300;color:var(--black);line-height:1.55;margin-bottom:20px" id="drag-coach-msg">—</div>
+    <div style="display:flex;gap:8px">
+      <button onclick="keepDragChange()" style="flex:1;padding:13px;background:var(--black);border:none;color:var(--bg);font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.1em;cursor:pointer">SO LASSEN</button>
+      <button onclick="undoDragChange()" style="flex:1;padding:13px;background:transparent;border:.5px solid var(--stone);color:var(--mid);font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.1em;cursor:pointer">RÜCKGÄNGIG</button>
+    </div>
   </div>
 </div>
 
