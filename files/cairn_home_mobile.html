@@ -892,8 +892,8 @@ function loadTodayWeek(){
       var dayColor=isToday?'color:var(--accent)':'color:var(--stone)';
       var dateColor=isToday?'color:#F0EDE6':'color:var(--mid)';
       html+='<div style="display:flex;align-items:center;gap:12px;padding:8px 16px;border-bottom:.5px solid rgba(46,44,42,.08);'+bgRow+'">';
-      html+='<div style="font-family:'DM Mono',monospace;font-size:8px;letter-spacing:.1em;width:20px;'+dayColor+'">'+DAYS[d]+'</div>';
-      html+='<div style="font-family:'DM Mono',monospace;font-size:13px;font-weight:300;width:22px;'+dateColor+'">'+day.getDate()+'</div>';
+      html+='<div style="font-family:\'DM Mono\',monospace;font-size:8px;letter-spacing:.1em;width:20px;'+dayColor+'">'+DAYS[d]+'</div>';
+      html+='<div style="font-family:\'DM Mono\',monospace;font-size:13px;font-weight:300;width:22px;'+dateColor+'">'+day.getDate()+'</div>';
       if(sessions.length){
         var s=sessions[0];
         var rawType=s.type||s.session_type||'';
@@ -907,17 +907,17 @@ function loadTodayWeek(){
         var nameCl=isToday?'color:#F0EDE6':'color:var(--black)';
         var distCl=isToday?'color:rgba(240,237,230,.5)':'color:var(--stone)';
         if(type==='REST'){
-          html+='<div style="font-family:'DM Mono',monospace;font-size:8px;color:'+(isToday?'rgba(240,237,230,.3)':'rgba(46,44,42,.25)')+';letter-spacing:.1em">REST</div>';
+          html+='<div style="font-family:\'DM Mono\',monospace;font-size:8px;color:'+(isToday?'rgba(240,237,230,.3)':'rgba(46,44,42,.25)')+';letter-spacing:.1em">REST</div>';
         } else {
           html+='<div style="flex:1;display:flex;align-items:center;gap:8px">';
-          html+='<div style="font-family:'DM Mono',monospace;font-size:7px;padding:2px 6px;background:'+tagBg+';color:'+tagColor+';letter-spacing:.08em">'+type+'</div>';
+          html+='<div style="font-family:\'DM Mono\',monospace;font-size:7px;padding:2px 6px;background:'+tagBg+';color:'+tagColor+';letter-spacing:.08em">'+type+'</div>';
           html+='<div style="flex:1;font-size:12px;'+nameCl+'">'+escHtml(name)+'</div>';
-          if(dist)html+='<div style="font-family:'DM Mono',monospace;font-size:10px;'+distCl+'">'+dist+'</div>';
-          if(isDone)html+='<div style="font-family:'DM Mono',monospace;font-size:9px;color:#4CAF50">&#10003;</div>';
+          if(dist)html+='<div style="font-family:\'DM Mono\',monospace;font-size:10px;'+distCl+'">'+dist+'</div>';
+          if(isDone)html+='<div style="font-family:\'DM Mono\',monospace;font-size:9px;color:#4CAF50">&#10003;</div>';
           html+='</div>';
         }
       } else {
-        html+='<div style="font-family:'DM Mono',monospace;font-size:8px;color:'+(isToday?'rgba(240,237,230,.2)':'rgba(46,44,42,.2)')+'">&mdash;</div>';
+        html+='<div style="font-family:\'DM Mono\',monospace;font-size:8px;color:'+(isToday?'rgba(240,237,230,.2)':'rgba(46,44,42,.2)')+'">&mdash;</div>';
       }
       html+='</div>';
     }
