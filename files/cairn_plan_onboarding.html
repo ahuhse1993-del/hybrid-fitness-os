@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>CAIRN · Plan erstellen</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --bg:#F0EDE6;--stone:#9E9B95;--mid:#2E2C2A;--black:#1A1918;
+  --accent:#E8D84A;--accent-mid:#C9BB2E;--accent-dark:#8C7F0A;
+}
+html,body{height:100%;background:var(--black);font-family:'DM Sans',sans-serif;color:#F0EDE6;font-size:14px}
+
+/* TOPBAR */
+.topbar{
+  position:fixed;top:0;left:0;right:0;height:56px;
+  background:var(--black);border-bottom:1px solid rgba(240,237,230,.1);
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 20px;z-index:100;
+}
+.topbar-kicker{font-family:'DM Mono',monospace;font-size:8px;color:rgba(232,216,74,.5);letter-spacing:.18em}
+.topbar-title{font-family:'DM Mono',monospace;font-size:10px;color:rgba(240,237,230,.4);letter-spacing:.1em}
+
+/* PROGRESS BAR */
+.progress-wrap{position:fixed;top:56px;left:0;right:0;height:2px;background:rgba(240,237,230,.08);z-index:100}
+.progress-fill{height:100%;background:var(--accent);transition:width .4s ease}
+
+/* MAIN */
+.main{
+  padding:80px 20px 120px;
+  min-height:100vh;
+  display:flex;flex-direction:column;
+}
+
+/* STEPS */
+.step{display:none}
+.step.active{display:flex;flex-direction:column;flex:1}
+.step-kicker{font-family:'DM Mono',monospace;font-size:8px;color:rgba(232,216,74,.45);letter-spacing:.18em;margin-bottom:16px}
+.step-question{font-size:26px;font-weight:300;line-height:1.35;letter-spacing:-.02em;margin-bottom:8px;color:#F0EDE6}
+.step-question b{font-weight:500}
+.step-sub{font-size:13px;color:rgba(240,237,230,.4);line-height:1.6;margin-bottom:32px}
+
+/* OPTIONS */
+.options{display:flex;flex-direction:column;gap:10px;margin-bottom:32px}
+.option{
+  display:flex;align-items:center;gap:14px;
+  padding:16px;
+  border:.5px solid rgba(240,237,230,.12);
+  cursor:pointer;transition:all .15s;
+  background:transparent;
+}
+.option:active,.option.sel{
+  border-color:var(--accent);
+  background:rgba(232,216,74,.06);
+}
+.option-icon{width:36px;height:36px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.option-text{flex:1}
+.option-title{font-size:15px;font-weight:400;color:#F0EDE6;margin-bottom:2px}
+.option-desc{font-size:12px;color:rgba(240,237,230,.35)}
+.option-check{width:16px;height:16px;border:.5px solid rgba(240,237,230,.2);flex-shrink:0;display:flex;align-items:center;justify-content:center}
+.option.sel .option-check{background:var(--accent);border-color:var(--accent)}
+.option.sel .option-check::after{content:'✓';font-size:10px;color:var(--black);font-weight:700}
+
+/* DAYS GRID */
+.days-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-bottom:32px}
+.day-btn{
+  display:flex;flex-direction:column;align-items:center;gap:4px;
+  padding:12px 4px;border:.5px solid rgba(240,237,230,.12);
+  cursor:pointer;transition:all .15s;
+}
+.day-btn.sel{border-color:var(--accent);background:rgba(232,216,74,.08)}
+.day-btn.disabled{opacity:.3;pointer-events:none}
+.day-name{font-family:'DM Mono',monospace;font-size:8px;color:rgba(240,237,230,.4);letter-spacing:.08em}
+.day-btn.sel .day-name{color:var(--accent)}
+
+/* NUMBER PICKER */
+.number-picker{display:flex;align-items:center;gap:16px;margin-bottom:32px}
+.np-btn{
+  width:44px;height:44px;border:.5px solid rgba(240,237,230,.2);
+  background:transparent;color:#F0EDE6;font-size:20px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+}
+.np-btn:active{background:rgba(240,237,230,.08)}
+.np-val{font-family:'DM Mono',monospace;font-size:36px;color:var(--accent);font-weight:500;min-width:60px;text-align:center}
+.np-unit{font-family:'DM Mono',monospace;font-size:10px;color:rgba(240,237,230,.3);letter-spacing:.1em}
+
+/* INPUT */
+.text-input{
+  width:100%;background:rgba(240,237,230,.06);
+  border:.5px solid rgba(240,237,230,.15);
+  padding:14px 16px;color:#F0EDE6;
+  font-family:'DM Sans',sans-serif;font-size:16px;
+  outline:none;margin-bottom:32px;
+  -webkit-appearance:none;
+}
+.text-input::placeholder{color:rgba(240,237,230,.2)}
+.date-input{
+  width:100%;background:rgba(240,237,230,.06);
+  border:.5px solid rgba(240,237,230,.15);
+  padding:14px 16px;color:#F0EDE6;
+  font-family:'DM Mono',monospace;font-size:14px;
+  outline:none;margin-bottom:32px;
+  -webkit-appearance:none;
+}
+
+/* SUMMARY */
+.summary-rows{display:flex;flex-direction:column;gap:0;margin-bottom:32px}
+.summary-row{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:14px 0;border-bottom:.5px solid rgba(240,237,230,.08);
+}
+.summary-label{font-family:'DM Mono',monospace;font-size:9px;color:rgba(240,237,230,.3);letter-spacing:.14em}
+.summary-value{font-size:14px;color:#F0EDE6}
+
+/* PHASE PREVIEW */
+.phase-preview{display:flex;gap:0;margin-bottom:32px;border:.5px solid rgba(240,237,230,.1)}
+.phase-block{flex:1;padding:12px 8px;text-align:center;border-right:.5px solid rgba(240,237,230,.08)}
+.phase-block:last-child{border-right:none}
+.phase-name{font-family:'DM Mono',monospace;font-size:7px;color:rgba(240,237,230,.3);letter-spacing:.1em;margin-bottom:4px}
+.phase-weeks{font-family:'DM Mono',monospace;font-size:13px;color:#F0EDE6}
+.phase-block.active-phase .phase-name{color:var(--accent)}
+.phase-block.active-phase .phase-weeks{color:var(--accent)}
+
+/* FOOTER */
+.footer{
+  position:fixed;bottom:0;left:0;right:0;
+  padding:16px 20px;padding-bottom:calc(16px + env(safe-area-inset-bottom));
+  background:var(--black);border-top:.5px solid rgba(240,237,230,.08);
+  display:flex;gap:10px;align-items:center;
+}
+.btn-back{
+  width:44px;height:50px;background:transparent;
+  border:.5px solid rgba(240,237,230,.15);color:rgba(240,237,230,.4);
+  font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;
+}
+.btn-next{
+  flex:1;height:50px;background:rgba(240,237,230,.1);border:none;
+  color:rgba(240,237,230,.3);font-family:'DM Mono',monospace;
+  font-size:10px;letter-spacing:.14em;cursor:pointer;
+  transition:all .2s;pointer-events:none;
+}
+.btn-next.ready{background:var(--accent);color:var(--black);font-weight:500;pointer-events:all}
+.btn-generate{
+  flex:1;height:50px;background:var(--accent);border:none;
+  color:var(--black);font-family:'DM Mono',monospace;
+  font-size:10px;letter-spacing:.14em;cursor:pointer;font-weight:500;
+  display:none;
+}
+
+/* GENERATING SCREEN */
+.generating{
+  display:none;position:fixed;inset:0;background:var(--black);
+  z-index:200;flex-direction:column;align-items:center;justify-content:center;
+  padding:40px;text-align:center;
+}
+.generating.show{display:flex}
+.gen-kicker{font-family:'DM Mono',monospace;font-size:8px;color:rgba(232,216,74,.45);letter-spacing:.18em;margin-bottom:24px}
+.gen-title{font-size:24px;font-weight:300;color:#F0EDE6;margin-bottom:8px}
+.gen-sub{font-size:13px;color:rgba(240,237,230,.4);margin-bottom:48px;line-height:1.6}
+.gen-bar-wrap{width:100%;max-width:280px;height:2px;background:rgba(240,237,230,.08);margin-bottom:16px}
+.gen-bar{height:100%;background:var(--accent);width:0%;transition:width .3s ease}
+.gen-status{font-family:'DM Mono',monospace;font-size:9px;color:rgba(240,237,230,.3);letter-spacing:.1em}
+</style>
+</head>
+<body>
+
+<!-- TOPBAR -->
+<div class="topbar">
+  <div class="topbar-kicker">CAIRN</div>
+  <div class="topbar-title" id="step-indicator">SCHRITT 1 VON 7</div>
+</div>
+
+<!-- PROGRESS -->
+<div class="progress-wrap">
+  <div class="progress-fill" id="progress-fill" style="width:14%"></div>
+</div>
+
+<!-- GENERATING SCREEN -->
+<div class="generating" id="generating">
+  <div class="gen-kicker">CAIRN · PLAN GENERATOR</div>
+  <div class="gen-title">Dein Plan wird erstellt.</div>
+  <div class="gen-sub">Der Coach analysiert dein Profil und berechnet die optimale Trainingsstruktur.</div>
+  <div class="gen-bar-wrap"><div class="gen-bar" id="gen-bar"></div></div>
+  <div class="gen-status" id="gen-status">PHASEN WERDEN BERECHNET...</div>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+
+  <!-- SCHRITT 1: ZIEL -->
+  <div class="step active" id="step-1">
+    <div class="step-kicker">SCHRITT 1 VON 7</div>
+    <div class="step-question">Was ist dein <b>Ziel?</b></div>
+    <div class="step-sub">Davon hängt die Struktur deines Plans ab.</div>
+    <div class="options">
+      <div class="option" onclick="selectGoal(this,'race')">
+        <div class="option-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="rgba(240,237,230,.3)" stroke-width="1"/><line x1="12" y1="2" x2="12" y2="6" stroke="rgba(232,216,74,.6)" stroke-width="1.5"/><line x1="12" y1="12" x2="16" y2="8" stroke="rgba(240,237,230,.5)" stroke-width="1.5" stroke-linecap="round"/><circle cx="12" cy="12" r="2" fill="rgba(240,237,230,.6)"/></svg>
+        </div>
+        <div class="option-text">
+          <div class="option-title">Race Plan</div>
+          <div class="option-desc">Vorbereitung auf ein spezifisches Rennen</div>
+        </div>
+        <div class="option-check"></div>
+      </div>
+      <div class="option" onclick="selectGoal(this,'fitness')">
+        <div class="option-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" stroke="rgba(240,237,230,.3)" stroke-width="1"/><line x1="3" y1="17" x2="9" y2="11" stroke="rgba(240,237,230,.5)" stroke-width="1.5" stroke-linecap="round"/><line x1="9" y1="11" x2="14" y2="14" stroke="rgba(240,237,230,.4)" stroke-width="1.5" stroke-linecap="round"/><line x1="14" y1="14" x2="21" y2="7" stroke="rgba(232,216,74,.6)" stroke-width="1.5" stroke-linecap="round"/></svg>
+        </div>
+        <div class="option-text">
+          <div class="option-title">Fitness aufbauen</div>
+          <div class="option-desc">Kein Rennen, aber strukturierter Fortschritt</div>
+        </div>
+        <div class="option-check"></div>
+      </div>
+      <div class="option" onclick="selectGoal(this,'maintain')">
+        <div class="option-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><line x1="3" y1="12" x2="21" y2="12" stroke="rgba(240,237,230,.5)" stroke-width="1.5"/><circle cx="12" cy="12" r="3" stroke="rgba(232,216,74,.5)" stroke-width="1" fill="none"/></svg>
+        </div>
+        <div class="option-text">
+          <div class="option-title">Fitness erhalten</div>
+          <div class="option-desc">Niveau halten ohne spezifischen Aufbau</div>
+        </div>
+        <div class="option-check"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SCHRITT 2: RENNEN -->
+  <div class="step" id="step-2">
+    <div class="step-kicker">SCHRITT 2 VON 7</div>
+    <div class="step-question">Welches <b>Rennen</b> planst du?</div>
+    <div class="step-sub">Name und Distanz helfen dem Coach den Plan zu spezifizieren.</div>
+    <div class="options" id="race-options">
+      <div class="option" onclick="selectRaceType(this,'5k')"><div class="option-text"><div class="option-title">5K</div></div><div class="option-check"></div></div>
+      <div class="option" onclick="selectRaceType(this,'10k')"><div class="option-text"><div class="option-title">10K</div></div><div class="option-check"></div></div>
+      <div class="option" onclick="selectRaceType(this,'hm')"><div class="option-text"><div class="option-title">Halbmarathon · 21.1 km</div></div><div class="option-check"></div></div>
+      <div class="option" onclick="selectRaceType(this,'marathon')"><div class="option-text"><div class="option-title">Marathon · 42.2 km</div></div><div class="option-check"></div></div>
+      <div class="option" onclick="selectRaceType(this,'50k')"><div class="option-text"><div class="option-title">Ultra · 50K</div></div><div class="option-check"></div></div>
+      <div class="option" onclick="selectRaceType(this,'100k')"><div class="option-text"><div class="option-title">Ultra · 100K</div></div><div class="option-check"></div></div>
+      <div class="option" onclick="selectRaceType(this,'trail')"><div class="option-text"><div class="option-title">Trail Race · andere Distanz</div></div><div class="option-check"></div></div>
+    </div>
+    <div id="race-name-wrap" style="display:none">
+      <input class="text-input" id="race-name" placeholder="Rennenname (z.B. Zürich Marathon)" oninput="checkStep2()">
+    </div>
+    <div id="race-date-wrap" style="display:none">
+      <div style="font-family:'DM Mono',monospace;font-size:9px;color:rgba(240,237,230,.3);letter-spacing:.14em;margin-bottom:10px">RENNDATUM</div>
+      <input class="date-input" type="date" id="race-date" onchange="checkStep2()">
+    </div>
+  </div>
+
+  <!-- SCHRITT 3: TRAININGSTAGE -->
+  <div class="step" id="step-3">
+    <div class="step-kicker">SCHRITT 3 VON 7</div>
+    <div class="step-question">Wie viele <b>Trainingstage</b> pro Woche?</div>
+    <div class="step-sub">Inkl. Kraft und Laufen zusammen.</div>
+    <div class="number-picker">
+      <button class="np-btn" onclick="changeNum('days',-1)">−</button>
+      <div class="np-val" id="days-val">5</div>
+      <button class="np-btn" onclick="changeNum('days',1)">+</button>
+      <div class="np-unit">TAGE</div>
+    </div>
+    <div style="font-family:'DM Mono',monospace;font-size:9px;color:rgba(240,237,230,.25);letter-spacing:.1em;line-height:1.8">
+      3 TAGE · Einsteiger / wenig Zeit<br>
+      4–5 TAGE · Intermediär<br>
+      6 TAGE · Erfahren / viel Zeit
+    </div>
+  </div>
+
+  <!-- SCHRITT 4: LONG RUN TAG -->
+  <div class="step" id="step-4">
+    <div class="step-kicker">SCHRITT 4 VON 7</div>
+    <div class="step-question">Wann ist dein <b>Long Run?</b></div>
+    <div class="step-sub">Meist am Wochenende wenn mehr Zeit vorhanden ist.</div>
+    <div class="days-grid" id="longrun-days">
+      <div class="day-btn" onclick="selectLongRun(this,1)"><div class="day-name">MO</div></div>
+      <div class="day-btn" onclick="selectLongRun(this,2)"><div class="day-name">DI</div></div>
+      <div class="day-btn" onclick="selectLongRun(this,3)"><div class="day-name">MI</div></div>
+      <div class="day-btn" onclick="selectLongRun(this,4)"><div class="day-name">DO</div></div>
+      <div class="day-btn" onclick="selectLongRun(this,5)"><div class="day-name">FR</div></div>
+      <div class="day-btn sel" onclick="selectLongRun(this,6)"><div class="day-name">SA</div></div>
+      <div class="day-btn" onclick="selectLongRun(this,7)"><div class="day-name">SO</div></div>
+    </div>
+  </div>
+
+  <!-- SCHRITT 5: QUALITY SESSIONS -->
+  <div class="step" id="step-5">
+    <div class="step-kicker">SCHRITT 5 VON 7</div>
+    <div class="step-question">Wie viele <b>Quality Sessions</b> pro Woche?</div>
+    <div class="step-sub">Intervalle, Tempo, Schwellenlauf. Max. 2 empfohlen.</div>
+    <div class="number-picker">
+      <button class="np-btn" onclick="changeNum('quality',-1)">−</button>
+      <div class="np-val" id="quality-val">1</div>
+      <button class="np-btn" onclick="changeNum('quality',1)">+</button>
+      <div class="np-unit">PRO WOCHE</div>
+    </div>
+    <div style="font-family:'DM Mono',monospace;font-size:9px;color:rgba(240,237,230,.25);letter-spacing:.1em;line-height:1.8">
+      1 · Konservativ, weniger Verletzungsrisiko<br>
+      2 · Standard für Intermediär / Fortgeschrittene<br>
+      3+ · Nur für sehr Erfahrene
+    </div>
+  </div>
+
+  <!-- SCHRITT 6: STRENGTH -->
+  <div class="step" id="step-6">
+    <div class="step-kicker">SCHRITT 6 VON 7</div>
+    <div class="step-question">Wie viele <b>Krafteinheiten</b> pro Woche?</div>
+    <div class="step-sub">Kraft ist fundamental für Trail Runner. Beugt Verletzungen vor.</div>
+    <div class="number-picker">
+      <button class="np-btn" onclick="changeNum('strength',-1)">−</button>
+      <div class="np-val" id="strength-val">2</div>
+      <button class="np-btn" onclick="changeNum('strength',1)">+</button>
+      <div class="np-unit">PRO WOCHE</div>
+    </div>
+    <div style="font-family:'DM Mono',monospace;font-size:9px;color:rgba(240,237,230,.25);letter-spacing:.1em;line-height:1.8">
+      1 · Minimal, Fokus auf Laufen<br>
+      2 · Empfohlen für Hybrid-Athleten<br>
+      3 · Intensiver Hybridansatz
+    </div>
+  </div>
+
+  <!-- SCHRITT 7: ZUSAMMENFASSUNG -->
+  <div class="step" id="step-7">
+    <div class="step-kicker">SCHRITT 7 VON 7</div>
+    <div class="step-question">Bereit für deinen <b>Plan?</b></div>
+    <div class="step-sub">Der Coach erstellt jetzt deinen persönlichen Trainingsplan.</div>
+
+    <div class="summary-rows" id="summary-rows"></div>
+
+    <!-- Phasen Preview -->
+    <div style="font-family:'DM Mono',monospace;font-size:8px;color:rgba(240,237,230,.3);letter-spacing:.14em;margin-bottom:10px">TRAININGSPLAN · PHASEN</div>
+    <div class="phase-preview" id="phase-preview"></div>
+
+    <div style="font-size:12px;color:rgba(240,237,230,.3);line-height:1.7;margin-top:16px">
+      Der Coach passt den Plan laufend an — basierend auf deinen Daten, deinem Befinden und deiner Progression.
+    </div>
+  </div>
+
+</div>
+
+<!-- FOOTER -->
+<div class="footer">
+  <button class="btn-back" id="btn-back" onclick="prevStep()" style="display:none">&#8592;</button>
+  <button class="btn-next ready" id="btn-next" onclick="nextStep()">WEITER &rarr;</button>
+  <button class="btn-generate" id="btn-generate" onclick="generatePlan()">PLAN ERSTELLEN &rarr;</button>
+</div>
+
+<script>
+var BASE = 'https://web-production-297f2.up.railway.app';
+var currentStep = 1;
+var totalSteps = 7;
+
+var planData = {
+  goal_type: '',
+  race_type: '',
+  race_name: '',
+  race_date: '',
+  days_per_week: 5,
+  long_run_day: 6,
+  quality_sessions: 1,
+  strength_sessions: 2
+};
+
+// Minimaldaten je Distanz (Wochen)
+var minWeeks = {'5k':8,'10k':10,'hm':12,'marathon':16,'50k':20,'100k':24,'trail':16,'fitness':12,'maintain':8};
+
+function selectGoal(el, val) {
+  document.querySelectorAll('#step-1 .option').forEach(function(o){ o.classList.remove('sel'); });
+  el.classList.add('sel');
+  planData.goal_type = val;
+  document.getElementById('btn-next').classList.add('ready');
+}
+
+function selectRaceType(el, val) {
+  document.querySelectorAll('#step-2 .option').forEach(function(o){ o.classList.remove('sel'); });
+  el.classList.add('sel');
+  planData.race_type = val;
+  document.getElementById('race-name-wrap').style.display = 'block';
+  document.getElementById('race-date-wrap').style.display = 'block';
+  checkStep2();
+}
+
+function checkStep2() {
+  var name = document.getElementById('race-name').value.trim();
+  var date = document.getElementById('race-date').value;
+  planData.race_name = name;
+  planData.race_date = date;
+  if (planData.race_type && name && date) {
+    document.getElementById('btn-next').classList.add('ready');
+  }
+}
+
+function selectLongRun(el, day) {
+  document.querySelectorAll('#longrun-days .day-btn').forEach(function(b){ b.classList.remove('sel'); });
+  el.classList.add('sel');
+  planData.long_run_day = day;
+  document.getElementById('btn-next').classList.add('ready');
+}
+
+function changeNum(type, delta) {
+  var limits = {days:[3,7], quality:[1,3], strength:[0,3]};
+  var keys = {days:'days_per_week', quality:'quality_sessions', strength:'strength_sessions'};
+  var key = keys[type];
+  var min = limits[type][0], max = limits[type][1];
+  planData[key] = Math.max(min, Math.min(max, planData[key] + delta));
+  document.getElementById(type + '-val').textContent = planData[key];
+}
+
+function getWeeks() {
+  if (planData.goal_type === 'race' && planData.race_date) {
+    var today = new Date();
+    var race = new Date(planData.race_date);
+    var weeks = Math.round((race - today) / (7 * 24 * 3600 * 1000));
+    return Math.max(8, Math.min(weeks, 32));
+  }
+  return minWeeks[planData.goal_type] || 12;
+}
+
+function getPhases(totalWeeks) {
+  if (planData.goal_type === 'maintain') {
+    return [{name:'ERHALT', weeks: totalWeeks, pct: 100}];
+  }
+  var taper = totalWeeks >= 20 ? 3 : 2;
+  var peak = totalWeeks >= 16 ? 2 : 1;
+  var base = Math.round((totalWeeks - taper - peak) * 0.4);
+  var build = totalWeeks - taper - peak - base;
+  return [
+    {name:'BASE', weeks: base},
+    {name:'BUILD', weeks: build},
+    {name:'PEAK', weeks: peak},
+    {name:'TAPER', weeks: taper}
+  ];
+}
+
+function buildSummary() {
+  var weeks = getWeeks();
+  var phases = getPhases(weeks);
+  var DAY_NAMES = ['','MO','DI','MI','DO','FR','SA','SO'];
+  var GOAL_NAMES = {race:'Race Plan', fitness:'Fitness aufbauen', maintain:'Fitness erhalten'};
+  var RACE_NAMES = {'5k':'5K','10k':'10K','hm':'Halbmarathon','marathon':'Marathon','50k':'Ultra 50K','100k':'Ultra 100K','trail':'Trail Race'};
+
+  var rows = [
+    {label: 'ZIEL', value: GOAL_NAMES[planData.goal_type] || '—'},
+    {label: 'RENNEN', value: (planData.race_name || '—') + (planData.race_type ? ' · ' + (RACE_NAMES[planData.race_type]||'') : '')},
+    {label: 'RENNDATUM', value: planData.race_date ? new Date(planData.race_date).toLocaleDateString('de-DE', {day:'2-digit', month:'long', year:'numeric'}) : '—'},
+    {label: 'PLANLÄNGE', value: weeks + ' Wochen'},
+    {label: 'TRAININGSTAGE', value: planData.days_per_week + ' pro Woche'},
+    {label: 'LONG RUN', value: DAY_NAMES[planData.long_run_day] || '—'},
+    {label: 'QUALITY SESSIONS', value: planData.quality_sessions + ' pro Woche'},
+    {label: 'KRAFT', value: planData.strength_sessions + ' pro Woche'},
+  ];
+
+  var rowsHtml = rows.map(function(r) {
+    return '<div class="summary-row"><div class="summary-label">' + r.label + '</div><div class="summary-value">' + r.value + '</div></div>';
+  }).join('');
+  document.getElementById('summary-rows').innerHTML = rowsHtml;
+
+  var phaseHtml = phases.map(function(p) {
+    return '<div class="phase-block"><div class="phase-name">' + p.name + '</div><div class="phase-weeks">' + p.weeks + ' W</div></div>';
+  }).join('');
+  document.getElementById('phase-preview').innerHTML = phaseHtml;
+}
+
+function nextStep() {
+  if (currentStep < totalSteps) {
+    // Step 2 überspringen wenn kein Race
+    if (currentStep === 1 && planData.goal_type !== 'race') {
+      currentStep = 3;
+    } else {
+      currentStep++;
+    }
+    showStep(currentStep);
+    if (currentStep === totalSteps) buildSummary();
+  }
+}
+
+function prevStep() {
+  if (currentStep > 1) {
+    if (currentStep === 3 && planData.goal_type !== 'race') {
+      currentStep = 1;
+    } else {
+      currentStep--;
+    }
+    showStep(currentStep);
+  }
+}
+
+function showStep(n) {
+  document.querySelectorAll('.step').forEach(function(s){ s.classList.remove('active'); });
+  var el = document.getElementById('step-' + n);
+  if (el) el.classList.add('active');
+
+  var pct = Math.round(n / totalSteps * 100);
+  document.getElementById('progress-fill').style.width = pct + '%';
+  document.getElementById('step-indicator').textContent = 'SCHRITT ' + n + ' VON ' + totalSteps;
+
+  var backBtn = document.getElementById('btn-back');
+  var nextBtn = document.getElementById('btn-next');
+  var genBtn = document.getElementById('btn-generate');
+
+  backBtn.style.display = n > 1 ? 'flex' : 'none';
+
+  if (n === totalSteps) {
+    nextBtn.style.display = 'none';
+    genBtn.style.display = 'flex';
+  } else {
+    nextBtn.style.display = 'flex';
+    genBtn.style.display = 'none';
+  }
+
+  // Steps 3,5,6 sind immer ready (haben Defaults)
+  if (n === 3 || n === 5 || n === 6) {
+    nextBtn.classList.add('ready');
+  } else if (n === 4) {
+    nextBtn.classList.add('ready');
+  } else if (n !== 1 && n !== 2) {
+    nextBtn.classList.add('ready');
+  }
+}
+
+function generatePlan() {
+  document.getElementById('generating').classList.add('show');
+  var bar = document.getElementById('gen-bar');
+  var status = document.getElementById('gen-status');
+  var steps = [
+    [10, 'PROFIL WIRD ANALYSIERT...'],
+    [30, 'PHASEN WERDEN BERECHNET...'],
+    [55, 'WÖCHENTLICHE STRUKTUR WIRD ERSTELLT...'],
+    [75, 'EINHEITEN WERDEN GENERIERT...'],
+    [90, 'PLAN WIRD GESPEICHERT...'],
+    [100, 'PLAN BEREIT']
+  ];
+  var i = 0;
+  function tick() {
+    if (i < steps.length) {
+      bar.style.width = steps[i][0] + '%';
+      status.textContent = steps[i][1];
+      i++;
+      setTimeout(tick, i < steps.length ? 1200 : 0);
+    }
+  }
+  tick();
+
+  var weeks = getWeeks();
+  var phases = getPhases(weeks);
+
+  fetch(BASE + '/api/plan/generate', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      goal_type: planData.goal_type,
+      race_type: planData.race_type,
+      race_name: planData.race_name,
+      race_date: planData.race_date,
+      days_per_week: planData.days_per_week,
+      long_run_day: planData.long_run_day,
+      quality_sessions: planData.quality_sessions,
+      strength_sessions: planData.strength_sessions,
+      total_weeks: weeks,
+      phases: phases
+    })
+  }).then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.status === 'ok') {
+        setTimeout(function() {
+          window.location.href = '/mobile';
+        }, 1000);
+      } else {
+        alert('Fehler: ' + (data.message || 'Unbekannt'));
+        document.getElementById('generating').classList.remove('show');
+      }
+    }).catch(function() {
+      setTimeout(function() {
+        window.location.href = '/mobile';
+      }, 1500);
+    });
+}
+
+// Init – Step 4 default Long Run = SA
+showStep(1);
+</script>
+</body>
+</html>
