@@ -162,7 +162,7 @@ html,body{height:100%;background:var(--black);font-family:'DM Sans',sans-serif;c
 
 <div class="topbar">
   <div class="topbar-kicker">CAIRN</div>
-  <div class="topbar-title" id="step-indicator">SCHRITT 1 VON 7</div>
+  <div class="topbar-title" id="step-indicator">SCHRITT 1 VON 8</div>
   <button onclick="confirmCancel()" style="background:transparent;border:none;color:rgba(240,237,230,.5);font-size:22px;cursor:pointer;padding:4px 0 4px 16px;line-height:1">&#x2715;</button>
 </div>
 <div class="progress-wrap">
@@ -182,7 +182,7 @@ html,body{height:100%;background:var(--black);font-family:'DM Sans',sans-serif;c
 
   <!-- SCHRITT 1: ZIEL -->
   <div class="step active" id="step-1">
-    <div class="step-kicker">SCHRITT 1 VON 7</div>
+    <div class="step-kicker">SCHRITT 1 VON 8</div>
     <div class="step-question">Was ist dein <b>Ziel?</b></div>
     <div class="step-sub">Davon hängt die Struktur deines Plans ab.</div>
     <div class="options">
@@ -340,23 +340,29 @@ html,body{height:100%;background:var(--black);font-family:'DM Sans',sans-serif;c
     </div>
   </div>
 
-  <!-- SCHRITT 7: ZUSAMMENFASSUNG -->
+  <!-- SCHRITT 7: STARTDATUM -->
   <div class="step" id="step-7">
-    <div class="step-kicker">SCHRITT 7 VON 7</div>
-    <div class="step-question">Bereit für deinen <b>Plan?</b></div>
-    <div class="step-sub">Der Coach erstellt jetzt deinen persönlichen Trainingsplan.</div>
-    <div class="summary-rows" id="summary-rows"></div>
-    <div class="input-label" style="margin-bottom:10px">TRAININGSPLAN · PHASEN</div>
-    <div class="phase-preview" id="phase-preview"></div>
-    <div class="input-label" style="margin-top:8px;margin-bottom:10px">PLAN STARTET AM</div>
-    <div class="date-row" style="margin-bottom:20px">
+    <div class="step-kicker">SCHRITT 7 VON 8</div>
+    <div class="step-question">Wann <b>startest</b> du?</div>
+    <div class="step-sub">Der Plan startet immer am Montag der gewählten Woche.</div>
+    <div class="date-row">
       <input class="date-part" id="start-day" placeholder="TT" type="number" min="1" max="31" oninput="checkStartDate()">
       <div class="date-sep">.</div>
       <input class="date-part" id="start-month" placeholder="MM" type="number" min="1" max="12" oninput="checkStartDate()">
       <div class="date-sep">.</div>
       <input class="date-part" id="start-year" placeholder="JJJJ" type="number" min="2025" max="2030" oninput="checkStartDate()" style="flex:2">
     </div>
-    <div id="start-hint" style="font-family:DM Mono,monospace;font-size:9px;color:rgba(240,237,230,.4);letter-spacing:.1em;margin-bottom:16px">STARTET IMMER AM MONTAG DER GEWÄHLTEN WOCHE</div>
+    <div id="start-hint" style="font-family:DM Mono,monospace;font-size:10px;color:rgba(240,237,230,.5);letter-spacing:.1em;margin-top:-16px;margin-bottom:24px">DATUM EINGEBEN</div>
+  </div>
+
+  <!-- SCHRITT 8: ZUSAMMENFASSUNG -->
+  <div class="step" id="step-8">
+    <div class="step-kicker">SCHRITT 8 VON 8</div>
+    <div class="step-question">Bereit für deinen <b>Plan?</b></div>
+    <div class="step-sub">Der Coach erstellt jetzt deinen persönlichen Trainingsplan.</div>
+    <div class="summary-rows" id="summary-rows"></div>
+    <div class="input-label" style="margin-bottom:10px">TRAININGSPLAN · PHASEN</div>
+    <div class="phase-preview" id="phase-preview"></div>
     <div style="font-size:13px;color:rgba(240,237,230,.5);line-height:1.7;margin-top:4px">
       Der Coach passt den Plan laufend an — basierend auf deinen Daten, deinem Befinden und deiner Progression.
     </div>
@@ -374,7 +380,7 @@ html,body{height:100%;background:var(--black);font-family:'DM Sans',sans-serif;c
 <script>
 var BASE = 'https://web-production-297f2.up.railway.app';
 var currentStep = 1;
-var totalSteps = 7;
+var totalSteps = 8;
 
 var planData = {
   goal_type: '',
@@ -558,7 +564,7 @@ function showStep(n) {
   }
 
   // Steps mit Defaults sind immer ready
-  if (n === 3 || n === 4 || n === 5 || n === 6 || n === 7) {
+  if (n === 3 || n === 4 || n === 5 || n === 6 || n === 7 || n === 8) {
     nextBtn.classList.add('ready');
   } else if (n === 1) {
     if (!planData.goal_type) nextBtn.classList.remove('ready');
