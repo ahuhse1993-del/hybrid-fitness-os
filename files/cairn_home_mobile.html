@@ -68,9 +68,9 @@ html,body{height:100%;overflow:hidden;background:var(--bg);font-family:'DM Sans'
 .section{border-bottom:.5px solid var(--black);padding:16px}
 
 /* ══ CHECK-IN ══ */
-.checkin-backdrop{display:none;position:fixed;inset:0;background:rgba(26,25,24,.65);z-index:500;align-items:flex-end}
+.checkin-backdrop{display:none;position:fixed;inset:0;background:rgba(26,25,24,.65);z-index:500;align-items:center;justify-content:center;padding:20px}
 .checkin-backdrop.open{display:flex}
-.checkin-box{background:var(--black);width:100%;border-top:3px solid var(--accent);padding:24px 16px;padding-bottom:calc(24px + env(safe-area-inset-bottom));max-height:90vh;overflow-y:auto}
+.checkin-box{background:var(--black);width:100%;max-width:420px;border-top:3px solid var(--accent);padding:28px 20px;max-height:80vh;overflow-y:auto}
 .ci-time{font-family:'DM Mono',monospace;font-size:8px;color:rgba(240,237,230,.25);letter-spacing:.18em;margin-bottom:16px}
 .ci-greeting{font-size:18px;font-weight:300;color:#F0EDE6;margin-bottom:4px}
 .ci-greeting b{font-weight:500}
@@ -225,17 +225,13 @@ html,body{height:100%;overflow:hidden;background:var(--bg);font-family:'DM Sans'
     <div class="ci-time" id="ci-time"></div>
     <div class="ci-greeting" id="ci-greeting">Guten Morgen, <b>Alexander.</b></div>
     <div class="ci-sub">Kurz zu dir, bevor wir starten.</div>
-    <div class="ci-q">WIE F&Uuml;HLST DU DICH?</div>
+    <div class="ci-q">WIE F&Uuml;HLST DU DICH HEUTE?</div>
     <input type="range" class="mood-slider" id="mood-slider" min="1" max="10" value="5" step="1" oninput="updateMoodSlider(this.value)">
-    <div class="mood-value" id="mood-value">5</div>
-    <div class="kicker" style="color:rgba(240,237,230,.25);margin-bottom:10px">IRGENDWAS ERW&Auml;HNENSWERT?</div>
-    <div class="ci-notes">
-      <button class="ci-note" onclick="togNote(this)">Schlechter Schlaf</button>
-      <button class="ci-note" onclick="togNote(this)">Schwere Beine</button>
-      <button class="ci-note" onclick="togNote(this)">Stressiger Tag</button>
-      <button class="ci-note" onclick="togNote(this)">F&uuml;hle mich gut</button>
-      <button class="ci-note" onclick="togNote(this)">Kein Anliegen</button>
+    <div style="display:flex;justify-content:space-between;margin-top:8px;margin-bottom:4px">
+      <span style="font-family:'DM Mono',monospace;font-size:8px;color:rgba(240,237,230,.25);letter-spacing:.1em">ERSCHÖPFT</span>
+      <span style="font-family:'DM Mono',monospace;font-size:8px;color:rgba(240,237,230,.25);letter-spacing:.1em">FRISCH</span>
     </div>
+    <div class="mood-value" id="mood-value">5</div>
     <button class="ci-submit ready" id="ci-submit" onclick="submitCheckin()">SO F&Uuml;HLE ICH MICH &rarr;</button>
   </div>
 </div>
