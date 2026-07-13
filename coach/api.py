@@ -85,9 +85,15 @@ def generate_plan():
         total_weeks = data.get('total_weeks', 16)
         phases = data.get('phases', [])
 
+        from knowledge.loader import load_plan_generation_knowledge
+        knowledge = load_plan_generation_knowledge()
         day_names = ['', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag']
 
         prompt = f"""Du bist CAIRN Coach. Erstelle einen strukturierten Trainingsplan.
+
+DEINE WISSENSBASIS (halte dich strikt daran):
+{knowledge}
+
 
 ATHLETENPROFIL:
 - Ziel: {goal_type}
@@ -743,33 +749,184 @@ def update_plan():
 def check_plan():
     try:
         import anthropic
+        from knowledge.loader import load_plan_adaptation_knowledge
         data = request.get_json(force=True)
         week_plan = data.get('week_plan', [])
+
+        # Wochenstruktur als lesbaren Text aufbauen
         lines = []
         for day in week_plan:
-            lines.append(day.get('day', '') + ': ' + day.get('session_type', '') + ' | ' + day.get('notes', ''))
+            session = day.get('session_type', 'Rest Day')
+            notes = day.get('notes', '')
+            lines.append(f"{day.get('day', '')}: {session}" + (f" ({notes.split(' · ')[0]})" if notes else ''))
 
-        prompt = 'Du bist CAIRN Coach. Pruefe diese Wochenstruktur.\n\n'
-        prompt += 'Wochenplan:\n' + '\n'.join(lines) + '\n\n'
-        prompt += 'REGELN:\n'
-        prompt += '1. Nach Unterkörper-Krafttraining darf NICHT direkt eine Qualitaetssession folgen.\n'
-        prompt += '2. Nicht mehr als 2 harte Sessions hintereinander.\n'
-        prompt += '3. Nach Long Run kein hartes Training direkt danach.\n\n'
-        prompt += 'Max 2 Saetze. Antworte NUR mit JSON:\n'
-        prompt += '{"ok": true, "message": "Kurzes Feedback auf Deutsch"}'
+        knowledge = load_plan_adaptation_knowledge()
+
+        prompt = f"""Du bist CAIRN Coach. Prüfe diese Trainingsstruktur auf Probleme.
+
+WOCHENSTRUKTUR (mehrere Wochen möglich):
+{chr(10).join(lines)}
+
+DEINE WISSENSBASIS:
+{knowledge}
+
+AUFGABE:
+Prüfe ob diese Struktur für den Athleten sinnvoll ist.
+Achte besonders auf:
+- Harte Sessions direkt hintereinander
+- Kein Erholungstag nach Long Run
+- Kraft direkt vor oder nach Quality Sessions
+- Zu viel Belastung ohne Deload
+
+Wenn alles ok ist: ok=true, kurze bestätigende Aussage.
+Wenn Problem: ok=false, 1-2 Sätze im CAIRN-Ton was du siehst und warum.
+Nie wie Software. Nie "Algorithmus". Wie ein erfahrener Bergführer.
+
+Antworte NUR mit JSON:
+{{"ok": true, "message": "Was du siehst in 1-2 Sätzen."}}"""
 
         client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
         message = client.messages.create(
             model="claude-sonnet-4-6",
-            max_tokens=200,
+            max_tokens=300,
             messages=[{"role": "user", "content": prompt}]
         )
         raw = message.content[0].text.strip().replace('```json', '').replace('```', '').strip()
         try:
             result = json.loads(raw)
         except Exception:
-            result = {"ok": True, "message": "Plan sieht gut aus."}
+            result = {"ok": True, "message": "Passt so."}
         return jsonify({"status": "ok", "check": result})
+
+    except Exception as e:
+        import traceback
+        return jsonify({"status": "error", "message": str(e), "trace": traceback.format_exc()}), 500
+
+# ─── PLAN SESSION VERSCHIEBEN (Drag & Drop) ───
+@app.route('/api/plan/move', methods=['POST'])
+def move_plan_session():
+    """
+    Verschiebt eine Session von A nach B (wochenübergreifend).
+    Tauscht wenn B belegt, setzt ein wenn B leer (Rest Day).
+    Danach: Coach-Check der betroffenen Tage.
+    Gibt Coach-Warnung zurück wenn nötig – speichert trotzdem.
+    """
+    try:
+        import anthropic
+        from knowledge.loader import load_plan_adaptation_knowledge
+        data = request.get_json(force=True)
+
+        source_id = data.get('source_id')          # training_plan.id der gezogenen Session
+        target_week = data.get('target_week')       # Ziel-Wochendatum (YYYY-MM-DD)
+        target_day = data.get('target_day')         # Ziel-Tag 1-7
+
+        if not source_id or not target_week or not target_day:
+            return jsonify({"status": "error", "message": "source_id, target_week, target_day erforderlich"}), 400
+
+        conn = get_db()
+        cur = conn.cursor()
+
+        # Quelle laden
+        cur.execute("""
+            SELECT id, week_date, day_of_week, session_type, session_zone,
+                   distance_km, duration_min, notes, phase, plan_id
+            FROM training_plan WHERE id = %s
+        """, (source_id,))
+        source = cur.fetchone()
+        if not source:
+            conn.close()
+            return jsonify({"status": "error", "message": "Session nicht gefunden"}), 404
+
+        source_week = str(source[1])
+        source_day = source[2]
+
+        # Ziel prüfen ob belegt
+        cur.execute("""
+            SELECT id, session_type FROM training_plan
+            WHERE week_date = %s AND day_of_week = %s
+        """, (target_week, target_day))
+        target = cur.fetchone()
+
+        # Tausch oder Einsetzen
+        if target:
+            # Tausch: Ziel kommt an Quellposition
+            cur.execute("""
+                UPDATE training_plan SET week_date=%s, day_of_week=%s
+                WHERE id=%s
+            """, (source_week, source_day, target[0]))
+
+        # Quelle an Zielposition
+        cur.execute("""
+            UPDATE training_plan SET week_date=%s, day_of_week=%s
+            WHERE id=%s
+        """, (target_week, target_day, source_id))
+
+        conn.commit()
+
+        # Betroffene Tage für Coach-Check laden (3 Tage um Quelle + 3 Tage um Ziel)
+        source_date = date.fromisoformat(source_week) + timedelta(days=source_day - 1)
+        target_date = date.fromisoformat(target_week) + timedelta(days=target_day - 1)
+        check_start = min(source_date, target_date) - timedelta(days=2)
+        check_end = max(source_date, target_date) + timedelta(days=2)
+
+        cur.execute("""
+            SELECT week_date, day_of_week, session_type, notes
+            FROM training_plan
+            WHERE week_date >= %s AND week_date <= %s
+            ORDER BY week_date, day_of_week
+        """, (
+            check_start - timedelta(days=check_start.weekday()),
+            check_end + timedelta(days=6 - check_end.weekday())
+        ))
+        context_rows = cur.fetchall()
+        conn.close()
+
+        # Coach-Check
+        day_names = ['', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So']
+        lines = []
+        for r in context_rows:
+            d = date.fromisoformat(str(r[0])) + timedelta(days=r[1] - 1)
+            notes_short = (r[3] or '').split(' · ')[0] if r[3] else ''
+            lines.append(f"{d.strftime('%d.%m')} {day_names[r[1]]}: {r[2]}" + (f" ({notes_short})" if notes_short else ''))
+
+        knowledge = load_plan_adaptation_knowledge()
+
+        prompt = f"""Du bist CAIRN Coach. Ein Athlet hat gerade eine Session verschoben.
+
+BETROFFENE TAGE (Kontext um die Verschiebung):
+{chr(10).join(lines)}
+
+VERSCHOBEN: {source[3]} von {source_date.strftime('%d.%m')} nach {target_date.strftime('%d.%m')}
+
+DEINE WISSENSBASIS:
+{knowledge}
+
+Prüfe nur ob es ein echtes Problem gibt.
+Kleine Unschönheiten → ok=true, kurze positive Aussage.
+Echtes Problem (z.B. Quality direkt nach Long Run, keine Erholung) → ok=false, 1-2 Sätze was du siehst.
+Nie wie Software. Wie ein ruhiger Bergführer.
+
+NUR JSON:
+{{"ok": true, "message": "Deine Beobachtung in 1-2 Sätzen."}}"""
+
+        client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+        message = client.messages.create(
+            model="claude-sonnet-4-6",
+            max_tokens=250,
+            messages=[{"role": "user", "content": prompt}]
+        )
+        raw = message.content[0].text.strip().replace('```json', '').replace('```', '').strip()
+        try:
+            coach_check = json.loads(raw)
+        except Exception:
+            coach_check = {"ok": True, "message": "Passt."}
+
+        return jsonify({
+            "status": "ok",
+            "moved": True,
+            "swapped": target is not None,
+            "coach": coach_check
+        })
 
     except Exception as e:
         import traceback
