@@ -227,6 +227,13 @@ html,body{height:100%;background:var(--black);font-family:'DM Sans',sans-serif;c
     <div id="race-name-wrap" style="display:none">
       <div class="input-label">RENNENNAME</div>
       <input class="text-input" id="race-name" placeholder="z.B. Zürich Marathon" oninput="checkStep2()">
+
+      <!-- Eigene Distanz – nur bei trail -->
+      <div id="custom-dist-wrap" style="display:none">
+        <div class="input-label">RENNDISTANZ (KM)</div>
+        <input class="text-input" id="race-dist-km" placeholder="z.B. 35" type="number" min="1" max="300" oninput="checkStep2()" style="margin-bottom:16px">
+      </div>
+
       <div class="input-label">RENNDATUM</div>
       <div class="date-row">
         <input class="date-part" id="date-day" placeholder="TT" maxlength="2" type="number" min="1" max="31" oninput="checkDateInput()">
@@ -234,6 +241,31 @@ html,body{height:100%;background:var(--black);font-family:'DM Sans',sans-serif;c
         <input class="date-part" id="date-month" placeholder="MM" maxlength="2" type="number" min="1" max="12" oninput="checkDateInput()">
         <div class="date-sep">.</div>
         <input class="date-part" id="date-year" placeholder="JJJJ" maxlength="4" type="number" min="2025" max="2030" oninput="checkDateInput()" style="flex:2">
+      </div>
+
+      <!-- GPX Upload -->
+      <div class="input-label" style="margin-top:8px">STRECKENPROFIL (OPTIONAL)</div>
+      <div id="gpx-upload-area" onclick="document.getElementById('gpx-file-input').click()"
+        style="border:.5px dashed rgba(240,237,230,.2);padding:20px;text-align:center;cursor:pointer;margin-bottom:24px;transition:border-color .15s"
+        ondragover="event.preventDefault();this.style.borderColor='var(--accent)'"
+        ondragleave="this.style.borderColor='rgba(240,237,230,.2)'"
+        ondrop="handleGpxDrop(event)">
+        <div id="gpx-upload-label" style="font-family:DM Mono,monospace;font-size:10px;color:rgba(240,237,230,.4);letter-spacing:.1em">GPX DATEI HOCHLADEN</div>
+        <div style="font-size:13px;color:rgba(240,237,230,.3);margin-top:6px">Drag & Drop oder antippen</div>
+        <input type="file" id="gpx-file-input" accept=".gpx" style="display:none" onchange="handleGpxFile(this.files[0])">
+      </div>
+
+      <!-- GPX Ergebnis -->
+      <div id="gpx-result" style="display:none;background:rgba(240,237,230,.06);border:.5px solid rgba(240,237,230,.12);padding:14px 16px;margin-bottom:24px">
+        <div style="font-family:DM Mono,monospace;font-size:8px;color:rgba(232,216,74,.5);letter-spacing:.14em;margin-bottom:8px">GPX ANALYSIERT</div>
+        <div id="gpx-summary" style="font-size:14px;color:#F0EDE6;margin-bottom:6px">—</div>
+        <div style="display:flex;gap:16px;flex-wrap:wrap">
+          <div><div style="font-family:DM Mono,monospace;font-size:8px;color:rgba(240,237,230,.4);letter-spacing:.1em">DISTANZ</div><div style="font-family:DM Mono,monospace;font-size:14px;color:#F0EDE6" id="gpx-dist">—</div></div>
+          <div><div style="font-family:DM Mono,monospace;font-size:8px;color:rgba(240,237,230,.4);letter-spacing:.1em">AUFSTIEG</div><div style="font-family:DM Mono,monospace;font-size:14px;color:#F0EDE6" id="gpx-gain">—</div></div>
+          <div><div style="font-family:DM Mono,monospace;font-size:8px;color:rgba(240,237,230,.4);letter-spacing:.1em">PROFIL</div><div style="font-family:DM Mono,monospace;font-size:14px;color:#F0EDE6" id="gpx-profile">—</div></div>
+          <div><div style="font-family:DM Mono,monospace;font-size:8px;color:rgba(240,237,230,.4);letter-spacing:.1em">M/KM</div><div style="font-family:DM Mono,monospace;font-size:14px;color:#F0EDE6" id="gpx-mkm">—</div></div>
+        </div>
+        <button onclick="clearGpx()" style="margin-top:10px;background:transparent;border:none;color:rgba(240,237,230,.3);font-family:DM Mono,monospace;font-size:9px;letter-spacing:.1em;cursor:pointer;padding:0">ENTFERNEN ×</button>
       </div>
     </div>
   </div>
@@ -340,6 +372,8 @@ var planData = {
   race_type: '',
   race_name: '',
   race_date: '',
+  race_distance_km: 0,
+  gpx_data: null,
   days_per_week: 5,
   long_run_day: 6,
   quality_sessions: 1,
@@ -358,6 +392,12 @@ function selectRaceType(el, val) {
   el.classList.add('sel');
   planData.race_type = val;
   document.getElementById('race-name-wrap').style.display = 'block';
+  // Distanzfeld nur bei eigener Distanz
+  var custWrap = document.getElementById('custom-dist-wrap');
+  if (custWrap) custWrap.style.display = val === 'trail' ? 'block' : 'none';
+  // Bei bekannter Distanz: automatisch setzen
+  var distMap = {'5k':5,'10k':10,'hm':21.1,'marathon':42.2,'50k':50,'100k':100};
+  planData.race_distance_km = distMap[val] || 0;
   checkStep2();
 }
 
@@ -375,7 +415,13 @@ function checkDateInput() {
 
 function checkStep2() {
   planData.race_name = document.getElementById('race-name').value.trim();
-  if (planData.race_type && planData.race_name && planData.race_date) {
+  // Eigene Distanz
+  if (planData.race_type === 'trail') {
+    var distVal = parseFloat(document.getElementById('race-dist-km').value);
+    planData.race_distance_km = distVal || 0;
+  }
+  var distOk = planData.race_type !== 'trail' || planData.race_distance_km > 0;
+  if (planData.race_type && planData.race_name && planData.race_date && distOk) {
     document.getElementById('btn-next').classList.add('ready');
   } else {
     document.getElementById('btn-next').classList.remove('ready');
@@ -435,7 +481,8 @@ function buildSummary() {
   var rows = [
     {label:'ZIEL', value: GOAL_NAMES[planData.goal_type] || '—'},
     {label:'RENNEN', value: planData.race_name || '—'},
-    {label:'DISTANZ', value: RACE_NAMES[planData.race_type] || '—'},
+    {label:'DISTANZ', value: planData.race_distance_km > 0 ? planData.race_distance_km + ' km' : (RACE_NAMES[planData.race_type] || '—')},
+    {label:'STRECKENPROFIL', value: planData.gpx_data ? planData.gpx_data.summary : 'Nicht hochgeladen'},
     {label:'RENNDATUM', value: planData.race_date ? new Date(planData.race_date).toLocaleDateString('de-DE',{day:'2-digit',month:'long',year:'numeric'}) : '—'},
     {label:'PLANLÄNGE', value: weeks + ' Wochen'},
     {label:'TRAININGSTAGE', value: planData.days_per_week + ' pro Woche'},
@@ -532,6 +579,77 @@ function confirmCancel() {
   document.body.appendChild(popup);
 }
 
+// ── GPX HANDLING ──
+var gpxLoading = false;
+
+function handleGpxDrop(event) {
+  event.preventDefault();
+  document.getElementById('gpx-upload-area').style.borderColor = 'rgba(240,237,230,.2)';
+  var file = event.dataTransfer.files[0];
+  if (file) handleGpxFile(file);
+}
+
+function handleGpxFile(file) {
+  if (!file || !file.name.endsWith('.gpx')) {
+    alert('Bitte eine .gpx Datei hochladen.');
+    return;
+  }
+  var label = document.getElementById('gpx-upload-label');
+  if (label) label.textContent = 'WIRD ANALYSIERT...';
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var base64 = btoa(unescape(encodeURIComponent(e.target.result)));
+    fetch(BASE + '/api/gpx/analyse', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({gpx_base64: base64})
+    }).then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (data.status === 'ok') {
+          planData.gpx_data = data.gpx;
+          showGpxResult(data.gpx, file.name);
+          // Distanz aus GPX übernehmen wenn Trail und noch keine gesetzt
+          if (planData.race_type === 'trail' && !planData.race_distance_km) {
+            planData.race_distance_km = data.gpx.distance_km;
+            var distInput = document.getElementById('race-dist-km');
+            if (distInput) distInput.value = data.gpx.distance_km;
+          }
+        } else {
+          if (label) label.textContent = 'FEHLER: ' + (data.message || 'GPX konnte nicht analysiert werden');
+        }
+      }).catch(function() {
+        if (label) label.textContent = 'GPX DATEI HOCHLADEN';
+        alert('GPX-Analyse fehlgeschlagen. Bitte versuche es nochmal.');
+      });
+  };
+  reader.readAsText(file);
+}
+
+function showGpxResult(gpx, filename) {
+  document.getElementById('gpx-upload-area').style.display = 'none';
+  var result = document.getElementById('gpx-result');
+  if (result) result.style.display = 'block';
+  var summEl = document.getElementById('gpx-summary');
+  if (summEl) summEl.textContent = filename || 'GPX analysiert';
+  var distEl = document.getElementById('gpx-dist');
+  if (distEl) distEl.textContent = gpx.distance_km + ' km';
+  var gainEl = document.getElementById('gpx-gain');
+  if (gainEl) gainEl.textContent = '+' + gpx.elevation_gain_m + ' m';
+  var profEl = document.getElementById('gpx-profile');
+  if (profEl) profEl.textContent = gpx.profile_de;
+  var mkmEl = document.getElementById('gpx-mkm');
+  if (mkmEl) mkmEl.textContent = gpx.gain_per_km + ' m/km';
+}
+
+function clearGpx() {
+  planData.gpx_data = null;
+  document.getElementById('gpx-upload-area').style.display = 'block';
+  document.getElementById('gpx-result').style.display = 'none';
+  var label = document.getElementById('gpx-upload-label');
+  if (label) label.textContent = 'GPX DATEI HOCHLADEN';
+  document.getElementById('gpx-file-input').value = '';
+}
+
 function generatePlan() {
   document.getElementById('generating').classList.add('show');
   var bar = document.getElementById('gen-bar');
@@ -566,6 +684,8 @@ function generatePlan() {
       race_type: planData.race_type,
       race_name: planData.race_name,
       race_date: planData.race_date,
+      race_distance_km: planData.race_distance_km || 0,
+      gpx_data: planData.gpx_data || null,
       days_per_week: planData.days_per_week,
       long_run_day: planData.long_run_day,
       quality_sessions: planData.quality_sessions,

@@ -67,6 +67,43 @@ def plan_status():
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
+# ─── GPX UPLOAD + ANALYSE ───
+@app.route('/api/gpx/analyse', methods=['POST'])
+def analyse_gpx():
+    """
+    Empfängt eine GPX-Datei als multipart/form-data oder base64 JSON.
+    Gibt Streckenkennzahlen zurück die in den Plan-Prompt fliessen.
+    """
+    try:
+        from data.gpx_parser import parse_gpx
+
+        gpx_content = None
+
+        # Multipart upload
+        if 'file' in request.files:
+            f = request.files['file']
+            gpx_content = f.read().decode('utf-8')
+        # Base64 JSON
+        elif request.is_json:
+            data = request.get_json(force=True)
+            import base64
+            gpx_b64 = data.get('gpx_base64', '')
+            if gpx_b64:
+                gpx_content = base64.b64decode(gpx_b64).decode('utf-8')
+
+        if not gpx_content:
+            return jsonify({"status": "error", "message": "Keine GPX-Datei"}), 400
+
+        result = parse_gpx(gpx_content)
+        if "error" in result:
+            return jsonify({"status": "error", "message": result["error"]}), 400
+
+        return jsonify({"status": "ok", "gpx": result})
+
+    except Exception as e:
+        import traceback
+        return jsonify({"status": "error", "message": str(e), "trace": traceback.format_exc()}), 500
+
 # ─── PLAN GENERIEREN ───
 @app.route('/api/plan/generate', methods=['POST'])
 def generate_plan():
@@ -78,6 +115,8 @@ def generate_plan():
         race_type = data.get('race_type', '')
         race_name = data.get('race_name', '')
         race_date = data.get('race_date', '')
+        race_distance_km = data.get('race_distance_km', 0)
+        gpx_data = data.get('gpx_data', None)  # GPX-Analyse Ergebnis
         days_per_week = data.get('days_per_week', 5)
         long_run_day = data.get('long_run_day', 6)
         quality_sessions = data.get('quality_sessions', 1)
@@ -99,12 +138,27 @@ ATHLETENPROFIL:
 - Ziel: {goal_type}
 - Rennen: {race_name} ({race_type})
 - Renndatum: {race_date}
+- Renndistanz: {race_distance_km if race_distance_km else 'nicht angegeben'} km
 - Trainingstage pro Woche: {days_per_week}
 - Long Run Tag: {day_names[long_run_day]}
 - Quality Sessions pro Woche: {quality_sessions}
 - Kraft-Sessions pro Woche: {strength_sessions}
 - Planlänge: {total_weeks} Wochen
 - Phasen: {json.dumps(phases)}
+{f"""
+STRECKENPROFIL (GPX-Analyse):
+- Distanz: {gpx_data.get('distance_km')} km
+- Höhenmeter aufwärts: {gpx_data.get('elevation_gain_m')} m
+- Höhenmeter abwärts: {gpx_data.get('elevation_loss_m')} m
+- Höhenmeter pro km: {gpx_data.get('gain_per_km')} m/km
+- Max. Steigung: {gpx_data.get('max_grade_pct')} %
+- Profil: {gpx_data.get('profile_de')}
+
+Berücksichtige das Streckenprofil bei der Planung:
+- Bei {gpx_data.get('gain_per_km', 0)} m/km Höhenmetern: spezifisches Hill-Training einplanen
+- Long Runs sollten das Gelände simulieren
+- Kraft-Training mit Fokus auf Steilheit und Abstieg
+""" if gpx_data else ""}
 
 REGELN:
 1. Long Run immer an Tag {long_run_day} ({day_names[long_run_day]})
@@ -179,7 +233,7 @@ Rest Days NICHT als Session eintragen – einfach weglassen.
             race_name or f"{goal_type} Plan {total_weeks}W",
             goal_type, race_name,
             race_date if race_date else None,
-            0,
+            race_distance_km or 0,
             total_weeks, days_per_week, long_run_day,
             quality_sessions, strength_sessions
         ))
