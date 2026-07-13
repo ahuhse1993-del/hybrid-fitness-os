@@ -111,7 +111,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);font-family:'DM Sans'
 .cb-illus-art{flex:1;display:flex;align-items:center;justify-content:center;padding:10px}
 .athlete-echo{display:none;align-items:center;gap:8px;padding:6px 10px;background:rgba(46,44,42,.05);border-left:2px solid rgba(46,44,42,.2);font-size:11px;color:var(--stone);margin-bottom:10px}
 .ae-lbl{font-family:'DM Mono',monospace;font-size:7px;color:var(--stone);letter-spacing:.1em}
-.cb-decision{font-size:22px;font-weight:300;line-height:1.5;letter-spacing:-.02em;color:var(--black)}
+.cb-decision{font-size:16px;font-weight:300;line-height:1.6;letter-spacing:-.01em;color:var(--black)}
 .cb-decision b{font-weight:500}
 .cb-quote{font-size:13px;font-weight:300;font-style:italic;color:var(--mid);border-left:2px solid var(--accent);padding:6px 12px;margin-bottom:12px;line-height:1.55}
 .cb-why-items{display:flex;flex-direction:column;gap:5px;margin-bottom:0}
@@ -406,7 +406,18 @@ html,body{height:100%;overflow:hidden;background:var(--bg);font-family:'DM Sans'
     </div>
   </div>
 
-  <!-- 3. HEALTH SNAPSHOT -->
+  <!-- 3. WOCHENÜBERSICHT – read only -->
+  <div style="border-bottom:.5px solid var(--black)" id="today-week-overview">
+    <div style="padding:10px 16px;border-bottom:.5px solid var(--black);display:flex;justify-content:space-between;align-items:center">
+      <div style="font-family:'DM Mono',monospace;font-size:8px;color:var(--stone);letter-spacing:.14em">DIESE WOCHE</div>
+      <div style="font-family:'DM Mono',monospace;font-size:8px;color:var(--stone)" id="today-week-kw">KW —</div>
+    </div>
+    <div id="today-week-days" style="display:flex;flex-direction:column">
+      <div style="padding:16px;font-family:'DM Mono',monospace;font-size:9px;color:var(--stone)">Wird geladen...</div>
+    </div>
+  </div>
+
+  <!-- 4. HEALTH SNAPSHOT -->
   <div style="background:var(--black);padding:16px">
     <div style="font-family:'DM Mono',monospace;font-size:8px;color:rgba(240,237,230,.3);letter-spacing:.14em;margin-bottom:12px">HEALTH SNAPSHOT</div>
     <div style="display:flex;flex-direction:column;gap:8px">
@@ -855,10 +866,71 @@ function closeReject(){document.getElementById('ov-reject').classList.remove('op
 
 function getWeekNumber(d){var date=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));var dayNum=date.getUTCDay()||7;date.setUTCDate(date.getUTCDate()+4-dayNum);var yearStart=new Date(Date.UTC(date.getUTCFullYear(),0,1));return Math.ceil((((date-yearStart)/86400000)+1)/7);}
 
+// ── WOCHENÜBERSICHT FÜR TODAY ──
+function loadTodayWeek(){
+  var now=new Date();
+  var monday=new Date(now);
+  var dow=monday.getDay();var diff=dow===0?-6:1-dow;
+  monday.setDate(monday.getDate()+diff);
+  var year=monday.getFullYear(),month=monday.getMonth()+1;
+  var kw=getWeekNumber(monday);
+  var kwEl=document.getElementById('today-week-kw');
+  if(kwEl)kwEl.textContent='KW '+kw;
+  var DAYS=['MO','DI','MI','DO','FR','SA','SO'];
+  var TYPE_MAP={'Easy Run':'EASY','Recovery Run':'RECOVERY','Long Run':'LONG RUN','Trail Run':'TRAIL','Intervalle':'INTERVALS','Tempo Run':'TEMPO','Threshold Run':'THRESHOLD','Krafttraining':'STRENGTH','Mobilität':'MOBILITY','Rest Day':'REST','WeightTraining':'STRENGTH','Run':'RUN','TrailRun':'TRAIL'};
+  var TYPE_COLOR={'EASY':'#D0CCC3','LONG RUN':' var(--mid)','TRAIL':'var(--mid)','INTERVALS':'var(--black)','TEMPO':'var(--black)','THRESHOLD':'var(--black)','STRENGTH':'var(--bg)','RECOVERY':'#D0CCC3','REST':'transparent','RUN':'#C4C0B8'};
+  var TYPE_TEXTCOLOR={'INTERVALS':'var(--accent)','TEMPO':'var(--accent)','THRESHOLD':'var(--accent)','default':'var(--black)'};
+  fetch(BASE+'/api/activities/month?year='+year+'&month='+month).then(function(r){return r.json();}).then(function(data){
+    var actual=data.actual||{};var plan=data.plan||{};var today=data.today;
+    var html='';
+    for(var d=0;d<7;d++){
+      var day=new Date(monday);day.setDate(monday.getDate()+d);
+      var dateStr=day.toISOString().split('T')[0];
+      var isToday=dateStr===today;var isPast=dateStr<today;
+      var sessions=actual[dateStr]||plan[dateStr]||[];
+      var bgRow=isToday?'background:var(--black)':'';
+      var dayColor=isToday?'color:var(--accent)':'color:var(--stone)';
+      var dateColor=isToday?'color:#F0EDE6':'color:var(--mid)';
+      html+='<div style="display:flex;align-items:center;gap:12px;padding:8px 16px;border-bottom:.5px solid rgba(46,44,42,.08);'+bgRow+'">';
+      html+='<div style="font-family:'DM Mono',monospace;font-size:8px;letter-spacing:.1em;width:20px;'+dayColor+'">'+DAYS[d]+'</div>';
+      html+='<div style="font-family:'DM Mono',monospace;font-size:13px;font-weight:300;width:22px;'+dateColor+'">'+day.getDate()+'</div>';
+      if(sessions.length){
+        var s=sessions[0];
+        var rawType=s.type||s.session_type||'';
+        var type=TYPE_MAP[rawType]||rawType.toUpperCase();
+        var name=(s.name||s.notes||rawType||'').split(' | ')[0].split(' · ')[0];
+        var dist=s.distance_km>0?s.distance_km.toFixed(1)+' km':(s.duration_min?s.duration_min+' min':'');
+        var isDone=isPast&&actual[dateStr];
+        var isQuality=type==='INTERVALS'||type==='TEMPO'||type==='THRESHOLD';
+        var tagBg=isQuality?'var(--black)':(type==='REST'?'transparent':'rgba(46,44,42,.1)');
+        var tagColor=isQuality?'var(--accent)':(isToday?'rgba(240,237,230,.5)':'var(--stone)');
+        var nameCl=isToday?'color:#F0EDE6':'color:var(--black)';
+        var distCl=isToday?'color:rgba(240,237,230,.5)':'color:var(--stone)';
+        if(type==='REST'){
+          html+='<div style="font-family:'DM Mono',monospace;font-size:8px;color:'+(isToday?'rgba(240,237,230,.3)':'rgba(46,44,42,.25)')+';letter-spacing:.1em">REST</div>';
+        } else {
+          html+='<div style="flex:1;display:flex;align-items:center;gap:8px">';
+          html+='<div style="font-family:'DM Mono',monospace;font-size:7px;padding:2px 6px;background:'+tagBg+';color:'+tagColor+';letter-spacing:.08em">'+type+'</div>';
+          html+='<div style="flex:1;font-size:12px;'+nameCl+'">'+escHtml(name)+'</div>';
+          if(dist)html+='<div style="font-family:'DM Mono',monospace;font-size:10px;'+distCl+'">'+dist+'</div>';
+          if(isDone)html+='<div style="font-family:'DM Mono',monospace;font-size:9px;color:#4CAF50">&#10003;</div>';
+          html+='</div>';
+        }
+      } else {
+        html+='<div style="font-family:'DM Mono',monospace;font-size:8px;color:'+(isToday?'rgba(240,237,230,.2)':'rgba(46,44,42,.2)')+'">&mdash;</div>';
+      }
+      html+='</div>';
+    }
+    var el=document.getElementById('today-week-days');
+    if(el)el.innerHTML=html;
+  }).catch(function(){});
+}
+
 // ── START ──
 if(lastCheckin===TODAY_STR){loadMorningBrief();}
 loadDashboard();
 loadNewActivities();
+loadTodayWeek();
 </script>
 </body>
 </html>
