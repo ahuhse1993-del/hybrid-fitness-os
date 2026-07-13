@@ -130,17 +130,10 @@ def generate_plan():
         if start_date:
             try:
                 start_monday = date.fromisoformat(start_date)
-                # Sicherstellen dass es ein Montag ist
-                if start_monday.weekday() != 0:
-                    start_monday = start_monday - timedelta(days=start_monday.weekday())
             except Exception:
-                start_monday = today + timedelta(days=(7 - today.weekday()) % 7 or 7)
+                start_monday = today + timedelta(days=1)
         else:
-            # Nächster Montag als Default
-            days_until_monday = (7 - today.weekday()) % 7
-            if days_until_monday == 0:
-                days_until_monday = 7
-            start_monday = today + timedelta(days=days_until_monday)
+            start_monday = today + timedelta(days=1)
         day_names = ['', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag']
 
         # Wochen in zwei Hälften aufteilen um Timeout zu vermeiden

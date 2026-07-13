@@ -344,7 +344,7 @@ html,body{height:100%;background:var(--black);font-family:'DM Sans',sans-serif;c
   <div class="step" id="step-7">
     <div class="step-kicker">SCHRITT 7 VON 8</div>
     <div class="step-question">Wann <b>startest</b> du?</div>
-    <div class="step-sub">Der Plan startet immer am Montag der gewählten Woche.</div>
+    <div class="step-sub">Der Plan startet an dem Tag den du wählst.</div>
     <div class="date-row">
       <input class="date-part" id="start-day" placeholder="TT" type="number" min="1" max="31" oninput="checkStartDate()">
       <div class="date-sep">.</div>
@@ -604,14 +604,11 @@ function checkStartDate() {
   if (d && m && y && y.length === 4) {
     var dd = String(d).padStart(2,'0');
     var mm = String(m).padStart(2,'0');
+    planData.start_date = y + '-' + mm + '-' + dd;
     var raw = new Date(y + '-' + mm + '-' + dd);
-    // Auf Montag der gewählten Woche runden
-    var dow = raw.getDay();
-    var diff = dow === 0 ? -6 : 1 - dow;
-    raw.setDate(raw.getDate() + diff);
-    planData.start_date = raw.toISOString().split('T')[0];
     var hint = document.getElementById('start-hint');
-    if (hint) hint.textContent = 'MONTAG ' + raw.toLocaleDateString('de-DE',{day:'2-digit',month:'long',year:'numeric'});
+    if (hint) hint.textContent = raw.toLocaleDateString('de-DE',{day:'2-digit',month:'long',year:'numeric',weekday:'long'}).toUpperCase();
+    document.getElementById('btn-next').classList.add('ready');
   }
 }
 
