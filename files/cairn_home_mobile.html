@@ -953,6 +953,46 @@ function openTodaySessionDetail(dataStr){
   }catch(e){}
 }
 
+
+// ── TODAY SESSION DETAIL POPUP ──
+function openTodayDay(dateStr){
+  var existing=document.getElementById('today-day-popup');
+  if(existing)existing.remove();
+  fetch(BASE+'/api/activities/month?year='+new Date().getFullYear()+'&month='+(new Date().getMonth()+1))
+    .then(function(r){return r.json();})
+    .then(function(data){
+      var actual=data.actual||{};
+      var plan=data.plan||{};
+      var sessions=actual[dateStr]||plan[dateStr]||[];
+      var popup=document.createElement('div');
+      popup.id='today-day-popup';
+      popup.style.cssText='position:fixed;inset:0;background:rgba(26,25,24,.75);z-index:600;display:flex;align-items:flex-end';
+      popup.onclick=function(e){if(e.target===popup)popup.remove();};
+      var html='<div style="background:var(--bg);width:100%;border-top:3px solid var(--stone);padding:24px 16px;padding-bottom:calc(24px + env(safe-area-inset-bottom));max-height:80vh;overflow-y:auto">';
+      html+='<div style="font-family:DM Mono,monospace;font-size:8px;color:var(--stone);letter-spacing:.14em;margin-bottom:12px">CAIRN · EINHEIT</div>';
+      if(!sessions.length){
+        html+='<div style="font-size:18px;font-weight:300;color:var(--mid);margin-bottom:16px">Kein Training geplant.</div>';
+      } else {
+        sessions.forEach(function(s){
+          var type=s.type||s.session_type||'';
+          var name=(s.name||s.notes||type||'').split(' | ')[0].split(' · ')[0];
+          var dist=s.distance_km>0?s.distance_km.toFixed(1)+' km':(s.duration_min?s.duration_min+' min':'');
+          var zone=s.session_zone||'';
+          html+='<div style="font-size:22px;font-weight:300;letter-spacing:-.02em;margin-bottom:4px">'+name+'</div>';
+          html+='<div style="font-family:DM Mono,monospace;font-size:9px;color:var(--stone);margin-bottom:16px">'+type+(dist?' · '+dist:'')+(zone?' · '+zone:'')+'</div>';
+          if(s.notes||s.duration_min){
+            html+='<div style="background:rgba(46,44,42,.05);padding:12px;font-size:13px;color:var(--mid);line-height:1.65;margin-bottom:16px">'+(s.notes||'')+'</div>';
+          }
+        });
+        html+='<div style="font-size:12px;color:var(--stone);margin-bottom:16px">Verschieben und umplanen im Plan-Reiter.</div>';
+      }
+      html+='<button onclick="document.getElementById('today-day-popup').remove()" style="width:100%;padding:13px;background:var(--black);border:none;color:var(--bg);font-family:DM Mono,monospace;font-size:9px;letter-spacing:.1em;cursor:pointer">SCHLIESSEN</button>';
+      html+='</div>';
+      popup.innerHTML=html;
+      document.body.appendChild(popup);
+    }).catch(function(){});
+}
+
 // ── START ──
 if(lastCheckin===TODAY_STR){loadMorningBrief();}
 loadDashboard();
