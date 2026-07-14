@@ -939,54 +939,148 @@ function loadPlanPage() {
     }).catch(function() { showNoPlanState(); });
 }
 
-function loadPlanWeek() {
-  var now = new Date();
-  var monday = new Date(now);
-  var dow = monday.getDay();
-  monday.setDate(monday.getDate() - (dow === 0 ? 6 : dow - 1) + (planWeekOffset * 7));
-  var year = monday.getFullYear();
-  var month = monday.getMonth() + 1;
-  var MONTHS_DE = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
-  var DAYS = ['MO','DI','MI','DO','FR','SA','SO'];
-  var kw = getWeekNumber(monday);
-  var lbl = planWeekOffset === 0 ? 'KW ' + kw + ' · DIESE WOCHE' : 'KW ' + kw + ' · ' + MONTHS_DE[monday.getMonth()];
-  document.getElementById('plan-week-lbl').textContent = lbl;
-  fetch(BASE + '/api/activities/month?year=' + year + '&month=' + month)
+function loadPlanFull() {
+  fetch(BASE + '/api/plan')
     .then(function(r) { return r.json(); })
     .then(function(data) {
-      var actual = data.actual || {};
-      var plan = data.plan || {};
-      var todayDate = data.today;
-      var html = '';
-      for (var d = 0; d < 7; d++) {
-        var day = new Date(monday);
-        day.setDate(monday.getDate() + d);
-        var dateStr = day.toISOString().split('T')[0];
-        var isToday = dateStr === todayDate;
-        var isPast = dateStr < todayDate;
-        var headCls = 'plan-day-head' + (isToday ? ' today-day' : '');
-        html += '<div class="plan-day"><div class="' + headCls + '">';
-        html += '<div class="plan-day-name">' + DAYS[d] + '</div>';
-        html += '<div class="plan-day-date">' + day.getDate() + '</div>';
-        var sessions = actual[dateStr] || plan[dateStr] || [];
-        if (sessions.length) {
-          var s = sessions[0];
-          var rawType = s.type || s.session_type || '';
-          var type = TYPE_MAP[rawType] || rawType.toUpperCase();
-          var name = (s.name || s.notes || rawType || '').split(' | ')[0].split(' · ')[0];
-          var dist = s.distance_km > 0 ? s.distance_km.toFixed(1) + ' km' : (s.duration_min ? s.duration_min + ' min' : '');
-          var badge = isPast ? '<span class="plan-day-badge badge-done">&#10003;</span>' : (isToday ? '<span class="plan-day-badge badge-quality">HEUTE</span>' : '');
-          html += '<div class="plan-session"><div class="plan-session-type">' + type + '</div><div class="plan-session-name">' + escHtml(name) + '</div>' + (dist ? '<div class="plan-session-meta">' + dist + '</div>' : '') + '</div>' + badge;
-        } else {
-          html += '<div class="plan-session"><div class="plan-session-name" style="color:rgba(46,44,42,.3);font-size:13px">—</div></div><span class="plan-day-badge badge-rest">REST</span>';
-        }
-        html += '</div></div>';
+      if (data.status !== 'ok' || !data.plan || !data.plan.length) {
+        showNoPlanState();
+        return;
       }
-      document.getElementById('plan-days-list').innerHTML = html;
-    }).catch(function() {
-      document.getElementById('plan-days-list').innerHTML = '<div style="padding:24px 16px;font-family:DM Mono,monospace;font-size:9px;color:var(--stone)">Konnte nicht geladen werden.</div>';
-    });
+      renderPlanHeader();
+      renderPlanWeeks(data.plan);
+    }).catch(function() { showNoPlanState(); });
 }
+
+function renderPlanHeader() {
+  if (!planData) return;
+  var header = document.getElementById('plan-header');
+  if (header) header.style.display = 'block';
+  var nameEl = document.getElementById('plan-header-name');
+  var metaEl = document.getElementById('plan-header-meta');
+  if (nameEl) nameEl.textContent = planData.race_name || planData.name || 'Trainingsplan';
+  if (metaEl && planData.race_date) {
+    var rd = new Date(planData.race_date);
+    metaEl.textContent = rd.toLocaleDateString('de-DE', {day:'2-digit', month:'long', year:'numeric'});
+    var daysLeft = Math.round((rd - new Date()) / 86400000);
+    var cdEl = document.getElementById('plan-race-countdown');
+    if (cdEl && daysLeft > 0) cdEl.textContent = daysLeft + ' TAGE';
+  }
+}
+
+function renderPlanWeeks(sessions) {
+  var weeks = {};
+  var today = new Date().toISOString().split('T')[0];
+  sessions.forEach(function(s) {
+    var wk = s.week_date;
+    if (!weeks[wk]) weeks[wk] = [];
+    weeks[wk].push(s);
+  });
+
+  var weekDates = Object.keys(weeks).sort();
+  var todayWeek = null;
+  weekDates.forEach(function(wd) {
+    var monday = new Date(wd + 'T12:00:00');
+    var sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+    if (today >= wd && today <= sunday.toISOString().split('T')[0]) todayWeek = wd;
+  });
+
+  var currentWeekIdx = todayWeek ? weekDates.indexOf(todayWeek) : 0;
+  var totalWeeks = planData ? planData.total_weeks : weekDates.length;
+  var pct = totalWeeks > 0 ? Math.round((currentWeekIdx + 1) / totalWeeks * 100) : 0;
+  var progressBar = document.getElementById('plan-progress-bar');
+  if (progressBar) progressBar.style.width = pct + '%';
+  var weekLbl = document.getElementById('plan-week-label');
+  if (weekLbl) weekLbl.textContent = 'Woche ' + (currentWeekIdx + 1) + ' von ' + totalWeeks;
+
+  var DAY_NAMES_SHORT = ['','MO','DI','MI','DO','FR','SA','SO'];
+  var PHASE_LABELS = {base:'BASE', build:'BUILD', peak:'PEAK', taper:'TAPER'};
+
+  var html = '';
+  weekDates.forEach(function(weekDate) {
+    var monday = new Date(weekDate + 'T12:00:00');
+    var kw = getWeekNumber(monday);
+    var isCurrentWeek = weekDate === todayWeek;
+    var phase = weeks[weekDate][0] && weeks[weekDate][0].phase ? weeks[weekDate][0].phase : 'base';
+    var phaseLabel = PHASE_LABELS[phase] || phase.toUpperCase();
+    var totalKm = 0;
+    var sessionCount = 0;
+    weeks[weekDate].forEach(function(s) {
+      totalKm += parseFloat(s.distance_km) || 0;
+      sessionCount++;
+    });
+
+    html += '<div class="plan-week-block" data-week="' + weekDate + '">';
+    html += '<div class="plan-week-head' + (isCurrentWeek ? ' current-week' : '') + '" onclick="toggleWeek(\'' + weekDate + '\')">';
+    html += '<div class="pwh-kw">KW ' + kw + '</div>';
+    html += '<div class="pwh-title">' + phaseLabel + (isCurrentWeek ? ' · JETZT' : '') + '</div>';
+    html += '<div class="pwh-meta">' + (totalKm > 0 ? totalKm.toFixed(0) + ' km' : '') + (sessionCount > 0 ? ' · ' + sessionCount + 'x' : '') + '</div>';
+    html += '<div class="pwh-arrow' + (isCurrentWeek ? ' open' : '') + '">&#9658;</div>';
+    html += '</div>';
+    html += '<div class="plan-week-body' + (isCurrentWeek ? ' open' : '') + '" id="week-body-' + weekDate + '">';
+
+    for (var d = 1; d <= 7; d++) {
+      var dayDate = new Date(monday);
+      dayDate.setDate(monday.getDate() + d - 1);
+      var dateStr = dayDate.toISOString().split('T')[0];
+      var isPast = dateStr < today;
+      var isToday = dateStr === today;
+      var daySessions = weeks[weekDate].filter(function(s) { return s.day_of_week === d; });
+
+      if (daySessions.length > 0) {
+        var s = daySessions[0];
+        var rawType = s.session_type || '';
+        var nameParts = (s.notes || rawType).split(' · ').filter(function(p) {
+          return p.trim() && !p.toLowerCase().startsWith('warm-up') && !p.toLowerCase().startsWith('cool down');
+        });
+        var displayName = nameParts.length ? nameParts[0].trim() : rawType;
+        var dist = s.distance_km > 0 ? s.distance_km.toFixed(1) + ' km' : (s.duration_min ? s.duration_min + ' min' : '');
+
+        html += '<div class="plan-session-row' + (isPast && s.is_done ? ' done-row' : '') + '"'
+          + ' id="psr-' + s.id + '"'
+          + ' data-id="' + s.id + '"'
+          + ' data-week="' + weekDate + '"'
+          + ' data-day="' + d + '"'
+          + ' data-date="' + dateStr + '"'
+          + ' ontouchstart="onPsrTouchStart(event,' + s.id + ')"'
+          + ' ontouchmove="onPsrTouchMove(event)"'
+          + ' ontouchend="onPsrTouchEnd(event)"'
+          + ' onclick="openTodayDay(\'' + dateStr + '\')"'
+          + (isToday ? ' style="border-left:3px solid var(--accent)"' : '')
+          + '>';
+        html += '<div class="psr-illus">' + getSessionIllus(rawType) + '</div>';
+        html += '<div class="psr-info">';
+        html += '<div class="psr-day">' + DAY_NAMES_SHORT[d] + ' ' + dayDate.getDate() + '.</div>';
+        html += '<div class="psr-type">' + escHtml(displayName) + '</div>';
+        if (dist) html += '<div class="psr-dist">' + dist + '</div>';
+        html += '</div>';
+        if (isPast && s.is_done) html += '<div class="psr-done">&#10003;</div>';
+        html += '</div>';
+      } else {
+        html += '<div class="plan-rest-row" data-date="' + dateStr + '" data-week="' + weekDate + '" data-day="' + d + '">';
+        html += '<div class="prest-day">' + DAY_NAMES_SHORT[d] + '</div>';
+        html += '<div class="prest-label">—</div>';
+        html += '</div>';
+      }
+    }
+    html += '</div></div>';
+  });
+
+  document.getElementById('plan-days-list').innerHTML = html || '<div style="padding:24px 16px;font-family:DM Mono,monospace;font-size:9px;color:var(--stone)">Keine Sessions gefunden.</div>';
+}
+
+function toggleWeek(weekDate) {
+  var body = document.getElementById('week-body-' + weekDate);
+  var head = body ? body.previousElementSibling : null;
+  if (!body) return;
+  var isOpen = body.classList.contains('open');
+  body.classList.toggle('open', !isOpen);
+  var arrow = head ? head.querySelector('.pwh-arrow') : null;
+  if (arrow) arrow.classList.toggle('open', !isOpen);
+}
+
+
 
 // ACTIVITIES PAGE
 function loadActivitiesPage() {
