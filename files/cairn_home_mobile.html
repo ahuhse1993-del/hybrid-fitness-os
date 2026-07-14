@@ -941,6 +941,7 @@ function loadPlanPage() {
 }
 
 function loadPlanFull() {
+  console.log("loadPlanFull called, planMeta:", planMeta);
   fetch(BASE + '/api/plan')
     .then(function(r) { return r.json(); })
     .then(function(data) {
@@ -948,6 +949,7 @@ function loadPlanFull() {
         showNoPlanState();
         return;
       }
+      console.log("rendering plan, sessions:", data.plan.length);
       renderPlanHeader();
       renderPlanWeeks(data.plan);
     }).catch(function() { showNoPlanState(); });
@@ -1068,6 +1070,7 @@ function renderPlanWeeks(sessions) {
     html += '</div></div>';
   });
 
+  console.log("html length:", html.length);
   document.getElementById('plan-days-list').innerHTML = html || '<div style="padding:24px 16px;font-family:DM Mono,monospace;font-size:9px;color:var(--stone)">Keine Sessions gefunden.</div>';
 }
 
