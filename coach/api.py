@@ -227,10 +227,10 @@ REGELN:
 
 SESSION-TYPEN: Easy Run, Trail Run, Long Run, Progression Run, Tempo Run, Intervalle, Hill Repeats, Krafttraining (Oberkörper A/B oder Unterkörper A/B), Mobilität
 
-NUR JSON, keine Erklärung:
-{{"weeks": [{{"week_number": {week_from}, "phase": "base", "total_km": 40, "sessions": [{{"day_of_week": 1, "session_type": "Easy Run", "session_zone": "Z1-Z2", "distance_km": 8, "duration_min": 55, "notes": "Easy Run Z1-Z2 · RPE 1-3"}}]}}]}}
+WICHTIG: Antworte NUR mit JSON. Kein Text davor oder danach. Kein plan_meta. Beginne direkt mit {{
+{{"weeks": [{{"week_number": {week_from}, "phase": "base", "total_km": 40, "sessions": [{{"day_of_week": 1, "session_type": "Easy Run", "session_zone": "Z1-Z2", "distance_km": 8, "duration_min": 55, "notes": "Easy Z1-Z2 RPE 1-3"}}]}}]}}
 
-Erstelle Wochen {week_from} bis {week_to}. day_of_week: 1=Mo bis 7=So. Rest Days weglassen."""
+Wochen {week_from} bis {week_to}. day_of_week: 1=Mo bis 7=So. Rest Days nicht eintragen. Genau {days_per_week} Sessions pro Woche."""
 
             message = client.messages.create(
                 model="claude-sonnet-4-6",
