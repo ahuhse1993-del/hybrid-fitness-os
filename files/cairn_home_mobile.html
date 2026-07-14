@@ -941,7 +941,6 @@ function loadPlanPage() {
 }
 
 function loadPlanFull() {
-  console.log("loadPlanFull called, planMeta:", planMeta);
   fetch(BASE + '/api/plan')
     .then(function(r) { return r.json(); })
     .then(function(data) {
@@ -949,7 +948,6 @@ function loadPlanFull() {
         showNoPlanState();
         return;
       }
-      console.log("rendering plan, sessions:", data.plan.length);
       renderPlanHeader();
       renderPlanWeeks(data.plan);
     }).catch(function() { showNoPlanState(); });
@@ -1070,7 +1068,6 @@ function renderPlanWeeks(sessions) {
     html += '</div></div>';
   });
 
-  console.log("html length:", html.length);
   document.getElementById('plan-days-list').innerHTML = html || '<div style="padding:24px 16px;font-family:DM Mono,monospace;font-size:9px;color:var(--stone)">Keine Sessions gefunden.</div>';
 }
 
@@ -1085,6 +1082,44 @@ function toggleWeek(weekDate) {
 }
 
 
+
+
+function getSessionIllus(type) {
+  var t = (type || '').toLowerCase();
+  if (t.includes('long run')) return '<svg width="40" height="40" viewBox="0 0 40 40" fill="none"><path d="M4 28 Q10 20 16 22 Q22 24 28 16 Q32 10 36 12" stroke="rgba(46,44,42,.4)" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg>';
+  if (t.includes('trail')) return '<svg width="40" height="40" viewBox="0 0 40 40" fill="none"><path d="M4 30 Q8 24 12 26 Q16 28 18 22 Q22 16 26 18 Q30 20 36 12" stroke="rgba(46,44,42,.4)" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg>';
+  if (t.includes('interval') || t.includes('intervalle')) return '<svg width="40" height="40" viewBox="0 0 40 40" fill="none"><polyline points="4,30 10,30 10,12 16,12 16,30 22,30 22,10 28,10 28,30 34,30" stroke="rgba(46,44,42,.5)" stroke-width="1.5" fill="none"/></svg>';
+  if (t.includes('tempo') || t.includes('threshold')) return '<svg width="40" height="40" viewBox="0 0 40 40" fill="none"><path d="M4 28 Q12 28 16 20 Q20 12 36 12" stroke="rgba(46,44,42,.4)" stroke-width="1.5" fill="none" stroke-linecap="round"/><circle cx="36" cy="12" r="2" fill="rgba(46,44,42,.4)"/></svg>';
+  if (t.includes('hill') || t.includes('berg')) return '<svg width="40" height="40" viewBox="0 0 40 40" fill="none"><polyline points="4,32 20,10 36,32" stroke="rgba(46,44,42,.4)" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  if (t.includes('kraft') || t.includes('strength') || t.includes('oberk') || t.includes('unterk')) return '<svg width="40" height="40" viewBox="0 0 40 40" fill="none"><rect x="14" y="14" width="12" height="12" stroke="rgba(46,44,42,.4)" stroke-width="1.2" fill="none"/><line x1="4" y1="20" x2="14" y2="20" stroke="rgba(46,44,42,.3)" stroke-width="1.2"/><line x1="26" y1="20" x2="36" y2="20" stroke="rgba(46,44,42,.3)" stroke-width="1.2"/></svg>';
+  if (t.includes('mobil') || t.includes('recover')) return '<svg width="40" height="40" viewBox="0 0 40 40" fill="none"><circle cx="20" cy="20" r="10" stroke="rgba(46,44,42,.25)" stroke-width="1" fill="none" stroke-dasharray="2 2"/><circle cx="20" cy="20" r="3" fill="rgba(46,44,42,.2)"/></svg>';
+  if (t.includes('progression')) return '<svg width="40" height="40" viewBox="0 0 40 40" fill="none"><path d="M4 30 Q12 28 18 24 Q24 18 36 10" stroke="rgba(46,44,42,.4)" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg>';
+  return '<svg width="40" height="40" viewBox="0 0 40 40" fill="none"><path d="M4 24 Q10 20 16 22 Q22 24 28 20 Q32 17 36 18" stroke="rgba(46,44,42,.3)" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg>';
+}
+
+var dragStartItem = null;
+var dragStartY = 0;
+var dragThreshold = 8;
+var pendingDrag = null;
+
+function onPsrTouchStart(event, id) {
+  dragStartY = event.touches[0].clientY;
+  dragStartItem = id;
+}
+function onPsrTouchMove(event) {
+  if (!dragStartItem) return;
+  var dy = Math.abs(event.touches[0].clientY - dragStartY);
+  if (dy > dragThreshold) { dragStartItem = null; }
+}
+function onPsrTouchEnd(event) { dragStartItem = null; }
+
+function keepDragChange() {
+  document.getElementById('drag-coach-popup').style.display = 'none';
+}
+function undoDragChange() {
+  document.getElementById('drag-coach-popup').style.display = 'none';
+  loadPlanPage();
+}
 
 // ACTIVITIES PAGE
 function loadActivitiesPage() {
