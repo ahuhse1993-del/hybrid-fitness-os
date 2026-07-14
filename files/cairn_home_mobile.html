@@ -102,17 +102,19 @@ html,body{height:100%;overflow:hidden;background:var(--bg);font-family:'DM Sans'
 .pwh-arrow{font-size:12px;color:var(--stone);transition:transform .2s;flex-shrink:0}
 .pwh-arrow.open{transform:rotate(90deg)}
 
-.plan-week-body{display:none;border-top:.5px solid rgba(46,44,42,.08)}
+.plan-week-body{display:none;border-top:.5px solid rgba(46,44,42,.08);padding:10px 0 4px}
 .plan-week-body.open{display:block}
 
 /* SESSION KACHEL */
 .plan-session-row{
   display:flex;align-items:center;
-  border-bottom:.5px solid rgba(46,44,42,.06);
+  margin:0 12px 6px;
+  border:1px solid rgba(46,44,42,.15);
+  background:#F8F5EE;
   cursor:pointer;transition:background .1s;
   position:relative;
 }
-.plan-session-row:active{background:#E8E4DC}
+.plan-session-row:active{background:#EDE9E0}
 .plan-session-row.dragging{opacity:.4;background:#E8E4DC}
 .plan-session-row.drag-over{background:rgba(232,216,74,.08);outline:1px dashed var(--accent)}
 .plan-session-row.done-row{opacity:.45}
@@ -120,8 +122,8 @@ html,body{height:100%;overflow:hidden;background:var(--bg);font-family:'DM Sans'
 .psr-illus{
   width:64px;height:64px;flex-shrink:0;
   display:flex;align-items:center;justify-content:center;
-  border-right:.5px solid rgba(46,44,42,.08);
-  background:var(--cal-bg);
+  border-right:1px solid rgba(46,44,42,.12);
+  background:#E8E4DC;
 }
 .psr-info{flex:1;padding:10px 12px}
 .psr-day{font-family:'DM Mono',monospace;font-size:8px;color:var(--stone);letter-spacing:.1em;margin-bottom:2px}
@@ -132,8 +134,9 @@ html,body{height:100%;overflow:hidden;background:var(--bg);font-family:'DM Sans'
 /* REST DAY */
 .plan-rest-row{
   display:flex;align-items:center;gap:12px;
-  padding:10px 16px;
-  border-bottom:.5px solid rgba(46,44,42,.04);
+  margin:0 12px 6px;
+  padding:8px 12px;
+  border:.5px dashed rgba(46,44,42,.15);
 }
 .prest-day{font-family:'DM Mono',monospace;font-size:8px;color:rgba(46,44,42,.25);letter-spacing:.1em;width:24px}
 .prest-label{font-family:'DM Mono',monospace;font-size:8px;color:rgba(46,44,42,.2);letter-spacing:.1em}
