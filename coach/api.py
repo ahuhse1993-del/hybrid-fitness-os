@@ -182,21 +182,14 @@ ATHLETENPROFIL:
 - Ziel: {goal_type}
 - Rennen: {race_name} ({race_type}) · {race_distance_km if race_distance_km else '?'} km
 - Renndatum: {race_date}
-- Trainingstage pro Woche: {days_per_week}
-- Long Run Tag: {day_names[long_run_day]} (Tag {long_run_day})
-- Quality Sessions pro Woche: {quality_sessions}
-- Kraft-Sessions pro Woche: {strength_sessions} (Tage: {', '.join([['','Mo','Di','Mi','Do','Fr','Sa','So'][d] for d in strength_days]) if strength_days else 'flexibel'})
 - Gesamtplan: {total_weeks} Wochen · Phasen: {', '.join(phase_context)}
-{f"""
-FESTE WOCHENSTRUKTUR (vom Athleten definiert, STRIKT einhalten):
-{chr(10).join([f"Tag {d}: {week_structure[str(d)]['type']}" for d in range(1,8) if str(d) in (week_structure or {})])}
 
-Diese Struktur gilt für JEDE Woche. Nur Volumen und Intensität ändern sich.
-""" if week_structure else f"""
-KRAFTTAGE: {', '.join([['','Mo','Di','Mi','Do','Fr','Sa','So'][d] for d in strength_days]) if strength_days else 'flexibel'}
-Baue eine konsistente Wochenstruktur die jede Woche gleich bleibt.
-Oberkörper-Kraft VOR Quality Sessions. Unterkörper-Kraft NACH Long Run oder an Ruhetagen.
-"""}
+WOCHENSTRUKTUR — GENAU {days_per_week} Sessions pro Woche:
+- {strength_sessions}x Krafttraining — NUR an: {', '.join([['','Mo','Di','Mi','Do','Fr','Sa','So'][d] for d in strength_days]) if strength_days else 'flexibel'}
+- 1x Long Run — IMMER an {day_names[long_run_day]} (Tag {long_run_day})
+- {quality_sessions}x Quality (Tempo / Intervalle / Hill Repeats)
+- {days_per_week - strength_sessions - 1 - quality_sessions}x Easy Run oder Trail Run
+- {7 - days_per_week}x REST — diese Tage komplett leer lassen, KEIN Eintrag
 {gpx_context}
 REGELN:
 1. Long Run IMMER an Tag {long_run_day} ({day_names[long_run_day]})
