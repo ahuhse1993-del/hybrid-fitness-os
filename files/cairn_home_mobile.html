@@ -113,6 +113,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);font-family:'DM Sans'
   background:#F8F5EE;
   cursor:pointer;transition:background .1s;
   position:relative;
+  touch-action:none;
 }
 .plan-session-row:active{background:#EDE9E0}
 .plan-session-row.dragging{opacity:.4;background:#E8E4DC}
@@ -1095,21 +1096,118 @@ function getSessionIllus(type) {
   return '<svg width="40" height="40" viewBox="0 0 40 40" fill="none"><path d="M4 24 Q10 20 16 22 Q22 24 28 20 Q32 17 36 18" stroke="rgba(46,44,42,.3)" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg>';
 }
 
-var dragStartItem = null;
-var dragStartY = 0;
-var dragThreshold = 8;
-var pendingDrag = null;
+
+// ── DRAG & DROP (Long Press Touch) ──
+var dnd = {
+  active: false,
+  sourceId: null,
+  sourceWeek: null,
+  sourceDay: null,
+  ghost: null,
+  timer: null,
+  startX: 0,
+  startY: 0,
+  lastTarget: null
+};
 
 function onPsrTouchStart(event, id) {
-  dragStartY = event.touches[0].clientY;
-  dragStartItem = id;
+  var el = document.getElementById('psr-' + id);
+  if (!el) return;
+  dnd.sourceId = id;
+  dnd.sourceWeek = el.dataset.week;
+  dnd.sourceDay = parseInt(el.dataset.day);
+  dnd.startX = event.touches[0].clientX;
+  dnd.startY = event.touches[0].clientY;
+  dnd.timer = setTimeout(function() {
+    dnd.active = true;
+    el.classList.add('dragging');
+    // Ghost erstellen
+    var ghost = el.cloneNode(true);
+    ghost.id = 'dnd-ghost';
+    ghost.style.cssText = 'position:fixed;width:' + el.offsetWidth + 'px;opacity:.85;z-index:999;pointer-events:none;left:' + el.getBoundingClientRect().left + 'px;top:' + el.getBoundingClientRect().top + 'px;border:2px solid var(--accent);background:#F0EDE6;box-shadow:0 8px 24px rgba(0,0,0,.2)';
+    document.body.appendChild(ghost);
+    dnd.ghost = ghost;
+    if (navigator.vibrate) navigator.vibrate(40);
+  }, 500);
 }
+
 function onPsrTouchMove(event) {
-  if (!dragStartItem) return;
-  var dy = Math.abs(event.touches[0].clientY - dragStartY);
-  if (dy > dragThreshold) { dragStartItem = null; }
+  var dx = Math.abs(event.touches[0].clientX - dnd.startX);
+  var dy = Math.abs(event.touches[0].clientY - dnd.startY);
+  if (!dnd.active && (dx > 8 || dy > 8)) {
+    clearTimeout(dnd.timer);
+    dnd.sourceId = null;
+    return;
+  }
+  if (!dnd.active) return;
+  event.preventDefault();
+  var x = event.touches[0].clientX;
+  var y = event.touches[0].clientY;
+  if (dnd.ghost) {
+    dnd.ghost.style.left = (x - dnd.ghost.offsetWidth/2) + 'px';
+    dnd.ghost.style.top = (y - 30) + 'px';
+  }
+  // Ziel highlighten
+  if (dnd.lastTarget) dnd.lastTarget.classList.remove('drag-over');
+  var el = document.elementFromPoint(x, y);
+  var row = el ? el.closest('.plan-session-row, .plan-rest-row') : null;
+  if (row && row.id !== 'psr-' + dnd.sourceId) {
+    row.classList.add('drag-over');
+    dnd.lastTarget = row;
+  }
 }
-function onPsrTouchEnd(event) { dragStartItem = null; }
+
+function onPsrTouchEnd(event) {
+  clearTimeout(dnd.timer);
+  if (dnd.ghost) { dnd.ghost.remove(); dnd.ghost = null; }
+  if (dnd.lastTarget) dnd.lastTarget.classList.remove('drag-over');
+  var srcEl = document.getElementById('psr-' + dnd.sourceId);
+  if (srcEl) srcEl.classList.remove('dragging');
+  if (!dnd.active || !dnd.sourceId) { dnd.active = false; dnd.sourceId = null; return; }
+
+  var x = event.changedTouches[0].clientX;
+  var y = event.changedTouches[0].clientY;
+  var el = document.elementFromPoint(x, y);
+  var targetRow = el ? el.closest('.plan-session-row, .plan-rest-row') : null;
+
+  if (targetRow && targetRow.id !== 'psr-' + dnd.sourceId) {
+    var targetId = targetRow.dataset.id ? parseInt(targetRow.dataset.id) : null;
+    var targetWeek = targetRow.dataset.week;
+    var targetDay = parseInt(targetRow.dataset.day);
+    swapSessions(dnd.sourceId, dnd.sourceWeek, dnd.sourceDay, targetId, targetWeek, targetDay);
+  }
+
+  dnd.active = false;
+  dnd.sourceId = null;
+  dnd.lastTarget = null;
+}
+
+function swapSessions(srcId, srcWeek, srcDay, tgtId, tgtWeek, tgtDay) {
+  fetch(BASE + '/api/plan/move', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      source_id: srcId,
+      source_week: srcWeek,
+      source_day: srcDay,
+      target_id: tgtId,
+      target_week: tgtWeek,
+      target_day: tgtDay
+    })
+  }).then(function(r) { return r.json(); })
+  .then(function(data) {
+    if (data.warning) {
+      document.getElementById('drag-coach-msg').textContent = data.warning;
+      document.getElementById('drag-coach-popup').style.display = 'flex';
+    }
+    planLoaded = false;
+    loadPlanPage();
+  }).catch(function() {
+    planLoaded = false;
+    loadPlanPage();
+  });
+}
+
 
 function keepDragChange() {
   document.getElementById('drag-coach-popup').style.display = 'none';
