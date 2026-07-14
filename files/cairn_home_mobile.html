@@ -812,9 +812,7 @@ function loadTodayWeek() {
           var s = sessions[0];
           var rawType = s.type || s.session_type || '';
           var type = TYPE_MAP[rawType] || rawType.toUpperCase();
-          var rawName = (s.name || s.notes || rawType || '').split(' | ')[0];
-          var nameParts = rawName.split(' · ').filter(function(p){ return p.trim() && !p.toLowerCase().startsWith('warm-up') && !p.toLowerCase().startsWith('cool down'); });
-          var name = nameParts.length ? nameParts[0].trim() : type;
+          var name = rawType || type;
           var dist = s.distance_km > 0 ? s.distance_km.toFixed(1) + ' km' : (s.duration_min ? s.duration_min + ' min' : '');
           var isDone = isPast && actual[dateStr];
           var isQuality = type === 'INTERVALS' || type === 'TEMPO' || type === 'THRESHOLD';
@@ -1205,10 +1203,7 @@ function loadTodaySession() {
         var s = sessions[0];
         var rawType = s.type || s.session_type || '';
         var type = TYPE_MAP[rawType] || rawType;
-        var notes = s.notes || '';
-        // Sauberer Name: ersten Teil ohne "Warm-Up" etc.
-        var parts = notes.split(' · ').filter(function(p) { return p.trim() && !p.toLowerCase().startsWith('warm-up') && !p.toLowerCase().startsWith('cool down'); });
-        var name = parts.length ? parts[0].trim() : type;
+        var name = rawType || type;
         var dist = s.distance_km > 0 ? s.distance_km.toFixed(1) + ' km' : '';
         var dur = s.duration_min > 0 ? s.duration_min + ' min' : '';
         var zone = s.session_zone || '';
