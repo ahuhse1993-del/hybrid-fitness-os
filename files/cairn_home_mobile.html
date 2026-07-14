@@ -1035,10 +1035,7 @@ function renderPlanWeeks(sessions) {
       if (daySessions.length > 0) {
         var s = daySessions[0];
         var rawType = s.session_type || '';
-        var nameParts = (s.notes || rawType).split(' · ').filter(function(p) {
-          return p.trim() && !p.toLowerCase().startsWith('warm-up') && !p.toLowerCase().startsWith('cool down');
-        });
-        var displayName = nameParts.length ? nameParts[0].trim() : rawType;
+        var displayName = rawType || '—';
         var dist = s.distance_km > 0 ? s.distance_km.toFixed(1) + ' km' : (s.duration_min ? s.duration_min + ' min' : '');
 
         html += '<div class="plan-session-row' + (isPast && s.is_done ? ' done-row' : '') + '"'
