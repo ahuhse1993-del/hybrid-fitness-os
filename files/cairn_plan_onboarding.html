@@ -983,15 +983,34 @@ function generatePlan() {
     })
   }).then(function(r){ return r.json(); })
     .then(function(data){
-      if (data.status === 'ok') {
-        setTimeout(function(){ window.location.href = '/mobile'; }, 1000);
+      if (data.status === 'ok' && data.job_id) {
+        pollPlanJob(data.job_id);
+      } else if (data.status === 'ok') {
+        window.location.href = '/mobile';
       } else {
         alert('Fehler: ' + (data.message || 'Unbekannt'));
         document.getElementById('generating').classList.remove('show');
       }
     }).catch(function(){
-      setTimeout(function(){ window.location.href = '/mobile'; }, 1500);
+      window.location.href = '/mobile';
     });
+}
+
+function pollPlanJob(jobId) {
+  setTimeout(function() {
+    fetch(BASE + '/api/plan/job/' + jobId)
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (data.status === 'done') {
+          window.location.href = '/mobile';
+        } else if (data.status === 'error') {
+          alert('Fehler beim Erstellen: ' + (data.message || 'Unbekannt'));
+          document.getElementById('generating').classList.remove('show');
+        } else {
+          pollPlanJob(jobId);
+        }
+      }).catch(function() { pollPlanJob(jobId); });
+  }, 5000);
 }
 
 showStep(1);
