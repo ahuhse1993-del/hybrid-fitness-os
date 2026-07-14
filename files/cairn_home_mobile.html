@@ -806,9 +806,13 @@ function loadTodayWeek() {
         var bgRow = isToday ? 'background:var(--black)' : '';
         var dayCol = isToday ? 'color:var(--accent)' : 'color:var(--stone)';
         var dateCol = isToday ? 'color:#F0EDE6' : 'color:var(--mid)';
-        html += '<div data-date="' + dateStr + '" onclick="openTodayDay(this.dataset.date)" style="display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:.5px solid rgba(46,44,42,.08);' + bgRow + ';cursor:pointer">';
-        html += '<div style="font-family:DM Mono,monospace;font-size:8px;letter-spacing:.1em;width:20px;' + dayCol + '">' + DAYS[d] + '</div>';
-        html += '<div style="font-family:DM Mono,monospace;font-size:13px;font-weight:300;width:22px;' + dateCol + '">' + day.getDate() + '</div>';
+        var cardBg = isToday ? 'var(--black)' : '#F8F5EE';
+        var cardBorder = isToday ? '2px solid var(--accent)' : '1px solid rgba(46,44,42,.15)';
+        html += '<div data-date="' + dateStr + '" onclick="openTodayDay(this.dataset.date)" style="display:flex;align-items:center;margin:0 12px 6px;border:' + cardBorder + ';background:' + cardBg + ';cursor:pointer;min-height:56px">';
+        html += '<div style="width:48px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;justify-content:center;border-right:1px solid rgba(46,44,42,.1);padding:8px 4px;background:' + (isToday ? 'rgba(232,216,74,.1)' : '#EDE9E0') + '">';
+        html += '<div style="font-family:DM Mono,monospace;font-size:8px;letter-spacing:.1em;' + dayCol + '">' + DAYS[d] + '</div>';
+        html += '<div style="font-family:DM Mono,monospace;font-size:16px;font-weight:300;' + dateCol + '">' + day.getDate() + '</div>';
+        html += '</div>';
         if (sessions.length) {
           var s = sessions[0];
           var rawType = s.type || s.session_type || '';
@@ -822,9 +826,9 @@ function loadTodayWeek() {
           var nameCol = isToday ? 'color:#F0EDE6' : 'color:var(--black)';
           var distCol = isToday ? 'color:rgba(240,237,230,.5)' : 'color:var(--stone)';
           if (type === 'REST') {
-            html += '<div style="font-family:DM Mono,monospace;font-size:8px;color:' + (isToday ? 'rgba(240,237,230,.3)' : 'rgba(46,44,42,.25)') + ';letter-spacing:.1em">REST</div>';
+            html += '<div style="flex:1;padding:0 12px;font-family:DM Mono,monospace;font-size:8px;color:' + (isToday ? 'rgba(240,237,230,.3)' : 'rgba(46,44,42,.25)') + ';letter-spacing:.1em">—</div>';
           } else {
-            html += '<div style="flex:1;display:flex;align-items:center;gap:8px">';
+            html += '<div style="flex:1;display:flex;align-items:center;gap:8px;padding:0 10px">';
             html += '<div style="font-family:DM Mono,monospace;font-size:7px;padding:2px 6px;background:' + tagBg + ';color:' + tagCol + ';letter-spacing:.08em">' + type + '</div>';
             html += '<div style="flex:1;font-size:12px;' + nameCol + '">' + escHtml(name) + '</div>';
             if (dist) html += '<div style="font-family:DM Mono,monospace;font-size:10px;' + distCol + '">' + dist + '</div>';
@@ -832,7 +836,7 @@ function loadTodayWeek() {
             html += '</div>';
           }
         } else {
-          html += '<div style="font-family:DM Mono,monospace;font-size:8px;color:' + (isToday ? 'rgba(240,237,230,.2)' : 'rgba(46,44,42,.2)') + '">&#8212;</div>';
+          html += '<div style="flex:1;padding:0 12px;font-family:DM Mono,monospace;font-size:8px;color:' + (isToday ? 'rgba(240,237,230,.2)' : 'rgba(46,44,42,.2)') + '">—</div>';
         }
         html += '</div>';
       }
