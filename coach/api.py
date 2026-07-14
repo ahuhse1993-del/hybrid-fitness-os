@@ -1,6 +1,6 @@
 from flask import Flask, jsonify, request, send_file
 from flask_cors import CORS
-import os, psycopg2, json
+import os, psycopg2, json, threading, time, traceback
 from datetime import date, timedelta, datetime
 from dotenv import load_dotenv
 
@@ -101,9 +101,6 @@ def analyse_gpx():
         return jsonify({"status": "ok", "gpx": result})
 
     except Exception as e:
-        import traceback
-import threading
-import time
         return jsonify({"status": "error", "message": str(e), "trace": traceback.format_exc()}), 500
 
 # ─── PLAN GENERIEREN ───
@@ -333,9 +330,6 @@ Erstelle Wochen {week_from} bis {week_to}. day_of_week: 1=Mo bis 7=So. Rest Days
         })
 
     except Exception as e:
-        import traceback
-import threading
-import time
         return jsonify({"status": "error", "message": str(e), "trace": traceback.format_exc()}), 500
 
 @app.route('/api/checkin', methods=['POST'])
@@ -496,9 +490,6 @@ def morning_brief():
         })
 
     except Exception as e:
-        import traceback
-import threading
-import time
         return jsonify({"status": "error", "message": str(e), "trace": traceback.format_exc()}), 500
 
 @app.route('/api/dashboard', methods=['GET'])
@@ -560,9 +551,6 @@ def dashboard():
         })
 
     except Exception as e:
-        import traceback
-import threading
-import time
         return jsonify({"status": "error", "message": str(e), "trace": traceback.format_exc()}), 500
 
 @app.route('/api/plan', methods=['GET'])
@@ -674,9 +662,6 @@ def get_plan():
         return jsonify({"status": "ok", "plan": plan})
 
     except Exception as e:
-        import traceback
-import threading
-import time
         return jsonify({"status": "error", "message": str(e), "trace": traceback.format_exc()}), 500
 
 @app.route('/api/activities/month', methods=['GET'])
@@ -755,9 +740,6 @@ def get_month():
         })
 
     except Exception as e:
-        import traceback
-import threading
-import time
         return jsonify({"status": "error", "message": str(e), "trace": traceback.format_exc()}), 500
 
 @app.route('/api/activities/recent', methods=['GET'])
@@ -786,9 +768,6 @@ def get_recent_activities():
             })
         return jsonify({"status": "ok", "activities": activities})
     except Exception as e:
-        import traceback
-import threading
-import time
         return jsonify({"status": "error", "message": str(e), "trace": traceback.format_exc()}), 500
 
 @app.route('/api/coach-chat', methods=['POST'])
@@ -831,9 +810,6 @@ Immer: Beobachtung, Einordnung, klare Empfehlung.
         return jsonify({"status": "ok", "reply": reply})
 
     except Exception as e:
-        import traceback
-import threading
-import time
         return jsonify({"status": "error", "message": str(e), "trace": traceback.format_exc()}), 500
 
 @app.route('/api/plan/update', methods=['POST'])
@@ -853,9 +829,6 @@ def update_plan():
         conn.close()
         return jsonify({"status": "ok"})
     except Exception as e:
-        import traceback
-import threading
-import time
         return jsonify({"status": "error", "message": str(e), "trace": traceback.format_exc()}), 500
 
 @app.route('/api/plan/check', methods=['POST'])
@@ -912,9 +885,6 @@ Antworte NUR mit JSON:
         return jsonify({"status": "ok", "check": result})
 
     except Exception as e:
-        import traceback
-import threading
-import time
         return jsonify({"status": "error", "message": str(e), "trace": traceback.format_exc()}), 500
 
 # ─── PLAN SESSION VERSCHIEBEN (Drag & Drop) ───
@@ -1044,9 +1014,6 @@ NUR JSON:
         })
 
     except Exception as e:
-        import traceback
-import threading
-import time
         return jsonify({"status": "error", "message": str(e), "trace": traceback.format_exc()}), 500
 
 @app.route('/api/activity/<int:training_id>', methods=['GET'])
@@ -1088,9 +1055,6 @@ def get_activity(training_id):
         return jsonify({"status": "ok", "activity": activity, "splits": splits})
 
     except Exception as e:
-        import traceback
-import threading
-import time
         return jsonify({"status": "error", "message": str(e), "trace": traceback.format_exc()}), 500
 
 @app.route('/api/activity/<int:training_id>/analyse', methods=['GET'])
@@ -1102,9 +1066,6 @@ def analyse_activity(training_id):
             return jsonify({"status": "error", "message": "Nicht gefunden"}), 404
         return jsonify({"status": "ok", "analysis": result})
     except Exception as e:
-        import traceback
-import threading
-import time
         return jsonify({"status": "error", "message": str(e), "trace": traceback.format_exc()}), 500
 
 @app.route('/api/activity/<int:training_id>/chat', methods=['POST'])
@@ -1119,9 +1080,6 @@ def activity_chat(training_id):
         reply = generate_chat_reply(training_id, message, history)
         return jsonify({"status": "ok", "reply": reply})
     except Exception as e:
-        import traceback
-import threading
-import time
         return jsonify({"status": "error", "message": str(e), "trace": traceback.format_exc()}), 500
 
 @app.route('/api/activity/<int:training_id>/gps', methods=['GET'])
@@ -1138,9 +1096,6 @@ def get_gps(training_id):
         points = [{"lat": float(r[0]), "lon": float(r[1]), "ele": float(r[2]) if r[2] else 0} for r in rows]
         return jsonify({"status": "ok", "points": points})
     except Exception as e:
-        import traceback
-import threading
-import time
         return jsonify({"status": "error", "message": str(e), "trace": traceback.format_exc()}), 500
 
 @app.route('/api/activity/<int:training_id>/hr', methods=['GET'])
@@ -1157,9 +1112,6 @@ def get_hr(training_id):
         points = [{"ts": r[0], "hr": r[1]} for r in rows]
         return jsonify({"status": "ok", "points": points})
     except Exception as e:
-        import traceback
-import threading
-import time
         return jsonify({"status": "error", "message": str(e), "trace": traceback.format_exc()}), 500
 
 @app.route('/api/new-activities', methods=['GET'])
@@ -1186,9 +1138,6 @@ def new_activities():
             })
         return jsonify({"status": "ok", "activities": activities})
     except Exception as e:
-        import traceback
-import threading
-import time
         return jsonify({"status": "error", "message": str(e), "trace": traceback.format_exc()}), 500
 
 @app.route('/api/activity/<int:training_id>/exercises', methods=['GET'])
@@ -1212,9 +1161,6 @@ def get_exercises(training_id):
             })
         return jsonify({"status": "ok", "exercises": exercises})
     except Exception as e:
-        import traceback
-import threading
-import time
         return jsonify({"status": "error", "message": str(e), "trace": traceback.format_exc()}), 500
 
 @app.route('/api/activity/<int:training_id>/mark-analysed', methods=['POST'])
@@ -1322,9 +1268,6 @@ def cron_health_sync():
         return jsonify({"status": "ok", "message": "Sync triggered", "triggered": True})
 
     except Exception as e:
-        import traceback
-import threading
-import time
         return jsonify({"status": "error", "message": str(e), "trace": traceback.format_exc()}), 500
 
 if __name__ == '__main__':
