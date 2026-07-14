@@ -251,7 +251,12 @@ Wochen {week_from} bis {week_to}. day_of_week: 1=Mo bis 7=So. Rest Days nicht ei
                 print(f"OK weeks {week_from}-{week_to}: {len(part_json.get('weeks', []))} weeks")
             except Exception as parse_err:
                 print(f"JSON parse error for weeks {week_from}-{week_to}: {parse_err}")
-                print(f"Raw start: {raw[:200]}")
+                print(f"Raw length: {len(raw)}")
+                print(f"Raw start: {raw[:500]}")
+                print(f"Stop reason: {message.stop_reason}")
+                print(f"Content blocks: {len(message.content)}")
+                for i, block in enumerate(message.content):
+                    print(f"  Block {i}: type={getattr(block, 'type', 'unknown')}, has_text={hasattr(block, 'text')}")
                 continue
 
         plan_json = {"weeks": all_weeks}
