@@ -125,12 +125,12 @@ def generate_plan():
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 def run_plan_job(data, job_id):
-    try:
-        generate_plan_internal(data)
-        plan_jobs[job_id] = {'status': 'done'}
-    except Exception as e:
-        import traceback as tb
-        plan_jobs[job_id] = {'status': 'error', 'message': str(e), 'trace': tb.format_exc()}
+    with app.app_context():
+        try:
+            generate_plan_internal(data)
+            plan_jobs[job_id] = {'status': 'done'}
+        except Exception as e:
+            plan_jobs[job_id] = {'status': 'error', 'message': str(e), 'trace': traceback.format_exc()}
 
 def generate_plan_internal(data):
     try:
