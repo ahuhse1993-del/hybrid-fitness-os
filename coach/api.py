@@ -199,11 +199,6 @@ STRECKENPROFIL (GPX-Analyse):
 
             prompt = f"""Du bist CAIRN Coach. Erstelle Woche {week_from} bis {week_to} eines {total_weeks}-Wochen Trainingsplans.
 
-Nutze Web Search um aktuelle Erkenntnisse zu finden falls nötig:
-- Optimale Kraft/Lauf-Reihenfolge für Hybrid-Athleten
-- Interferenz-Effekt zwischen Kraft und Ausdauer
-- Split-Empfehlungen für Trail Runner die auch Gym machen
-
 ATHLETENPROFIL:
 - Ziel: {goal_type}
 - Rennen: {race_name} ({race_type}) · {race_distance_km if race_distance_km else '?'} km
@@ -235,7 +230,6 @@ Wochen {week_from} bis {week_to}. day_of_week: 1=Mo bis 7=So. Rest Days nicht ei
             message = client.messages.create(
                 model="claude-sonnet-5",
                 max_tokens=8000,
-                tools=[{"type": "web_search_20250305", "name": "web_search"}],
                 messages=[{"role": "user", "content": prompt}]
             )
 
