@@ -228,7 +228,7 @@ WICHTIG: Antworte NUR mit JSON. Kein Text davor oder danach. Kein plan_meta. Beg
 Wochen {week_from} bis {week_to}. day_of_week: 1=Mo bis 7=So. Rest Days nicht eintragen. Genau {days_per_week} Sessions pro Woche."""
 
             message = client.messages.create(
-                model="claude-sonnet-5",
+                model="claude-sonnet-4-6",
                 max_tokens=8000,
                 messages=[{"role": "user", "content": prompt}]
             )
@@ -800,7 +800,7 @@ Immer: Beobachtung, Einordnung, klare Empfehlung.
 
         client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
         response = client.messages.create(
-            model="claude-sonnet-5",
+            model="claude-sonnet-4-6",
             max_tokens=300,
             system=system,
             messages=clean_messages
@@ -872,7 +872,7 @@ Antworte NUR mit JSON:
 
         client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
         message = client.messages.create(
-            model="claude-sonnet-5",
+            model="claude-sonnet-4-6",
             max_tokens=300,
             messages=[{"role": "user", "content": prompt}]
         )
@@ -995,7 +995,7 @@ NUR JSON:
 
         client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
         message = client.messages.create(
-            model="claude-sonnet-5",
+            model="claude-sonnet-4-6",
             max_tokens=250,
             messages=[{"role": "user", "content": prompt}]
         )
