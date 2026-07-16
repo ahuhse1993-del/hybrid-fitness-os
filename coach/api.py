@@ -206,21 +206,24 @@ ATHLETENPROFIL:
 - Gesamtplan: {total_weeks} Wochen · Phasen: {', '.join(phase_context)}
 
 WOCHENSTRUKTUR — GENAU {days_per_week} Sessions pro Woche:
-- {strength_sessions}x Krafttraining — NUR an: {', '.join([['','Mo','Di','Mi','Do','Fr','Sa','So'][d] for d in strength_days]) if strength_days else 'flexibel'}
+- {strength_sessions}x Strength Training — NUR an: {', '.join([['','Mo','Di','Mi','Do','Fr','Sa','So'][d] for d in strength_days]) if strength_days else 'flexibel'}
 - 1x Long Run — IMMER an {day_names[long_run_day]} (Tag {long_run_day})
-- {quality_sessions}x Quality (Tempo / Intervalle / Hill Repeats)
+- {quality_sessions}x Quality (Tempo Session / Interval Session / Sprint Session / Hill Session)
 - {days_per_week - strength_sessions - 1 - quality_sessions}x Easy Run oder Trail Run
-- {7 - days_per_week}x REST — diese Tage komplett leer lassen, KEIN Eintrag
+- {7 - days_per_week}x Rest Day — diese Tage komplett leer lassen, KEIN Eintrag
 {gpx_context}
 REGELN:
 1. Long Run IMMER an Tag {long_run_day} ({day_names[long_run_day]})
 2. Nie 2 harte Sessions direkt hintereinander
-3. Nach Long Run: Rest oder Easy
-4. Kraft nicht direkt vor Quality
+3. Nach Long Run: Rest Day oder Easy Run
+4. Strength Training nicht direkt vor Quality Session
 5. Deload alle 4 Wochen (Volumen -20%)
 6. Trail Run = RPE-basiert, keine Pace
 
-SESSION-TYPEN: Easy Run, Trail Run, Long Run, Progression Run, Tempo Run, Intervalle, Hill Repeats, Krafttraining (Oberkörper A/B oder Unterkörper A/B), Mobilität
+ERLAUBTE SESSION-TYPEN — NUR diese 14, exakt so geschrieben (kein anderer Wert erlaubt):
+Easy Run, Recovery Run, Long Run, Tempo Session, Interval Session, Sprint Session, Hill Session, Trail Run, Cross Training, Strength Training, Mobility, Rest Day, Time Trial, Race Day
+
+Strength Training hat KEINE eigenen session_type-Unterkategorien. Oberkörper A/B, Unterkörper A/B oder Full Body gehören ausschließlich ins notes-Feld, z.B. session_type: "Strength Training", notes: "Oberkörper A".
 
 WICHTIG: Antworte NUR mit JSON. Kein Text davor oder danach. Kein plan_meta. Beginne direkt mit {{
 {{"weeks": [{{"week_number": {week_from}, "phase": "base", "total_km": 40, "sessions": [{{"day_of_week": 1, "session_type": "Easy Run", "session_zone": "Z1-Z2", "distance_km": 8, "duration_min": 55, "notes": "Easy Z1-Z2 RPE 1-3"}}]}}]}}
@@ -581,12 +584,19 @@ def get_plan():
         conn.close()
 
         type_match = {
-            'Easy Run': ['Run'], 'Recovery Run': ['Run'],
-            'Long Run': ['Run', 'TrailRun'], 'Trail Run': ['TrailRun', 'Run'],
-            'Intervalle': ['Run'], 'Tempo Run': ['Run'], 'Threshold Run': ['Run'],
-            'Progression Run': ['Run'], 'Race Pace Run': ['Run'],
-            'Hill Repeats': ['Run', 'TrailRun'], 'Strides': ['Run'],
-            'Krafttraining': ['WeightTraining'], 'Mobilität': ['WeightTraining'],
+            'Easy Run': ['Run'],
+            'Recovery Run': ['Run'],
+            'Long Run': ['Run', 'TrailRun'],
+            'Tempo Session': ['Run'],
+            'Interval Session': ['Run'],
+            'Sprint Session': ['Run'],
+            'Hill Session': ['Run', 'TrailRun'],
+            'Trail Run': ['TrailRun', 'Run'],
+            'Cross Training': ['Ride', 'Swim', 'Walk', 'Hike', 'Yoga', 'Other'],
+            'Strength Training': ['WeightTraining'],
+            'Mobility': ['WeightTraining', 'Yoga'],
+            'Time Trial': ['Run', 'TrailRun'],
+            'Race Day': ['Run', 'TrailRun'],
         }
 
         actual_by_date = {}
