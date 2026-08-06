@@ -176,49 +176,48 @@ def generate_plan_internal(data):
 
         all_weeks = []
 
-        # Hevy Krafttraining-Historie: bisherige Workout-Vorlagen mit Übungen, klassifiziert nach Ober-/Unterkörper
-        OB_KEYWORDS = ['bank', 'press', 'schulter', 'bizep', 'trizep', 'pull', 'row', 'rudern', 'face', 'lat', 'chest', 'arm']
-        UB_KEYWORDS = ['squat', 'knie', 'bein', 'lunge', 'ausfall', 'bulgar', 'deadlift', 'kreuzheben', 'hip', 'glute', 'calf', 'wade', 'leg', 'nordic']
-
-        conn = get_db()
-        cur = conn.cursor()
-        cur.execute("""
-            SELECT t.notes, e.exercise_name
-            FROM trainings t
-            JOIN hevy_exercises e ON e.training_id = t.id
-            WHERE t.type = 'WeightTraining' AND t.notes IS NOT NULL AND t.notes != ''
-            ORDER BY t.date DESC, e.exercise_index
-        """)
-        hevy_rows = cur.fetchall()
-        conn.close()
-
-        hevy_workouts = {}
-        for workout_name, exercise_name in hevy_rows:
-            if not exercise_name:
-                continue
-            exercises = hevy_workouts.setdefault(workout_name, [])
-            if exercise_name not in exercises:
-                exercises.append(exercise_name)
+        # Hevy CAIRN-Routinen: offizielle Strength-Training-Vorlagen direkt aus der Hevy API
+        CAIRN_FOLDER_ID = 3380361
+        HEVY_CATEGORIES = {
+            'Upper Body CAIRN': 'Oberkörper',
+            'Lower Body + Arms CAIRN': 'Unterkörper',
+            'Full Body Light CAIRN': 'Full Body Light',
+        }
 
         hevy_context = ""
-        if hevy_workouts:
-            hevy_lines = []
-            for workout_name, exercises in hevy_workouts.items():
-                text = (workout_name + ' ' + ' '.join(exercises)).lower()
-                ob_score = sum(1 for kw in OB_KEYWORDS if kw in text)
-                ub_score = sum(1 for kw in UB_KEYWORDS if kw in text)
-                if ob_score > ub_score:
-                    category = 'Oberkörper'
-                elif ub_score > ob_score:
-                    category = 'Unterkörper'
-                else:
-                    category = 'Ganzkörper'
-                hevy_lines.append(f"- {workout_name} [{category}]: {', '.join(exercises[:4])}")
+        try:
+            import requests
+            hevy_resp = requests.get(
+                "https://api.hevyapp.com/v1/routines",
+                headers={"api-key": os.getenv("HEVY_API_KEY")},
+                params={"page": 1, "pageSize": 10},
+                timeout=10
+            )
+            routines = hevy_resp.json().get('routines', [])
 
-            hevy_context = f"""
-HEVY KRAFTTRAINING-VORLAGEN (bisher genutzt vom Athleten):
+            cairn_routines = {}
+            for r in routines:
+                if r.get('folder_id') != CAIRN_FOLDER_ID:
+                    continue
+                title = (r.get('title') or '').strip()
+                if not title or title in cairn_routines:
+                    continue  # Duplikat ignorieren
+                cairn_routines[title] = [e.get('title', '') for e in r.get('exercises', []) if e.get('title')]
+
+            if cairn_routines:
+                hevy_lines = []
+                for title, exercises in cairn_routines.items():
+                    category = HEVY_CATEGORIES.get(title, 'Ganzkörper')
+                    hevy_lines.append(f"- {title} [{category}]: {', '.join(exercises)}")
+
+                hevy_context = f"""
+HEVY CAIRN-ROUTINEN (offizielle Strength-Training-Vorlagen des Athleten):
 {chr(10).join(hevy_lines)}
+
+Nutze AUSSCHLIESSLICH diese CAIRN-Routinen für Strength Training Sessions. Normale Wochen: Upper Body CAIRN + Lower Body + Arms CAIRN abwechselnd. Deload/Taper Wochen: Full Body Light CAIRN.
 """
+        except Exception as hevy_err:
+            print(f"Hevy Routinen Fehler: {hevy_err}")
 
         client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 
@@ -370,7 +369,7 @@ Wochen {week_from} bis {week_to}. day_of_week: 1=Mo bis 7=So. Rest Days nicht ei
         conn.commit()
         conn.close()
 
-        # ─── Workout-Vorschläge: Coach vergleicht geplante Strength-Sessions mit Hevy-Historie ───
+        # ─── Workout-Vorschläge: Coach vergleicht geplante Strength-Sessions mit den CAIRN-Routinen ───
         try:
             strength_notes = []
             for week in plan_json.get('weeks', []):
@@ -386,11 +385,10 @@ Wochen {week_from} bis {week_to}. day_of_week: 1=Mo bis 7=So. Rest Days nicht ei
 GEPLANTE STRENGTH-TRAINING-EINHEITEN IN DIESEM PLAN:
 {chr(10).join('- ' + n for n in strength_notes)}
 
-BISHERIGE KRAFTTRAINING-HISTORIE DES ATHLETEN (Hevy):
 {hevy_context}
 
 AUFGABE:
-Vergleiche die geplanten Einheiten mit der bisherigen Übungsauswahl des Athleten.
+Vergleiche die geplanten Einheiten mit den offiziellen CAIRN-Routinen und deren Übungsauswahl.
 Wo sinnvoll: schlage konkrete Anpassungen vor — Übungen ergänzen, streichen oder anpassen.
 Nur wenn es wirklich etwas zu verbessern gibt, nicht erzwingen. Maximal 4 Vorschläge. Wenn nichts zu verbessern ist: leere Liste.
 
