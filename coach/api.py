@@ -555,6 +555,138 @@ def dashboard():
     except Exception as e:
         return jsonify({"status": "error", "message": str(e), "trace": traceback.format_exc()}), 500
 
+# ─── ATHLETE PROFILE (Schicht 1 — editierbar) ───
+@app.route('/api/athlete/profile', methods=['GET'])
+def get_athlete_profile():
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT name, age, weight_kg,
+                   hr_z1_min, hr_z1_max, hr_z2_min, hr_z2_max, hr_z3_min, hr_z3_max,
+                   hr_z4_min, hr_z4_max, hr_z5_min, hr_z5_max,
+                   pace_z1, pace_z2, pace_z3, pace_z4, pace_z5,
+                   shoes, cross_rennrad, cross_schwimmen, cross_wandern, cross_ski,
+                   long_term_goals
+            FROM athlete_profile ORDER BY id LIMIT 1
+        """)
+        row = cur.fetchone()
+        conn.close()
+
+        if not row:
+            return jsonify({"status": "ok", "has_profile": False, "profile": None})
+
+        profile = {
+            "name": row[0] or "",
+            "age": row[1],
+            "weight_kg": float(row[2]) if row[2] is not None else None,
+            "hr_zones": {
+                "z1": {"min": row[3], "max": row[4]},
+                "z2": {"min": row[5], "max": row[6]},
+                "z3": {"min": row[7], "max": row[8]},
+                "z4": {"min": row[9], "max": row[10]},
+                "z5": {"min": row[11], "max": row[12]},
+            },
+            "pace_zones": {
+                "z1": row[13] or "", "z2": row[14] or "", "z3": row[15] or "",
+                "z4": row[16] or "", "z5": row[17] or "",
+            },
+            "shoes": row[18] or [],
+            "cross_training": {
+                "rennrad": bool(row[19]), "schwimmen": bool(row[20]),
+                "wandern": bool(row[21]), "ski": bool(row[22]),
+            },
+            "long_term_goals": row[23] or "",
+        }
+        return jsonify({"status": "ok", "has_profile": True, "profile": profile})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e), "trace": traceback.format_exc()}), 500
+
+@app.route('/api/athlete/profile', methods=['POST'])
+def save_athlete_profile():
+    try:
+        from psycopg2.extras import Json
+        data = request.get_json(force=True)
+
+        hr = data.get('hr_zones', {}) or {}
+        pace = data.get('pace_zones', {}) or {}
+        cross = data.get('cross_training', {}) or {}
+
+        def hr_min(z): return (hr.get(z) or {}).get('min')
+        def hr_max(z): return (hr.get(z) or {}).get('max')
+
+        values = (
+            data.get('name', ''), data.get('age'), data.get('weight_kg'),
+            hr_min('z1'), hr_max('z1'), hr_min('z2'), hr_max('z2'),
+            hr_min('z3'), hr_max('z3'), hr_min('z4'), hr_max('z4'),
+            hr_min('z5'), hr_max('z5'),
+            pace.get('z1', ''), pace.get('z2', ''), pace.get('z3', ''),
+            pace.get('z4', ''), pace.get('z5', ''),
+            Json(data.get('shoes', [])),
+            bool(cross.get('rennrad')), bool(cross.get('schwimmen')),
+            bool(cross.get('wandern')), bool(cross.get('ski')),
+            data.get('long_term_goals', ''),
+        )
+
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute("SELECT id FROM athlete_profile ORDER BY id LIMIT 1")
+        existing = cur.fetchone()
+
+        if existing:
+            cur.execute("""
+                UPDATE athlete_profile SET
+                    name=%s, age=%s, weight_kg=%s,
+                    hr_z1_min=%s, hr_z1_max=%s, hr_z2_min=%s, hr_z2_max=%s,
+                    hr_z3_min=%s, hr_z3_max=%s, hr_z4_min=%s, hr_z4_max=%s,
+                    hr_z5_min=%s, hr_z5_max=%s,
+                    pace_z1=%s, pace_z2=%s, pace_z3=%s, pace_z4=%s, pace_z5=%s,
+                    shoes=%s,
+                    cross_rennrad=%s, cross_schwimmen=%s, cross_wandern=%s, cross_ski=%s,
+                    long_term_goals=%s, updated_at=NOW()
+                WHERE id=%s
+            """, values + (existing[0],))
+        else:
+            cur.execute("""
+                INSERT INTO athlete_profile
+                    (name, age, weight_kg,
+                     hr_z1_min, hr_z1_max, hr_z2_min, hr_z2_max,
+                     hr_z3_min, hr_z3_max, hr_z4_min, hr_z4_max,
+                     hr_z5_min, hr_z5_max,
+                     pace_z1, pace_z2, pace_z3, pace_z4, pace_z5,
+                     shoes, cross_rennrad, cross_schwimmen, cross_wandern, cross_ski,
+                     long_term_goals)
+                VALUES (%s,%s,%s, %s,%s,%s,%s, %s,%s,%s,%s, %s,%s, %s,%s,%s,%s,%s, %s, %s,%s,%s,%s, %s)
+            """, values)
+
+        conn.commit()
+        conn.close()
+        return jsonify({"status": "ok"})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e), "trace": traceback.format_exc()}), 500
+
+# ─── COACH CONTEXT (Schicht 2 — read-only, nur Coach schreibt) ───
+@app.route('/api/athlete/context', methods=['GET'])
+def get_athlete_context():
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT category, content, created_at
+            FROM coach_context
+            ORDER BY created_at DESC
+            LIMIT 100
+        """)
+        rows = cur.fetchall()
+        conn.close()
+        context = [
+            {"category": r[0] or "", "content": r[1], "created_at": r[2].isoformat() if r[2] else None}
+            for r in rows
+        ]
+        return jsonify({"status": "ok", "context": context})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e), "trace": traceback.format_exc()}), 500
+
 @app.route('/api/plan', methods=['GET'])
 def get_plan():
     try:
