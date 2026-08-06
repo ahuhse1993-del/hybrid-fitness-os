@@ -175,6 +175,51 @@ def generate_plan_internal(data):
         week_ranges = [(1, half), (half + 1, total_weeks)] if total_weeks > 10 else [(1, total_weeks)]
 
         all_weeks = []
+
+        # Hevy Krafttraining-Historie: bisherige Workout-Vorlagen mit Übungen, klassifiziert nach Ober-/Unterkörper
+        OB_KEYWORDS = ['bank', 'press', 'schulter', 'bizep', 'trizep', 'pull', 'row', 'rudern', 'face', 'lat', 'chest', 'arm']
+        UB_KEYWORDS = ['squat', 'knie', 'bein', 'lunge', 'ausfall', 'bulgar', 'deadlift', 'kreuzheben', 'hip', 'glute', 'calf', 'wade', 'leg', 'nordic']
+
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT t.notes, e.exercise_name
+            FROM trainings t
+            JOIN hevy_exercises e ON e.training_id = t.id
+            WHERE t.type = 'WeightTraining' AND t.notes IS NOT NULL AND t.notes != ''
+            ORDER BY t.date DESC, e.exercise_index
+        """)
+        hevy_rows = cur.fetchall()
+        conn.close()
+
+        hevy_workouts = {}
+        for workout_name, exercise_name in hevy_rows:
+            if not exercise_name:
+                continue
+            exercises = hevy_workouts.setdefault(workout_name, [])
+            if exercise_name not in exercises:
+                exercises.append(exercise_name)
+
+        hevy_context = ""
+        if hevy_workouts:
+            hevy_lines = []
+            for workout_name, exercises in hevy_workouts.items():
+                text = (workout_name + ' ' + ' '.join(exercises)).lower()
+                ob_score = sum(1 for kw in OB_KEYWORDS if kw in text)
+                ub_score = sum(1 for kw in UB_KEYWORDS if kw in text)
+                if ob_score > ub_score:
+                    category = 'Oberkörper'
+                elif ub_score > ob_score:
+                    category = 'Unterkörper'
+                else:
+                    category = 'Ganzkörper'
+                hevy_lines.append(f"- {workout_name} [{category}]: {', '.join(exercises[:4])}")
+
+            hevy_context = f"""
+HEVY KRAFTTRAINING-VORLAGEN (bisher genutzt vom Athleten):
+{chr(10).join(hevy_lines)}
+"""
+
         client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 
 
@@ -212,6 +257,7 @@ WOCHENSTRUKTUR — GENAU {days_per_week} Sessions pro Woche:
 - {days_per_week - strength_sessions - 1 - quality_sessions}x Easy Run oder Trail Run
 - {7 - days_per_week}x Rest Day — diese Tage komplett leer lassen, KEIN Eintrag
 {gpx_context}
+{hevy_context}
 REGELN:
 1. Long Run IMMER an Tag {long_run_day} ({day_names[long_run_day]})
 2. Nie 2 harte Sessions direkt hintereinander
