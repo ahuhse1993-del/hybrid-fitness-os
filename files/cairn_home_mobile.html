@@ -177,6 +177,40 @@ html,body{height:100%;overflow:hidden;background:var(--bg);font-family:'DM Sans'
 .athlete-row-lbl{font-family:'DM Mono',monospace;font-size:9px;color:var(--stone);letter-spacing:.1em}
 .athlete-row-val{font-size:13px;color:var(--black)}
 
+/* ATHLETE FORM (Schicht 1) */
+.af-field{margin-bottom:14px}
+.af-field:last-child{margin-bottom:0}
+.af-label{font-family:'DM Mono',monospace;font-size:8px;color:var(--stone);letter-spacing:.1em;margin-bottom:5px;display:block}
+.af-input{width:100%;background:#F8F5EE;border:.5px solid rgba(46,44,42,.18);padding:9px 10px;font-family:'DM Sans',sans-serif;font-size:13px;color:var(--black);outline:none}
+.af-input:focus{border-color:var(--accent-dark)}
+.af-textarea{width:100%;min-height:76px;background:#F8F5EE;border:.5px solid rgba(46,44,42,.18);padding:10px;font-family:'DM Sans',sans-serif;font-size:13px;color:var(--black);outline:none;resize:vertical;line-height:1.5}
+.af-row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.af-zone-row{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:.5px solid rgba(46,44,42,.06)}
+.af-zone-row:last-child{border-bottom:none}
+.af-zone-lbl{font-family:'DM Mono',monospace;font-size:9px;color:var(--stone);width:20px;flex-shrink:0}
+.af-zone-input{width:52px;background:#F8F5EE;border:.5px solid rgba(46,44,42,.18);padding:6px 4px;font-family:'DM Mono',monospace;font-size:12px;color:var(--black);text-align:center;outline:none}
+.af-zone-sep{color:var(--stone);font-size:11px}
+.af-zone-unit{font-family:'DM Mono',monospace;font-size:9px;color:var(--stone)}
+.af-checkbox-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:.5px solid rgba(46,44,42,.06);cursor:pointer}
+.af-checkbox-row:last-child{border-bottom:none}
+.af-checkbox{width:18px;height:18px;border:.5px solid var(--black);flex-shrink:0;display:flex;align-items:center;justify-content:center;background:#F8F5EE}
+.af-checkbox.checked{background:var(--accent);border-color:var(--accent-dark)}
+.af-checkbox.checked::after{content:'\2713';font-size:11px;color:var(--black);font-weight:700}
+.af-shoe-row{background:#F8F5EE;border:.5px solid rgba(46,44,42,.15);padding:10px;margin-bottom:8px}
+.af-shoe-row .af-input{margin-bottom:6px}
+.af-shoe-del{font-family:'DM Mono',monospace;font-size:9px;color:var(--stone);cursor:pointer;letter-spacing:.08em;text-align:right}
+.af-add-btn{width:100%;padding:10px;background:transparent;border:.5px dashed rgba(46,44,42,.3);color:var(--mid);font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.1em;cursor:pointer;text-align:center}
+.af-save-btn{width:100%;padding:14px;background:var(--accent);border:none;color:var(--black);font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.12em;cursor:pointer;font-weight:500}
+.af-save-btn:disabled{opacity:.5;cursor:default}
+.af-save-status{font-family:'DM Mono',monospace;font-size:9px;color:var(--stone);text-align:center;margin-top:8px;min-height:12px}
+
+/* COACH CONTEXT (Schicht 2, read-only) */
+.cc-item{padding:10px 0;border-bottom:.5px solid rgba(46,44,42,.08)}
+.cc-item:last-child{border-bottom:none}
+.cc-cat{font-family:'DM Mono',monospace;font-size:7px;color:var(--accent-dark);letter-spacing:.1em;margin-bottom:3px;text-transform:uppercase}
+.cc-content{font-size:12px;color:var(--mid);line-height:1.5}
+.cc-date{font-family:'DM Mono',monospace;font-size:8px;color:var(--stone);margin-top:3px}
+
 /* OVERLAYS */
 .overlay{display:none;position:fixed;inset:0;background:rgba(26,25,24,.75);z-index:400;align-items:flex-end}
 .overlay.open{display:flex}
@@ -499,28 +533,91 @@ html,body{height:100%;overflow:hidden;background:var(--bg);font-family:'DM Sans'
   <div style="padding:12px 16px;border-bottom:.5px solid var(--black);background:var(--cal-bg)">
     <div style="font-family:'DM Mono',monospace;font-size:9px;color:var(--stone);letter-spacing:.1em">ATHLET &middot; PROFIL</div>
   </div>
-  <div class="athlete-section">
-    <div class="kicker">PER&Scaron;NLICH</div>
-    <div class="athlete-row"><div class="athlete-row-lbl">NAME</div><div class="athlete-row-val">Alexander</div></div>
-    <div class="athlete-row"><div class="athlete-row-lbl">GEWICHT</div><div class="athlete-row-val">— kg</div></div>
-    <div class="athlete-row"><div class="athlete-row-lbl">LAUFPACE Z2</div><div class="athlete-row-val">5:10–6:01 /km</div></div>
-    <div class="athlete-row"><div class="athlete-row-lbl">N&Auml;CHSTER WETTKAMPF</div><div class="athlete-row-val" style="color:var(--accent-dark)">7 Tage</div></div>
-  </div>
-  <div class="athlete-section">
-    <div class="kicker">LANGZEITZIELE</div>
-    <div style="font-size:13px;color:var(--mid);line-height:1.65;padding:8px 0">Hybrid-Athlet bleiben. Trail Running + Krafttraining. Erste 50k in 2026.</div>
-  </div>
-  <div class="athlete-section">
-    <div class="kicker">SCHUHE</div>
-    <div style="padding:10px 0;border-bottom:.5px solid rgba(46,44,42,.08)">
-      <div style="font-size:13px;color:var(--black);margin-bottom:2px">Hoka Speedgoat 6</div>
-      <div style="font-family:'DM Mono',monospace;font-size:9px;color:var(--stone)">TRAIL · 487 km</div>
-      <div style="margin-top:4px;height:6px;display:flex;width:100%"><div style="height:100%;background:var(--mid);width:69.5%"></div><div style="flex:1;height:100%;background-image:var(--dot);background-size:4px 4px"></div></div>
-      <div style="font-family:'DM Mono',monospace;font-size:8px;color:var(--stone);margin-top:3px">487 / 700 km</div>
+
+  <div id="athlete-loading" style="padding:24px 16px;font-family:'DM Mono',monospace;font-size:9px;color:var(--stone)">Lade Profil&hellip;</div>
+
+  <div id="athlete-content" style="display:none">
+
+    <!-- SCHICHT 1: PERSÖNLICH -->
+    <div class="athlete-section">
+      <div class="kicker">PER&Scaron;NLICH</div>
+      <div class="af-field">
+        <label class="af-label">NAME</label>
+        <input class="af-input" id="af-name" type="text" placeholder="Name">
+      </div>
+      <div class="af-row2">
+        <div class="af-field">
+          <label class="af-label">ALTER</label>
+          <input class="af-input" id="af-age" type="number" placeholder="&mdash;">
+        </div>
+        <div class="af-field">
+          <label class="af-label">GEWICHT (KG)</label>
+          <input class="af-input" id="af-weight" type="number" step="0.1" placeholder="&mdash;">
+        </div>
+      </div>
     </div>
-  </div>
-  <div style="padding:20px 16px">
-    <button onclick="openCoach()" style="width:100%;padding:14px;background:var(--accent);border:none;color:var(--black);font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.12em;cursor:pointer;font-weight:500">COACH FRAGEN &rarr;</button>
+
+    <!-- HF-ZONEN -->
+    <div class="athlete-section">
+      <div class="kicker">HF-ZONEN</div>
+      <div id="af-hr-zones"></div>
+    </div>
+
+    <!-- PACE-PROFIL -->
+    <div class="athlete-section">
+      <div class="kicker">PACE-PROFIL</div>
+      <div id="af-pace-zones"></div>
+    </div>
+
+    <!-- SCHUHE -->
+    <div class="athlete-section">
+      <div class="kicker">SCHUHE</div>
+      <div id="af-shoes-list"></div>
+      <div class="af-add-btn" onclick="addShoeRow()">+ SCHUH HINZUF&Uuml;GEN</div>
+    </div>
+
+    <!-- CROSS TRAINING -->
+    <div class="athlete-section">
+      <div class="kicker">CROSS TRAINING PR&Auml;FERENZEN</div>
+      <div class="af-checkbox-row" onclick="toggleCross('rennrad')">
+        <div class="af-checkbox" id="af-cross-rennrad"></div>
+        <div style="font-size:13px;color:var(--black)">Rennrad</div>
+      </div>
+      <div class="af-checkbox-row" onclick="toggleCross('schwimmen')">
+        <div class="af-checkbox" id="af-cross-schwimmen"></div>
+        <div style="font-size:13px;color:var(--black)">Schwimmen</div>
+      </div>
+      <div class="af-checkbox-row" onclick="toggleCross('wandern')">
+        <div class="af-checkbox" id="af-cross-wandern"></div>
+        <div style="font-size:13px;color:var(--black)">Wandern</div>
+      </div>
+      <div class="af-checkbox-row" onclick="toggleCross('ski')">
+        <div class="af-checkbox" id="af-cross-ski"></div>
+        <div style="font-size:13px;color:var(--black)">Ski</div>
+      </div>
+    </div>
+
+    <!-- LANGZEITZIELE -->
+    <div class="athlete-section">
+      <div class="kicker">LANGZEITZIELE</div>
+      <textarea class="af-textarea" id="af-goals" placeholder="Deine langfristigen Ziele&hellip;"></textarea>
+    </div>
+
+    <div style="padding:16px">
+      <button class="af-save-btn" id="af-save-btn" onclick="saveAthleteProfile()">PROFIL SPEICHERN</button>
+      <div class="af-save-status" id="af-save-status"></div>
+    </div>
+
+    <!-- SCHICHT 2: COACH-KONTEXT (READ-ONLY) -->
+    <div class="athlete-section">
+      <div class="kicker">WAS DEIN COACH &Uuml;BER DICH WEISS</div>
+      <div id="cc-list" style="font-size:12px;color:var(--stone)">Lade&hellip;</div>
+    </div>
+
+    <div style="padding:20px 16px">
+      <button onclick="openCoach()" style="width:100%;padding:14px;background:var(--accent);border:none;color:var(--black);font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.12em;cursor:pointer;font-weight:500">COACH FRAGEN &rarr;</button>
+    </div>
+
   </div>
 </div>
 
@@ -546,6 +643,12 @@ var planLoaded = false;
 var planMeta = null;
 var activitiesLoaded = false;
 var planWeekOffset = 0;
+var athleteLoaded = false;
+var athleteShoes = [];
+var athleteCross = {};
+var athleteHrZones = {};
+var athletePaceZones = {};
+var HR_ZONE_KEYS = ['z1', 'z2', 'z3', 'z4', 'z5'];
 
 var pageTitles = {today:'TODAY', plan:'PLAN', activities:'ACTIVITIES', coach:'COACH', athlete:'ATHLETE'};
 
@@ -586,6 +689,7 @@ function goPage(page) {
   currentPage = page;
   if (page === 'plan' && !planLoaded) loadPlanPage();
   if (page === 'activities' && !activitiesLoaded) loadActivitiesPage();
+  if (page === 'athlete' && !athleteLoaded) loadAthletePage();
 }
 
 // DATUM
@@ -1256,6 +1360,181 @@ function loadActivitiesPage() {
       document.getElementById('activities-list').innerHTML = html;
     }).catch(function() {
       document.getElementById('activities-list').innerHTML = '<div style="padding:24px 16px;font-family:DM Mono,monospace;font-size:9px;color:var(--stone)">Konnte nicht geladen werden.</div>';
+    });
+}
+
+// ATHLETE PAGE — SCHICHT 1 (editierbar) + SCHICHT 2 (Coach-Kontext, read-only)
+function loadAthletePage() {
+  athleteLoaded = true;
+  fetch(BASE + '/api/athlete/profile')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      renderAthleteProfile(data.profile || {});
+      document.getElementById('athlete-loading').style.display = 'none';
+      document.getElementById('athlete-content').style.display = 'block';
+    }).catch(function() {
+      renderAthleteProfile({});
+      document.getElementById('athlete-loading').style.display = 'none';
+      document.getElementById('athlete-content').style.display = 'block';
+    });
+  loadCoachContext();
+}
+
+function renderAthleteProfile(profile) {
+  document.getElementById('af-name').value = profile.name || '';
+  document.getElementById('af-age').value = profile.age != null ? profile.age : '';
+  document.getElementById('af-weight').value = profile.weight_kg != null ? profile.weight_kg : '';
+  document.getElementById('af-goals').value = profile.long_term_goals || '';
+
+  athleteHrZones = profile.hr_zones || {};
+  athletePaceZones = profile.pace_zones || {};
+  athleteShoes = (profile.shoes || []).slice();
+  athleteCross = profile.cross_training || {};
+
+  renderHrZones();
+  renderPaceZones();
+  renderShoes();
+  renderCrossCheckboxes();
+}
+
+function renderHrZones() {
+  var html = '';
+  HR_ZONE_KEYS.forEach(function(z) {
+    var zone = athleteHrZones[z] || {};
+    html += '<div class="af-zone-row">';
+    html += '<div class="af-zone-lbl">' + z.toUpperCase() + '</div>';
+    html += '<input class="af-zone-input" type="number" id="af-hr-' + z + '-min" value="' + (zone.min != null ? zone.min : '') + '" placeholder="min">';
+    html += '<div class="af-zone-sep">&ndash;</div>';
+    html += '<input class="af-zone-input" type="number" id="af-hr-' + z + '-max" value="' + (zone.max != null ? zone.max : '') + '" placeholder="max">';
+    html += '<div class="af-zone-unit">bpm</div>';
+    html += '</div>';
+  });
+  document.getElementById('af-hr-zones').innerHTML = html;
+}
+
+function renderPaceZones() {
+  var html = '';
+  HR_ZONE_KEYS.forEach(function(z) {
+    html += '<div class="af-zone-row">';
+    html += '<div class="af-zone-lbl">' + z.toUpperCase() + '</div>';
+    html += '<input class="af-input" style="flex:1" type="text" id="af-pace-' + z + '" value="' + escHtml(athletePaceZones[z] || '') + '" placeholder="z.B. 5:10-6:01 /km">';
+    html += '</div>';
+  });
+  document.getElementById('af-pace-zones').innerHTML = html;
+}
+
+function renderShoes() {
+  var html = '';
+  athleteShoes.forEach(function(shoe, i) {
+    html += '<div class="af-shoe-row">';
+    html += '<input class="af-input" type="text" placeholder="Modell" value="' + escHtml(shoe.name || '') + '" oninput="updateShoe(' + i + ',\'name\',this.value)">';
+    html += '<div class="af-row2" style="margin-bottom:6px">';
+    html += '<input class="af-input" type="text" placeholder="Kategorie (z.B. TRAIL)" value="' + escHtml(shoe.category || '') + '" oninput="updateShoe(' + i + ',\'category\',this.value)">';
+    html += '<input class="af-input" type="number" placeholder="Max km" value="' + (shoe.max_km != null ? shoe.max_km : '') + '" oninput="updateShoe(' + i + ',\'max_km\',this.value)">';
+    html += '</div>';
+    html += '<input class="af-input" type="number" placeholder="Aktuelle km" value="' + (shoe.km != null ? shoe.km : '') + '" oninput="updateShoe(' + i + ',\'km\',this.value)">';
+    html += '<div class="af-shoe-del" onclick="removeShoeRow(' + i + ')">ENTFERNEN</div>';
+    html += '</div>';
+  });
+  document.getElementById('af-shoes-list').innerHTML = html;
+}
+
+function addShoeRow() {
+  athleteShoes.push({name: '', category: '', km: 0, max_km: 700});
+  renderShoes();
+}
+
+function removeShoeRow(i) {
+  athleteShoes.splice(i, 1);
+  renderShoes();
+}
+
+function updateShoe(i, field, value) {
+  if (!athleteShoes[i]) return;
+  if (field === 'km' || field === 'max_km') value = value === '' ? null : parseFloat(value);
+  athleteShoes[i][field] = value;
+}
+
+function renderCrossCheckboxes() {
+  ['rennrad', 'schwimmen', 'wandern', 'ski'].forEach(function(key) {
+    var el = document.getElementById('af-cross-' + key);
+    if (el) el.classList.toggle('checked', !!athleteCross[key]);
+  });
+}
+
+function toggleCross(key) {
+  athleteCross[key] = !athleteCross[key];
+  renderCrossCheckboxes();
+}
+
+function saveAthleteProfile() {
+  var btn = document.getElementById('af-save-btn');
+  var status = document.getElementById('af-save-status');
+  btn.disabled = true;
+  status.textContent = 'Speichert...';
+
+  var hrZones = {};
+  var paceZones = {};
+  HR_ZONE_KEYS.forEach(function(z) {
+    var minEl = document.getElementById('af-hr-' + z + '-min');
+    var maxEl = document.getElementById('af-hr-' + z + '-max');
+    hrZones[z] = {
+      min: minEl && minEl.value !== '' ? parseInt(minEl.value) : null,
+      max: maxEl && maxEl.value !== '' ? parseInt(maxEl.value) : null
+    };
+    var paceEl = document.getElementById('af-pace-' + z);
+    paceZones[z] = paceEl ? paceEl.value : '';
+  });
+
+  var payload = {
+    name: document.getElementById('af-name').value,
+    age: document.getElementById('af-age').value ? parseInt(document.getElementById('af-age').value) : null,
+    weight_kg: document.getElementById('af-weight').value ? parseFloat(document.getElementById('af-weight').value) : null,
+    hr_zones: hrZones,
+    pace_zones: paceZones,
+    shoes: athleteShoes,
+    cross_training: athleteCross,
+    long_term_goals: document.getElementById('af-goals').value
+  };
+
+  fetch(BASE + '/api/athlete/profile', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(payload)
+  }).then(function(r) { return r.json(); }).then(function(data) {
+    btn.disabled = false;
+    status.textContent = data.status === 'ok' ? 'Gespeichert.' : 'Fehler beim Speichern.';
+    setTimeout(function() { status.textContent = ''; }, 2500);
+  }).catch(function() {
+    btn.disabled = false;
+    status.textContent = 'Verbindung unterbrochen.';
+  });
+}
+
+function loadCoachContext() {
+  fetch(BASE + '/api/athlete/context')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      var items = data.context || [];
+      var el = document.getElementById('cc-list');
+      if (!items.length) {
+        el.innerHTML = '<div style="font-size:12px;color:var(--stone);padding:8px 0">Noch keine Beobachtungen.</div>';
+        return;
+      }
+      var MONTHS = ['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
+      var html = '';
+      items.forEach(function(c) {
+        var d = c.created_at ? new Date(c.created_at) : null;
+        var dateStr = d ? (d.getDate() + '. ' + MONTHS[d.getMonth()] + ' ' + d.getFullYear()) : '';
+        html += '<div class="cc-item">';
+        if (c.category) html += '<div class="cc-cat">' + escHtml(c.category) + '</div>';
+        html += '<div class="cc-content">' + escHtml(c.content) + '</div>';
+        if (dateStr) html += '<div class="cc-date">' + dateStr + '</div>';
+        html += '</div>';
+      });
+      el.innerHTML = html;
+    }).catch(function() {
+      document.getElementById('cc-list').innerHTML = '<div style="font-size:12px;color:var(--stone)">Konnte nicht geladen werden.</div>';
     });
 }
 
