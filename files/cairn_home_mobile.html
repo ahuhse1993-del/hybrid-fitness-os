@@ -923,7 +923,7 @@ function loadTodayWeek() {
           var s = sessions[0];
           var rawType = s.type || s.session_type || '';
           var type = TYPE_MAP[rawType] || rawType.toUpperCase();
-          var name = rawType || type;
+          var name = (rawType === 'Strength Training' && s.notes) ? s.notes : (rawType || type);
           var dist = s.distance_km > 0 ? s.distance_km.toFixed(1) + ' km' : (s.duration_min ? s.duration_min + ' min' : '');
           var isDone = isPast && actual[dateStr];
           var isQuality = type === 'INTERVALS' || type === 'TEMPO' || type === 'SPRINT' || type === 'HILL';
@@ -994,7 +994,9 @@ function openTodayDay(dateStr) {
             h += '<div style="background:rgba(46,44,42,.05);padding:12px;font-size:13px;color:var(--mid);line-height:1.65;margin-bottom:16px">' + escHtml(notes) + '</div>';
           }
         }
-        h += '<div style="font-size:12px;color:var(--stone);margin-bottom:16px">Verschieben und umplanen im Plan-Reiter.</div>';
+        if (currentPage !== 'plan') {
+          h += '<div style="font-size:12px;color:var(--stone);margin-bottom:16px">Verschieben und umplanen im Plan-Reiter.</div>';
+        }
       }
       h += '<button onclick="document.getElementById(\'today-day-popup\').remove()" style="width:100%;padding:13px;background:var(--black);border:none;color:var(--bg);font-family:DM Mono,monospace;font-size:9px;letter-spacing:.1em;cursor:pointer">SCHLIESSEN</button>';
       h += '</div>';
@@ -1144,7 +1146,7 @@ function renderPlanWeeks(sessions) {
       if (daySessions.length > 0) {
         var s = daySessions[0];
         var rawType = s.session_type || '';
-        var displayName = rawType || '—';
+        var displayName = (rawType === 'Strength Training' && s.notes) ? s.notes : (rawType || '—');
         var dist = s.distance_km > 0 ? s.distance_km.toFixed(1) + ' km' : (s.duration_min ? s.duration_min + ' min' : '');
 
         html += '<div class="plan-session-row' + (isPast && s.is_done ? ' done-row' : '') + '"'
@@ -1590,7 +1592,7 @@ function loadTodaySession() {
         var s = sessions[0];
         var rawType = s.type || s.session_type || '';
         var type = TYPE_MAP[rawType] || rawType;
-        var name = rawType || type;
+        var name = (rawType === 'Strength Training' && s.notes) ? s.notes : (rawType || type);
         var dist = s.distance_km > 0 ? s.distance_km.toFixed(1) + ' km' : '';
         var dur = s.duration_min > 0 ? s.duration_min + ' min' : '';
         var zone = s.session_zone || '';
