@@ -152,6 +152,9 @@ def generate_plan_internal(data):
         total_weeks = data.get('total_weeks', 16)
         phases = data.get('phases', [])
         start_date = data.get('start_date', None)
+        cross_training = data.get('cross_training', False)
+        cross_training_types = data.get('cross_training_types', [])
+        cross_training_days = data.get('cross_training_days', 0)
 
         # Startdatum berechnen
         today = get_today()
@@ -219,6 +222,12 @@ Nutze AUSSCHLIESSLICH diese CAIRN-Routinen für Strength Training Sessions. Norm
         except Exception as hevy_err:
             print(f"Hevy Routinen Fehler: {hevy_err}")
 
+        cross_training_context = ""
+        if cross_training:
+            cross_training_context = f"""
+CROSS TRAINING: {cross_training_days}x pro Woche — Typen: {', '.join(cross_training_types) if cross_training_types else 'flexibel'}. Nutze session_type='Cross Training' mit notes=Typ (z.B. 'Rennrad 60 min').
+"""
+
         client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 
 
@@ -257,6 +266,7 @@ WOCHENSTRUKTUR — GENAU {days_per_week} Sessions pro Woche:
 - {7 - days_per_week}x Rest Day — diese Tage komplett leer lassen, KEIN Eintrag
 {gpx_context}
 {hevy_context}
+{cross_training_context}
 REGELN:
 1. Long Run IMMER an Tag {long_run_day} ({day_names[long_run_day]})
 2. Nie 2 harte Sessions direkt hintereinander

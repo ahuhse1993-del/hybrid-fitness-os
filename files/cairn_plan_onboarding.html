@@ -224,7 +224,7 @@ html,body{height:100%;background:var(--black);font-family:'DM Sans',sans-serif;c
 
   <!-- SCHRITT 1: ZIEL -->
   <div class="step active" id="step-1">
-    <div class="step-kicker">SCHRITT 1 VON 8</div>
+    <div class="step-kicker">SCHRITT 1 VON 9</div>
     <div class="step-question">Was ist dein <b>Ziel?</b></div>
     <div class="step-sub">Davon hängt die Struktur deines Plans ab.</div>
     <div class="options">
@@ -254,7 +254,7 @@ html,body{height:100%;background:var(--black);font-family:'DM Sans',sans-serif;c
 
   <!-- SCHRITT 2: RENNEN -->
   <div class="step" id="step-2">
-    <div class="step-kicker">SCHRITT 2 VON 7</div>
+    <div class="step-kicker">SCHRITT 2 VON 9</div>
     <div class="step-question">Welches <b>Rennen?</b></div>
     <div class="step-sub">Distanz, Name und Datum.</div>
     <div class="options" id="race-options">
@@ -314,7 +314,7 @@ html,body{height:100%;background:var(--black);font-family:'DM Sans',sans-serif;c
 
   <!-- SCHRITT 3: TRAININGSTAGE -->
   <div class="step" id="step-3">
-    <div class="step-kicker">SCHRITT 3 VON 7</div>
+    <div class="step-kicker">SCHRITT 3 VON 9</div>
     <div class="step-question">Wie viele <b>Trainingstage</b> pro Woche?</div>
     <div class="step-sub">Inkl. Kraft und Laufen zusammen.</div>
     <div class="number-picker">
@@ -332,7 +332,7 @@ html,body{height:100%;background:var(--black);font-family:'DM Sans',sans-serif;c
 
   <!-- SCHRITT 4: LONG RUN TAG -->
   <div class="step" id="step-4">
-    <div class="step-kicker">SCHRITT 4 VON 7</div>
+    <div class="step-kicker">SCHRITT 4 VON 9</div>
     <div class="step-question">Wann ist dein <b>Long Run?</b></div>
     <div class="step-sub">Meist am Wochenende wenn mehr Zeit vorhanden ist.</div>
     <div class="days-list">
@@ -348,7 +348,7 @@ html,body{height:100%;background:var(--black);font-family:'DM Sans',sans-serif;c
 
   <!-- SCHRITT 5: QUALITY -->
   <div class="step" id="step-5">
-    <div class="step-kicker">SCHRITT 5 VON 7</div>
+    <div class="step-kicker">SCHRITT 5 VON 9</div>
     <div class="step-question">Wie viele <b>Quality Sessions</b> pro Woche?</div>
     <div class="step-sub">Tempo Session, Interval Session, Sprint Session, Hill Session. Max. 2 empfohlen.</div>
     <div class="number-picker">
@@ -366,7 +366,7 @@ html,body{height:100%;background:var(--black);font-family:'DM Sans',sans-serif;c
 
   <!-- SCHRITT 6: KRAFT -->
   <div class="step" id="step-6">
-    <div class="step-kicker">SCHRITT 6 VON 8</div>
+    <div class="step-kicker">SCHRITT 6 VON 9</div>
     <div class="step-question">Wann <b>Krafttraining?</b></div>
     <div class="step-sub">Wie viele Einheiten und an welchen Tagen.</div>
 
@@ -390,9 +390,46 @@ html,body{height:100%;background:var(--black);font-family:'DM Sans',sans-serif;c
     <div id="strength-day-hint" style="font-family:'DM Mono',monospace;font-size:9px;color:rgba(240,237,230,.35);letter-spacing:.1em;margin-top:12px">BITTE TAGE WÄHLEN</div>
   </div>
 
-  <!-- SCHRITT 7: STARTDATUM -->
+  <!-- SCHRITT 7: CROSS TRAINING -->
   <div class="step" id="step-7">
-    <div class="step-kicker">SCHRITT 7 VON 8</div>
+    <div class="step-kicker">SCHRITT 7 VON 9</div>
+    <div class="step-question">Möchtest du <b>Cross Training</b> einbauen?</div>
+    <div class="step-sub">Zusätzliche Bewegung neben Laufen und Kraft — nach Bedarf, nicht Pflicht.</div>
+
+    <div class="options ct-toggle" style="margin-bottom:28px">
+      <div class="option" onclick="selectCrossTraining(this,true)">
+        <div class="option-text"><div class="option-title">Ja</div></div>
+        <div class="option-check"></div>
+      </div>
+      <div class="option" onclick="selectCrossTraining(this,false)">
+        <div class="option-text"><div class="option-title">Nein</div></div>
+        <div class="option-check"></div>
+      </div>
+    </div>
+
+    <div id="ct-detail" style="display:none">
+      <div class="input-label">WELCHES? &middot; MEHRFACHAUSWAHL MÖGLICH</div>
+      <div class="days-list" id="ct-types-list">
+        <div class="day-btn" onclick="toggleCrossType(this,'Rennrad')"><div class="day-label">Rennrad</div><div class="day-check"></div></div>
+        <div class="day-btn" onclick="toggleCrossType(this,'Schwimmen')"><div class="day-label">Schwimmen</div><div class="day-check"></div></div>
+        <div class="day-btn" onclick="toggleCrossType(this,'Wandern')"><div class="day-label">Wandern</div><div class="day-check"></div></div>
+        <div class="day-btn" onclick="toggleCrossType(this,'Ski')"><div class="day-label">Ski</div><div class="day-check"></div></div>
+        <div class="day-btn" onclick="toggleCrossType(this,'Anderes')"><div class="day-label">Anderes</div><div class="day-check"></div></div>
+      </div>
+
+      <div class="input-label">WIE OFT PRO WOCHE?</div>
+      <div class="number-picker">
+        <button class="np-btn" onclick="changeNum('cross',-1)">−</button>
+        <div class="np-val" id="cross-val">2</div>
+        <button class="np-btn" onclick="changeNum('cross',1)">+</button>
+      </div>
+      <div class="np-unit" style="text-align:center;margin-bottom:16px">PRO WOCHE</div>
+    </div>
+  </div>
+
+  <!-- SCHRITT 8: STARTDATUM -->
+  <div class="step" id="step-8">
+    <div class="step-kicker">SCHRITT 8 VON 9</div>
     <div class="step-question">Wann <b>startest</b> du?</div>
     <div class="step-sub">Wähle den Tag an dem du starten möchtest.</div>
     <div class="date-row">
@@ -405,9 +442,9 @@ html,body{height:100%;background:var(--black);font-family:'DM Sans',sans-serif;c
     <div id="start-hint" style="font-family:DM Mono,monospace;font-size:10px;color:rgba(240,237,230,.5);letter-spacing:.1em;margin-top:-16px;margin-bottom:24px">DATUM EINGEBEN</div>
   </div>
 
-  <!-- SCHRITT 8: ZUSAMMENFASSUNG -->
-  <div class="step" id="step-8">
-    <div class="step-kicker">SCHRITT 8 VON 8</div>
+  <!-- SCHRITT 9: ZUSAMMENFASSUNG -->
+  <div class="step" id="step-9">
+    <div class="step-kicker">SCHRITT 9 VON 9</div>
     <div class="step-question">Bereit für deinen <b>Plan?</b></div>
     <div class="step-sub">Der Coach erstellt jetzt deinen persönlichen Trainingsplan.</div>
     <div class="summary-rows" id="summary-rows"></div>
@@ -432,7 +469,7 @@ html,body{height:100%;background:var(--black);font-family:'DM Sans',sans-serif;c
 <script>
 var BASE = 'https://web-production-297f2.up.railway.app';
 var currentStep = 1;
-var totalSteps = 8;
+var totalSteps = 9;
 
 var planData = {
   goal_type: '',
@@ -446,6 +483,9 @@ var planData = {
   quality_sessions: 1,
   strength_sessions: 2,
   strength_days: [],
+  cross_training: false,
+  cross_training_types: [],
+  cross_training_days: 0,
   start_date: ''
   ,week_structure: null
 };
@@ -506,8 +546,8 @@ function selectLongRun(el, day) {
 }
 
 function changeNum(type, delta) {
-  var limits = {days:[3,7], quality:[1,3], strength:[0,3]};
-  var keys = {days:'days_per_week', quality:'quality_sessions', strength:'strength_sessions'};
+  var limits = {days:[3,7], quality:[1,3], strength:[0,3], cross:[1,3]};
+  var keys = {days:'days_per_week', quality:'quality_sessions', strength:'strength_sessions', cross:'cross_training_days'};
   var key = keys[type];
   var min = limits[type][0], max = limits[type][1];
   planData[key] = Math.max(min, Math.min(max, planData[key] + delta));
@@ -519,6 +559,9 @@ function changeNum(type, delta) {
     var hint = document.getElementById('strength-day-hint');
     if (hint) hint.textContent = 'BITTE TAGE WÄHLEN';
     document.getElementById('btn-next').classList.remove('ready');
+  }
+  if (type === 'cross') {
+    checkCrossTrainingReady();
   }
 }
 
@@ -581,6 +624,45 @@ function toggleStrengthDay(el, day) {
   } else {
     document.getElementById('btn-next').classList.remove('ready');
   }
+}
+
+// ── CROSS TRAINING ──
+function selectCrossTraining(el, val) {
+  document.querySelectorAll('#step-7 .ct-toggle .option').forEach(function(o){ o.classList.remove('sel'); });
+  el.classList.add('sel');
+  planData.cross_training = val;
+  var detail = document.getElementById('ct-detail');
+  if (val) {
+    detail.style.display = 'block';
+    if (!planData.cross_training_days) {
+      planData.cross_training_days = parseInt(document.getElementById('cross-val').textContent);
+    }
+  } else {
+    detail.style.display = 'none';
+    planData.cross_training_types = [];
+    planData.cross_training_days = 0;
+    document.querySelectorAll('#ct-types-list .day-btn').forEach(function(b){ b.classList.remove('sel'); });
+  }
+  checkCrossTrainingReady();
+}
+
+function toggleCrossType(el, type) {
+  var idx = planData.cross_training_types.indexOf(type);
+  if (idx === -1) {
+    planData.cross_training_types.push(type);
+    el.classList.add('sel');
+  } else {
+    planData.cross_training_types.splice(idx, 1);
+    el.classList.remove('sel');
+  }
+  checkCrossTrainingReady();
+}
+
+function checkCrossTrainingReady() {
+  var btn = document.getElementById('btn-next');
+  if (!btn) return;
+  var ready = !planData.cross_training || (planData.cross_training_types.length > 0 && planData.cross_training_days > 0);
+  if (ready) btn.classList.add('ready'); else btn.classList.remove('ready');
 }
 
 // ── WOCHENSTRUKTUR VORSCHAU ──
@@ -786,6 +868,7 @@ function buildSummary() {
     {label:'LONG RUN', value: DAY_NAMES[planData.long_run_day] || '—'},
     {label:'QUALITY SESSIONS', value: planData.quality_sessions + ' pro Woche'},
     {label:'KRAFTEINHEITEN', value: planData.strength_sessions + ' pro Woche'},
+    {label:'CROSS TRAINING', value: planData.cross_training ? (planData.cross_training_types.join(', ') + ' · ' + planData.cross_training_days + 'x/Woche') : 'Nein'},
     {label:'PLAN START', value: planData.start_date ? new Date(planData.start_date).toLocaleDateString('de-DE',{day:'2-digit',month:'long',year:'numeric'}) : 'Nicht gesetzt'},
   ];
 
@@ -848,7 +931,7 @@ function showStep(n) {
   }
 
   // Steps mit Defaults sind immer ready
-  if (n === 3 || n === 4 || n === 5 || n === 7 || n === 8) {
+  if (n === 3 || n === 4 || n === 5 || n === 8 || n === 9) {
     nextBtn.classList.add('ready');
   } else if (n === 1) {
     if (!planData.goal_type) nextBtn.classList.remove('ready');
@@ -856,6 +939,8 @@ function showStep(n) {
     if (!planData.race_type || !planData.race_name || !planData.race_date) {
       nextBtn.classList.remove('ready');
     }
+  } else if (n === 7) {
+    checkCrossTrainingReady();
   }
 
   // Ab Schritt 2: Zurück-Button als gelber Button links
@@ -1017,7 +1102,10 @@ function generatePlan() {
       phases: phases,
       start_date: planData.start_date || null,
       strength_days: planData.strength_days || [],
-      week_structure: planData.week_structure || null
+      week_structure: planData.week_structure || null,
+      cross_training: planData.cross_training || false,
+      cross_training_types: planData.cross_training_types || [],
+      cross_training_days: planData.cross_training_days || 0
     })
   }).then(function(r){ return r.json(); })
     .then(function(data){
