@@ -9,6 +9,8 @@ load_dotenv()
 app = Flask(__name__)
 CORS(app)
 
+HEVY_CAIRN_FOLDER_ID = 3380361
+
 @app.after_request
 def no_cache(response):
     response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
@@ -180,7 +182,6 @@ def generate_plan_internal(data):
         all_weeks = []
 
         # Hevy CAIRN-Routinen: offizielle Strength-Training-Vorlagen direkt aus der Hevy API
-        CAIRN_FOLDER_ID = 3380361
         HEVY_CATEGORIES = {
             'Upper Body CAIRN': 'Oberkörper',
             'Lower Body + Arms CAIRN': 'Unterkörper',
@@ -188,6 +189,7 @@ def generate_plan_internal(data):
         }
 
         hevy_context = ""
+        routine_by_category = {}
         try:
             import requests
             hevy_resp = requests.get(
@@ -200,7 +202,7 @@ def generate_plan_internal(data):
 
             cairn_routines = {}
             for r in routines:
-                if r.get('folder_id') != CAIRN_FOLDER_ID:
+                if r.get('folder_id') != HEVY_CAIRN_FOLDER_ID:
                     continue
                 title = (r.get('title') or '').strip()
                 if not title or title in cairn_routines:
@@ -209,24 +211,24 @@ def generate_plan_internal(data):
 
             if cairn_routines:
                 hevy_lines = ["STRENGTH TRAINING: Verwende NUR diese Workout-Namen (exakt so wie hier geschrieben):"]
-                routine_by_category = {}
                 for title, exercises in cairn_routines.items():
                     category = HEVY_CATEGORIES.get(title, 'Ganzkörper')
                     routine_by_category.setdefault(category, title)
                     hevy_lines.append(f"- {title} [{category}]: {', '.join(exercises[:4])}")
                 hevy_lines.append("Jeder andere Strength Training Name ist VERBOTEN.")
 
-                oberkoerper_routine = routine_by_category.get('Oberkörper')
-                unterkoerper_routine = routine_by_category.get('Unterkörper')
-                full_body_routine = routine_by_category.get('Full Body Light')
-                if oberkoerper_routine and unterkoerper_routine:
-                    hevy_lines.append(f"Normale Wochen: {oberkoerper_routine} und {unterkoerper_routine} abwechselnd")
-                if full_body_routine:
-                    hevy_lines.append(f"Deload/Taper: {full_body_routine}")
+                if routine_by_category.get('Oberkörper') and routine_by_category.get('Unterkörper'):
+                    hevy_lines.append(f"Normale Wochen: {routine_by_category['Oberkörper']} und {routine_by_category['Unterkörper']} abwechselnd")
+                if routine_by_category.get('Full Body Light'):
+                    hevy_lines.append(f"Deload/Taper: {routine_by_category['Full Body Light']}")
 
                 hevy_context = "\n" + "\n".join(hevy_lines) + "\n"
         except Exception as hevy_err:
             print(f"Hevy Routinen Fehler: {hevy_err}")
+
+        oberkoerper_routine = routine_by_category.get('Oberkörper')
+        unterkoerper_routine = routine_by_category.get('Unterkörper')
+        full_body_routine = routine_by_category.get('Full Body Light')
 
         cross_training_context = ""
         if cross_training:
@@ -324,6 +326,25 @@ Wochen {week_from} bis {week_to}. day_of_week: 1=Mo bis 7=So. Rest Days nicht ei
                 continue
 
         plan_json = {"weeks": all_weeks}
+
+        # Strength Training Sessions bekommen die passende CAIRN-Routine als notes zugewiesen
+        # (kein Keyword-Parsing — Routine-Namen kommen direkt aus routine_by_category)
+        for week in plan_json.get('weeks', []):
+            phase_lower = (week.get('phase') or '').lower()
+            strength_count = 0
+            for session in week.get('sessions', []):
+                if session.get('session_type') != 'Strength Training':
+                    continue
+                strength_count += 1
+                if 'taper' in phase_lower or 'deload' in phase_lower:
+                    if full_body_routine:
+                        session['notes'] = full_body_routine
+                elif strength_count % 2 == 0:
+                    if oberkoerper_routine:
+                        session['notes'] = oberkoerper_routine
+                else:
+                    if unterkoerper_routine:
+                        session['notes'] = unterkoerper_routine
 
         # In DB speichern
         conn = get_db()
@@ -887,6 +908,46 @@ def get_athlete_context():
             for r in rows
         ]
         return jsonify({"status": "ok", "context": context})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e), "trace": traceback.format_exc()}), 500
+
+# ─── HEVY ROUTINE (Übungsliste einer CAIRN-Routine nach Name) ───
+@app.route('/api/hevy/routine', methods=['GET'])
+def get_hevy_routine():
+    try:
+        import requests
+        name = (request.args.get('name') or '').strip()
+        if not name:
+            return jsonify({"status": "error", "message": "name erforderlich"}), 400
+
+        hevy_resp = requests.get(
+            "https://api.hevyapp.com/v1/routines",
+            headers={"api-key": os.getenv("HEVY_API_KEY")},
+            params={"page": 1, "pageSize": 10},
+            timeout=10
+        )
+        routines = hevy_resp.json().get('routines', [])
+
+        match = None
+        for r in routines:
+            if r.get('folder_id') == HEVY_CAIRN_FOLDER_ID and (r.get('title') or '').strip() == name:
+                match = r
+                break
+
+        if not match:
+            return jsonify({"status": "error", "message": "Routine nicht gefunden"}), 404
+
+        exercises = []
+        for e in match.get('exercises', []):
+            sets = e.get('sets', [])
+            reps = sets[-1].get('reps') if sets else None
+            exercises.append({
+                "title": e.get('title', ''),
+                "sets": len(sets),
+                "reps": reps
+            })
+
+        return jsonify({"status": "ok", "routine_name": name, "exercises": exercises})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e), "trace": traceback.format_exc()}), 500
 

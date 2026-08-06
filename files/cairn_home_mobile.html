@@ -966,6 +966,7 @@ function openTodayDay(dateStr) {
       popup.onclick = function(e) { if (e.target === popup) popup.remove(); };
       var h = '<div style="background:var(--bg);width:100%;border-top:3px solid var(--stone);padding:24px 16px;padding-bottom:calc(24px + env(safe-area-inset-bottom));max-height:80vh;overflow-y:auto">';
       h += '<div style="font-family:DM Mono,monospace;font-size:8px;color:var(--stone);letter-spacing:.14em;margin-bottom:12px">CAIRN · EINHEIT</div>';
+      var strengthRoutineName = '';
       if (!sessions.length) {
         h += '<div style="font-size:18px;font-weight:300;color:var(--mid);margin-bottom:16px">Kein Training geplant.</div>';
       } else {
@@ -981,7 +982,11 @@ function openTodayDay(dateStr) {
         h = h.replace('border-top:3px solid var(--stone)', 'border-top:3px solid ' + borderCol);
         h += '<div style="font-size:22px;font-weight:300;letter-spacing:-.02em;margin-bottom:4px;color:var(--black)">' + escHtml(type) + '</div>';
         h += '<div style="font-family:DM Mono,monospace;font-size:9px;color:var(--stone);margin-bottom:16px">' + (dist ? dist : '') + (zone ? ' · ' + zone : '') + '</div>';
-        if (notes) {
+        if (rawType === 'Strength Training' && notes) {
+          strengthRoutineName = notes;
+          h += '<div style="font-family:DM Mono,monospace;font-size:9px;color:var(--stone);letter-spacing:.08em;margin-bottom:8px">' + escHtml(notes.toUpperCase()) + '</div>';
+          h += '<div id="strength-exercises-list" style="margin-bottom:16px"><div style="font-size:13px;color:var(--stone)">Lade Übungen&hellip;</div></div>';
+        } else if (notes) {
           var phases = notes.split(' · ').filter(function(p) { return p.trim(); });
           if (phases.length > 1) {
             phases.forEach(function(phase) {
@@ -1002,7 +1007,35 @@ function openTodayDay(dateStr) {
       h += '</div>';
       popup.innerHTML = h;
       document.body.appendChild(popup);
+      if (strengthRoutineName) {
+        loadStrengthExercises(strengthRoutineName);
+      }
     }).catch(function() {});
+}
+
+function loadStrengthExercises(routineName) {
+  fetch(BASE + '/api/hevy/routine?name=' + encodeURIComponent(routineName))
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      var el = document.getElementById('strength-exercises-list');
+      if (!el) return;
+      if (data.status !== 'ok' || !data.exercises || !data.exercises.length) {
+        el.innerHTML = '<div style="font-size:13px;color:var(--stone)">Übungsliste nicht verfügbar.</div>';
+        return;
+      }
+      var html = '';
+      data.exercises.forEach(function(ex) {
+        var setsReps = ex.sets + (ex.reps ? ' x ' + ex.reps : '');
+        html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:.5px solid rgba(46,44,42,.08)">';
+        html += '<div style="font-size:13px;color:var(--black)">' + escHtml(ex.title) + '</div>';
+        html += '<div style="font-family:DM Mono,monospace;font-size:11px;color:var(--stone);flex-shrink:0;padding-left:12px">' + escHtml(setsReps) + '</div>';
+        html += '</div>';
+      });
+      el.innerHTML = html;
+    }).catch(function() {
+      var el = document.getElementById('strength-exercises-list');
+      if (el) el.innerHTML = '<div style="font-size:13px;color:var(--stone)">Übungsliste konnte nicht geladen werden.</div>';
+    });
 }
 
 // PLAN PAGE
