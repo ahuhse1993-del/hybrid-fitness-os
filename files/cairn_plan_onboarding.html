@@ -156,6 +156,31 @@ html,body{height:100%;background:var(--black);font-family:'DM Sans',sans-serif;c
 .gen-bar-wrap{width:100%;max-width:280px;height:2px;background:rgba(240,237,230,.08);margin-bottom:16px}
 .gen-bar{height:100%;background:var(--accent);width:0%;transition:width .4s ease}
 .gen-status{font-family:'DM Mono',monospace;font-size:9px;color:rgba(240,237,230,.4);letter-spacing:.1em}
+
+/* WORKOUT SUGGESTIONS */
+.suggestions-screen{
+  display:none;position:fixed;inset:0;background:var(--black);
+  z-index:210;flex-direction:column;
+}
+.suggestions-screen.show{display:flex}
+.sg-head{padding:44px 20px 20px;text-align:center;flex-shrink:0}
+.sg-kicker{font-family:'DM Mono',monospace;font-size:9px;color:rgba(232,216,74,.5);letter-spacing:.18em;margin-bottom:16px}
+.sg-title{font-size:22px;font-weight:300;color:#F0EDE6;line-height:1.4}
+.sg-progress{font-family:'DM Mono',monospace;font-size:9px;color:rgba(240,237,230,.3);letter-spacing:.1em;margin-top:10px}
+.sg-body{flex:1;display:flex;flex-direction:column;justify-content:center;padding:20px;overflow-y:auto}
+.sg-card{border:.5px solid rgba(240,237,230,.15);padding:24px 20px}
+.sg-workout{font-family:'DM Mono',monospace;font-size:9px;color:rgba(232,216,74,.6);letter-spacing:.12em;margin-bottom:14px}
+.sg-change{font-size:19px;font-weight:300;color:#F0EDE6;line-height:1.5;margin-bottom:16px}
+.sg-reason{font-size:14px;color:rgba(240,237,230,.65);line-height:1.65;border-left:2px solid var(--accent);padding-left:14px}
+.sg-footer{
+  padding:16px 20px;padding-bottom:calc(16px + env(safe-area-inset-bottom));
+  display:flex;gap:10px;flex-shrink:0;
+}
+.sg-btn{flex:1;height:56px;border:.5px solid rgba(240,237,230,.25);background:transparent;color:#F0EDE6;font-family:'DM Mono',monospace;font-size:12px;letter-spacing:.1em;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px}
+.sg-btn.accept{border-color:var(--accent);color:var(--accent)}
+.sg-btn.accept:active{background:rgba(232,216,74,.1)}
+.sg-btn.reject:active{background:rgba(240,237,230,.08)}
+.sg-done-btn{width:100%;height:56px;background:var(--accent);border:none;color:var(--black);font-family:'DM Mono',monospace;font-size:13px;letter-spacing:.14em;font-weight:500;cursor:pointer}
 </style>
 </head>
 <body>
@@ -180,6 +205,19 @@ html,body{height:100%;background:var(--black);font-family:'DM Sans',sans-serif;c
     DAS MACHST DU NUR ALLE PAAR WOCHEN.<br>
     NIMM DIR EINEN KAFFEE.
   </div>
+</div>
+
+<!-- WORKOUT SUGGESTIONS -->
+<div class="suggestions-screen" id="suggestions-screen">
+  <div class="sg-head">
+    <div class="sg-kicker">CAIRN · WORKOUT-CHECK</div>
+    <div class="sg-title" id="sg-title">Ich habe mir deine Workouts angeschaut.</div>
+    <div class="sg-progress" id="sg-progress"></div>
+  </div>
+  <div class="sg-body">
+    <div class="sg-card" id="sg-card"></div>
+  </div>
+  <div class="sg-footer" id="sg-footer"></div>
 </div>
 
 <div class="main">
@@ -1002,7 +1040,7 @@ function pollPlanJob(jobId) {
       .then(function(r) { return r.json(); })
       .then(function(data) {
         if (data.status === 'done') {
-          window.location.href = '/mobile';
+          checkWorkoutSuggestions();
         } else if (data.status === 'error') {
           alert('Fehler beim Erstellen: ' + (data.message || 'Unbekannt'));
           document.getElementById('generating').classList.remove('show');
@@ -1011,6 +1049,78 @@ function pollPlanJob(jobId) {
         }
       }).catch(function() { pollPlanJob(jobId); });
   }, 5000);
+}
+
+// WORKOUT SUGGESTIONS — nach Plan-Generierung, einen Vorschlag nach dem anderen
+var workoutSuggestions = [];
+var currentSuggestionIdx = 0;
+var suggestionPlanId = null;
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function checkWorkoutSuggestions() {
+  fetch(BASE + '/api/plan/workout-suggestions')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      suggestionPlanId = data.plan_id;
+      var pending = (data.suggestions || []).filter(function(s) { return s.status === 'pending'; });
+      if (!pending.length) {
+        window.location.href = '/mobile';
+        return;
+      }
+      workoutSuggestions = pending;
+      currentSuggestionIdx = 0;
+      document.getElementById('generating').classList.remove('show');
+      document.getElementById('suggestions-screen').classList.add('show');
+      renderSuggestion();
+    }).catch(function() {
+      window.location.href = '/mobile';
+    });
+}
+
+function renderSuggestion() {
+  var s = workoutSuggestions[currentSuggestionIdx];
+  var total = workoutSuggestions.length;
+
+  document.getElementById('sg-title').textContent = currentSuggestionIdx === 0
+    ? 'Ich habe mir deine Workouts angeschaut.'
+    : 'Noch einer.';
+  document.getElementById('sg-progress').textContent = (currentSuggestionIdx + 1) + ' / ' + total;
+
+  document.getElementById('sg-card').innerHTML =
+    '<div class="sg-workout">' + escHtml((s.workout_name || 'STRENGTH TRAINING').toUpperCase()) + '</div>' +
+    '<div class="sg-change">' + escHtml(s.change || '') + '</div>' +
+    '<div class="sg-reason">' + escHtml(s.reason || '') + '</div>';
+
+  document.getElementById('sg-footer').innerHTML =
+    '<button class="sg-btn reject" onclick="respondSuggestion(\'rejected\')">&#10005; ABLEHNEN</button>' +
+    '<button class="sg-btn accept" onclick="respondSuggestion(\'accepted\')">&#10003; ANNEHMEN</button>';
+}
+
+function respondSuggestion(status) {
+  var s = workoutSuggestions[currentSuggestionIdx];
+  fetch(BASE + '/api/plan/workout-suggestions/respond', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({plan_id: suggestionPlanId, suggestion_id: s.id, status: status})
+  }).catch(function() {});
+
+  currentSuggestionIdx++;
+  if (currentSuggestionIdx < workoutSuggestions.length) {
+    renderSuggestion();
+  } else {
+    showSuggestionsDone();
+  }
+}
+
+function showSuggestionsDone() {
+  document.getElementById('sg-title').textContent = 'Gut. Ich hab’s notiert.';
+  document.getElementById('sg-progress').textContent = '';
+  document.getElementById('sg-card').innerHTML = '<div style="font-size:15px;color:rgba(240,237,230,.7);line-height:1.6;text-align:center;padding:20px 0">Dein Plan steht. Den Rest passen wir unterwegs an.</div>';
+  document.getElementById('sg-footer').innerHTML =
+    '<button class="sg-done-btn" onclick="window.location.href=\'/mobile\'">ZUM PLAN &rarr;</button>';
 }
 
 showStep(1);

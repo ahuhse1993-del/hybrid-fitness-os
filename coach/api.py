@@ -370,6 +370,83 @@ Wochen {week_from} bis {week_to}. day_of_week: 1=Mo bis 7=So. Rest Days nicht ei
         conn.commit()
         conn.close()
 
+        # ─── Workout-Vorschläge: Coach vergleicht geplante Strength-Sessions mit Hevy-Historie ───
+        try:
+            strength_notes = []
+            for week in plan_json.get('weeks', []):
+                for session in week.get('sessions', []):
+                    if session.get('session_type') == 'Strength Training':
+                        note = session.get('notes', '') or 'Strength Training'
+                        if note not in strength_notes:
+                            strength_notes.append(note)
+
+            if strength_notes and hevy_context:
+                suggestion_prompt = f"""Du bist CAIRN Coach. Du hast gerade einen neuen Trainingsplan erstellt.
+
+GEPLANTE STRENGTH-TRAINING-EINHEITEN IN DIESEM PLAN:
+{chr(10).join('- ' + n for n in strength_notes)}
+
+BISHERIGE KRAFTTRAINING-HISTORIE DES ATHLETEN (Hevy):
+{hevy_context}
+
+AUFGABE:
+Vergleiche die geplanten Einheiten mit der bisherigen Übungsauswahl des Athleten.
+Wo sinnvoll: schlage konkrete Anpassungen vor — Übungen ergänzen, streichen oder anpassen.
+Nur wenn es wirklich etwas zu verbessern gibt, nicht erzwingen. Maximal 4 Vorschläge. Wenn nichts zu verbessern ist: leere Liste.
+
+Für jeden Vorschlag:
+- workout_name: exakt einer der oben genannten geplanten Einheiten-Namen
+- change: was konkret ändern (1 Satz, mit konkreten Übungsnamen)
+- reason: warum (1-2 Sätze, CAIRN-Ton — ruhig, direkt, wie ein erfahrener Bergführer, nie wie Software)
+
+Antworte NUR mit JSON:
+{{"suggestions": [{{"workout_name": "...", "change": "...", "reason": "..."}}]}}"""
+
+                sugg_message = client.messages.create(
+                    model="claude-sonnet-4-6",
+                    max_tokens=1200,
+                    messages=[{"role": "user", "content": suggestion_prompt}]
+                )
+                sugg_raw = ""
+                for block in sugg_message.content:
+                    if hasattr(block, 'text'):
+                        sugg_raw += block.text
+                sugg_raw = sugg_raw.replace('```json', '').replace('```', '').strip()
+                if not sugg_raw.startswith('{'):
+                    import re
+                    m = re.search(r'\{[\s\S]*"suggestions"[\s\S]*\}', sugg_raw)
+                    if m:
+                        sugg_raw = m.group(0)
+
+                raw_suggestions = json.loads(sugg_raw).get('suggestions', [])
+                now_iso = datetime.utcnow().isoformat()
+                workout_suggestions = [
+                    {
+                        "id": f"{plan_id}-{i + 1}",
+                        "workout_name": s.get('workout_name', ''),
+                        "change": s.get('change', ''),
+                        "reason": s.get('reason', ''),
+                        "status": "pending",
+                        "comment": None,
+                        "created_at": now_iso,
+                        "responded_at": None,
+                    }
+                    for i, s in enumerate(raw_suggestions)
+                ]
+
+                if workout_suggestions:
+                    from psycopg2.extras import Json
+                    sugg_conn = get_db()
+                    sugg_cur = sugg_conn.cursor()
+                    sugg_cur.execute(
+                        "UPDATE plans SET workout_suggestions = %s WHERE id = %s",
+                        (Json(workout_suggestions), plan_id)
+                    )
+                    sugg_conn.commit()
+                    sugg_conn.close()
+        except Exception as sugg_err:
+            print(f"Workout-Vorschläge Fehler: {sugg_err}")
+
         return jsonify({
             "status": "ok",
             "plan_id": plan_id,
@@ -377,6 +454,72 @@ Wochen {week_from} bis {week_to}. day_of_week: 1=Mo bis 7=So. Rest Days nicht ei
             "sessions": sessions_inserted
         })
 
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e), "trace": traceback.format_exc()}), 500
+
+# ─── WORKOUT-VORSCHLÄGE (Coach-Feedback zu Strength-Sessions eines Plans) ───
+@app.route('/api/plan/workout-suggestions', methods=['GET'])
+def get_workout_suggestions():
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT id, workout_suggestions FROM plans
+            WHERE status = 'active' ORDER BY created_at DESC LIMIT 1
+        """)
+        row = cur.fetchone()
+        conn.close()
+        if not row:
+            return jsonify({"status": "ok", "plan_id": None, "suggestions": []})
+        return jsonify({"status": "ok", "plan_id": row[0], "suggestions": row[1] or []})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e), "trace": traceback.format_exc()}), 500
+
+@app.route('/api/plan/workout-suggestions/respond', methods=['POST'])
+def respond_workout_suggestion():
+    try:
+        from psycopg2.extras import Json
+        data = request.get_json(force=True)
+        suggestion_id = data.get('suggestion_id')
+        new_status = data.get('status')
+        comment = data.get('comment')
+        plan_id = data.get('plan_id')
+
+        if not suggestion_id or new_status not in ('accepted', 'rejected', 'pending'):
+            return jsonify({"status": "error", "message": "suggestion_id und status (accepted/rejected) erforderlich"}), 400
+
+        conn = get_db()
+        cur = conn.cursor()
+        if plan_id:
+            cur.execute("SELECT id, workout_suggestions FROM plans WHERE id = %s", (plan_id,))
+        else:
+            cur.execute("""
+                SELECT id, workout_suggestions FROM plans
+                WHERE status = 'active' ORDER BY created_at DESC LIMIT 1
+            """)
+        row = cur.fetchone()
+        if not row:
+            conn.close()
+            return jsonify({"status": "error", "message": "Kein Plan gefunden"}), 404
+
+        plan_id, suggestions = row[0], row[1] or []
+        found = False
+        for s in suggestions:
+            if s.get('id') == suggestion_id:
+                s['status'] = new_status
+                s['comment'] = comment
+                s['responded_at'] = datetime.utcnow().isoformat()
+                found = True
+                break
+
+        if not found:
+            conn.close()
+            return jsonify({"status": "error", "message": "Vorschlag nicht gefunden"}), 404
+
+        cur.execute("UPDATE plans SET workout_suggestions = %s WHERE id = %s", (Json(suggestions), plan_id))
+        conn.commit()
+        conn.close()
+        return jsonify({"status": "ok"})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e), "trace": traceback.format_exc()}), 500
 
@@ -973,13 +1116,40 @@ def coach_chat():
             'coach': 'Der Athlet hat den Coach direkt geöffnet. Allgemeines Coaching.'
         }
 
+        workout_suggestions_context = ""
+        try:
+            conn = get_db()
+            cur = conn.cursor()
+            cur.execute("""
+                SELECT workout_suggestions FROM plans
+                WHERE status = 'active' ORDER BY created_at DESC LIMIT 1
+            """)
+            row = cur.fetchone()
+            conn.close()
+            suggestions = (row[0] if row else None) or []
+            if suggestions:
+                lines = []
+                for s in suggestions:
+                    line = f"- [{s.get('status', 'pending')}] {s.get('workout_name', '')}: {s.get('change', '')} — Begründung: {s.get('reason', '')}"
+                    if s.get('comment'):
+                        line += f" | Kommentar vom Athlet: {s.get('comment')}"
+                    lines.append(line)
+                workout_suggestions_context = (
+                    "\n\nWORKOUT-VORSCHLÄGE ZUM AKTUELLEN PLAN (inkl. abgelehnte):\n"
+                    + "\n".join(lines)
+                    + "\nWenn der Athlet danach fragt: erkläre deine Vorschläge, in eigenen Worten. "
+                    "Bei einem abgelehnten Vorschlag: wenn der Athlet danach fragt, wiederhole ihn und begründe ihn neu — anders, nicht wortgleich."
+                )
+        except Exception:
+            workout_suggestions_context = ""
+
         system = """Du bist CAIRN, ein erfahrener Endurance Coach.
 Sprich wie ein ruhiger, erfahrener Bergführer. Nie wie Software.
 Kurze Sätze. Direkt. Menschlich. Auf Augenhöhe.
 Nie: 'Readiness Score', 'approved', 'freigegeben', 'Algorithmus'.
 Immer: Beobachtung, Einordnung, klare Empfehlung.
 
-""" + page_context.get(page, '')
+""" + page_context.get(page, '') + workout_suggestions_context
 
         clean_messages = [m for m in messages if m.get('role') in ['user', 'assistant'] and m.get('content', '').strip()]
 
