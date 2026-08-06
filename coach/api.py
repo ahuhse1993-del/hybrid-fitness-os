@@ -208,17 +208,23 @@ def generate_plan_internal(data):
                 cairn_routines[title] = [e.get('title', '') for e in r.get('exercises', []) if e.get('title')]
 
             if cairn_routines:
-                hevy_lines = []
+                hevy_lines = ["STRENGTH TRAINING: Verwende NUR diese Workout-Namen (exakt so wie hier geschrieben):"]
+                routine_by_category = {}
                 for title, exercises in cairn_routines.items():
                     category = HEVY_CATEGORIES.get(title, 'Ganzkörper')
-                    hevy_lines.append(f"- {title} [{category}]: {', '.join(exercises)}")
+                    routine_by_category.setdefault(category, title)
+                    hevy_lines.append(f"- {title} [{category}]: {', '.join(exercises[:4])}")
+                hevy_lines.append("Jeder andere Strength Training Name ist VERBOTEN.")
 
-                hevy_context = f"""
-HEVY CAIRN-ROUTINEN (offizielle Strength-Training-Vorlagen des Athleten):
-{chr(10).join(hevy_lines)}
+                oberkoerper_routine = routine_by_category.get('Oberkörper')
+                unterkoerper_routine = routine_by_category.get('Unterkörper')
+                full_body_routine = routine_by_category.get('Full Body Light')
+                if oberkoerper_routine and unterkoerper_routine:
+                    hevy_lines.append(f"Normale Wochen: {oberkoerper_routine} und {unterkoerper_routine} abwechselnd")
+                if full_body_routine:
+                    hevy_lines.append(f"Deload/Taper: {full_body_routine}")
 
-Nutze AUSSCHLIESSLICH diese CAIRN-Routinen für Strength Training Sessions. Normale Wochen: Upper Body CAIRN + Lower Body + Arms CAIRN abwechselnd. Deload/Taper Wochen: Full Body Light CAIRN.
-"""
+                hevy_context = "\n" + "\n".join(hevy_lines) + "\n"
         except Exception as hevy_err:
             print(f"Hevy Routinen Fehler: {hevy_err}")
 
