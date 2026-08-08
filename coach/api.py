@@ -183,9 +183,9 @@ def generate_plan_internal(data):
 
         # Hevy CAIRN-Routinen: offizielle Strength-Training-Vorlagen direkt aus der Hevy API
         HEVY_CATEGORIES = {
-            'Upper Body CAIRN': 'Oberkörper',
-            'Lower Body + Arms CAIRN': 'Unterkörper',
-            'Full Body Light CAIRN': 'Full Body Light',
+            'Upper Body CAIRN': 'oberkörper',
+            'Lower Body + Arms CAIRN': 'unterkörper',
+            'Full Body Light CAIRN': 'full_body_light',
         }
 
         hevy_context = ""
