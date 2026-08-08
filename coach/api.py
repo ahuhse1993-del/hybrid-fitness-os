@@ -1667,7 +1667,7 @@ def trigger_sync():
 
 @app.route('/api/health', methods=['GET'])
 def health():
-    return jsonify({"status": "ok", "date": str(get_today()), "version": "cairn-routine-fix-v3"})
+    return jsonify({"status": "ok", "date": str(get_today()), "version": "cairn-routine-fix-v4"})
 
 @app.route('/api/cron/health-sync', methods=['GET', 'POST'])
 def cron_health_sync():
