@@ -413,7 +413,31 @@ Wochen {week_from} bis {week_to}. day_of_week: 1=Mo bis 7=So. Rest Days nicht ei
                             strength_notes.append(note)
 
             if strength_notes and hevy_context:
+                # Athletenprofil laden — Langzeitziele haben Vorrang vor generischen Übungsempfehlungen
+                profile_conn = get_db()
+                profile_cur = profile_conn.cursor()
+                profile_cur.execute("""
+                    SELECT long_term_goals, cross_rennrad, cross_schwimmen, cross_wandern, cross_ski
+                    FROM athlete_profile ORDER BY id LIMIT 1
+                """)
+                profile_row = profile_cur.fetchone()
+                profile_conn.close()
+
+                long_term_goals = (profile_row[0] if profile_row else '') or 'keine angegeben'
+                cross_prefs = []
+                if profile_row:
+                    if profile_row[1]: cross_prefs.append('Rennrad')
+                    if profile_row[2]: cross_prefs.append('Schwimmen')
+                    if profile_row[3]: cross_prefs.append('Wandern')
+                    if profile_row[4]: cross_prefs.append('Ski')
+
+                athlete_profile_context = f"ATHLETENPROFIL LANGZEITZIELE: {long_term_goals}"
+                if cross_prefs:
+                    athlete_profile_context += f"\nCROSS TRAINING PRÄFERENZEN: {', '.join(cross_prefs)}"
+
                 suggestion_prompt = f"""Du bist CAIRN Coach. Du hast gerade einen neuen Trainingsplan erstellt.
+
+{athlete_profile_context}
 
 GEPLANTE STRENGTH-TRAINING-EINHEITEN IN DIESEM PLAN:
 {chr(10).join('- ' + n for n in strength_notes)}
@@ -424,6 +448,7 @@ AUFGABE:
 Vergleiche die geplanten Einheiten mit den offiziellen CAIRN-Routinen und deren Übungsauswahl.
 Wo sinnvoll: schlage konkrete Anpassungen vor — Übungen ergänzen, streichen oder anpassen.
 Nur wenn es wirklich etwas zu verbessern gibt, nicht erzwingen. Maximal 4 Vorschläge. Wenn nichts zu verbessern ist: leere Liste.
+Berücksichtige die Langzeitziele des Athleten. Wenn Optik oder ästhetische Ziele genannt sind, haben diese Vorrang vor reinem Functional Training. Schlage nur Änderungen vor die WIRKLICH fehlen — prüfe die Übungsliste sorgfältig bevor du etwas vorschlägst.
 
 Für jeden Vorschlag:
 - workout_name: exakt einer der oben genannten geplanten Einheiten-Namen
