@@ -384,6 +384,23 @@ Wochen {week_from} bis {week_to}. day_of_week: 1=Mo bis 7=So. Rest Days nicht ei
                 # Erste Woche: Sessions vor dem Startdatum überspringen
                 if week_num == 1 and day_of_week < actual_start_day:
                     continue
+                # CAIRN Routine Namen direkt beim Insert setzen
+                session_type_val = session.get('session_type', 'Easy Run')
+                notes_val = session.get('notes', '')
+                if session_type_val == 'Strength Training':
+                    phase_lower = phase.lower()
+                    if 'taper' in phase_lower or 'deload' in phase_lower:
+                        notes_val = full_body_routine or notes_val
+                    elif not hasattr(generate_plan_internal, '_strength_counter'):
+                        generate_plan_internal._strength_counter = {}
+                    else:
+                        wk_key = str(week_monday)
+                        generate_plan_internal._strength_counter[wk_key] = generate_plan_internal._strength_counter.get(wk_key, 0) + 1
+                        if generate_plan_internal._strength_counter[wk_key] % 2 == 1:
+                            notes_val = unterkoerper_routine or notes_val
+                        else:
+                            notes_val = oberkoerper_routine or notes_val
+
                 cur.execute("""
                     INSERT INTO training_plan
                     (week_date, day_of_week, session_type, session_zone,
@@ -392,11 +409,11 @@ Wochen {week_from} bis {week_to}. day_of_week: 1=Mo bis 7=So. Rest Days nicht ei
                 """, (
                     week_monday,
                     day_of_week,
-                    session.get('session_type', 'Easy Run'),
+                    session_type_val,
                     session.get('session_zone', ''),
                     session.get('duration_min', 0),
                     session.get('distance_km', 0),
-                    session.get('notes', ''),
+                    notes_val,
                     phase,
                     plan_id,
                     week_num
