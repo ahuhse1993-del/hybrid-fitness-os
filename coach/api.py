@@ -229,6 +229,7 @@ def generate_plan_internal(data):
         oberkoerper_routine = routine_by_category.get('oberkörper')
         unterkoerper_routine = routine_by_category.get('unterkörper')
         full_body_routine = routine_by_category.get('full_body_light')
+        print(f'DEBUG routines: ob={oberkoerper_routine}, ub={unterkoerper_routine}, fb={full_body_routine}')
 
         cross_training_context = ""
         if cross_training:
