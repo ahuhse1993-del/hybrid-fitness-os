@@ -374,6 +374,7 @@ Wochen {week_from} bis {week_to}. day_of_week: 1=Mo bis 7=So. Rest Days nicht ei
 
         # Sessions eintragen
         sessions_inserted = 0
+        strength_counter_per_week = {}
         for week in plan_json.get('weeks', []):
             week_num = week.get('week_number', 1)
             phase = week.get('phase', 'base')
@@ -390,16 +391,17 @@ Wochen {week_from} bis {week_to}. day_of_week: 1=Mo bis 7=So. Rest Days nicht ei
                 if session_type_val == 'Strength Training':
                     phase_lower = phase.lower()
                     if 'taper' in phase_lower or 'deload' in phase_lower:
-                        notes_val = full_body_routine or notes_val
-                    elif not hasattr(generate_plan_internal, '_strength_counter'):
-                        generate_plan_internal._strength_counter = {}
+                        if full_body_routine:
+                            notes_val = full_body_routine
                     else:
-                        wk_key = str(week_monday)
-                        generate_plan_internal._strength_counter[wk_key] = generate_plan_internal._strength_counter.get(wk_key, 0) + 1
-                        if generate_plan_internal._strength_counter[wk_key] % 2 == 1:
-                            notes_val = unterkoerper_routine or notes_val
+                        week_key = week_num
+                        strength_counter_per_week[week_key] = strength_counter_per_week.get(week_key, 0) + 1
+                        if strength_counter_per_week[week_key] % 2 == 1:
+                            if unterkoerper_routine:
+                                notes_val = unterkoerper_routine
                         else:
-                            notes_val = oberkoerper_routine or notes_val
+                            if oberkoerper_routine:
+                                notes_val = oberkoerper_routine
 
                 cur.execute("""
                     INSERT INTO training_plan
