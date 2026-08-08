@@ -327,25 +327,6 @@ Wochen {week_from} bis {week_to}. day_of_week: 1=Mo bis 7=So. Rest Days nicht ei
 
         plan_json = {"weeks": all_weeks}
 
-        # Strength Training Sessions bekommen die passende CAIRN-Routine als notes zugewiesen
-        # (kein Keyword-Parsing — Routine-Namen kommen direkt aus routine_by_category)
-        for week in plan_json.get('weeks', []):
-            phase_lower = (week.get('phase') or '').lower()
-            strength_count = 0
-            for session in week.get('sessions', []):
-                if session.get('session_type') != 'Strength Training':
-                    continue
-                strength_count += 1
-                if 'taper' in phase_lower or 'deload' in phase_lower:
-                    if full_body_routine:
-                        session['notes'] = full_body_routine
-                elif strength_count % 2 == 0:
-                    if oberkoerper_routine:
-                        session['notes'] = oberkoerper_routine
-                else:
-                    if unterkoerper_routine:
-                        session['notes'] = unterkoerper_routine
-
         # In DB speichern
         conn = get_db()
         cur = conn.cursor()
