@@ -181,7 +181,8 @@ def generate_plan_internal(data):
 
         all_weeks = []
 
-        # Hevy CAIRN-Routinen: offizielle Strength-Training-Vorlagen direkt aus der Hevy API
+        # CAIRN-Routinen: offizielle Strength-Training-Vorlagen aus der cairn_routines Tabelle
+        # (dort von data/hevy_routines_sync.py per GitHub Action alle 2 Tage aus Hevy synchronisiert)
         HEVY_CATEGORIES = {
             'Upper Body CAIRN': 'oberkörper',
             'Lower Body + Arms CAIRN': 'unterkörper',
@@ -191,23 +192,18 @@ def generate_plan_internal(data):
         hevy_context = ""
         routine_by_category = {}
         try:
-            import requests
-            hevy_resp = requests.get(
-                "https://api.hevyapp.com/v1/routines",
-                headers={"api-key": os.getenv("HEVY_API_KEY")},
-                params={"page": 1, "pageSize": 10},
-                timeout=10
-            )
-            routines = hevy_resp.json().get('routines', [])
+            hevy_conn = get_db()
+            hevy_cur = hevy_conn.cursor()
+            hevy_cur.execute("SELECT title, exercises FROM cairn_routines")
+            rows = hevy_cur.fetchall()
+            hevy_conn.close()
 
             cairn_routines = {}
-            for r in routines:
-                if r.get('folder_id') != HEVY_CAIRN_FOLDER_ID:
-                    continue
-                title = (r.get('title') or '').strip()
+            for title, exercises in rows:
+                title = (title or '').strip()
                 if not title or title in cairn_routines:
                     continue  # Duplikat ignorieren
-                cairn_routines[title] = [e.get('title', '') for e in r.get('exercises', []) if e.get('title')]
+                cairn_routines[title] = exercises or []
 
             if cairn_routines:
                 hevy_lines = ["STRENGTH TRAINING: Verwende NUR diese Workout-Namen (exakt so wie hier geschrieben):"]
