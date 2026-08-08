@@ -217,18 +217,18 @@ def generate_plan_internal(data):
                     hevy_lines.append(f"- {title} [{category}]: {', '.join(exercises[:4])}")
                 hevy_lines.append("Jeder andere Strength Training Name ist VERBOTEN.")
 
-                if routine_by_category.get('Oberkörper') and routine_by_category.get('Unterkörper'):
-                    hevy_lines.append(f"Normale Wochen: {routine_by_category['Oberkörper']} und {routine_by_category['Unterkörper']} abwechselnd")
-                if routine_by_category.get('Full Body Light'):
-                    hevy_lines.append(f"Deload/Taper: {routine_by_category['Full Body Light']}")
+                if routine_by_category.get('oberkörper') and routine_by_category.get('unterkörper'):
+                    hevy_lines.append(f"Normale Wochen: {routine_by_category['oberkörper']} und {routine_by_category['unterkörper']} abwechselnd")
+                if routine_by_category.get('full_body_light'):
+                    hevy_lines.append(f"Deload/Taper: {routine_by_category['full_body_light']}")
 
                 hevy_context = "\n" + "\n".join(hevy_lines) + "\n"
         except Exception as hevy_err:
             print(f"Hevy Routinen Fehler: {hevy_err}")
 
-        oberkoerper_routine = routine_by_category.get('Oberkörper')
-        unterkoerper_routine = routine_by_category.get('Unterkörper')
-        full_body_routine = routine_by_category.get('Full Body Light')
+        oberkoerper_routine = routine_by_category.get('oberkörper')
+        unterkoerper_routine = routine_by_category.get('unterkörper')
+        full_body_routine = routine_by_category.get('full_body_light')
 
         cross_training_context = ""
         if cross_training:
