@@ -113,7 +113,6 @@ html,body{height:100%;overflow:hidden;background:var(--bg);font-family:'DM Sans'
   background:#F8F5EE;
   cursor:pointer;transition:background .1s;
   position:relative;
-  touch-action:none;
 }
 .plan-session-row:active{background:#EDE9E0}
 .plan-session-row.dragging{opacity:.85;border:2px solid var(--accent)}
@@ -241,6 +240,13 @@ html,body{height:100%;overflow:hidden;background:var(--bg);font-family:'DM Sans'
 .cc-cat{font-family:'DM Mono',monospace;font-size:7px;color:var(--accent-dark);letter-spacing:.1em;margin-bottom:3px;text-transform:uppercase}
 .cc-content{font-size:12px;color:var(--mid);line-height:1.5}
 .cc-date{font-family:'DM Mono',monospace;font-size:8px;color:var(--stone);margin-top:3px}
+
+/* QUALITY SESSION STRUKTUR (Warm-Up / Hauptteil / Cool Down) */
+.qsd-block{background:var(--black);border-left:3px solid rgba(240,237,230,.15);padding:11px 13px;margin-bottom:6px}
+.qsd-block.main{border-left-color:var(--accent)}
+.qsd-label{font-family:'DM Mono',monospace;font-size:8px;letter-spacing:.14em;color:rgba(240,237,230,.4);margin-bottom:4px}
+.qsd-block.main .qsd-label{color:var(--accent)}
+.qsd-text{font-size:13px;color:#F0EDE6;line-height:1.55}
 
 /* OVERLAYS */
 .overlay{display:none;position:fixed;inset:0;background:rgba(26,25,24,.75);z-index:400;align-items:flex-end}
@@ -993,6 +999,53 @@ function loadTodayWeek() {
     }).catch(function() {});
 }
 
+// Baut Warm-Up / Hauptteil / Cool Down Blöcke für Quality Sessions.
+// Erst versuchen die Struktur aus den Coach-Notes zu lesen, sonst 15/70/15 der Gesamtdistanz (oder Dauer).
+function parseQualitySessionStructure(notes, distanceKm, durationMin) {
+  var markers = [
+    {key: 'warmup', label: 'WARM-UP', re: /warm[\s-]?up|aufw[aä]rm(en)?/i},
+    {key: 'main', label: 'HAUPTTEIL', re: /hauptteil|intervalle?|haupteinheit/i},
+    {key: 'cooldown', label: 'COOL DOWN', re: /cool[\s-]?down|abw[aä]rm(en)?|ausklang/i}
+  ];
+
+  var found = [];
+  if (notes) {
+    markers.forEach(function(m) {
+      var match = m.re.exec(notes);
+      if (match) found.push({key: m.key, label: m.label, index: match.index});
+    });
+  }
+
+  if (found.length === 3) {
+    found.sort(function(a, b) { return a.index - b.index; });
+    return found.map(function(f, i) {
+      var end = (i + 1 < found.length) ? found[i + 1].index : notes.length;
+      var text = notes.slice(f.index, end).replace(/^[^:]{0,20}:\s*/, '').trim();
+      return {key: f.key, label: f.label, text: text || notes.slice(f.index, end).trim()};
+    });
+  }
+
+  var isKm = distanceKm > 0;
+  var total = isKm ? distanceKm : (durationMin || 0);
+  var unit = isKm ? 'km' : 'min';
+  if (!total) {
+    return [
+      {key: 'warmup', label: 'WARM-UP', text: 'Locker einlaufen.'},
+      {key: 'main', label: 'HAUPTTEIL', text: notes || 'Hauptbelastung nach Plan.'},
+      {key: 'cooldown', label: 'COOL DOWN', text: 'Locker austraben.'}
+    ];
+  }
+  var round = function(v) { return isKm ? Math.round(v * 10) / 10 : Math.round(v); };
+  var warmup = round(total * 0.15);
+  var main = round(total * 0.70);
+  var cooldown = round(total - warmup - main);
+  return [
+    {key: 'warmup', label: 'WARM-UP', text: warmup + ' ' + unit + ' locker einlaufen'},
+    {key: 'main', label: 'HAUPTTEIL', text: main + ' ' + unit + (notes ? ' — ' + notes : '')},
+    {key: 'cooldown', label: 'COOL DOWN', text: cooldown + ' ' + unit + ' locker austraben'}
+  ];
+}
+
 function openTodayDay(dateStr) {
   var existing = document.getElementById('today-day-popup');
   if (existing) existing.remove();
@@ -1028,6 +1081,15 @@ function openTodayDay(dateStr) {
           strengthRoutineName = notes;
           h += '<div style="font-family:DM Mono,monospace;font-size:9px;color:var(--stone);letter-spacing:.08em;margin-bottom:8px">' + escHtml(notes.toUpperCase()) + '</div>';
           h += '<div id="strength-exercises-list" style="margin-bottom:16px"><div style="font-size:13px;color:var(--stone)">Lade Übungen&hellip;</div></div>';
+        } else if (isQuality) {
+          var qsdBlocks = parseQualitySessionStructure(notes, s.distance_km, s.duration_min);
+          qsdBlocks.forEach(function(b) {
+            h += '<div class="qsd-block' + (b.key === 'main' ? ' main' : '') + '">';
+            h += '<div class="qsd-label">' + escHtml(b.label) + '</div>';
+            h += '<div class="qsd-text">' + escHtml(b.text) + '</div>';
+            h += '</div>';
+          });
+          h += '<div style="margin-bottom:10px"></div>';
         } else if (notes) {
           var phases = notes.split(' · ').filter(function(p) { return p.trim(); });
           if (phases.length > 1) {
@@ -1130,7 +1192,8 @@ function loadPlanPage() {
 }
 
 function loadPlanFull() {
-  fetch(BASE + '/api/plan')
+  // offset_weeks=0 -> Backend lädt Wochen von (diese Woche - 1) bis (diese Woche + 52), explizit statt implizit
+  fetch(BASE + '/api/plan?offset_weeks=0')
     .then(function(r) { return r.json(); })
     .then(function(data) {
       if (data.status !== 'ok' || !data.plan || !data.plan.length) {
@@ -1337,9 +1400,9 @@ function onPsrTouchStart(event, id) {
 }
 
 function onPsrTouchMove(event) {
-  var dx = Math.abs(event.touches[0].clientX - dnd.startX);
   var dy = Math.abs(event.touches[0].clientY - dnd.startY);
-  if (!dnd.active && (dx > 8 || dy > 8)) {
+  if (!dnd.active && dy > 8) {
+    // Vertikale Bewegung vor Ablauf des Long-Press-Timers = Scroll-Absicht, kein Drag.
     clearTimeout(dnd.timer);
     dnd.sourceId = null;
     return;
