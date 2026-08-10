@@ -145,22 +145,21 @@ html,body{height:100%;overflow:hidden;background:var(--bg);font-family:'DM Sans'
 .prest-day{font-family:'DM Mono',monospace;font-size:9px;color:var(--stone);letter-spacing:.1em}
 .prest-label{font-family:'DM Mono',monospace;font-size:9px;color:var(--stone);letter-spacing:.14em}
 
-/* PLAN SAVE / UNDO BAR */
-.plan-save-bar,.plan-undo-bar{
+/* PLAN SAVE BAR */
+.plan-save-bar{
   display:none;position:sticky;top:0;z-index:50;
   align-items:center;justify-content:space-between;gap:10px;
   padding:11px 14px;
   background:var(--black);
   border-bottom:2px solid var(--accent);
 }
-.plan-save-bar.show,.plan-undo-bar.show{display:flex}
+.plan-save-bar.show{display:flex}
 .psb-text{font-family:'DM Mono',monospace;font-size:9px;color:#F0EDE6;letter-spacing:.08em;flex:1}
 .psb-actions{display:flex;gap:8px;flex-shrink:0}
 .psb-btn{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.08em;padding:9px 12px;border:none;cursor:pointer}
 .psb-btn.discard{background:transparent;border:.5px solid rgba(240,237,230,.3);color:rgba(240,237,230,.7)}
 .psb-btn.save{background:var(--accent);color:var(--black);font-weight:500}
 .psb-btn.save:disabled{opacity:.5}
-.psb-btn.undo{background:transparent;border:.5px solid var(--accent);color:var(--accent)}
 
 /* PLAN COACH TOAST */
 .plan-coach-toast{
@@ -533,12 +532,6 @@ html,body{height:100%;overflow:hidden;background:var(--bg);font-family:'DM Sans'
     </div>
   </div>
 
-  <!-- UNDO BAR: erscheint 5s nach dem Speichern -->
-  <div id="plan-undo-bar" class="plan-undo-bar">
-    <div class="psb-text">GESPEICHERT.</div>
-    <button class="psb-btn undo" onclick="undoPlanSave()">RÜCKGÄNGIG</button>
-  </div>
-
   <!-- PLAN BODY: Wochen -->
   <div id="plan-days-list" ontouchmove="onPlanContainerTouchMove(event)">
     <div style="padding:24px 16px;font-family:'DM Mono',monospace;font-size:9px;color:var(--stone)">PLAN WIRD GELADEN...</div>
@@ -693,8 +686,6 @@ var activitiesLoaded = false;
 var planWeekOffset = 0;
 var planSessionsData = [];
 var pendingMoves = [];
-var lastSavedMoves = [];
-var undoBarTimer = null;
 var coachToastTimer = null;
 var athleteLoaded = false;
 var athleteShoes = [];
@@ -1517,7 +1508,7 @@ function savePlanChanges() {
   var hadError = false;
 
   function step(i) {
-    if (i >= moves.length) { finishSave(moves, results, hadError); return; }
+    if (i >= moves.length) { finishSave(results, hadError); return; }
     fetch(BASE + '/api/plan/move', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
@@ -1532,7 +1523,7 @@ function savePlanChanges() {
   step(0);
 }
 
-function finishSave(moves, results, hadError) {
+function finishSave(results, hadError) {
   var btn = document.getElementById('plan-save-btn');
   if (btn) { btn.disabled = false; btn.textContent = 'SPEICHERN'; }
 
@@ -1548,10 +1539,6 @@ function finishSave(moves, results, hadError) {
     showCoachToast((results[0] && results[0].message) || 'Gespeichert.', true);
   }
 
-  if (!hadError) {
-    lastSavedMoves = moves;
-    showUndoBar();
-  }
   planLoaded = false;
   loadPlanPage();
 }
@@ -1565,41 +1552,13 @@ function showCoachToast(message, isOk) {
     + '<div class="pct-text">' + escHtml(message) + '</div>';
   el.classList.add('show');
   clearTimeout(coachToastTimer);
-  coachToastTimer = setTimeout(function() { el.classList.remove('show'); }, 15000);
+  coachToastTimer = setTimeout(function() { el.classList.remove('show'); }, 30000);
 }
 
 function closeCoachToast() {
   var el = document.getElementById('plan-coach-toast');
   if (el) el.classList.remove('show');
   clearTimeout(coachToastTimer);
-}
-
-function showUndoBar() {
-  var bar = document.getElementById('plan-undo-bar');
-  if (!bar) return;
-  bar.classList.add('show');
-  clearTimeout(undoBarTimer);
-  undoBarTimer = setTimeout(function() { bar.classList.remove('show'); }, 5000);
-}
-
-function undoPlanSave() {
-  var bar = document.getElementById('plan-undo-bar');
-  if (bar) bar.classList.remove('show');
-  clearTimeout(undoBarTimer);
-  if (!lastSavedMoves.length) return;
-
-  var moves = lastSavedMoves.slice().reverse();
-  lastSavedMoves = [];
-
-  function step(i) {
-    if (i >= moves.length) { planLoaded = false; loadPlanPage(); return; }
-    fetch(BASE + '/api/plan/move', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({source_id: moves[i].sourceId, target_week: moves[i].fromWeek, target_day: moves[i].fromDay})
-    }).then(function() { step(i + 1); }).catch(function() { step(i + 1); });
-  }
-  step(0);
 }
 
 // ACTIVITIES PAGE
