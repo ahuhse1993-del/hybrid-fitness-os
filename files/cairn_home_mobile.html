@@ -116,9 +116,10 @@ html,body{height:100%;overflow:hidden;background:var(--bg);font-family:'DM Sans'
   touch-action:none;
 }
 .plan-session-row:active{background:#EDE9E0}
-.plan-session-row.dragging{opacity:.4;background:#E8E4DC}
+.plan-session-row.dragging{opacity:.85;border:2px solid var(--accent)}
 .plan-session-row.drag-over{background:rgba(232,216,74,.08);outline:1px dashed var(--accent)}
 .plan-session-row.done-row{opacity:.45}
+.plan-session-row.not-draggable{cursor:default}
 
 .psr-illus{
   width:64px;height:64px;flex-shrink:0;
@@ -134,13 +135,43 @@ html,body{height:100%;overflow:hidden;background:var(--bg);font-family:'DM Sans'
 
 /* REST DAY */
 .plan-rest-row{
-  display:flex;align-items:center;gap:12px;
+  display:flex;align-items:center;justify-content:space-between;
   margin:0 12px 6px;
-  padding:8px 12px;
-  border:.5px dashed rgba(46,44,42,.15);
+  min-height:66px;
+  padding:0 16px;
+  border:1px dashed rgba(46,44,42,.2);
 }
-.prest-day{font-family:'DM Mono',monospace;font-size:8px;color:rgba(46,44,42,.25);letter-spacing:.1em;width:24px}
-.prest-label{font-family:'DM Mono',monospace;font-size:8px;color:var(--stone);letter-spacing:.1em}
+.plan-rest-row.drag-over{background:rgba(232,216,74,.1);border-color:var(--accent);border-style:solid}
+.prest-day{font-family:'DM Mono',monospace;font-size:9px;color:var(--stone);letter-spacing:.1em}
+.prest-label{font-family:'DM Mono',monospace;font-size:9px;color:var(--stone);letter-spacing:.14em}
+
+/* PLAN SAVE / UNDO BAR */
+.plan-save-bar,.plan-undo-bar{
+  display:none;position:sticky;top:0;z-index:50;
+  align-items:center;justify-content:space-between;gap:10px;
+  padding:11px 14px;
+  background:var(--black);
+  border-bottom:2px solid var(--accent);
+}
+.plan-save-bar.show,.plan-undo-bar.show{display:flex}
+.psb-text{font-family:'DM Mono',monospace;font-size:9px;color:#F0EDE6;letter-spacing:.08em;flex:1}
+.psb-actions{display:flex;gap:8px;flex-shrink:0}
+.psb-btn{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.08em;padding:9px 12px;border:none;cursor:pointer}
+.psb-btn.discard{background:transparent;border:.5px solid rgba(240,237,230,.3);color:rgba(240,237,230,.7)}
+.psb-btn.save{background:var(--accent);color:var(--black);font-weight:500}
+.psb-btn.save:disabled{opacity:.5}
+.psb-btn.undo{background:transparent;border:.5px solid var(--accent);color:var(--accent)}
+
+/* PLAN COACH TOAST */
+.plan-coach-toast{
+  display:none;position:fixed;left:16px;right:16px;
+  bottom:calc(var(--nav-h) + 16px + env(safe-area-inset-bottom));
+  z-index:700;padding:12px 14px;font-size:13px;line-height:1.5;
+  border-left:3px solid;background:var(--bg);
+}
+.plan-coach-toast.show{display:block}
+.plan-coach-toast.ok{border-color:#4CAF50;color:var(--black)}
+.plan-coach-toast.warn{border-color:var(--accent-dark);color:var(--black)}
 .plan-day{border-bottom:.5px solid var(--black)}
 .plan-day-head{display:flex;align-items:center;gap:12px;padding:12px 16px;background:var(--bg)}
 .plan-day-name{font-family:'DM Mono',monospace;font-size:9px;color:var(--stone);letter-spacing:.1em;width:24px}
@@ -482,23 +513,29 @@ html,body{height:100%;overflow:hidden;background:var(--bg);font-family:'DM Sans'
     </div>
   </div>
 
+  <!-- SAVE BAR: erscheint sobald lokale Verschiebungen ausstehen -->
+  <div id="plan-save-bar" class="plan-save-bar">
+    <div class="psb-text" id="plan-save-text">1 ÄNDERUNG NICHT GESPEICHERT</div>
+    <div class="psb-actions">
+      <button class="psb-btn discard" onclick="discardPlanChanges()">VERWERFEN</button>
+      <button class="psb-btn save" id="plan-save-btn" onclick="savePlanChanges()">SPEICHERN</button>
+    </div>
+  </div>
+
+  <!-- UNDO BAR: erscheint 5s nach dem Speichern -->
+  <div id="plan-undo-bar" class="plan-undo-bar">
+    <div class="psb-text">GESPEICHERT.</div>
+    <button class="psb-btn undo" onclick="undoPlanSave()">RÜCKGÄNGIG</button>
+  </div>
+
   <!-- PLAN BODY: Wochen -->
   <div id="plan-days-list">
     <div style="padding:24px 16px;font-family:'DM Mono',monospace;font-size:9px;color:var(--stone)">PLAN WIRD GELADEN...</div>
   </div>
 </div>
 
-<!-- DRAG COACH POPUP -->
-<div id="drag-coach-popup" style="display:none;position:fixed;inset:0;background:rgba(26,25,24,.75);z-index:600;align-items:flex-end">
-  <div style="background:var(--bg);width:100%;border-top:3px solid var(--accent-dark);padding:24px 16px;padding-bottom:calc(24px + env(safe-area-inset-bottom))">
-    <div style="font-family:'DM Mono',monospace;font-size:8px;color:var(--accent-dark);letter-spacing:.14em;margin-bottom:10px">CAIRN · HINWEIS</div>
-    <div style="font-size:16px;font-weight:300;color:var(--black);line-height:1.55;margin-bottom:20px" id="drag-coach-msg">—</div>
-    <div style="display:flex;gap:8px">
-      <button onclick="keepDragChange()" style="flex:1;padding:13px;background:var(--black);border:none;color:var(--bg);font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.1em;cursor:pointer">SO LASSEN</button>
-      <button onclick="undoDragChange()" style="flex:1;padding:13px;background:transparent;border:.5px solid var(--stone);color:var(--mid);font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.1em;cursor:pointer">RÜCKGÄNGIG</button>
-    </div>
-  </div>
-</div>
+<!-- COACH TOAST: kurzes Feedback nach dem Speichern -->
+<div id="plan-coach-toast" class="plan-coach-toast"></div>
 
 <!-- PAGE: ACTIVITIES -->
 <div class="page" id="page-activities">
@@ -643,6 +680,11 @@ var planLoaded = false;
 var planMeta = null;
 var activitiesLoaded = false;
 var planWeekOffset = 0;
+var planSessionsData = [];
+var pendingMoves = [];
+var lastSavedMoves = [];
+var undoBarTimer = null;
+var coachToastTimer = null;
 var athleteLoaded = false;
 var athleteShoes = [];
 var athleteCross = {};
@@ -1095,8 +1137,11 @@ function loadPlanFull() {
         showNoPlanState();
         return;
       }
+      planSessionsData = data.plan;
+      pendingMoves = [];
+      updateSaveBar();
       renderPlanHeader();
-      renderPlanWeeks(data.plan);
+      renderPlanWeeks(planSessionsData);
     }).catch(function() { showNoPlanState(); });
 }
 
@@ -1117,6 +1162,13 @@ function renderPlanHeader() {
 }
 
 function renderPlanWeeks(sessions) {
+  // Manuell geöffnete Wochen merken — sonst klappt jede Woche bei jedem Re-Render
+  // (z.B. nach einer lokalen Verschiebung) wieder zu.
+  var openWeeks = {};
+  document.querySelectorAll('.plan-week-body.open').forEach(function(el) {
+    openWeeks[el.id.replace('week-body-', '')] = true;
+  });
+
   var weeks = {};
   var today = new Date().toISOString().split('T')[0];
   sessions.forEach(function(s) {
@@ -1150,6 +1202,7 @@ function renderPlanWeeks(sessions) {
     var monday = new Date(weekDate + 'T12:00:00');
     var kw = getWeekNumber(monday);
     var isCurrentWeek = weekDate === todayWeek;
+    var isOpen = isCurrentWeek || !!openWeeks[weekDate];
     var phase = weeks[weekDate][0] && weeks[weekDate][0].phase ? weeks[weekDate][0].phase : 'base';
     var phaseLabel = PHASE_LABELS[phase] || phase.toUpperCase();
     var totalKm = 0;
@@ -1164,9 +1217,9 @@ function renderPlanWeeks(sessions) {
     html += '<div class="pwh-kw">KW ' + kw + '</div>';
     html += '<div class="pwh-title">' + phaseLabel + (isCurrentWeek ? ' · JETZT' : '') + '</div>';
     html += '<div class="pwh-meta">' + (totalKm > 0 ? totalKm.toFixed(0) + ' km' : '') + (sessionCount > 0 ? ' · ' + sessionCount + 'x' : '') + '</div>';
-    html += '<div class="pwh-arrow' + (isCurrentWeek ? ' open' : '') + '">&#9658;</div>';
+    html += '<div class="pwh-arrow' + (isOpen ? ' open' : '') + '">&#9658;</div>';
     html += '</div>';
-    html += '<div class="plan-week-body' + (isCurrentWeek ? ' open' : '') + '" id="week-body-' + weekDate + '">';
+    html += '<div class="plan-week-body' + (isOpen ? ' open' : '') + '" id="week-body-' + weekDate + '">';
 
     for (var d = 1; d <= 7; d++) {
       var dayDate = new Date(monday);
@@ -1181,16 +1234,19 @@ function renderPlanWeeks(sessions) {
         var rawType = s.session_type || '';
         var displayName = (rawType === 'Strength Training' && s.notes) ? s.notes : (rawType || '—');
         var dist = s.distance_km > 0 ? s.distance_km.toFixed(1) + ' km' : (s.duration_min ? s.duration_min + ' min' : '');
+        var isDone = isPast && s.is_done;
+        // Nur echte, noch nicht abgehakte Plan-Sessions (positive id) lassen sich verschieben.
+        var isDraggable = s.id > 0 && !isDone;
 
-        html += '<div class="plan-session-row' + (isPast && s.is_done ? ' done-row' : '') + '"'
+        html += '<div class="plan-session-row' + (isDone ? ' done-row' : '') + (isDraggable ? '' : ' not-draggable') + '"'
           + ' id="psr-' + s.id + '"'
           + ' data-id="' + s.id + '"'
           + ' data-week="' + weekDate + '"'
           + ' data-day="' + d + '"'
           + ' data-date="' + dateStr + '"'
-          + ' ontouchstart="onPsrTouchStart(event,' + s.id + ')"'
-          + ' ontouchmove="onPsrTouchMove(event)"'
-          + ' ontouchend="onPsrTouchEnd(event)"'
+          + (isDraggable
+              ? ' ontouchstart="onPsrTouchStart(event,' + s.id + ')" ontouchmove="onPsrTouchMove(event)" ontouchend="onPsrTouchEnd(event)"'
+              : '')
           + ' onclick="openTodayDay(\'' + dateStr + '\')"'
           + (isToday ? ' style="border-left:3px solid var(--accent)"' : '')
           + '>';
@@ -1200,11 +1256,11 @@ function renderPlanWeeks(sessions) {
         html += '<div class="psr-type">' + escHtml(displayName) + '</div>';
         if (dist) html += '<div class="psr-dist">' + dist + '</div>';
         html += '</div>';
-        if (isPast && s.is_done) html += '<div class="psr-done">&#10003;</div>';
+        if (isDone) html += '<div class="psr-done">&#10003;</div>';
         html += '</div>';
       } else {
         html += '<div class="plan-rest-row" data-date="' + dateStr + '" data-week="' + weekDate + '" data-day="' + d + '">';
-        html += '<div class="prest-day">' + DAY_NAMES_SHORT[d] + '</div>';
+        html += '<div class="prest-day">' + DAY_NAMES_SHORT[d] + ' ' + dayDate.getDate() + '.</div>';
         html += '<div class="prest-label">REST</div>';
         html += '</div>';
       }
@@ -1270,10 +1326,10 @@ function onPsrTouchStart(event, id) {
   dnd.timer = setTimeout(function() {
     dnd.active = true;
     el.classList.add('dragging');
-    // Ghost erstellen
+    // Ghost erstellen — folgt dem Finger, die Kachel selbst bleibt an Ort und Stelle
     var ghost = el.cloneNode(true);
     ghost.id = 'dnd-ghost';
-    ghost.style.cssText = 'position:fixed;width:' + el.offsetWidth + 'px;opacity:.85;z-index:999;pointer-events:none;left:' + el.getBoundingClientRect().left + 'px;top:' + el.getBoundingClientRect().top + 'px;border:2px solid var(--accent);background:#F0EDE6;box-shadow:0 8px 24px rgba(0,0,0,.2)';
+    ghost.style.cssText = 'position:fixed;width:' + el.offsetWidth + 'px;opacity:.85;z-index:999;pointer-events:none;left:' + el.getBoundingClientRect().left + 'px;top:' + el.getBoundingClientRect().top + 'px;border:2px solid var(--accent);background:#F0EDE6';
     document.body.appendChild(ghost);
     dnd.ghost = ghost;
     if (navigator.vibrate) navigator.vibrate(40);
@@ -1296,11 +1352,11 @@ function onPsrTouchMove(event) {
     dnd.ghost.style.left = (x - dnd.ghost.offsetWidth/2) + 'px';
     dnd.ghost.style.top = (y - 30) + 'px';
   }
-  // Ziel highlighten
+  // Ziel highlighten — jede andere Session-Kachel oder Rest-Day-Kachel ist ein gültiges Ziel
   if (dnd.lastTarget) dnd.lastTarget.classList.remove('drag-over');
   var el = document.elementFromPoint(x, y);
   var row = el ? el.closest('.plan-session-row, .plan-rest-row') : null;
-  if (row && row.id !== 'psr-' + dnd.sourceId) {
+  if (row && row.id !== 'psr-' + dnd.sourceId && !row.classList.contains('done-row')) {
     row.classList.add('drag-over');
     dnd.lastTarget = row;
   }
@@ -1319,11 +1375,10 @@ function onPsrTouchEnd(event) {
   var el = document.elementFromPoint(x, y);
   var targetRow = el ? el.closest('.plan-session-row, .plan-rest-row') : null;
 
-  if (targetRow && targetRow.id !== 'psr-' + dnd.sourceId) {
-    var targetId = targetRow.dataset.id ? parseInt(targetRow.dataset.id) : null;
+  if (targetRow && targetRow.id !== 'psr-' + dnd.sourceId && !targetRow.classList.contains('done-row')) {
     var targetWeek = targetRow.dataset.week;
     var targetDay = parseInt(targetRow.dataset.day);
-    swapSessions(dnd.sourceId, dnd.sourceWeek, dnd.sourceDay, targetId, targetWeek, targetDay);
+    moveSessionLocal(dnd.sourceId, dnd.sourceWeek, dnd.sourceDay, targetWeek, targetDay);
   }
 
   dnd.active = false;
@@ -1331,39 +1386,129 @@ function onPsrTouchEnd(event) {
   dnd.lastTarget = null;
 }
 
-function swapSessions(srcId, srcWeek, srcDay, tgtId, tgtWeek, tgtDay) {
-  fetch(BASE + '/api/plan/move', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({
-      source_id: srcId,
-      source_week: srcWeek,
-      source_day: srcDay,
-      target_id: tgtId,
-      target_week: tgtWeek,
-      target_day: tgtDay
-    })
-  }).then(function(r) { return r.json(); })
-  .then(function(data) {
-    if (data.warning) {
-      document.getElementById('drag-coach-msg').textContent = data.warning;
-      document.getElementById('drag-coach-popup').style.display = 'flex';
-    }
-    planLoaded = false;
-    loadPlanPage();
-  }).catch(function() {
-    planLoaded = false;
-    loadPlanPage();
-  });
+// Verschiebt nur lokal (im Browser) — noch nicht gespeichert. Merkt sich die
+// Änderung in pendingMoves, damit "SPEICHERN" sie später an den Server schickt.
+function moveSessionLocal(sourceId, fromWeek, fromDay, toWeek, toDay) {
+  if (fromWeek === toWeek && fromDay === toDay) return;
+  var source = planSessionsData.find(function(s) { return s.id === sourceId; });
+  if (!source) return;
+  var target = planSessionsData.find(function(s) { return s.week_date === toWeek && s.day_of_week === toDay; });
+
+  if (target) {
+    target.week_date = fromWeek;
+    target.day_of_week = fromDay;
+  }
+  source.week_date = toWeek;
+  source.day_of_week = toDay;
+
+  pendingMoves.push({sourceId: sourceId, fromWeek: fromWeek, fromDay: fromDay, toWeek: toWeek, toDay: toDay});
+  renderPlanWeeks(planSessionsData);
+  updateSaveBar();
 }
 
-
-function keepDragChange() {
-  document.getElementById('drag-coach-popup').style.display = 'none';
+function updateSaveBar() {
+  var bar = document.getElementById('plan-save-bar');
+  var textEl = document.getElementById('plan-save-text');
+  if (!bar) return;
+  if (pendingMoves.length > 0) {
+    if (textEl) textEl.textContent = pendingMoves.length + (pendingMoves.length === 1 ? ' ÄNDERUNG' : ' ÄNDERUNGEN') + ' NICHT GESPEICHERT';
+    bar.classList.add('show');
+  } else {
+    bar.classList.remove('show');
+  }
 }
-function undoDragChange() {
-  document.getElementById('drag-coach-popup').style.display = 'none';
+
+function discardPlanChanges() {
+  pendingMoves = [];
+  updateSaveBar();
+  planLoaded = false;
   loadPlanPage();
+}
+
+function savePlanChanges() {
+  if (!pendingMoves.length) return;
+  var btn = document.getElementById('plan-save-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'SPEICHERT...'; }
+
+  var moves = pendingMoves.slice();
+  var results = [];
+  var hadError = false;
+
+  function step(i) {
+    if (i >= moves.length) { finishSave(moves, results, hadError); return; }
+    fetch(BASE + '/api/plan/move', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({source_id: moves[i].sourceId, target_week: moves[i].toWeek, target_day: moves[i].toDay})
+    }).then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (data.status === 'ok') results.push(data.coach || {ok: true, message: ''});
+        else hadError = true;
+        step(i + 1);
+      }).catch(function() { hadError = true; step(i + 1); });
+  }
+  step(0);
+}
+
+function finishSave(moves, results, hadError) {
+  var btn = document.getElementById('plan-save-btn');
+  if (btn) { btn.disabled = false; btn.textContent = 'SPEICHERN'; }
+
+  pendingMoves = [];
+  updateSaveBar();
+
+  var warning = results.find(function(r) { return r && r.ok === false; });
+  if (hadError) {
+    showCoachToast('Speichern hat nicht ganz geklappt — ich lade den Plan neu.', false);
+  } else if (warning) {
+    showCoachToast(warning.message || 'Schau dir das nochmal an.', false);
+  } else {
+    showCoachToast((results[0] && results[0].message) || 'Gespeichert.', true);
+  }
+
+  if (!hadError) {
+    lastSavedMoves = moves;
+    showUndoBar();
+  }
+  planLoaded = false;
+  loadPlanPage();
+}
+
+function showCoachToast(message, isOk) {
+  var el = document.getElementById('plan-coach-toast');
+  if (!el) return;
+  el.textContent = message;
+  el.className = 'plan-coach-toast show ' + (isOk ? 'ok' : 'warn');
+  clearTimeout(coachToastTimer);
+  coachToastTimer = setTimeout(function() { el.classList.remove('show'); }, 2000);
+}
+
+function showUndoBar() {
+  var bar = document.getElementById('plan-undo-bar');
+  if (!bar) return;
+  bar.classList.add('show');
+  clearTimeout(undoBarTimer);
+  undoBarTimer = setTimeout(function() { bar.classList.remove('show'); }, 5000);
+}
+
+function undoPlanSave() {
+  var bar = document.getElementById('plan-undo-bar');
+  if (bar) bar.classList.remove('show');
+  clearTimeout(undoBarTimer);
+  if (!lastSavedMoves.length) return;
+
+  var moves = lastSavedMoves.slice().reverse();
+  lastSavedMoves = [];
+
+  function step(i) {
+    if (i >= moves.length) { planLoaded = false; loadPlanPage(); return; }
+    fetch(BASE + '/api/plan/move', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({source_id: moves[i].sourceId, target_week: moves[i].fromWeek, target_day: moves[i].fromDay})
+    }).then(function() { step(i + 1); }).catch(function() { step(i + 1); });
+  }
+  step(0);
 }
 
 // ACTIVITIES PAGE
