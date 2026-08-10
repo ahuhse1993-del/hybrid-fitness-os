@@ -113,6 +113,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);font-family:'DM Sans'
   background:#F8F5EE;
   cursor:pointer;transition:background .1s;
   position:relative;
+  user-select:none;-webkit-user-select:none;
 }
 .plan-session-row:active{background:#EDE9E0}
 .plan-session-row.dragging{opacity:.85;border:2px solid var(--accent)}
@@ -535,7 +536,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);font-family:'DM Sans'
   </div>
 
   <!-- PLAN BODY: Wochen -->
-  <div id="plan-days-list">
+  <div id="plan-days-list" ontouchmove="onPlanContainerTouchMove(event)">
     <div style="padding:24px 16px;font-family:'DM Mono',monospace;font-size:9px;color:var(--stone)">PLAN WIRD GELADEN...</div>
   </div>
 </div>
@@ -1388,6 +1389,7 @@ function onPsrTouchStart(event, id) {
   dnd.startY = event.touches[0].clientY;
   dnd.timer = setTimeout(function() {
     dnd.active = true;
+    event.preventDefault(); // unterdrückt iOS Text-Auswahl/Callout beim Long Press
     el.classList.add('dragging');
     // Ghost erstellen — folgt dem Finger, die Kachel selbst bleibt an Ort und Stelle
     var ghost = el.cloneNode(true);
@@ -1422,6 +1424,18 @@ function onPsrTouchMove(event) {
   if (row && row.id !== 'psr-' + dnd.sourceId && !row.classList.contains('done-row')) {
     row.classList.add('drag-over');
     dnd.lastTarget = row;
+  }
+}
+
+// Zusätzliche Absicherung auf dem gesamten Plan-Container (iOS liefert touchmove
+// beim Scrollen nicht immer zuverlässig an das einzelne Kachel-Element).
+function onPlanContainerTouchMove(event) {
+  if (dnd.active) return;
+  if (!event.touches || !event.touches[0]) return;
+  var dy = Math.abs(event.touches[0].clientY - dnd.startY);
+  if (dy > 5) {
+    clearTimeout(dnd.timer);
+    dnd.sourceId = null;
   }
 }
 
