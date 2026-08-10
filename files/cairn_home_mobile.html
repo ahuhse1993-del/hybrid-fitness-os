@@ -166,12 +166,16 @@ html,body{height:100%;overflow:hidden;background:var(--bg);font-family:'DM Sans'
 .plan-coach-toast{
   display:none;position:fixed;left:16px;right:16px;
   bottom:calc(var(--nav-h) + 16px + env(safe-area-inset-bottom));
-  z-index:700;padding:12px 14px;font-size:13px;line-height:1.5;
-  border-left:3px solid;background:var(--bg);
+  z-index:700;
+  background:var(--black);
+  border:2px solid var(--accent);
+  padding:14px 40px 14px 14px;
 }
 .plan-coach-toast.show{display:block}
-.plan-coach-toast.ok{border-color:#4CAF50;color:var(--black)}
-.plan-coach-toast.warn{border-color:var(--accent-dark);color:var(--black)}
+.pct-kicker{font-family:'DM Mono',monospace;font-size:8px;letter-spacing:.14em;color:var(--accent);margin-bottom:6px}
+.pct-text{font-size:13px;line-height:1.55;color:#F0EDE6}
+.pct-close{position:absolute;top:8px;right:8px;width:26px;height:26px;background:transparent;border:none;color:rgba(240,237,230,.5);font-family:'DM Mono',monospace;font-size:16px;line-height:1;cursor:pointer;padding:0;display:flex;align-items:center;justify-content:center}
+.pct-close:active{color:var(--accent)}
 .plan-day{border-bottom:.5px solid var(--black)}
 .plan-day-head{display:flex;align-items:center;gap:12px;padding:12px 16px;background:var(--bg)}
 .plan-day-name{font-family:'DM Mono',monospace;font-size:9px;color:var(--stone);letter-spacing:.1em;width:24px}
@@ -1555,10 +1559,19 @@ function finishSave(moves, results, hadError) {
 function showCoachToast(message, isOk) {
   var el = document.getElementById('plan-coach-toast');
   if (!el) return;
-  el.textContent = message;
-  el.className = 'plan-coach-toast show ' + (isOk ? 'ok' : 'warn');
+  el.innerHTML =
+    '<button class="pct-close" onclick="closeCoachToast()" aria-label="Schliessen">&times;</button>'
+    + '<div class="pct-kicker">' + (isOk ? 'CAIRN · PASST' : 'CAIRN · HINWEIS') + '</div>'
+    + '<div class="pct-text">' + escHtml(message) + '</div>';
+  el.classList.add('show');
   clearTimeout(coachToastTimer);
-  coachToastTimer = setTimeout(function() { el.classList.remove('show'); }, 2000);
+  coachToastTimer = setTimeout(function() { el.classList.remove('show'); }, 15000);
+}
+
+function closeCoachToast() {
+  var el = document.getElementById('plan-coach-toast');
+  if (el) el.classList.remove('show');
+  clearTimeout(coachToastTimer);
 }
 
 function showUndoBar() {
