@@ -1196,6 +1196,154 @@ def get_recent_activities():
     except Exception as e:
         return jsonify({"status": "error", "message": str(e), "trace": traceback.format_exc()}), 500
 
+def build_athlete_context():
+    """
+    Lädt Athletenprofil, CAIRN-Routinen, Plan, jüngste Aktivitäten und Befinden
+    und baut daraus den ATHLETE CONTEXT Block für den Coach-Chat-System-Prompt.
+    """
+    try:
+        today = get_today()
+        conn = get_db()
+        cur = conn.cursor()
+
+        # 1. athlete_profile
+        cur.execute("""
+            SELECT name, long_term_goals,
+                   hr_z1_min, hr_z1_max, hr_z2_min, hr_z2_max, hr_z3_min, hr_z3_max,
+                   hr_z4_min, hr_z4_max, hr_z5_min, hr_z5_max,
+                   pace_z1, pace_z2, pace_z3, pace_z4, pace_z5,
+                   cross_rennrad, cross_schwimmen, cross_wandern, cross_ski
+            FROM athlete_profile ORDER BY id LIMIT 1
+        """)
+        profile_row = cur.fetchone()
+
+        # 2. cairn_routines
+        cur.execute("SELECT title, exercises FROM cairn_routines")
+        routine_rows = cur.fetchall()
+
+        # 3. training_plan: aktuelle + nächste 2 Wochen
+        monday = today - timedelta(days=today.weekday())
+        window_end = monday + timedelta(weeks=3)
+        cur.execute("""
+            SELECT session_type, notes, day_of_week, week_date
+            FROM training_plan
+            WHERE week_date >= %s AND week_date < %s
+            ORDER BY week_date, day_of_week
+        """, (monday, window_end))
+        plan_rows = cur.fetchall()
+
+        # 4. trainings: letzte 30 Tage
+        cur.execute("""
+            SELECT date, type, distance_km, duration_minutes, heart_rate_avg
+            FROM trainings
+            WHERE date >= %s
+            ORDER BY date
+        """, (today - timedelta(days=30),))
+        training_rows = cur.fetchall()
+
+        # 5. daily_logs: letzte 7 Tage
+        cur.execute("""
+            SELECT date, feel, hrv_last_night, sleep_duration_h, resting_hr
+            FROM daily_logs
+            WHERE date >= %s
+            ORDER BY date DESC
+        """, (today - timedelta(days=7),))
+        log_rows = cur.fetchall()
+
+        # 6. plans: aktiver Plan
+        cur.execute("""
+            SELECT race_name, race_date, total_weeks
+            FROM plans WHERE status = 'active'
+            ORDER BY created_at DESC LIMIT 1
+        """)
+        plan_row = cur.fetchone()
+
+        conn.close()
+    except Exception as e:
+        print(f"Athlete-Context Fehler: {e}")
+        return ""
+
+    # ── Aufbereiten ──
+    name = (profile_row[0] if profile_row else '') or 'Athlet'
+    long_term_goals = (profile_row[1] if profile_row else '') or 'keine angegeben'
+
+    hr_zones_str = ''
+    pace_zones_str = ''
+    cross_prefs = []
+    if profile_row:
+        hr_parts = []
+        for i, label in enumerate(['Z1', 'Z2', 'Z3', 'Z4', 'Z5']):
+            lo, hi = profile_row[2 + i * 2], profile_row[3 + i * 2]
+            if lo is not None and hi is not None:
+                hr_parts.append(f"{label} {lo}-{hi}")
+        hr_zones_str = ', '.join(hr_parts)
+
+        pace_parts = []
+        for i, label in enumerate(['Z1', 'Z2', 'Z3', 'Z4', 'Z5']):
+            val = profile_row[12 + i]
+            if val:
+                pace_parts.append(f"{label} {val}")
+        pace_zones_str = ', '.join(pace_parts)
+
+        if profile_row[17]: cross_prefs.append('Rennrad')
+        if profile_row[18]: cross_prefs.append('Schwimmen')
+        if profile_row[19]: cross_prefs.append('Wandern')
+        if profile_row[20]: cross_prefs.append('Ski')
+
+    routines_str = '; '.join(
+        f"{title}: {', '.join(exercises or [])}" for title, exercises in routine_rows
+    )
+
+    day_names = ['', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So']
+    plan_lines = []
+    for session_type, notes, day_of_week, week_date in plan_rows:
+        line = f"{day_names[day_of_week]} {week_date}: {session_type}"
+        if notes:
+            line += f" ({notes})"
+        plan_lines.append(line)
+    plan_str = '\n'.join(plan_lines) if plan_lines else 'Keine Sessions geplant.'
+
+    total_km = sum(float(r[2]) for r in training_rows if r[2])
+    total_sessions = len(training_rows)
+    hrv_values = [float(r[2]) for r in log_rows if r[2] is not None]
+    avg_hrv = round(sum(hrv_values) / len(hrv_values), 1) if hrv_values else None
+
+    today_log = next((r for r in log_rows if str(r[0]) == str(today)), None)
+    feel_today = (today_log[1] if today_log else None) or '—'
+    hrv_today = today_log[2] if today_log else None
+    sleep_today = today_log[3] if today_log else None
+
+    race_name = plan_row[0] if plan_row else None
+    race_date = plan_row[1] if plan_row else None
+
+    lines = [
+        "ATHLETE CONTEXT:",
+        f"Name: {name}",
+        "Ziel: " + (f"{race_name} am {race_date}" if race_name else "kein aktives Rennen"),
+        f"Langzeitziele: {long_term_goals}",
+    ]
+    if hr_zones_str:
+        lines.append(f"HF-Zonen: {hr_zones_str}")
+    if pace_zones_str:
+        lines.append(f"Pace-Zonen: {pace_zones_str}")
+    if cross_prefs:
+        lines.append(f"Cross Training Präferenzen: {', '.join(cross_prefs)}")
+    lines.append(f"Trainingsplan (aktuelle + nächste 2 Wochen):\n{plan_str}")
+    lines.append(
+        f"Letzte 30 Tage: {total_km:.0f} km, {total_sessions} Sessions"
+        + (f", Ø HRV {avg_hrv}" if avg_hrv else "")
+    )
+    if routines_str:
+        lines.append(f"CAIRN Routinen: {routines_str}")
+    befinden = f"Feel {feel_today}"
+    if hrv_today is not None:
+        befinden += f", HRV {hrv_today}"
+    if sleep_today is not None:
+        befinden += f", Schlaf {sleep_today}h"
+    lines.append(f"Befinden heute: {befinden}")
+
+    return '\n'.join(lines)
+
 @app.route('/api/coach-chat', methods=['POST'])
 def coach_chat():
     try:
@@ -1239,6 +1387,8 @@ def coach_chat():
         except Exception:
             workout_suggestions_context = ""
 
+        athlete_context = build_athlete_context()
+
         system = """Du bist CAIRN, ein erfahrener Endurance Coach.
 Sprich wie ein ruhiger, erfahrener Bergführer. Nie wie Software.
 Kurze Sätze. Direkt. Menschlich. Auf Augenhöhe.
@@ -1246,6 +1396,12 @@ Nie: 'Readiness Score', 'approved', 'freigegeben', 'Algorithmus'.
 Immer: Beobachtung, Einordnung, klare Empfehlung.
 
 """ + page_context.get(page, '') + workout_suggestions_context
+
+        if athlete_context:
+            system += (
+                "\n\n" + athlete_context
+                + "\n\nNutze diesen Kontext um individuell zu antworten — nie generisch."
+            )
 
         clean_messages = [m for m in messages if m.get('role') in ['user', 'assistant'] and m.get('content', '').strip()]
 
