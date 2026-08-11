@@ -356,6 +356,13 @@ STRECKENPROFIL (GPX-Analyse):
 
             prompt = f"""Du bist CAIRN Coach. Erstelle Woche {week_from} bis {week_to} eines {total_weeks}-Wochen Trainingsplans.
 
+Nutze Web Search um aktuelle Erkenntnisse zu finden:
+- Optimale Trainingsplanung für Hybrid-Athleten (Laufen + Kraft)
+- Periodisierung für Trail Running
+- Wann Quality Sessions, wann Kraft, wann Erholung
+- Interferenz-Effekt zwischen Kraft und Ausdauer
+Plane basierend auf diesen wissenschaftlichen Erkenntnissen UND den Athletendaten.
+
 ATHLETENPROFIL:
 - Ziel: {goal_type}
 - Rennen: {race_name} ({race_type}) · {race_distance_km if race_distance_km else '?'} km
@@ -391,14 +398,15 @@ Wochen {week_from} bis {week_to}. day_of_week: 1=Mo bis 7=So. Rest Days nicht ei
 
             message = client.messages.create(
                 model="claude-sonnet-4-6",
-                max_tokens=8000,
+                max_tokens=64000,
+                tools=[{"type": "web_search_20250305", "name": "web_search"}],
                 messages=[{"role": "user", "content": prompt}]
             )
 
             # Text aus allen Content-Blöcken zusammensetzen (inkl. nach Web Search)
             raw = ""
             for block in message.content:
-                if hasattr(block, 'text'):
+                if hasattr(block, 'text') and getattr(block, 'type', None) == 'text':
                     raw += block.text
             raw = raw.replace('```json', '').replace('```', '').strip()
             # JSON aus dem Text extrahieren - suche nach { "weeks": [
@@ -494,7 +502,6 @@ Wochen {week_from} bis {week_to}. day_of_week: 1=Mo bis 7=So. Rest Days nicht ei
 
         # Sessions eintragen
         sessions_inserted = 0
-        strength_counter_per_week = {}
         for week in plan_json.get('weeks', []):
             week_num = week.get('week_number', 1)
             phase = week.get('phase', 'base')
@@ -505,24 +512,6 @@ Wochen {week_from} bis {week_to}. day_of_week: 1=Mo bis 7=So. Rest Days nicht ei
                 # Erste Woche: Sessions vor dem Startdatum überspringen
                 if week_num == 1 and day_of_week < actual_start_day:
                     continue
-                # CAIRN Routine Namen direkt beim Insert setzen
-                session_type_val = session.get('session_type', 'Easy Run')
-                notes_val = session.get('notes', '')
-                if session_type_val == 'Strength Training':
-                    phase_lower = phase.lower()
-                    if 'taper' in phase_lower or 'deload' in phase_lower:
-                        if full_body_routine:
-                            notes_val = full_body_routine
-                    else:
-                        week_key = week_num
-                        strength_counter_per_week[week_key] = strength_counter_per_week.get(week_key, 0) + 1
-                        if strength_counter_per_week[week_key] % 2 == 1:
-                            if unterkoerper_routine:
-                                notes_val = unterkoerper_routine
-                        else:
-                            if oberkoerper_routine:
-                                notes_val = oberkoerper_routine
-
                 cur.execute("""
                     INSERT INTO training_plan
                     (week_date, day_of_week, session_type, session_zone,
@@ -531,11 +520,11 @@ Wochen {week_from} bis {week_to}. day_of_week: 1=Mo bis 7=So. Rest Days nicht ei
                 """, (
                     week_monday,
                     day_of_week,
-                    session_type_val,
+                    session.get('session_type', 'Easy Run'),
                     session.get('session_zone', ''),
                     session.get('duration_min', 0),
                     session.get('distance_km', 0),
-                    notes_val,
+                    session.get('notes', ''),
                     phase,
                     plan_id,
                     week_num
