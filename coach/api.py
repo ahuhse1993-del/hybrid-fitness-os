@@ -132,9 +132,12 @@ def run_plan_job(data, job_id):
             generate_plan_internal(data)
             plan_jobs[job_id] = {'status': 'done'}
         except Exception as e:
-            plan_jobs[job_id] = {'status': 'error', 'message': str(e), 'trace': traceback.format_exc()}
+            trace = traceback.format_exc()
+            print(f"run_plan_job Fehler (job_id={job_id}): {e}\n{trace}")
+            plan_jobs[job_id] = {'status': 'error', 'message': str(e), 'trace': trace}
 
 def generate_plan_internal(data):
+    print("generate_plan_internal started")
     try:
         import anthropic
         data = data
@@ -635,6 +638,7 @@ Antworte NUR mit JSON:
         except Exception as sugg_err:
             print(f"Workout-Vorschläge Fehler: {sugg_err}")
 
+        print(f"generate_plan_internal completed, sessions={sessions_inserted}")
         return jsonify({
             "status": "ok",
             "plan_id": plan_id,
