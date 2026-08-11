@@ -439,9 +439,12 @@ Wochen {week_from} bis {week_to}. day_of_week: 1=Mo bis 7=So. Rest Days nicht ei
                     continue
 
                 # Regel 1: Unterkörper → kein Quality danach
+                notes_lower = (s.get('notes') or '').lower()
                 is_lower = (s.get('session_type') == 'Strength Training' and
-                           unterkoerper_routine and
-                           unterkoerper_routine in (s.get('notes') or ''))
+                           ('lower' in notes_lower or 'unterk' in notes_lower or
+                            'bein' in notes_lower or 'leg' in notes_lower or
+                            'squat' in notes_lower or 'deadlift' in notes_lower or
+                            'kreuzheben' in notes_lower or 'bulgar' in notes_lower))
                 # Regel 2: Kein Quality direkt vor Long Run
                 is_quality_before_long = (s.get('session_type') in quality_types and
                                          next_s.get('session_type') == 'Long Run')
