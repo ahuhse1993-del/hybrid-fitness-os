@@ -335,7 +335,7 @@ Der gesamte Trainingsplan — jede Woche, jede Phase, jede Progression — muss 
 """
         except Exception as an_err:
             print(f"Athleten-Analyse Fehler: {an_err}")
-            import traceback; traceback.print_exc()
+            import traceback as tb2; tb2.print_exc()
             athlete_analysis_context = ""
 
         client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
