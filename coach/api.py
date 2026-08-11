@@ -239,12 +239,12 @@ CROSS TRAINING: {cross_training_days}x pro Woche — Typen: {', '.join(cross_tra
             an_conn = get_db()
             an_cur = an_conn.cursor()
 
-            # 1. trainings letzte 90 Tage
+            # 1. trainings letzte 28 Tage (4 Wochen)
             an_cur.execute("""
                 SELECT type, distance_km, heart_rate_avg
                 FROM trainings
                 WHERE date >= %s
-            """, (today - timedelta(days=90),))
+            """, (today - timedelta(days=28),))
             training_rows = an_cur.fetchall()
 
             # 2. daily_logs letzte 30 Tage
@@ -268,7 +268,7 @@ CROSS TRAINING: {cross_training_days}x pro Woche — Typen: {', '.join(cross_tra
 
             run_rows = [r for r in training_rows if r[0] in ('Run', 'TrailRun')]
             run_kms = [float(r[1]) for r in run_rows if r[1]]
-            avg_weekly_km = round(sum(run_kms) / (90 / 7.0), 1) if run_kms else 0
+            avg_weekly_km = round(sum(run_kms) / 4.0, 1) if run_kms else 0
             total_runs = len(run_rows)
             max_km = round(max(run_kms), 1) if run_kms else 0
 
@@ -317,7 +317,7 @@ CROSS TRAINING: {cross_training_days}x pro Woche — Typen: {', '.join(cross_tra
 
             athlete_analysis_context = f"""
 ATHLETEN-ANALYSE (echte Daten — der gesamte Plan muss darauf basieren):
-Aktuelles Laufniveau: Ø {avg_weekly_km} km/Woche über 90 Tage ({total_runs} Einheiten)
+Aktuelles Laufniveau: Ø {avg_weekly_km} km/Woche über die letzten 4 Wochen ({total_runs} Einheiten)
 Längste Einheit: {max_km} km
 Häufigste Session-Typen: {top_types_str}
 Ø Herzfrequenz: {avg_hr if avg_hr is not None else 'keine Daten'} bpm
@@ -1332,13 +1332,13 @@ def build_athlete_context():
         """, (monday, window_end))
         plan_rows = cur.fetchall()
 
-        # 4. trainings: letzte 30 Tage
+        # 4. trainings: letzte 28 Tage (4 Wochen)
         cur.execute("""
             SELECT date, type, distance_km, duration_minutes, heart_rate_avg
             FROM trainings
             WHERE date >= %s
             ORDER BY date
-        """, (today - timedelta(days=30),))
+        """, (today - timedelta(days=28),))
         training_rows = cur.fetchall()
 
         # 5. daily_logs: letzte 7 Tage
@@ -1430,7 +1430,7 @@ def build_athlete_context():
         lines.append(f"Cross Training Präferenzen: {', '.join(cross_prefs)}")
     lines.append(f"Trainingsplan (aktuelle + nächste 2 Wochen):\n{plan_str}")
     lines.append(
-        f"Letzte 30 Tage: {total_km:.0f} km, {total_sessions} Sessions"
+        f"Letzte 4 Wochen: {total_km:.0f} km, {total_sessions} Sessions"
         + (f", Ø HRV {avg_hrv}" if avg_hrv else "")
     )
     if routines_str:
