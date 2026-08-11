@@ -390,11 +390,10 @@ WOCHENSTRUKTUR — GENAU {days_per_week} Sessions pro Woche:
 REGELN:
 1. Long Run IMMER an Tag {long_run_day} ({day_names[long_run_day]})
 2. Nie 2 harte Sessions direkt hintereinander
-3. Nach Long Run: Rest Day oder Easy Run
-4. Strength Training nicht direkt vor Quality Session
+3. Tag nach Long Run: NUR Easy Run, Rest Day oder Strength Training Oberkörper. KEIN Quality, KEIN Unterkörper-Kraft.
+4. Strength Training NICHT direkt vor Quality Session. Wenn Unterkörper-Kraft geplant: Quality mindestens 1 Tag Abstand danach.
 5. Deload alle 4 Wochen (Volumen -20%)
 6. Trail Run = RPE-basiert, keine Pace
-7. Tag nach Long Run: NUR Easy Run, Rest Day oder Strength Training Oberkörper erlaubt. Kein Quality, kein Unterkörper-Kraft.
 
 ERLAUBTE SESSION-TYPEN — NUR diese 14, exakt so geschrieben (kein anderer Wert erlaubt):
 Easy Run, Recovery Run, Long Run, Tempo Session, Interval Session, Sprint Session, Hill Session, Trail Run, Cross Training, Strength Training, Mobility, Rest Day, Time Trial, Race Day
