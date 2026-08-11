@@ -194,12 +194,14 @@ def generate_plan_internal(data):
 
         hevy_context = ""
         routine_by_category = {}
+        hevy_conn = None
+        print("DEBUG: starting cairn_routines query")
         try:
             hevy_conn = get_db()
             hevy_cur = hevy_conn.cursor()
             hevy_cur.execute("SELECT title, exercises FROM cairn_routines")
             rows = hevy_cur.fetchall()
-            hevy_conn.close()
+            print(f"DEBUG: cairn_routines query returned {len(rows)} rows")
 
             cairn_routines = {}
             for title, exercises in rows:
@@ -222,8 +224,12 @@ def generate_plan_internal(data):
                     hevy_lines.append(f"Deload/Taper: {routine_by_category['full_body_light']}")
 
                 hevy_context = "\n" + "\n".join(hevy_lines) + "\n"
+            print("DEBUG: hevy_context built")
         except Exception as hevy_err:
             print(f"Hevy Routinen Fehler: {hevy_err}")
+        finally:
+            if hevy_conn:
+                hevy_conn.close()
 
         oberkoerper_routine = routine_by_category.get('oberkörper')
         unterkoerper_routine = routine_by_category.get('unterkörper')
@@ -239,6 +245,7 @@ CROSS TRAINING: {cross_training_days}x pro Woche — Typen: {', '.join(cross_tra
         # Leistungsniveau aufbaut statt auf generischen Annahmen.
         athlete_analysis_context = ""
         print("DEBUG: starting athlete analysis")
+        an_conn = None
         try:
             an_conn = get_db()
             print("DEBUG: db connected")
@@ -251,6 +258,7 @@ CROSS TRAINING: {cross_training_days}x pro Woche — Typen: {', '.join(cross_tra
                 WHERE date >= %s
             """, (today - timedelta(days=28),))
             training_rows = an_cur.fetchall()
+            print(f"DEBUG: trainings query returned {len(training_rows)} rows")
 
             # 2. daily_logs letzte 30 Tage
             an_cur.execute("""
@@ -259,6 +267,7 @@ CROSS TRAINING: {cross_training_days}x pro Woche — Typen: {', '.join(cross_tra
                 WHERE date >= %s
             """, (today - timedelta(days=30),))
             log_rows = an_cur.fetchall()
+            print(f"DEBUG: daily_logs query returned {len(log_rows)} rows")
 
             # 3. athlete_profile
             an_cur.execute("""
@@ -269,7 +278,7 @@ CROSS TRAINING: {cross_training_days}x pro Woche — Typen: {', '.join(cross_tra
                 FROM athlete_profile ORDER BY id LIMIT 1
             """)
             profile_row = an_cur.fetchone()
-            an_conn.close()
+            print(f"DEBUG: athlete_profile query returned {'1 row' if profile_row else 'no row'}")
 
             run_rows = [r for r in training_rows if r[0] in ('Run', 'TrailRun')]
             run_kms = [float(r[1]) for r in run_rows if r[1]]
@@ -319,6 +328,7 @@ CROSS TRAINING: {cross_training_days}x pro Woche — Typen: {', '.join(cross_tra
                 if profile_row[13]: cross_prefs.append('Wandern')
                 if profile_row[14]: cross_prefs.append('Ski')
             cross_prefs_str = ', '.join(cross_prefs) if cross_prefs else 'keine Präferenz hinterlegt'
+            print("DEBUG: athlete analysis calculations complete")
 
             athlete_analysis_context = f"""
 ATHLETEN-ANALYSE (echte Daten — der gesamte Plan muss darauf basieren):
@@ -333,12 +343,17 @@ Cross Training: {cross_prefs_str}
 
 Der gesamte Trainingsplan — jede Woche, jede Phase, jede Progression — muss auf diesem Athleten-Niveau aufbauen. Nicht zu hoch starten, nicht zu tief. Realistisch progressiv aufbauen basierend auf dem was der Athlet aktuell wirklich leistet. Ein Athlet der Ø 30km/Woche läuft startet anders als einer der Ø 80km/Woche läuft.
 """
+            print("DEBUG: athlete_analysis_context built")
         except Exception as an_err:
             print(f"Athleten-Analyse Fehler: {an_err}")
             import traceback as tb2; tb2.print_exc()
             athlete_analysis_context = ""
+        finally:
+            if an_conn:
+                an_conn.close()
 
         client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+        print("DEBUG: anthropic client created")
 
 
         for (week_from, week_to) in week_ranges:
@@ -402,12 +417,14 @@ WICHTIG: Antworte NUR mit JSON. Kein Text davor oder danach. Kein plan_meta. Beg
 
 Wochen {week_from} bis {week_to}. day_of_week: 1=Mo bis 7=So. Rest Days nicht eintragen. Genau {days_per_week} Sessions pro Woche."""
 
+            print(f"DEBUG: calling anthropic for weeks {week_from}-{week_to}")
             message = client.messages.create(
                 model="claude-sonnet-4-6",
                 max_tokens=64000,
                 tools=[{"type": "web_search_20250305", "name": "web_search"}],
                 messages=[{"role": "user", "content": prompt}]
             )
+            print(f"DEBUG: anthropic call for weeks {week_from}-{week_to} returned, stop_reason={message.stop_reason}, blocks={len(message.content)}")
 
             # Text aus allen Content-Blöcken zusammensetzen (inkl. nach Web Search)
             raw = ""
@@ -439,12 +456,13 @@ Wochen {week_from} bis {week_to}. day_of_week: 1=Mo bis 7=So. Rest Days nicht ei
 
 
         # ─── POST-PROCESSING: Trainingsregeln durchsetzen ───
+        print(f"DEBUG: starting post-processing, {len(all_weeks)} weeks total")
         quality_types = {'Tempo Session', 'Interval Session', 'Sprint Session', 'Hill Session'}
 
         for week in plan_json.get('weeks', []):
             sessions = week.get('sessions', [])
-            # Index nach day_of_week
-            by_day = {s['day_of_week']: s for s in sessions}
+            # Index nach day_of_week — .get() statt [] falls das Modell mal day_of_week vergisst
+            by_day = {s.get('day_of_week'): s for s in sessions if s.get('day_of_week') is not None}
 
             for day in sorted(by_day.keys()):
                 s = by_day[day]
@@ -481,66 +499,74 @@ Wochen {week_from} bis {week_to}. day_of_week: 1=Mo bis 7=So. Rest Days nicht ei
                         next_s['session_zone'], swap_target['session_zone'] = swap_target.get('session_zone',''), next_s.get('session_zone','')
 
         # In DB speichern
+        print("DEBUG: starting DB save")
         conn = get_db()
         cur = conn.cursor()
+        try:
+            # Plan-Metadaten
+            cur.execute("""
+                INSERT INTO plans (name, goal_type, race_name, race_date, race_distance_km,
+                    total_weeks, days_per_week, long_run_day, quality_sessions, strength_sessions, status)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'active')
+                RETURNING id
+            """, (
+                race_name or f"{goal_type} Plan {total_weeks}W",
+                goal_type, race_name,
+                race_date if race_date else None,
+                race_distance_km or 0,
+                total_weeks, days_per_week, long_run_day,
+                quality_sessions, strength_sessions
+            ))
+            plan_id = cur.fetchone()[0]
+            print(f"DEBUG: plan metadata inserted, plan_id={plan_id}")
 
-        # Plan-Metadaten
-        cur.execute("""
-            INSERT INTO plans (name, goal_type, race_name, race_date, race_distance_km,
-                total_weeks, days_per_week, long_run_day, quality_sessions, strength_sessions, status)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'active')
-            RETURNING id
-        """, (
-            race_name or f"{goal_type} Plan {total_weeks}W",
-            goal_type, race_name,
-            race_date if race_date else None,
-            race_distance_km or 0,
-            total_weeks, days_per_week, long_run_day,
-            quality_sessions, strength_sessions
-        ))
-        plan_id = cur.fetchone()[0]
+            # Alten Plan archivieren
+            cur.execute("UPDATE plans SET status='archived' WHERE status='active' AND id != %s", (plan_id,))
+            print("DEBUG: old plans archived")
 
-        # Alten Plan archivieren
-        cur.execute("UPDATE plans SET status='archived' WHERE status='active' AND id != %s", (plan_id,))
+            # Alten training_plan löschen
+            cur.execute("DELETE FROM training_plan WHERE plan_id = %s OR plan_id IS NULL", (plan_id,))
+            print("DEBUG: old training_plan rows deleted")
 
-        # Alten training_plan löschen
-        cur.execute("DELETE FROM training_plan WHERE plan_id = %s OR plan_id IS NULL", (plan_id,))
+            # Sessions eintragen
+            sessions_inserted = 0
+            for week in plan_json.get('weeks', []):
+                week_num = week.get('week_number', 1)
+                phase = week.get('phase', 'base')
+                week_monday = start_monday + timedelta(weeks=week_num - 1)
 
-        # Sessions eintragen
-        sessions_inserted = 0
-        for week in plan_json.get('weeks', []):
-            week_num = week.get('week_number', 1)
-            phase = week.get('phase', 'base')
-            week_monday = start_monday + timedelta(weeks=week_num - 1)
+                for session in week.get('sessions', []):
+                    day_of_week = session.get('day_of_week', 1)
+                    # Erste Woche: Sessions vor dem Startdatum überspringen
+                    if week_num == 1 and day_of_week < actual_start_day:
+                        continue
+                    cur.execute("""
+                        INSERT INTO training_plan
+                        (week_date, day_of_week, session_type, session_zone,
+                         duration_min, distance_km, notes, phase, plan_id, plan_week)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    """, (
+                        week_monday,
+                        day_of_week,
+                        session.get('session_type', 'Easy Run'),
+                        session.get('session_zone', ''),
+                        session.get('duration_min', 0),
+                        session.get('distance_km', 0),
+                        session.get('notes', ''),
+                        phase,
+                        plan_id,
+                        week_num
+                    ))
+                    sessions_inserted += 1
+            print(f"DEBUG: sessions insert loop complete, sessions_inserted={sessions_inserted}")
 
-            for session in week.get('sessions', []):
-                day_of_week = session.get('day_of_week', 1)
-                # Erste Woche: Sessions vor dem Startdatum überspringen
-                if week_num == 1 and day_of_week < actual_start_day:
-                    continue
-                cur.execute("""
-                    INSERT INTO training_plan
-                    (week_date, day_of_week, session_type, session_zone,
-                     duration_min, distance_km, notes, phase, plan_id, plan_week)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                """, (
-                    week_monday,
-                    day_of_week,
-                    session.get('session_type', 'Easy Run'),
-                    session.get('session_zone', ''),
-                    session.get('duration_min', 0),
-                    session.get('distance_km', 0),
-                    session.get('notes', ''),
-                    phase,
-                    plan_id,
-                    week_num
-                ))
-                sessions_inserted += 1
-
-        conn.commit()
-        conn.close()
+            conn.commit()
+            print("DEBUG: DB transaction committed")
+        finally:
+            conn.close()
 
         # ─── Workout-Vorschläge: Coach vergleicht geplante Strength-Sessions mit den CAIRN-Routinen ───
+        print("DEBUG: starting workout suggestions")
         try:
             strength_notes = []
             for week in plan_json.get('weeks', []):
@@ -549,17 +575,21 @@ Wochen {week_from} bis {week_to}. day_of_week: 1=Mo bis 7=So. Rest Days nicht ei
                         note = session.get('notes', '') or 'Strength Training'
                         if note not in strength_notes:
                             strength_notes.append(note)
+            print(f"DEBUG: found {len(strength_notes)} distinct strength session notes")
 
             if strength_notes and hevy_context:
                 # Athletenprofil laden — Langzeitziele haben Vorrang vor generischen Übungsempfehlungen
                 profile_conn = get_db()
-                profile_cur = profile_conn.cursor()
-                profile_cur.execute("""
-                    SELECT long_term_goals, cross_rennrad, cross_schwimmen, cross_wandern, cross_ski
-                    FROM athlete_profile ORDER BY id LIMIT 1
-                """)
-                profile_row = profile_cur.fetchone()
-                profile_conn.close()
+                try:
+                    profile_cur = profile_conn.cursor()
+                    profile_cur.execute("""
+                        SELECT long_term_goals, cross_rennrad, cross_schwimmen, cross_wandern, cross_ski
+                        FROM athlete_profile ORDER BY id LIMIT 1
+                    """)
+                    profile_row = profile_cur.fetchone()
+                finally:
+                    profile_conn.close()
+                print("DEBUG: athlete_profile (workout suggestions) query complete")
 
                 long_term_goals = (profile_row[0] if profile_row else '') or 'keine angegeben'
                 cross_prefs = []
@@ -601,6 +631,7 @@ Antworte NUR mit JSON:
                     max_tokens=1200,
                     messages=[{"role": "user", "content": suggestion_prompt}]
                 )
+                print(f"DEBUG: workout suggestions anthropic call complete, stop_reason={sugg_message.stop_reason}")
                 sugg_raw = ""
                 for block in sugg_message.content:
                     if hasattr(block, 'text'):
@@ -613,6 +644,7 @@ Antworte NUR mit JSON:
                         sugg_raw = m.group(0)
 
                 raw_suggestions = json.loads(sugg_raw).get('suggestions', [])
+                print(f"DEBUG: parsed {len(raw_suggestions)} workout suggestions")
                 now_iso = datetime.utcnow().isoformat()
                 workout_suggestions = [
                     {
@@ -631,13 +663,16 @@ Antworte NUR mit JSON:
                 if workout_suggestions:
                     from psycopg2.extras import Json
                     sugg_conn = get_db()
-                    sugg_cur = sugg_conn.cursor()
-                    sugg_cur.execute(
-                        "UPDATE plans SET workout_suggestions = %s WHERE id = %s",
-                        (Json(workout_suggestions), plan_id)
-                    )
-                    sugg_conn.commit()
-                    sugg_conn.close()
+                    try:
+                        sugg_cur = sugg_conn.cursor()
+                        sugg_cur.execute(
+                            "UPDATE plans SET workout_suggestions = %s WHERE id = %s",
+                            (Json(workout_suggestions), plan_id)
+                        )
+                        sugg_conn.commit()
+                        print("DEBUG: workout_suggestions saved to DB")
+                    finally:
+                        sugg_conn.close()
         except Exception as sugg_err:
             print(f"Workout-Vorschläge Fehler: {sugg_err}")
 
