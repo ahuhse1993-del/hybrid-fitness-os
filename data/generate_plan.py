@@ -203,16 +203,22 @@ Der gesamte Trainingsplan — jede Woche, jede Phase, jede Progression — muss 
     return athlete_analysis_context
 
 
-def build_training_science_context(client):
+def build_training_science_context(client, terrain='', race_elevation_m=0):
     """Einmaliger Web-Search-Pre-Call für Trainingswissenschaft (statt pro Wochen-Batch)."""
     training_science_context = ""
+    if terrain == 'trail':
+        query = f"trail ultra running training elevation hill sessions periodization {race_elevation_m}m gain"
+    elif terrain == 'road':
+        query = "road running training plan interval tempo quality sessions periodization"
+    else:
+        query = "Key principles for hybrid athlete training plan (running + strength): optimal sequence, quality session placement, interference effect avoidance."
     try:
         science_message = client.messages.create(
             model="claude-sonnet-4-6",
             max_tokens=4000,
             tools=[{"type": "web_search_20250305", "name": "web_search"}],
             system="Answer in max 200 words.",
-            messages=[{"role": "user", "content": "Key principles for hybrid athlete training plan (running + strength): optimal sequence, quality session placement, interference effect avoidance."}]
+            messages=[{"role": "user", "content": query}]
         )
         science_text = "".join(
             block.text for block in science_message.content
@@ -278,6 +284,8 @@ def generate_plan(job_id, data):
     race_name = data.get('race_name', '')
     race_date = data.get('race_date', '')
     race_distance_km = data.get('race_distance_km', 0)
+    terrain = data.get('terrain', '')
+    race_elevation_m = data.get('race_elevation_m', 0)
     gpx_data = data.get('gpx_data', None)
     days_per_week = data.get('days_per_week', 5)
     long_run_day = data.get('long_run_day', 6)
@@ -304,6 +312,7 @@ def generate_plan(job_id, data):
         start_monday = today
         actual_start_day = 1
     day_names = ['', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag']
+    gain_per_km = (race_elevation_m / race_distance_km) if race_distance_km else 0
 
     half = total_weeks // 2
     week_ranges = [(1, half), (half + 1, total_weeks)] if total_weeks > 10 else [(1, total_weeks)]
@@ -323,7 +332,7 @@ CROSS TRAINING: {cross_training_days}x pro Woche — Typen: {', '.join(cross_tra
     client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
     print("DEBUG: anthropic client created")
 
-    training_science_context = build_training_science_context(client)
+    training_science_context = build_training_science_context(client, terrain, race_elevation_m)
 
     for (week_from, week_to) in week_ranges:
         phase_context = []
@@ -347,6 +356,7 @@ ATHLETENPROFIL:
 - Ziel: {goal_type}
 - Rennen: {race_name} ({race_type}) · {race_distance_km if race_distance_km else '?'} km
 - Renndatum: {race_date}
+- Terrain: {terrain} · Distanz: {race_distance_km}km · Höhenmeter: {race_elevation_m}m · D+ pro km: {gain_per_km:.0f}m/km
 - Gesamtplan: {total_weeks} Wochen · Phasen: {', '.join(phase_context)}
 {athlete_analysis_context}
 {training_science_context}
@@ -381,8 +391,10 @@ STRUKTURIERTE FELDER — NUR für Quality Sessions (Tempo/Interval/Sprint/Hill S
 - cooldown_km, cooldown_min: Auslaufen
 notes fasst das in einem lesbaren Satz zusammen, z.B. "2km Einlaufen · 8×400m bei 4:00/km · 200m Trabpause · 2km Auslaufen".
 
+elevation_gain_m (INTEGER) — für JEDE Lauf-Session (Easy Run, Long Run, Trail Run, Hill Session etc.) die geschätzten Höhenmeter dieser Einheit, passend zum Terrain und D+ pro km des Rennens. Bei Terrain "road" meist 0 oder gering, bei "trail"/"mixed" realistisch nach Streckenprofil.
+
 WICHTIG: Antworte NUR mit JSON. Kein Text davor oder danach. Kein plan_meta. Beginne direkt mit {{
-{{"weeks": [{{"week_number": {week_from}, "phase": "base", "total_km": 40, "sessions": [{{"day_of_week": 1, "session_type": "Interval Session", "distance_km": 10, "duration_min": 55, "session_zone": "Z4-Z5", "warmup_km": 2, "warmup_min": 12, "main_sets": 8, "main_distance_m": 400, "main_pace": "4:00/km", "recovery_m": 200, "cooldown_km": 2, "cooldown_min": 10, "notes": "2km Einlaufen · 8×400m bei 4:00/km · 200m Trabpause · 2km Auslaufen"}}]}}]}}
+{{"weeks": [{{"week_number": {week_from}, "phase": "base", "total_km": 40, "sessions": [{{"day_of_week": 1, "session_type": "Interval Session", "distance_km": 10, "duration_min": 55, "session_zone": "Z4-Z5", "warmup_km": 2, "warmup_min": 12, "main_sets": 8, "main_distance_m": 400, "main_pace": "4:00/km", "recovery_m": 200, "cooldown_km": 2, "cooldown_min": 10, "elevation_gain_m": 50, "notes": "2km Einlaufen · 8×400m bei 4:00/km · 200m Trabpause · 2km Auslaufen"}}]}}]}}
 
 Wochen {week_from} bis {week_to}. day_of_week: 1=Mo bis 7=So. Rest Days nicht eintragen. Genau {days_per_week} Sessions pro Woche."""
 
@@ -460,8 +472,8 @@ Wochen {week_from} bis {week_to}. day_of_week: 1=Mo bis 7=So. Rest Days nicht ei
                     (week_date, day_of_week, session_type, session_zone,
                      duration_min, distance_km, notes, phase, plan_id, plan_week,
                      warmup_km, warmup_min, main_sets, main_distance_m, main_pace,
-                     recovery_m, cooldown_km, cooldown_min)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                     recovery_m, cooldown_km, cooldown_min, elevation_gain_m)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """, (
                     week_monday,
                     day_of_week,
@@ -481,6 +493,7 @@ Wochen {week_from} bis {week_to}. day_of_week: 1=Mo bis 7=So. Rest Days nicht ei
                     session.get('recovery_m'),
                     session.get('cooldown_km'),
                     session.get('cooldown_min'),
+                    session.get('elevation_gain_m'),
                 ))
                 sessions_inserted += 1
         print(f"DEBUG: sessions insert loop complete, sessions_inserted={sessions_inserted}")

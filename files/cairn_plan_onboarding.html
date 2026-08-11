@@ -276,6 +276,12 @@ html,body{height:100%;background:var(--black);font-family:'DM Sans',sans-serif;c
         <input class="text-input" id="race-dist-km" placeholder="z.B. 35" type="number" min="1" max="300" oninput="checkStep2()" style="margin-bottom:16px">
       </div>
 
+      <!-- Höhenmeter – manuell, wird ausgeblendet sobald GPX hochgeladen ist -->
+      <div id="elevation-wrap">
+        <div class="input-label">HÖHENMETER RENNEN</div>
+        <input class="text-input" id="race-elevation-m" placeholder="z.B. 1200" type="number" min="0" max="10000" oninput="checkStep2()" style="margin-bottom:16px">
+      </div>
+
       <div class="input-label">RENNDATUM</div>
       <div class="date-row">
         <input class="date-part" id="date-day" placeholder="TT" maxlength="2" type="number" min="1" max="31" oninput="checkDateInput()">
@@ -283,6 +289,13 @@ html,body{height:100%;background:var(--black);font-family:'DM Sans',sans-serif;c
         <input class="date-part" id="date-month" placeholder="MM" maxlength="2" type="number" min="1" max="12" oninput="checkDateInput()">
         <div class="date-sep">.</div>
         <input class="date-part" id="date-year" placeholder="JJJJ" maxlength="4" type="number" min="2025" max="2030" oninput="checkDateInput()" style="flex:2">
+      </div>
+
+      <div class="input-label" style="margin-top:8px">TERRAIN</div>
+      <div class="options" id="terrain-options" style="margin-bottom:24px">
+        <div class="option" onclick="selectTerrain(this,'road')"><div class="option-text"><div class="option-title">Strasse</div></div><div class="option-check"></div></div>
+        <div class="option" onclick="selectTerrain(this,'trail')"><div class="option-text"><div class="option-title">Trail / Berge</div></div><div class="option-check"></div></div>
+        <div class="option" onclick="selectTerrain(this,'mixed')"><div class="option-text"><div class="option-title">Mixed</div></div><div class="option-check"></div></div>
       </div>
 
       <!-- GPX Upload -->
@@ -302,8 +315,8 @@ html,body{height:100%;background:var(--black);font-family:'DM Sans',sans-serif;c
         <div style="font-family:DM Mono,monospace;font-size:8px;color:rgba(232,216,74,.5);letter-spacing:.14em;margin-bottom:8px">GPX ANALYSIERT</div>
         <div id="gpx-summary" style="font-size:14px;color:#F0EDE6;margin-bottom:6px">—</div>
         <div style="display:flex;gap:16px;flex-wrap:wrap">
-          <div><div style="font-family:DM Mono,monospace;font-size:8px;color:rgba(240,237,230,.4);letter-spacing:.1em">DISTANZ</div><div style="font-family:DM Mono,monospace;font-size:14px;color:#F0EDE6" id="gpx-dist">—</div></div>
-          <div><div style="font-family:DM Mono,monospace;font-size:8px;color:rgba(240,237,230,.4);letter-spacing:.1em">AUFSTIEG</div><div style="font-family:DM Mono,monospace;font-size:14px;color:#F0EDE6" id="gpx-gain">—</div></div>
+          <div><div style="font-family:DM Mono,monospace;font-size:8px;color:rgba(240,237,230,.4);letter-spacing:.1em">DISTANZ · AUS GPX</div><div style="font-family:DM Mono,monospace;font-size:14px;color:#F0EDE6" id="gpx-dist">—</div></div>
+          <div><div style="font-family:DM Mono,monospace;font-size:8px;color:rgba(240,237,230,.4);letter-spacing:.1em">HÖHENMETER · AUS GPX</div><div style="font-family:DM Mono,monospace;font-size:14px;color:#F0EDE6" id="gpx-gain">—</div></div>
           <div><div style="font-family:DM Mono,monospace;font-size:8px;color:rgba(240,237,230,.4);letter-spacing:.1em">PROFIL</div><div style="font-family:DM Mono,monospace;font-size:14px;color:#F0EDE6" id="gpx-profile">—</div></div>
           <div><div style="font-family:DM Mono,monospace;font-size:8px;color:rgba(240,237,230,.4);letter-spacing:.1em">M/KM</div><div style="font-family:DM Mono,monospace;font-size:14px;color:#F0EDE6" id="gpx-mkm">—</div></div>
         </div>
@@ -477,6 +490,8 @@ var planData = {
   race_name: '',
   race_date: '',
   race_distance_km: 0,
+  terrain: '',
+  race_elevation_m: 0,
   gpx_data: null,
   days_per_week: 5,
   long_run_day: 6,
@@ -511,6 +526,13 @@ function selectRaceType(el, val) {
   checkStep2();
 }
 
+function selectTerrain(el, val) {
+  document.querySelectorAll('#terrain-options .option').forEach(function(o){ o.classList.remove('sel'); });
+  el.classList.add('sel');
+  planData.terrain = val;
+  checkStep2();
+}
+
 function checkDateInput() {
   var d = document.getElementById('date-day').value;
   var m = document.getElementById('date-month').value;
@@ -530,8 +552,13 @@ function checkStep2() {
     var distVal = parseFloat(document.getElementById('race-dist-km').value);
     planData.race_distance_km = distVal || 0;
   }
+  // Höhenmeter – manuell nur wenn kein GPX hochgeladen (sonst kommt der Wert aus dem GPX)
+  if (!planData.gpx_data) {
+    var elInput = document.getElementById('race-elevation-m');
+    if (elInput) planData.race_elevation_m = parseInt(elInput.value) || 0;
+  }
   var distOk = planData.race_type !== 'trail' || planData.race_distance_km > 0;
-  if (planData.race_type && planData.race_name && planData.race_date && distOk) {
+  if (planData.race_type && planData.race_name && planData.race_date && planData.terrain && distOk) {
     document.getElementById('btn-next').classList.add('ready');
   } else {
     document.getElementById('btn-next').classList.remove('ready');
@@ -856,11 +883,14 @@ function buildSummary() {
   var DAY_NAMES = ['','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag','Sonntag'];
   var GOAL_NAMES = {race:'Race Plan', fitness:'Fitness aufbauen', maintain:'Fitness erhalten'};
   var RACE_NAMES = {'5k':'5K','10k':'10K','hm':'Halbmarathon','marathon':'Marathon','50k':'Ultra 50K','100k':'Ultra 100K','trail':'Trail Race'};
+  var TERRAIN_NAMES = {road:'Strasse', trail:'Trail / Berge', mixed:'Mixed'};
 
   var rows = [
     {label:'ZIEL', value: GOAL_NAMES[planData.goal_type] || '—'},
     {label:'RENNEN', value: planData.race_name || '—'},
+    {label:'TERRAIN', value: TERRAIN_NAMES[planData.terrain] || '—'},
     {label:'DISTANZ', value: planData.race_distance_km > 0 ? planData.race_distance_km + ' km' : (RACE_NAMES[planData.race_type] || '—')},
+    {label:'HÖHENMETER', value: planData.race_elevation_m > 0 ? planData.race_elevation_m + ' m' : '—'},
     {label:'STRECKENPROFIL', value: planData.gpx_data ? planData.gpx_data.summary : 'Nicht hochgeladen'},
     {label:'RENNDATUM', value: planData.race_date ? new Date(planData.race_date).toLocaleDateString('de-DE',{day:'2-digit',month:'long',year:'numeric'}) : '—'},
     {label:'PLANLÄNGE', value: weeks + ' Wochen'},
@@ -1011,12 +1041,14 @@ function handleGpxFile(file) {
         if (data.status === 'ok') {
           planData.gpx_data = data.gpx;
           showGpxResult(data.gpx, file.name);
-          // Distanz aus GPX übernehmen wenn Trail und noch keine gesetzt
-          if (planData.race_type === 'trail' && !planData.race_distance_km) {
-            planData.race_distance_km = data.gpx.distance_km;
-            var distInput = document.getElementById('race-dist-km');
-            if (distInput) distInput.value = data.gpx.distance_km;
-          }
+          // Distanz und Höhenmeter aus GPX übernehmen (überschreibt manuelle Eingabe)
+          planData.race_distance_km = data.gpx.distance_km;
+          planData.race_elevation_m = data.gpx.elevation_gain_m;
+          var distInput = document.getElementById('race-dist-km');
+          if (distInput) distInput.value = data.gpx.distance_km;
+          var elWrap = document.getElementById('elevation-wrap');
+          if (elWrap) elWrap.style.display = 'none';
+          checkStep2();
         } else {
           if (label) label.textContent = 'FEHLER: ' + (data.message || 'GPX konnte nicht analysiert werden');
         }
@@ -1051,6 +1083,14 @@ function clearGpx() {
   var label = document.getElementById('gpx-upload-label');
   if (label) label.textContent = 'GPX DATEI HOCHLADEN';
   document.getElementById('gpx-file-input').value = '';
+  var elWrap = document.getElementById('elevation-wrap');
+  if (elWrap) elWrap.style.display = 'block';
+  // Distanz wieder auf Rennstandard zurücksetzen (ausser bei Trail mit eigener Distanz)
+  var distMap = {'5k':5,'10k':10,'hm':21.1,'marathon':42.2,'50k':50,'100k':100};
+  if (planData.race_type !== 'trail') {
+    planData.race_distance_km = distMap[planData.race_type] || 0;
+  }
+  checkStep2();
 }
 
 function generatePlan() {
@@ -1093,6 +1133,8 @@ function generatePlan() {
       race_name: planData.race_name,
       race_date: planData.race_date,
       race_distance_km: planData.race_distance_km || 0,
+      terrain: planData.terrain || '',
+      race_elevation_m: planData.race_elevation_m || 0,
       gpx_data: planData.gpx_data || null,
       days_per_week: planData.days_per_week,
       long_run_day: planData.long_run_day,
