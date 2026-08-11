@@ -1,6 +1,6 @@
 from flask import Flask, jsonify, request, send_file
 from flask_cors import CORS
-import os, psycopg2, json, threading, time, traceback
+import os, psycopg2, json, time, traceback
 from datetime import date, timedelta, datetime
 from dotenv import load_dotenv
 
@@ -105,602 +105,66 @@ def analyse_gpx():
     except Exception as e:
         return jsonify({"status": "error", "message": str(e), "trace": traceback.format_exc()}), 500
 
-# ─── PLAN GENERIEREN ───
-plan_jobs = {}
-
+# ─── PLAN GENERIEREN (asynchron via GitHub Action) ───
 @app.route('/api/plan/job/<job_id>', methods=['GET'])
 def get_plan_job(job_id):
-    job = plan_jobs.get(job_id, {'status': 'unknown'})
-    return jsonify(job)
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute("SELECT status, error FROM plan_jobs WHERE id = %s", (job_id,))
+        row = cur.fetchone()
+        conn.close()
+        if not row:
+            return jsonify({'status': 'unknown'})
+        status, error = row
+        result = {'status': status}
+        if error:
+            result['message'] = error
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
 
 @app.route('/api/plan/generate', methods=['POST'])
 def generate_plan():
     try:
+        from psycopg2.extras import Json
         data = request.get_json(force=True)
         job_id = str(int(time.time()))
-        plan_jobs[job_id] = {'status': 'running'}
-        t = threading.Thread(target=run_plan_job, args=(data, job_id))
-        t.daemon = True
-        t.start()
-        return jsonify({'status': 'ok', 'job_id': job_id})
-    except Exception as e:
-        return jsonify({'status': 'error', 'message': str(e)}), 500
 
-def run_plan_job(data, job_id):
-    with app.app_context():
-        try:
-            generate_plan_internal(data)
-            plan_jobs[job_id] = {'status': 'done'}
-        except Exception as e:
-            trace = traceback.format_exc()
-            print(f"run_plan_job Fehler (job_id={job_id}): {e}\n{trace}")
-            plan_jobs[job_id] = {'status': 'error', 'message': str(e), 'trace': trace}
-
-def generate_plan_internal(data):
-    print("generate_plan_internal started")
-    try:
-        import anthropic
-        data = data
-
-        goal_type = data.get('goal_type', 'race')
-        race_type = data.get('race_type', '')
-        race_name = data.get('race_name', '')
-        race_date = data.get('race_date', '')
-        race_distance_km = data.get('race_distance_km', 0)
-        gpx_data = data.get('gpx_data', None)  # GPX-Analyse Ergebnis
-        days_per_week = data.get('days_per_week', 5)
-        long_run_day = data.get('long_run_day', 6)
-        quality_sessions = data.get('quality_sessions', 1)
-        strength_sessions = data.get('strength_sessions', 2)
-        strength_days = data.get('strength_days', [])
-        week_structure = data.get('week_structure', None)
-        total_weeks = data.get('total_weeks', 16)
-        phases = data.get('phases', [])
-        start_date = data.get('start_date', None)
-        cross_training = data.get('cross_training', False)
-        cross_training_types = data.get('cross_training_types', [])
-        cross_training_days = data.get('cross_training_days', 0)
-
-        # Startdatum berechnen
-        today = get_today()
-        if start_date:
-            try:
-                start_day = date.fromisoformat(start_date)
-                # Montag der Startwoche
-                start_monday = start_day - timedelta(days=start_day.weekday())
-                # Startdatum merken um erste Woche zu trimmen
-                actual_start_day = start_day.isoweekday()  # 1=Mo, 7=So
-            except Exception:
-                start_monday = today
-                actual_start_day = 1
-        else:
-            start_monday = today
-            actual_start_day = 1
-        day_names = ['', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag']
-
-        # Wochen in zwei Hälften aufteilen um Timeout zu vermeiden
-        half = total_weeks // 2
-        week_ranges = [(1, half), (half + 1, total_weeks)] if total_weeks > 10 else [(1, total_weeks)]
-
-        all_weeks = []
-
-        # CAIRN-Routinen: offizielle Strength-Training-Vorlagen aus der cairn_routines Tabelle
-        # (dort von data/hevy_routines_sync.py per GitHub Action alle 2 Tage aus Hevy synchronisiert)
-        HEVY_CATEGORIES = {
-            'Upper Body CAIRN': 'oberkörper',
-            'Lower Body + Arms CAIRN': 'unterkörper',
-            'Full Body Light CAIRN': 'full_body_light',
-        }
-
-        hevy_context = ""
-        routine_by_category = {}
-        hevy_conn = None
-        print("DEBUG: starting cairn_routines query")
-        try:
-            hevy_conn = get_db()
-            hevy_cur = hevy_conn.cursor()
-            hevy_cur.execute("SELECT title, exercises FROM cairn_routines")
-            rows = hevy_cur.fetchall()
-            print(f"DEBUG: cairn_routines query returned {len(rows)} rows")
-
-            cairn_routines = {}
-            for title, exercises in rows:
-                title = (title or '').strip()
-                if not title or title in cairn_routines:
-                    continue  # Duplikat ignorieren
-                cairn_routines[title] = exercises or []
-
-            if cairn_routines:
-                hevy_lines = ["STRENGTH TRAINING: Verwende NUR diese Workout-Namen (exakt so wie hier geschrieben):"]
-                for title, exercises in cairn_routines.items():
-                    category = HEVY_CATEGORIES.get(title, 'Ganzkörper')
-                    routine_by_category.setdefault(category, title)
-                    hevy_lines.append(f"- {title} [{category}]: {', '.join(exercises[:4])}")
-                hevy_lines.append("Jeder andere Strength Training Name ist VERBOTEN.")
-
-                if routine_by_category.get('oberkörper') and routine_by_category.get('unterkörper'):
-                    hevy_lines.append(f"Normale Wochen: {routine_by_category['oberkörper']} und {routine_by_category['unterkörper']} abwechselnd")
-                if routine_by_category.get('full_body_light'):
-                    hevy_lines.append(f"Deload/Taper: {routine_by_category['full_body_light']}")
-
-                hevy_context = "\n" + "\n".join(hevy_lines) + "\n"
-            print("DEBUG: hevy_context built")
-        except Exception as hevy_err:
-            print(f"Hevy Routinen Fehler: {hevy_err}")
-        finally:
-            if hevy_conn:
-                hevy_conn.close()
-
-        oberkoerper_routine = routine_by_category.get('oberkörper')
-        unterkoerper_routine = routine_by_category.get('unterkörper')
-        full_body_routine = routine_by_category.get('full_body_light')
-
-        cross_training_context = ""
-        if cross_training:
-            cross_training_context = f"""
-CROSS TRAINING: {cross_training_days}x pro Woche — Typen: {', '.join(cross_training_types) if cross_training_types else 'flexibel'}. Nutze session_type='Cross Training' mit notes=Typ (z.B. 'Rennrad 60 min').
-"""
-
-        # Athleten-Analyse: echte Trainingshistorie, damit der Plan auf dem tatsächlichen
-        # Leistungsniveau aufbaut statt auf generischen Annahmen.
-        athlete_analysis_context = ""
-        print("DEBUG: starting athlete analysis")
-        an_conn = None
-        try:
-            an_conn = get_db()
-            print("DEBUG: db connected")
-            an_cur = an_conn.cursor()
-
-            # 1. trainings letzte 28 Tage (4 Wochen)
-            an_cur.execute("""
-                SELECT type, distance_km, heart_rate_avg
-                FROM trainings
-                WHERE date >= %s
-            """, (today - timedelta(days=28),))
-            training_rows = an_cur.fetchall()
-            print(f"DEBUG: trainings query returned {len(training_rows)} rows")
-
-            # 2. daily_logs letzte 30 Tage
-            an_cur.execute("""
-                SELECT hrv_last_night, sleep_duration_h, feel
-                FROM daily_logs
-                WHERE date >= %s
-            """, (today - timedelta(days=30),))
-            log_rows = an_cur.fetchall()
-            print(f"DEBUG: daily_logs query returned {len(log_rows)} rows")
-
-            # 3. athlete_profile
-            an_cur.execute("""
-                SELECT long_term_goals,
-                       hr_z1_min, hr_z1_max, hr_z2_min, hr_z2_max, hr_z3_min, hr_z3_max,
-                       hr_z4_min, hr_z4_max, hr_z5_min, hr_z5_max,
-                       cross_rennrad, cross_schwimmen, cross_wandern, cross_ski
-                FROM athlete_profile ORDER BY id LIMIT 1
-            """)
-            profile_row = an_cur.fetchone()
-            print(f"DEBUG: athlete_profile query returned {'1 row' if profile_row else 'no row'}")
-
-            run_rows = [r for r in training_rows if r[0] in ('Run', 'TrailRun')]
-            run_kms = [float(r[1]) for r in run_rows if r[1]]
-            avg_weekly_km = round(sum(run_kms) / 4.0, 1) if run_kms else 0
-            total_runs = len(run_rows)
-            max_km = round(max(run_kms), 1) if run_kms else 0
-
-            hr_values = [float(r[2]) for r in training_rows if r[2]]
-            avg_hr = round(sum(hr_values) / len(hr_values)) if hr_values else None
-
-            type_counts = {}
-            for r in training_rows:
-                t = r[0] or 'Unbekannt'
-                type_counts[t] = type_counts.get(t, 0) + 1
-            top_types = sorted(type_counts.items(), key=lambda x: -x[1])[:3]
-            top_types_str = ', '.join(f"{t} ({c}x)" for t, c in top_types) if top_types else 'keine Daten'
-
-            hrv_values = [float(r[0]) for r in log_rows if r[0] is not None]
-            avg_hrv = round(sum(hrv_values) / len(hrv_values), 1) if hrv_values else None
-
-            sleep_values = [float(r[1]) for r in log_rows if r[1] is not None]
-            avg_sleep = round(sum(sleep_values) / len(sleep_values), 1) if sleep_values else None
-
-            feel_values = []
-            for r in log_rows:
-                try:
-                    if r[2] is not None:
-                        feel_values.append(float(r[2]))
-                except (TypeError, ValueError):
-                    pass
-            avg_feel = round(sum(feel_values) / len(feel_values), 1) if feel_values else None
-
-            long_term_goals = (profile_row[0] if profile_row else '') or 'keine angegeben'
-
-            hr_zone_parts = []
-            if profile_row:
-                for i, label in enumerate(['Z1', 'Z2', 'Z3', 'Z4', 'Z5']):
-                    lo, hi = profile_row[1 + i * 2], profile_row[2 + i * 2]
-                    if lo is not None and hi is not None:
-                        hr_zone_parts.append(f"{label} {lo}-{hi}")
-            hr_zones_str = ', '.join(hr_zone_parts) if hr_zone_parts else 'keine hinterlegt'
-
-            cross_prefs = []
-            if profile_row:
-                if profile_row[11]: cross_prefs.append('Rennrad')
-                if profile_row[12]: cross_prefs.append('Schwimmen')
-                if profile_row[13]: cross_prefs.append('Wandern')
-                if profile_row[14]: cross_prefs.append('Ski')
-            cross_prefs_str = ', '.join(cross_prefs) if cross_prefs else 'keine Präferenz hinterlegt'
-            print("DEBUG: athlete analysis calculations complete")
-
-            athlete_analysis_context = f"""
-ATHLETEN-ANALYSE (echte Daten — der gesamte Plan muss darauf basieren):
-Aktuelles Laufniveau: Ø {avg_weekly_km} km/Woche über die letzten 4 Wochen ({total_runs} Einheiten)
-Längste Einheit: {max_km} km
-Häufigste Session-Typen: {top_types_str}
-Ø Herzfrequenz: {avg_hr if avg_hr is not None else 'keine Daten'} bpm
-Ø HRV: {avg_hrv if avg_hrv is not None else 'keine Daten'} ms | Ø Schlaf: {avg_sleep if avg_sleep is not None else 'keine Daten'}h | Ø Befinden: {avg_feel if avg_feel is not None else 'keine Daten'}/10
-HF-Zonen: {hr_zones_str}
-Langzeitziele: {long_term_goals}
-Cross Training: {cross_prefs_str}
-
-Der gesamte Trainingsplan — jede Woche, jede Phase, jede Progression — muss auf diesem Athleten-Niveau aufbauen. Nicht zu hoch starten, nicht zu tief. Realistisch progressiv aufbauen basierend auf dem was der Athlet aktuell wirklich leistet. Ein Athlet der Ø 30km/Woche läuft startet anders als einer der Ø 80km/Woche läuft.
-"""
-            print("DEBUG: athlete_analysis_context built")
-        except Exception as an_err:
-            print(f"Athleten-Analyse Fehler: {an_err}")
-            import traceback as tb2; tb2.print_exc()
-            athlete_analysis_context = ""
-        finally:
-            if an_conn:
-                an_conn.close()
-
-        client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
-        print("DEBUG: anthropic client created")
-
-        # Pre-Call: Web Search EINMAL für Trainingswissenschaft statt pro Wochen-Batch im Haupt-Loop
-        training_science_context = ""
-        try:
-            science_message = client.messages.create(
-                model="claude-sonnet-4-6",
-                max_tokens=1000,
-                tools=[{"type": "web_search_20250305", "name": "web_search"}],
-                system="Answer in max 200 words.",
-                messages=[{"role": "user", "content": "Key principles for hybrid athlete training plan (running + strength): optimal sequence, quality session placement, interference effect avoidance."}]
-            )
-            science_text = "".join(
-                block.text for block in science_message.content
-                if hasattr(block, 'text') and getattr(block, 'type', None) == 'text'
-            ).strip()
-            if science_text:
-                training_science_context = "\nTRAININGSWISSENSCHAFT (Recherche):\n" + science_text + "\n"
-            print("DEBUG: training science pre-call done")
-        except Exception as science_err:
-            print(f"Training Science Pre-Call Fehler: {science_err}")
-            training_science_context = ""
-
-        for (week_from, week_to) in week_ranges:
-            weeks_in_range = week_to - week_from + 1
-
-            # Phase für diesen Block bestimmen
-            phase_context = []
-            for ph in phases:
-                phase_context.append(f"{ph.get('name','').upper()}: {ph.get('weeks',0)} Wochen")
-
-            gpx_context = ""
-            if gpx_data:
-                gpx_context = f"""
-STRECKENPROFIL (GPX-Analyse):
-- Distanz: {gpx_data.get('distance_km')} km
-- Höhenmeter aufwärts: {gpx_data.get('elevation_gain_m')} m
-- Höhenmeter pro km: {gpx_data.get('gain_per_km')} m/km
-- Profil: {gpx_data.get('profile_de')}
-- Max. Steigung: {gpx_data.get('max_grade_pct')} %
-"""
-
-            prompt = f"""Du bist CAIRN Coach. Erstelle Woche {week_from} bis {week_to} eines {total_weeks}-Wochen Trainingsplans.
-
-ATHLETENPROFIL:
-- Ziel: {goal_type}
-- Rennen: {race_name} ({race_type}) · {race_distance_km if race_distance_km else '?'} km
-- Renndatum: {race_date}
-- Gesamtplan: {total_weeks} Wochen · Phasen: {', '.join(phase_context)}
-{athlete_analysis_context}
-{training_science_context}
-Plane basierend auf diesen wissenschaftlichen Erkenntnissen UND den Athletendaten.
-
-WOCHENSTRUKTUR — GENAU {days_per_week} Sessions pro Woche:
-- {strength_sessions}x Strength Training — NUR an: {', '.join([['','Mo','Di','Mi','Do','Fr','Sa','So'][d] for d in strength_days]) if strength_days else 'flexibel'}
-- 1x Long Run — IMMER an {day_names[long_run_day]} (Tag {long_run_day})
-- {quality_sessions}x Quality (Tempo Session / Interval Session / Sprint Session / Hill Session)
-- {days_per_week - strength_sessions - 1 - quality_sessions}x Easy Run oder Trail Run
-- {7 - days_per_week}x Rest Day — diese Tage komplett leer lassen, KEIN Eintrag
-{gpx_context}
-{hevy_context}
-{cross_training_context}
-REGELN:
-1. Long Run IMMER an Tag {long_run_day} ({day_names[long_run_day]})
-2. Nie 2 harte Sessions direkt hintereinander
-3. Nach Long Run: Rest Day oder Easy Run
-4. Strength Training nicht direkt vor Quality Session
-5. Deload alle 4 Wochen (Volumen -20%)
-6. Trail Run = RPE-basiert, keine Pace
-
-ERLAUBTE SESSION-TYPEN — NUR diese 14, exakt so geschrieben (kein anderer Wert erlaubt):
-Easy Run, Recovery Run, Long Run, Tempo Session, Interval Session, Sprint Session, Hill Session, Trail Run, Cross Training, Strength Training, Mobility, Rest Day, Time Trial, Race Day
-
-Strength Training hat KEINE eigenen session_type-Unterkategorien. Oberkörper A/B, Unterkörper A/B oder Full Body gehören ausschließlich ins notes-Feld, z.B. session_type: "Strength Training", notes: "Oberkörper A".
-
-WICHTIG: Antworte NUR mit JSON. Kein Text davor oder danach. Kein plan_meta. Beginne direkt mit {{
-{{"weeks": [{{"week_number": {week_from}, "phase": "base", "total_km": 40, "sessions": [{{"day_of_week": 1, "session_type": "Easy Run", "session_zone": "Z1-Z2", "distance_km": 8, "duration_min": 55, "notes": "Easy Z1-Z2 RPE 1-3"}}]}}]}}
-
-Wochen {week_from} bis {week_to}. day_of_week: 1=Mo bis 7=So. Rest Days nicht eintragen. Genau {days_per_week} Sessions pro Woche."""
-
-            print(f"DEBUG: calling anthropic for weeks {week_from}-{week_to}")
-            message = client.messages.create(
-                model="claude-sonnet-4-6",
-                max_tokens=64000,
-                messages=[{"role": "user", "content": prompt}]
-            )
-            print(f"DEBUG: anthropic call for weeks {week_from}-{week_to} returned, stop_reason={message.stop_reason}, blocks={len(message.content)}")
-
-            # Text aus allen Content-Blöcken zusammensetzen
-            raw = ""
-            for block in message.content:
-                if hasattr(block, 'text') and getattr(block, 'type', None) == 'text':
-                    raw += block.text
-            raw = raw.replace('```json', '').replace('```', '').strip()
-            # JSON aus dem Text extrahieren - suche nach { "weeks": [
-            if not raw.startswith('{'):
-                import re
-                json_match = re.search(r'\{[\s\S]*"weeks"[\s\S]*\}', raw)
-                if json_match:
-                    raw = json_match.group(0)
-            try:
-                part_json = json.loads(raw)
-                all_weeks.extend(part_json.get('weeks', []))
-                print(f"OK weeks {week_from}-{week_to}: {len(part_json.get('weeks', []))} weeks")
-            except Exception as parse_err:
-                print(f"JSON parse error for weeks {week_from}-{week_to}: {parse_err}")
-                print(f"Raw length: {len(raw)}")
-                print(f"Raw start: {raw[:500]}")
-                print(f"Stop reason: {message.stop_reason}")
-                print(f"Content blocks: {len(message.content)}")
-                for i, block in enumerate(message.content):
-                    print(f"  Block {i}: type={getattr(block, 'type', 'unknown')}, has_text={hasattr(block, 'text')}")
-                continue
-
-        plan_json = {"weeks": all_weeks}
-
-
-        # ─── POST-PROCESSING: Trainingsregeln durchsetzen ───
-        print(f"DEBUG: starting post-processing, {len(all_weeks)} weeks total")
-        quality_types = {'Tempo Session', 'Interval Session', 'Sprint Session', 'Hill Session'}
-
-        for week in plan_json.get('weeks', []):
-            sessions = week.get('sessions', [])
-            # Index nach day_of_week — .get() statt [] falls das Modell mal day_of_week vergisst
-            by_day = {s.get('day_of_week'): s for s in sessions if s.get('day_of_week') is not None}
-
-            for day in sorted(by_day.keys()):
-                s = by_day[day]
-                next_s = by_day.get(day + 1)
-                if not next_s:
-                    continue
-
-                # Regel 1: Unterkörper → kein Quality danach
-                notes_lower = (s.get('notes') or '').lower()
-                is_lower = (s.get('session_type') == 'Strength Training' and
-                           ('lower' in notes_lower or 'unterk' in notes_lower or
-                            'bein' in notes_lower or 'leg' in notes_lower or
-                            'squat' in notes_lower or 'deadlift' in notes_lower or
-                            'kreuzheben' in notes_lower or 'bulgar' in notes_lower))
-                # Regel 2: Kein Quality direkt vor Long Run
-                is_quality_before_long = (s.get('session_type') in quality_types and
-                                         next_s.get('session_type') == 'Long Run')
-
-                if (is_lower and next_s.get('session_type') in quality_types) or is_quality_before_long:
-                    # Finde Easy/Trail Run zum Tauschen
-                    swap_target = None
-                    for other_day in sorted(by_day.keys()):
-                        if other_day in (day, day + 1):
-                            continue
-                        if by_day[other_day].get('session_type') in {'Easy Run', 'Trail Run', 'Recovery Run'}:
-                            swap_target = by_day[other_day]
-                            break
-                    if swap_target:
-                        # Tausch
-                        next_s['session_type'], swap_target['session_type'] = swap_target['session_type'], next_s['session_type']
-                        next_s['notes'], swap_target['notes'] = swap_target.get('notes',''), next_s.get('notes','')
-                        next_s['distance_km'], swap_target['distance_km'] = swap_target.get('distance_km',0), next_s.get('distance_km',0)
-                        next_s['duration_min'], swap_target['duration_min'] = swap_target.get('duration_min',0), next_s.get('duration_min',0)
-                        next_s['session_zone'], swap_target['session_zone'] = swap_target.get('session_zone',''), next_s.get('session_zone','')
-
-        # In DB speichern
-        print("DEBUG: starting DB save")
         conn = get_db()
-        cur = conn.cursor()
         try:
-            # Plan-Metadaten
-            cur.execute("""
-                INSERT INTO plans (name, goal_type, race_name, race_date, race_distance_km,
-                    total_weeks, days_per_week, long_run_day, quality_sessions, strength_sessions, status)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'active')
-                RETURNING id
-            """, (
-                race_name or f"{goal_type} Plan {total_weeks}W",
-                goal_type, race_name,
-                race_date if race_date else None,
-                race_distance_km or 0,
-                total_weeks, days_per_week, long_run_day,
-                quality_sessions, strength_sessions
-            ))
-            plan_id = cur.fetchone()[0]
-            print(f"DEBUG: plan metadata inserted, plan_id={plan_id}")
-
-            # Alten Plan archivieren
-            cur.execute("UPDATE plans SET status='archived' WHERE status='active' AND id != %s", (plan_id,))
-            print("DEBUG: old plans archived")
-
-            # Alten training_plan löschen
-            cur.execute("DELETE FROM training_plan WHERE plan_id = %s OR plan_id IS NULL", (plan_id,))
-            print("DEBUG: old training_plan rows deleted")
-
-            # Sessions eintragen
-            sessions_inserted = 0
-            for week in plan_json.get('weeks', []):
-                week_num = week.get('week_number', 1)
-                phase = week.get('phase', 'base')
-                week_monday = start_monday + timedelta(weeks=week_num - 1)
-
-                for session in week.get('sessions', []):
-                    day_of_week = session.get('day_of_week', 1)
-                    # Erste Woche: Sessions vor dem Startdatum überspringen
-                    if week_num == 1 and day_of_week < actual_start_day:
-                        continue
-                    cur.execute("""
-                        INSERT INTO training_plan
-                        (week_date, day_of_week, session_type, session_zone,
-                         duration_min, distance_km, notes, phase, plan_id, plan_week)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                    """, (
-                        week_monday,
-                        day_of_week,
-                        session.get('session_type', 'Easy Run'),
-                        session.get('session_zone', ''),
-                        session.get('duration_min', 0),
-                        session.get('distance_km', 0),
-                        session.get('notes', ''),
-                        phase,
-                        plan_id,
-                        week_num
-                    ))
-                    sessions_inserted += 1
-            print(f"DEBUG: sessions insert loop complete, sessions_inserted={sessions_inserted}")
-
+            cur = conn.cursor()
+            cur.execute(
+                "INSERT INTO plan_jobs (id, data, status) VALUES (%s, %s, 'pending')",
+                (job_id, Json(data))
+            )
             conn.commit()
-            print("DEBUG: DB transaction committed")
         finally:
             conn.close()
 
-        # ─── Workout-Vorschläge: Coach vergleicht geplante Strength-Sessions mit den CAIRN-Routinen ───
-        print("DEBUG: starting workout suggestions")
-        try:
-            strength_notes = []
-            for week in plan_json.get('weeks', []):
-                for session in week.get('sessions', []):
-                    if session.get('session_type') == 'Strength Training':
-                        note = session.get('notes', '') or 'Strength Training'
-                        if note not in strength_notes:
-                            strength_notes.append(note)
-            print(f"DEBUG: found {len(strength_notes)} distinct strength session notes")
+        # Plan-Generierung läuft als GitHub Action (data/generate_plan.py), nicht mehr im
+        # Flask-Prozess selbst — vermeidet Railway-Request-Timeouts bei langen Plänen.
+        import urllib.request
+        github_token = os.getenv("CAIRN_GITHUB_TOKEN")
+        if github_token:
+            payload = json.dumps({"ref": "main", "inputs": {"job_id": job_id}}).encode()
+            req = urllib.request.Request(
+                "https://api.github.com/repos/ahuhse1993-del/hybrid-fitness-os/actions/workflows/plan_generate.yml/dispatches",
+                data=payload,
+                headers={
+                    "Authorization": f"Bearer {github_token}",
+                    "Accept": "application/vnd.github.v3+json",
+                    "Content-Type": "application/json"
+                },
+                method="POST"
+            )
+            urllib.request.urlopen(req, timeout=10)
+        else:
+            print("Kein CAIRN_GITHUB_TOKEN gesetzt — Plan-Job gespeichert, aber kein Workflow getriggert.")
 
-            if strength_notes and hevy_context:
-                # Athletenprofil laden — Langzeitziele haben Vorrang vor generischen Übungsempfehlungen
-                profile_conn = get_db()
-                try:
-                    profile_cur = profile_conn.cursor()
-                    profile_cur.execute("""
-                        SELECT long_term_goals, cross_rennrad, cross_schwimmen, cross_wandern, cross_ski
-                        FROM athlete_profile ORDER BY id LIMIT 1
-                    """)
-                    profile_row = profile_cur.fetchone()
-                finally:
-                    profile_conn.close()
-                print("DEBUG: athlete_profile (workout suggestions) query complete")
-
-                long_term_goals = (profile_row[0] if profile_row else '') or 'keine angegeben'
-                cross_prefs = []
-                if profile_row:
-                    if profile_row[1]: cross_prefs.append('Rennrad')
-                    if profile_row[2]: cross_prefs.append('Schwimmen')
-                    if profile_row[3]: cross_prefs.append('Wandern')
-                    if profile_row[4]: cross_prefs.append('Ski')
-
-                athlete_profile_context = f"ATHLETENPROFIL LANGZEITZIELE: {long_term_goals}"
-                if cross_prefs:
-                    athlete_profile_context += f"\nCROSS TRAINING PRÄFERENZEN: {', '.join(cross_prefs)}"
-
-                suggestion_prompt = f"""Du bist CAIRN Coach. Du hast gerade einen neuen Trainingsplan erstellt.
-
-{athlete_profile_context}
-
-GEPLANTE STRENGTH-TRAINING-EINHEITEN IN DIESEM PLAN:
-{chr(10).join('- ' + n for n in strength_notes)}
-
-{hevy_context}
-
-AUFGABE:
-Vergleiche die geplanten Einheiten mit den offiziellen CAIRN-Routinen und deren Übungsauswahl.
-Wo sinnvoll: schlage konkrete Anpassungen vor — Übungen ergänzen, streichen oder anpassen.
-Nur wenn es wirklich etwas zu verbessern gibt, nicht erzwingen. Maximal 4 Vorschläge. Wenn nichts zu verbessern ist: leere Liste.
-Berücksichtige die Langzeitziele des Athleten. Wenn Optik oder ästhetische Ziele genannt sind, haben diese Vorrang vor reinem Functional Training. Schlage nur Änderungen vor die WIRKLICH fehlen — prüfe die Übungsliste sorgfältig bevor du etwas vorschlägst.
-
-Für jeden Vorschlag:
-- workout_name: exakt einer der oben genannten geplanten Einheiten-Namen
-- change: was konkret ändern (1 Satz, mit konkreten Übungsnamen)
-- reason: warum (1-2 Sätze, CAIRN-Ton — ruhig, direkt, wie ein erfahrener Bergführer, nie wie Software)
-
-Antworte NUR mit JSON:
-{{"suggestions": [{{"workout_name": "...", "change": "...", "reason": "..."}}]}}"""
-
-                sugg_message = client.messages.create(
-                    model="claude-sonnet-4-6",
-                    max_tokens=1200,
-                    messages=[{"role": "user", "content": suggestion_prompt}]
-                )
-                print(f"DEBUG: workout suggestions anthropic call complete, stop_reason={sugg_message.stop_reason}")
-                sugg_raw = ""
-                for block in sugg_message.content:
-                    if hasattr(block, 'text'):
-                        sugg_raw += block.text
-                sugg_raw = sugg_raw.replace('```json', '').replace('```', '').strip()
-                if not sugg_raw.startswith('{'):
-                    import re
-                    m = re.search(r'\{[\s\S]*"suggestions"[\s\S]*\}', sugg_raw)
-                    if m:
-                        sugg_raw = m.group(0)
-
-                raw_suggestions = json.loads(sugg_raw).get('suggestions', [])
-                print(f"DEBUG: parsed {len(raw_suggestions)} workout suggestions")
-                now_iso = datetime.utcnow().isoformat()
-                workout_suggestions = [
-                    {
-                        "id": f"{plan_id}-{i + 1}",
-                        "workout_name": s.get('workout_name', ''),
-                        "change": s.get('change', ''),
-                        "reason": s.get('reason', ''),
-                        "status": "pending",
-                        "comment": None,
-                        "created_at": now_iso,
-                        "responded_at": None,
-                    }
-                    for i, s in enumerate(raw_suggestions)
-                ]
-
-                if workout_suggestions:
-                    from psycopg2.extras import Json
-                    sugg_conn = get_db()
-                    try:
-                        sugg_cur = sugg_conn.cursor()
-                        sugg_cur.execute(
-                            "UPDATE plans SET workout_suggestions = %s WHERE id = %s",
-                            (Json(workout_suggestions), plan_id)
-                        )
-                        sugg_conn.commit()
-                        print("DEBUG: workout_suggestions saved to DB")
-                    finally:
-                        sugg_conn.close()
-        except Exception as sugg_err:
-            print(f"Workout-Vorschläge Fehler: {sugg_err}")
-
-        print(f"generate_plan_internal completed, sessions={sessions_inserted}")
-        return jsonify({
-            "status": "ok",
-            "plan_id": plan_id,
-            "weeks": len(plan_json.get('weeks', [])),
-            "sessions": sessions_inserted
-        })
-
+        return jsonify({'status': 'ok', 'job_id': job_id})
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e), "trace": traceback.format_exc()}), 500
+        return jsonify({'status': 'error', 'message': str(e)}), 500
 
 # ─── WORKOUT-VORSCHLÄGE (Coach-Feedback zu Strength-Sessions eines Plans) ───
 @app.route('/api/plan/workout-suggestions', methods=['GET'])
