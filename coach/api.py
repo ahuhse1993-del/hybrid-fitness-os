@@ -355,6 +355,26 @@ Der gesamte Trainingsplan — jede Woche, jede Phase, jede Progression — muss 
         client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
         print("DEBUG: anthropic client created")
 
+        # Pre-Call: Web Search EINMAL für Trainingswissenschaft statt pro Wochen-Batch im Haupt-Loop
+        training_science_context = ""
+        try:
+            science_message = client.messages.create(
+                model="claude-sonnet-4-6",
+                max_tokens=1000,
+                tools=[{"type": "web_search_20250305", "name": "web_search"}],
+                system="Answer in max 200 words.",
+                messages=[{"role": "user", "content": "Key principles for hybrid athlete training plan (running + strength): optimal sequence, quality session placement, interference effect avoidance."}]
+            )
+            science_text = "".join(
+                block.text for block in science_message.content
+                if hasattr(block, 'text') and getattr(block, 'type', None) == 'text'
+            ).strip()
+            if science_text:
+                training_science_context = "\nTRAININGSWISSENSCHAFT (Recherche):\n" + science_text + "\n"
+            print("DEBUG: training science pre-call done")
+        except Exception as science_err:
+            print(f"Training Science Pre-Call Fehler: {science_err}")
+            training_science_context = ""
 
         for (week_from, week_to) in week_ranges:
             weeks_in_range = week_to - week_from + 1
@@ -377,19 +397,15 @@ STRECKENPROFIL (GPX-Analyse):
 
             prompt = f"""Du bist CAIRN Coach. Erstelle Woche {week_from} bis {week_to} eines {total_weeks}-Wochen Trainingsplans.
 
-Nutze Web Search um aktuelle Erkenntnisse zu finden:
-- Optimale Trainingsplanung für Hybrid-Athleten (Laufen + Kraft)
-- Periodisierung für Trail Running
-- Wann Quality Sessions, wann Kraft, wann Erholung
-- Interferenz-Effekt zwischen Kraft und Ausdauer
-Plane basierend auf diesen wissenschaftlichen Erkenntnissen UND den Athletendaten.
-
 ATHLETENPROFIL:
 - Ziel: {goal_type}
 - Rennen: {race_name} ({race_type}) · {race_distance_km if race_distance_km else '?'} km
 - Renndatum: {race_date}
 - Gesamtplan: {total_weeks} Wochen · Phasen: {', '.join(phase_context)}
 {athlete_analysis_context}
+{training_science_context}
+Plane basierend auf diesen wissenschaftlichen Erkenntnissen UND den Athletendaten.
+
 WOCHENSTRUKTUR — GENAU {days_per_week} Sessions pro Woche:
 - {strength_sessions}x Strength Training — NUR an: {', '.join([['','Mo','Di','Mi','Do','Fr','Sa','So'][d] for d in strength_days]) if strength_days else 'flexibel'}
 - 1x Long Run — IMMER an {day_names[long_run_day]} (Tag {long_run_day})
@@ -421,12 +437,11 @@ Wochen {week_from} bis {week_to}. day_of_week: 1=Mo bis 7=So. Rest Days nicht ei
             message = client.messages.create(
                 model="claude-sonnet-4-6",
                 max_tokens=64000,
-                tools=[{"type": "web_search_20250305", "name": "web_search"}],
                 messages=[{"role": "user", "content": prompt}]
             )
             print(f"DEBUG: anthropic call for weeks {week_from}-{week_to} returned, stop_reason={message.stop_reason}, blocks={len(message.content)}")
 
-            # Text aus allen Content-Blöcken zusammensetzen (inkl. nach Web Search)
+            # Text aus allen Content-Blöcken zusammensetzen
             raw = ""
             for block in message.content:
                 if hasattr(block, 'text') and getattr(block, 'type', None) == 'text':
