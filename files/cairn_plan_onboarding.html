@@ -596,7 +596,7 @@ function getWeeks() {
   if (planData.goal_type === 'race' && planData.race_date) {
     var today = new Date();
     var race = new Date(planData.race_date);
-    var weeks = Math.round((race - today) / (7 * 24 * 3600 * 1000));
+    var weeks = Math.ceil((race - today) / (7 * 24 * 3600 * 1000));
     return Math.max(4, Math.min(weeks, 52));
   }
   var defaults = {fitness:12, maintain:8};
