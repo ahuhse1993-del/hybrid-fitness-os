@@ -207,11 +207,11 @@ def build_training_science_context(client, terrain='', race_elevation_m=0):
     """Einmaliger Web-Search-Pre-Call für Trainingswissenschaft (statt pro Wochen-Batch)."""
     training_science_context = ""
     if terrain == 'trail':
-        query = f"trail ultra running training elevation hill sessions periodization {race_elevation_m}m gain"
+        query = f"trail ultra running training elevation hill sessions periodization {race_elevation_m}m gain taper week race week training reduction"
     elif terrain == 'road':
-        query = "road running training plan interval tempo quality sessions periodization"
+        query = "road running training plan interval tempo quality sessions periodization taper week race week training reduction"
     else:
-        query = "Key principles for hybrid athlete training plan (running + strength): optimal sequence, quality session placement, interference effect avoidance."
+        query = "Key principles for hybrid athlete training plan (running + strength): optimal sequence, quality session placement, interference effect avoidance, taper week race week training reduction"
     try:
         science_message = client.messages.create(
             model="claude-sonnet-4-6",
@@ -358,6 +358,10 @@ ATHLETENPROFIL:
 - Renndatum: {race_date}
 - Terrain: {terrain} · Distanz: {race_distance_km}km · Höhenmeter: {race_elevation_m}m · D+ pro km: {gain_per_km:.0f}m/km
 - Gesamtplan: {total_weeks} Wochen · Phasen: {', '.join(phase_context)}
+
+RACE DAY FIXPUNKT: {race_date} ist der Renntag. Dieser Tag ist ABSOLUT unveränderlich.
+Der Race Day muss exakt auf dieses Datum fallen – unabhängig vom üblichen Long Run Tag.
+Berechne alle Phasen rückwärts von diesem Datum.
 {athlete_analysis_context}
 {training_science_context}
 Plane basierend auf diesen wissenschaftlichen Erkenntnissen UND den Athletendaten.
@@ -378,6 +382,7 @@ REGELN:
 4. Strength Training nicht direkt vor Quality Session
 5. Deload alle 4 Wochen (Volumen -20%)
 6. Trail Run = RPE-basiert, keine Pace
+7. Tag nach Long Run: NUR Easy Run, Rest Day oder Strength Training Oberkörper erlaubt. Kein Quality, kein Unterkörper-Kraft.
 
 ERLAUBTE SESSION-TYPEN — NUR diese 14, exakt so geschrieben (kein anderer Wert erlaubt):
 Easy Run, Recovery Run, Long Run, Tempo Session, Interval Session, Sprint Session, Hill Session, Trail Run, Cross Training, Strength Training, Mobility, Rest Day, Time Trial, Race Day
