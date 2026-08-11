@@ -423,6 +423,46 @@ Wochen {week_from} bis {week_to}. day_of_week: 1=Mo bis 7=So. Rest Days nicht ei
 
         plan_json = {"weeks": all_weeks}
 
+
+        # ─── POST-PROCESSING: Trainingsregeln durchsetzen ───
+        quality_types = {'Tempo Session', 'Interval Session', 'Sprint Session', 'Hill Session'}
+
+        for week in plan_json.get('weeks', []):
+            sessions = week.get('sessions', [])
+            # Index nach day_of_week
+            by_day = {s['day_of_week']: s for s in sessions}
+
+            for day in sorted(by_day.keys()):
+                s = by_day[day]
+                next_s = by_day.get(day + 1)
+                if not next_s:
+                    continue
+
+                # Regel 1: Unterkörper → kein Quality danach
+                is_lower = (s.get('session_type') == 'Strength Training' and
+                           unterkoerper_routine and
+                           unterkoerper_routine in (s.get('notes') or ''))
+                # Regel 2: Kein Quality direkt vor Long Run
+                is_quality_before_long = (s.get('session_type') in quality_types and
+                                         next_s.get('session_type') == 'Long Run')
+
+                if (is_lower and next_s.get('session_type') in quality_types) or is_quality_before_long:
+                    # Finde Easy/Trail Run zum Tauschen
+                    swap_target = None
+                    for other_day in sorted(by_day.keys()):
+                        if other_day in (day, day + 1):
+                            continue
+                        if by_day[other_day].get('session_type') in {'Easy Run', 'Trail Run', 'Recovery Run'}:
+                            swap_target = by_day[other_day]
+                            break
+                    if swap_target:
+                        # Tausch
+                        next_s['session_type'], swap_target['session_type'] = swap_target['session_type'], next_s['session_type']
+                        next_s['notes'], swap_target['notes'] = swap_target.get('notes',''), next_s.get('notes','')
+                        next_s['distance_km'], swap_target['distance_km'] = swap_target.get('distance_km',0), next_s.get('distance_km',0)
+                        next_s['duration_min'], swap_target['duration_min'] = swap_target.get('duration_min',0), next_s.get('duration_min',0)
+                        next_s['session_zone'], swap_target['session_zone'] = swap_target.get('session_zone',''), next_s.get('session_zone','')
+
         # In DB speichern
         conn = get_db()
         cur = conn.cursor()
