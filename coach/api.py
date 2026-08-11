@@ -238,8 +238,10 @@ CROSS TRAINING: {cross_training_days}x pro Woche — Typen: {', '.join(cross_tra
         # Athleten-Analyse: echte Trainingshistorie, damit der Plan auf dem tatsächlichen
         # Leistungsniveau aufbaut statt auf generischen Annahmen.
         athlete_analysis_context = ""
+        print("DEBUG: starting athlete analysis")
         try:
             an_conn = get_db()
+            print("DEBUG: db connected")
             an_cur = an_conn.cursor()
 
             # 1. trainings letzte 28 Tage (4 Wochen)
@@ -333,6 +335,7 @@ Der gesamte Trainingsplan — jede Woche, jede Phase, jede Progression — muss 
 """
         except Exception as an_err:
             print(f"Athleten-Analyse Fehler: {an_err}")
+            import traceback; traceback.print_exc()
             athlete_analysis_context = ""
 
         client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
