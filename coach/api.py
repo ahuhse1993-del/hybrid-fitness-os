@@ -232,6 +232,106 @@ def generate_plan_internal(data):
 CROSS TRAINING: {cross_training_days}x pro Woche — Typen: {', '.join(cross_training_types) if cross_training_types else 'flexibel'}. Nutze session_type='Cross Training' mit notes=Typ (z.B. 'Rennrad 60 min').
 """
 
+        # Athleten-Analyse: echte Trainingshistorie, damit der Plan auf dem tatsächlichen
+        # Leistungsniveau aufbaut statt auf generischen Annahmen.
+        athlete_analysis_context = ""
+        try:
+            an_conn = get_db()
+            an_cur = an_conn.cursor()
+
+            # 1. trainings letzte 90 Tage
+            an_cur.execute("""
+                SELECT type, distance_km, heart_rate_avg
+                FROM trainings
+                WHERE date >= %s
+            """, (today - timedelta(days=90),))
+            training_rows = an_cur.fetchall()
+
+            # 2. daily_logs letzte 30 Tage
+            an_cur.execute("""
+                SELECT hrv_last_night, sleep_duration_h, feel
+                FROM daily_logs
+                WHERE date >= %s
+            """, (today - timedelta(days=30),))
+            log_rows = an_cur.fetchall()
+
+            # 3. athlete_profile
+            an_cur.execute("""
+                SELECT long_term_goals,
+                       hr_z1_min, hr_z1_max, hr_z2_min, hr_z2_max, hr_z3_min, hr_z3_max,
+                       hr_z4_min, hr_z4_max, hr_z5_min, hr_z5_max,
+                       cross_rennrad, cross_schwimmen, cross_wandern, cross_ski
+                FROM athlete_profile ORDER BY id LIMIT 1
+            """)
+            profile_row = an_cur.fetchone()
+            an_conn.close()
+
+            run_rows = [r for r in training_rows if r[0] in ('Run', 'TrailRun')]
+            run_kms = [float(r[1]) for r in run_rows if r[1]]
+            avg_weekly_km = round(sum(run_kms) / (90 / 7.0), 1) if run_kms else 0
+            total_runs = len(run_rows)
+            max_km = round(max(run_kms), 1) if run_kms else 0
+
+            hr_values = [float(r[2]) for r in training_rows if r[2]]
+            avg_hr = round(sum(hr_values) / len(hr_values)) if hr_values else None
+
+            type_counts = {}
+            for r in training_rows:
+                t = r[0] or 'Unbekannt'
+                type_counts[t] = type_counts.get(t, 0) + 1
+            top_types = sorted(type_counts.items(), key=lambda x: -x[1])[:3]
+            top_types_str = ', '.join(f"{t} ({c}x)" for t, c in top_types) if top_types else 'keine Daten'
+
+            hrv_values = [float(r[0]) for r in log_rows if r[0] is not None]
+            avg_hrv = round(sum(hrv_values) / len(hrv_values), 1) if hrv_values else None
+
+            sleep_values = [float(r[1]) for r in log_rows if r[1] is not None]
+            avg_sleep = round(sum(sleep_values) / len(sleep_values), 1) if sleep_values else None
+
+            feel_values = []
+            for r in log_rows:
+                try:
+                    if r[2] is not None:
+                        feel_values.append(float(r[2]))
+                except (TypeError, ValueError):
+                    pass
+            avg_feel = round(sum(feel_values) / len(feel_values), 1) if feel_values else None
+
+            long_term_goals = (profile_row[0] if profile_row else '') or 'keine angegeben'
+
+            hr_zone_parts = []
+            if profile_row:
+                for i, label in enumerate(['Z1', 'Z2', 'Z3', 'Z4', 'Z5']):
+                    lo, hi = profile_row[1 + i * 2], profile_row[2 + i * 2]
+                    if lo is not None and hi is not None:
+                        hr_zone_parts.append(f"{label} {lo}-{hi}")
+            hr_zones_str = ', '.join(hr_zone_parts) if hr_zone_parts else 'keine hinterlegt'
+
+            cross_prefs = []
+            if profile_row:
+                if profile_row[11]: cross_prefs.append('Rennrad')
+                if profile_row[12]: cross_prefs.append('Schwimmen')
+                if profile_row[13]: cross_prefs.append('Wandern')
+                if profile_row[14]: cross_prefs.append('Ski')
+            cross_prefs_str = ', '.join(cross_prefs) if cross_prefs else 'keine Präferenz hinterlegt'
+
+            athlete_analysis_context = f"""
+ATHLETEN-ANALYSE (echte Daten — der gesamte Plan muss darauf basieren):
+Aktuelles Laufniveau: Ø {avg_weekly_km} km/Woche über 90 Tage ({total_runs} Einheiten)
+Längste Einheit: {max_km} km
+Häufigste Session-Typen: {top_types_str}
+Ø Herzfrequenz: {avg_hr if avg_hr is not None else 'keine Daten'} bpm
+Ø HRV: {avg_hrv if avg_hrv is not None else 'keine Daten'} ms | Ø Schlaf: {avg_sleep if avg_sleep is not None else 'keine Daten'}h | Ø Befinden: {avg_feel if avg_feel is not None else 'keine Daten'}/10
+HF-Zonen: {hr_zones_str}
+Langzeitziele: {long_term_goals}
+Cross Training: {cross_prefs_str}
+
+Der gesamte Trainingsplan — jede Woche, jede Phase, jede Progression — muss auf diesem Athleten-Niveau aufbauen. Nicht zu hoch starten, nicht zu tief. Realistisch progressiv aufbauen basierend auf dem was der Athlet aktuell wirklich leistet. Ein Athlet der Ø 30km/Woche läuft startet anders als einer der Ø 80km/Woche läuft.
+"""
+        except Exception as an_err:
+            print(f"Athleten-Analyse Fehler: {an_err}")
+            athlete_analysis_context = ""
+
         client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 
 
@@ -261,7 +361,7 @@ ATHLETENPROFIL:
 - Rennen: {race_name} ({race_type}) · {race_distance_km if race_distance_km else '?'} km
 - Renndatum: {race_date}
 - Gesamtplan: {total_weeks} Wochen · Phasen: {', '.join(phase_context)}
-
+{athlete_analysis_context}
 WOCHENSTRUKTUR — GENAU {days_per_week} Sessions pro Woche:
 - {strength_sessions}x Strength Training — NUR an: {', '.join([['','Mo','Di','Mi','Do','Fr','Sa','So'][d] for d in strength_days]) if strength_days else 'flexibel'}
 - 1x Long Run — IMMER an {day_names[long_run_day]} (Tag {long_run_day})
