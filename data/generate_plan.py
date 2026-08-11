@@ -313,6 +313,10 @@ def generate_plan(job_id, data):
         actual_start_day = 1
     day_names = ['', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag']
     gain_per_km = (race_elevation_m / race_distance_km) if race_distance_km else 0
+    try:
+        race_dow = date.fromisoformat(race_date).isoweekday() if race_date else None  # 1=Mo, 7=So
+    except Exception:
+        race_dow = None
 
     half = total_weeks // 2
     week_ranges = [(1, half), (half + 1, total_weeks)] if total_weeks > 10 else [(1, total_weeks)]
@@ -362,6 +366,14 @@ ATHLETENPROFIL:
 RACE DAY FIXPUNKT: {race_date} ist der Renntag. Dieser Tag ist ABSOLUT unveränderlich.
 Der Race Day muss exakt auf dieses Datum fallen – unabhängig vom üblichen Long Run Tag.
 Berechne alle Phasen rückwärts von diesem Datum.
+
+RENNWOCHE REGELN (Woche die {race_date} enthält) — ABSOLUT UNVERÄNDERLICH:
+- KEIN Long Run
+- KEIN Quality Session (Tempo/Interval/Hill/Sprint)
+- KEIN Unterkörper-Kraft (Lower Body)
+- Erlaubt: Easy Run (max 6km), Upper Body Kraft, Mobility, Rest Day, Race Day
+- Race Day = {race_date} (day_of_week={race_dow}) mit session_type='Race Day'
+- Alle anderen Tage der Rennwoche: sehr leicht oder Ruhe
 {athlete_analysis_context}
 {training_science_context}
 Plane basierend auf diesen wissenschaftlichen Erkenntnissen UND den Athletendaten.
