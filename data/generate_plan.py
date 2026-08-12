@@ -302,11 +302,12 @@ def _is_leg_loading(session):
     return _is_hard_session(session) or session.get('session_type') == 'Trail Run'
 
 
-def validate_and_fix_plan(plan_json, race_date, start_monday):
+def validate_and_fix_plan(plan_json, race_date, race_dow, start_monday):
     """Prüft den generierten Plan gegen die Belastungsregeln. Für jeden Verstoss wird versucht,
     die betroffene Session mit einem kompatiblen Easy Run oder einem freien (Rest Day) Kalendertag
     in derselben Woche zu tauschen. Ist kein kompatibler Tausch möglich, bleibt die Session stehen."""
     print("DEBUG: starting plan validation")
+    print(f"VALIDATOR: race_date={race_date}, race_dow={race_dow}")
 
     try:
         race_date_obj = date.fromisoformat(race_date) if race_date else None
@@ -367,20 +368,22 @@ def validate_and_fix_plan(plan_json, race_date, start_monday):
 
         # Race Day liegt nicht exakt auf race_date
         if is_race_week:
-            expected_dow = race_date_obj.isoweekday()
-            if by_day.get(expected_dow, {}).get('session_type') != 'Race Day':
+            for day in sorted(by_day.keys()):
+                s = by_day[day]
+                print(f"VALIDATOR CHECK: session day_of_week={s.get('day_of_week')}, expected race_dow={race_dow}, session_type={s.get('session_type')}")
+            if by_day.get(race_dow, {}).get('session_type') != 'Race Day':
                 print(f"VALIDATOR FEHLER: Race Day liegt nicht exakt auf {race_date} (Woche {week_num})")
                 race_days = [d for d, s in by_day.items() if s.get('session_type') == 'Race Day']
                 if race_days:
                     wrong_day = race_days[0]
                     race_session = by_day[wrong_day]
-                    if expected_dow in by_day:
-                        target_session = by_day[expected_dow]
+                    if race_dow in by_day:
+                        target_session = by_day[race_dow]
                         for field in swap_fields:
                             race_session[field], target_session[field] = target_session.get(field), race_session.get(field)
                     else:
-                        race_session['day_of_week'] = expected_dow
-                        by_day[expected_dow] = race_session
+                        race_session['day_of_week'] = race_dow
+                        by_day[race_dow] = race_session
                         del by_day[wrong_day]
                 else:
                     print(f"KEIN TAUSCH MÖGLICH: kein Race Day in Rennwoche {week_num} gefunden")
@@ -668,7 +671,7 @@ Wochen {week_from} bis {week_to}. day_of_week: 1=Mo bis 7=So. Rest Days nicht ei
 
     plan_json = {"weeks": all_weeks}
     plan_json = apply_post_processing(plan_json)
-    plan_json = validate_and_fix_plan(plan_json, race_date, start_monday)
+    plan_json = validate_and_fix_plan(plan_json, race_date, race_dow, start_monday)
 
     # ─── In DB speichern ───
     print("DEBUG: starting DB save")
