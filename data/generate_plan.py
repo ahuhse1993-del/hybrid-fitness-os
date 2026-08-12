@@ -314,6 +314,8 @@ def validate_and_fix_plan(plan_json, race_date, race_dow, start_monday):
     except Exception:
         race_date_obj = None
 
+    race_week_monday = race_date_obj - timedelta(days=race_date_obj.weekday()) if race_date_obj else None
+
     swap_fields = (
         'session_type', 'notes', 'distance_km', 'duration_min', 'session_zone',
         'warmup_km', 'warmup_min', 'main_sets', 'main_distance_m', 'main_pace',
@@ -364,7 +366,8 @@ def validate_and_fix_plan(plan_json, race_date, race_dow, start_monday):
         by_day = {s.get('day_of_week'): s for s in sessions if s.get('day_of_week') is not None}
 
         week_monday = start_monday + timedelta(weeks=week_num - 1)
-        is_race_week = bool(race_date_obj) and week_monday <= race_date_obj <= week_monday + timedelta(days=6)
+        print(f"VALIDATOR: week {week.get('week_number')} starts {start_monday + timedelta(weeks=week.get('week_number', 1) - 1)}, race_week_monday={race_week_monday}")
+        is_race_week = bool(race_week_monday) and week_monday == race_week_monday
 
         # Race Day liegt nicht exakt auf race_date
         if is_race_week:
