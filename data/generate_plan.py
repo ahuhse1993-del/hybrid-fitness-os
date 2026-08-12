@@ -278,6 +278,164 @@ def apply_post_processing(plan_json):
     return plan_json
 
 
+QUALITY_TYPES = {'Tempo Session', 'Interval Session', 'Sprint Session', 'Hill Session'}
+
+
+def _is_lower_body_strength(session):
+    notes_lower = (session.get('notes') or '').lower()
+    return (session.get('session_type') == 'Strength Training' and
+            ('lower' in notes_lower or 'unterk' in notes_lower or
+             'bein' in notes_lower or 'leg' in notes_lower or
+             'squat' in notes_lower or 'deadlift' in notes_lower or
+             'kreuzheben' in notes_lower or 'bulgar' in notes_lower))
+
+
+def _is_hard_session(session):
+    """Harte Einheit = Quality Session, Long Run oder Unterkörper-Kraft."""
+    return (session.get('session_type') in QUALITY_TYPES or
+            session.get('session_type') == 'Long Run' or
+            _is_lower_body_strength(session))
+
+
+def _is_leg_loading(session):
+    """Beinbelastend = harte Einheit oder Trail Run."""
+    return _is_hard_session(session) or session.get('session_type') == 'Trail Run'
+
+
+def validate_and_fix_plan(plan_json, race_date, start_monday):
+    """Prüft den generierten Plan gegen die Belastungsregeln. Für jeden Verstoss wird versucht,
+    die betroffene Session mit einem kompatiblen Easy Run oder einem freien (Rest Day) Kalendertag
+    in derselben Woche zu tauschen. Ist kein kompatibler Tausch möglich, bleibt die Session stehen."""
+    print("DEBUG: starting plan validation")
+
+    try:
+        race_date_obj = date.fromisoformat(race_date) if race_date else None
+    except Exception:
+        race_date_obj = None
+
+    swap_fields = (
+        'session_type', 'notes', 'distance_km', 'duration_min', 'session_zone',
+        'warmup_km', 'warmup_min', 'main_sets', 'main_distance_m', 'main_pace',
+        'recovery_m', 'cooldown_km', 'cooldown_min', 'elevation_gain_m',
+    )
+
+    def find_swap_target(by_day, exclude_days):
+        for day in sorted(by_day.keys()):
+            if day in exclude_days:
+                continue
+            if by_day[day].get('session_type') == 'Easy Run':
+                return day, False  # bestehende Easy-Run-Session, Feldertausch
+        for day in range(1, 8):
+            if day in exclude_days or day in by_day:
+                continue
+            return day, True  # freier Kalendertag (Rest Day), Session wird verschoben
+        return None, None
+
+    def swap_or_move(by_day, offending_day, offending_session, exclude_days):
+        target_day, is_move = find_swap_target(by_day, exclude_days | {offending_day})
+        if target_day is None:
+            print(f"KEIN TAUSCH MÖGLICH: {offending_session}")
+            return
+        if is_move:
+            offending_session['day_of_week'] = target_day
+            by_day[target_day] = offending_session
+            del by_day[offending_day]
+        else:
+            target_session = by_day[target_day]
+            for field in swap_fields:
+                offending_session[field], target_session[field] = target_session.get(field), offending_session.get(field)
+
+    def convert_to_easy_run(session):
+        # Ein Tausch mit einem anderen Tag INNERHALB der Rennwoche würde die verbotene
+        # Session nur verschieben, nicht entfernen — die ganze Woche unterliegt derselben
+        # Beschränkung. Deshalb wird direkt umgewandelt statt getauscht.
+        session['session_type'] = 'Easy Run'
+        session['distance_km'] = min(session.get('distance_km') or 6, 6)
+        session['session_zone'] = 'Z1-Z2'
+        session['notes'] = 'Sehr leicht, Rennwoche.'
+        for field in ('warmup_km', 'warmup_min', 'main_sets', 'main_distance_m',
+                      'main_pace', 'recovery_m', 'cooldown_km', 'cooldown_min'):
+            session[field] = None
+
+    for week in plan_json.get('weeks', []):
+        week_num = week.get('week_number', 1)
+        sessions = week.get('sessions', [])
+        by_day = {s.get('day_of_week'): s for s in sessions if s.get('day_of_week') is not None}
+
+        week_monday = start_monday + timedelta(weeks=week_num - 1)
+        is_race_week = bool(race_date_obj) and week_monday <= race_date_obj <= week_monday + timedelta(days=6)
+
+        # Race Day liegt nicht exakt auf race_date
+        if is_race_week:
+            expected_dow = race_date_obj.isoweekday()
+            if by_day.get(expected_dow, {}).get('session_type') != 'Race Day':
+                print(f"VALIDATOR FEHLER: Race Day liegt nicht exakt auf {race_date} (Woche {week_num})")
+                race_days = [d for d, s in by_day.items() if s.get('session_type') == 'Race Day']
+                if race_days:
+                    wrong_day = race_days[0]
+                    race_session = by_day[wrong_day]
+                    if expected_dow in by_day:
+                        target_session = by_day[expected_dow]
+                        for field in swap_fields:
+                            race_session[field], target_session[field] = target_session.get(field), race_session.get(field)
+                    else:
+                        race_session['day_of_week'] = expected_dow
+                        by_day[expected_dow] = race_session
+                        del by_day[wrong_day]
+                else:
+                    print(f"KEIN TAUSCH MÖGLICH: kein Race Day in Rennwoche {week_num} gefunden")
+
+        # Quality, Long Run oder Unterkörper-Kraft in der Rennwoche
+        if is_race_week:
+            for day in sorted(by_day.keys()):
+                s = by_day[day]
+                if s.get('session_type') == 'Race Day':
+                    continue
+                if (s.get('session_type') in QUALITY_TYPES or
+                        s.get('session_type') == 'Long Run' or
+                        _is_lower_body_strength(s)):
+                    print(f"VALIDATOR FEHLER: {s.get('session_type')} in der Rennwoche (Woche {week_num}, Tag {day})")
+                    convert_to_easy_run(s)
+
+        # Tages-Checks laufen zweimal: ein Tausch kann an anderer Stelle eine neue
+        # Verletzung erzeugen (z.B. Unterkörper-Kraft landet neu vor einer Quality Session),
+        # der zweite Durchlauf fängt diese kaskadierten Fälle ab.
+        for _pass in range(2):
+            # Quality Session am Tag nach Long Run
+            for day in sorted(by_day.keys()):
+                s = by_day[day]
+                next_s = by_day.get(day + 1)
+                if s.get('session_type') == 'Long Run' and next_s and next_s.get('session_type') in QUALITY_TYPES:
+                    print(f"VALIDATOR FEHLER: Quality Session am Tag nach Long Run (Woche {week_num}, Tag {day + 1})")
+                    swap_or_move(by_day, day + 1, next_s, {day, day + 1})
+
+            # Unterkörper-Kraft am Tag vor Quality Session
+            for day in sorted(by_day.keys()):
+                s = by_day[day]
+                next_s = by_day.get(day + 1)
+                if _is_lower_body_strength(s) and next_s and next_s.get('session_type') in QUALITY_TYPES:
+                    print(f"VALIDATOR FEHLER: Unterkörper-Kraft am Tag vor Quality Session (Woche {week_num}, Tag {day})")
+                    swap_or_move(by_day, day, s, {day, day + 1})
+
+            # Harte Einheit am Tag vor Long Run
+            for day in sorted(by_day.keys()):
+                s = by_day[day]
+                next_s = by_day.get(day + 1)
+                if next_s and next_s.get('session_type') == 'Long Run' and _is_hard_session(s):
+                    print(f"VALIDATOR FEHLER: Harte Einheit am Tag vor Long Run (Woche {week_num}, Tag {day})")
+                    swap_or_move(by_day, day, s, {day, day + 1})
+
+            # Drei beinbelastende Tage hintereinander
+            for day in sorted(by_day.keys()):
+                d1, d2, d3 = by_day.get(day), by_day.get(day + 1), by_day.get(day + 2)
+                if d1 and d2 and d3 and _is_leg_loading(d1) and _is_leg_loading(d2) and _is_leg_loading(d3):
+                    print(f"VALIDATOR FEHLER: Drei beinbelastende Tage hintereinander (Woche {week_num}, Tag {day}-{day + 2})")
+                    swap_or_move(by_day, day + 2, d3, {day, day + 1, day + 2})
+
+    print("DEBUG: plan validation complete")
+    return plan_json
+
+
 def generate_plan(job_id, data):
     goal_type = data.get('goal_type', 'race')
     race_type = data.get('race_type', '')
@@ -335,10 +493,10 @@ CROSS TRAINING: {cross_training_days}x pro Woche — Typen: {', '.join(cross_tra
     if terrain in ['trail', 'mixed']:
         terrain_rules = """
 TERRAIN TRAIL/BERGE:
-24. Long Runs finden bevorzugt auf hügeligem, bergigem oder technischem Terrain statt.
-25. Hill Sessions und Trail Runs sind die primären Quality-Formen. Flache Tempo- oder Intervall-Sessions werden ergänzend eingesetzt.
-26. Die geplanten Höhenmeter werden progressiv aufgebaut und dürfen nicht gleichzeitig mit Laufdistanz und Intensität stark gesteigert werden.
-27. Technische Trail Runs werden nicht allein anhand von Kilometern bewertet. Dauer, Höhenmeter, Untergrund und RPE müssen bei der Belastungsberechnung berücksichtigt werden.
+32. Long Runs finden bevorzugt auf hügeligem, bergigem oder technischem Terrain statt.
+33. Hill Sessions und Trail Runs sind die primären Quality-Formen. Flache Tempo- oder Intervall-Sessions werden ergänzend eingesetzt.
+34. Die geplanten Höhenmeter werden progressiv aufgebaut und dürfen nicht gleichzeitig mit Laufdistanz und Intensität stark gesteigert werden.
+35. Technische Trail Runs werden nicht allein anhand von Kilometern bewertet. Dauer, Höhenmeter, Untergrund und RPE müssen bei der Belastungsberechnung berücksichtigt werden.
 """
 
     athlete_analysis_context = build_athlete_analysis(today)
@@ -420,33 +578,44 @@ DEFINITIONEN:
 BELASTUNGSREGELN:
 1. Der reguläre Long-Run-Tag ist {day_names[long_run_day]} und wird außerhalb der Rennwoche nicht verschoben.
 2. Am Kalendertag vor und nach dem Long Run sind ausschließlich erlaubt: Easy Run, Recovery Run, Rest Day, Mobility, Oberkörper-Kraft.
-3. Unterkörper-Kraft benötigt mindestens zwei vollständige Kalendertage Abstand vor und nach jeder Quality Session.
-4. Unterkörper-Kraft darf weder am Tag vor noch am Tag nach einem Long Run oder Race stattfinden.
-5. Harte Sessions dürfen niemals an zwei aufeinanderfolgenden Kalendertagen liegen.
-6. Zwischen zwei laufintensiven harten Sessions muss mindestens ein vollständiger leichter oder trainingsfreier Tag liegen.
-7. Bei Konflikten wird zuerst die Quality Session reduziert oder entfernt. Der Long Run bleibt auf seinem festgelegten Tag.
+
+BELASTUNGSVERTEILUNG KRAFT UND QUALITY:
+3. Unterkörper-Kraft und Quality Session dürfen nicht am selben Tag stattfinden.
+4. Unterkörper-Kraft am Tag vor einer Quality Session ist zu vermeiden.
+5. Wenn zwei Krafttage verfügbar sind: Oberkörper bevorzugt auf den Tag unmittelbar vor der Quality Session, Unterkörper bevorzugt auf den Tag danach.
+6. Unterkörper-Kraft darf am Tag nach einer Quality Session stattfinden. In diesem Fall: reduziertes Beinvolumen, RPE 6-7, 2-3 Wiederholungen im Tank, kein Muskelversagen, keine neue Übung.
+7. Oberkörper-Kraft gilt nicht als harte Beineinheit und darf vor oder nach Quality Sessions und Longruns eingeplant werden.
+8. Nie drei beinbelastende Tage hintereinander. Beinbelastend = Quality Session, Long Run, Unterkörper-Kraft, anspruchsvoller Trail Run.
+9. Tag nach Long Run: bevorzugt Easy Run, Recovery Run, lockeres Cross Training, Oberkörper-Kraft oder Rest. Kein hartes Unterkörpertraining, keine Quality Session.
+10. Tag vor Long Run: nur Easy Run, Recovery Run, lockeres Cross Training, Oberkörper-Kraft oder Rest.
+11. Priorität bei Konflikten: Race Day > Long Run > Quality Session > Unterkörper-Kraft > Easy Run/Cross Training.
+12. Wenn Trainingstage keine ideale Verteilung ermöglichen: zuerst Umfang und Intensität Unterkörper reduzieren, nicht Quality oder Long Run verschieben.
+
+13. Harte Sessions dürfen niemals an zwei aufeinanderfolgenden Kalendertagen liegen.
+14. Zwischen zwei laufintensiven harten Sessions muss mindestens ein vollständiger leichter oder trainingsfreier Tag liegen.
+15. Bei Konflikten wird zuerst die Quality Session reduziert oder entfernt. Der Long Run bleibt auf seinem festgelegten Tag.
 
 PROGRESSION:
-8. Das Laufvolumen darf gegenüber der vorherigen regulären Belastungswoche um maximal 10% steigen.
-9. Eine Deload- oder Taperwoche bildet keine neue Basis für die 10%-Progression. Nach einer Reduktionswoche darf maximal zum Umfang der letzten regulären Belastungswoche zurückgekehrt werden.
-10. Jede vierte Trainingswoche ist grundsätzlich eine Deload-Woche: Laufvolumen etwa 20% unter der vorherigen Belastungswoche, keine Quality Session, Long Run entsprechend verkürzen, Intensität ausschließlich Easy/Recovery.
-11. Liegt eine planmäßige Deload-Woche innerhalb von Peak, Taper oder Rennwoche, gelten stattdessen die Regeln der jeweiligen Rennphase.
-12. Die Peak-Woche liegt zwei bis drei Wochen vor dem Rennen und enthält das höchste sinnvolle Wochenvolumen des Trainingsblocks.
-13. Der Taper beginnt 14 Tage vor dem Race Day: erste Taperwoche Volumen etwa 30% unter Peak, Rennwoche Volumen etwa 40-60% unter Peak (Race nicht eingerechnet), Intensität darf in kurzen kontrollierten Abschnitten erhalten bleiben.
+16. Das Laufvolumen darf gegenüber der vorherigen regulären Belastungswoche um maximal 10% steigen.
+17. Eine Deload- oder Taperwoche bildet keine neue Basis für die 10%-Progression. Nach einer Reduktionswoche darf maximal zum Umfang der letzten regulären Belastungswoche zurückgekehrt werden.
+18. Jede vierte Trainingswoche ist grundsätzlich eine Deload-Woche: Laufvolumen etwa 20% unter der vorherigen Belastungswoche, keine Quality Session, Long Run entsprechend verkürzen, Intensität ausschließlich Easy/Recovery.
+19. Liegt eine planmäßige Deload-Woche innerhalb von Peak, Taper oder Rennwoche, gelten stattdessen die Regeln der jeweiligen Rennphase.
+20. Die Peak-Woche liegt zwei bis drei Wochen vor dem Rennen und enthält das höchste sinnvolle Wochenvolumen des Trainingsblocks.
+21. Der Taper beginnt 14 Tage vor dem Race Day: erste Taperwoche Volumen etwa 30% unter Peak, Rennwoche Volumen etwa 40-60% unter Peak (Race nicht eingerechnet), Intensität darf in kurzen kontrollierten Abschnitten erhalten bleiben.
 
 RENNWOCHE ({race_date}):
-14. Race Day liegt exakt am {race_date} und hat day_of_week={race_dow}. Er darf niemals verschoben werden.
-15. In der Rennwoche gibt es keinen Long Run, keine reguläre Quality Session und kein Unterkörper-Krafttraining.
-16. An den Tagen vor dem Race Day sind ausschließlich erlaubt: Easy Run mit maximal 6 km, kurzer Recovery Run, lockeres Oberkörper-Krafttraining, Mobility, Rest Day.
-17. Spätestens am Tag vor dem Race Day: maximal 20-30 Minuten sehr lockerer Shake-out Run oder Rest, keine zusätzliche Ermüdung erzeugen.
-18. Training nach dem Race Day wird ausschließlich als Recovery geplant.
+22. Race Day liegt exakt am {race_date} und hat day_of_week={race_dow}. Er darf niemals verschoben werden.
+23. In der Rennwoche gibt es keinen Long Run, keine reguläre Quality Session und kein Unterkörper-Krafttraining.
+24. An den Tagen vor dem Race Day sind ausschließlich erlaubt: Easy Run mit maximal 6 km, kurzer Recovery Run, lockeres Oberkörper-Krafttraining, Mobility, Rest Day.
+25. Spätestens am Tag vor dem Race Day: maximal 20-30 Minuten sehr lockerer Shake-out Run oder Rest, keine zusätzliche Ermüdung erzeugen.
+26. Training nach dem Race Day wird ausschließlich als Recovery geplant.
 
 SESSION-SPEZIFIK:
-19. Tempo-, Intervall- und Sprint-Sessions werden pace-basiert geplant und enthalten konkrete Zielbereiche in min/km.
-20. Pace-basierte Quality Sessions müssen enthalten: Warm-up, Hauptteil mit Distanz oder Dauer, Zielpace als Bereich, Trab- oder Stehpausen, Cooldown.
-21. Hill Sessions und Trail Runs werden über RPE und Belastungsdauer gesteuert. Es werden keine verbindlichen Pace-Ziele angegeben.
-22. Long Runs auf Trail-, Berg- oder technisch anspruchsvollem Terrain werden über RPE gesteuert. Pace dient dort nicht als Belastungsziel.
-23. Jede Laufeinheit enthält: Distanz, geschätzte Dauer, Intensitätssteuerung, Terrain, elevation_gain_m.
+27. Tempo-, Intervall- und Sprint-Sessions werden pace-basiert geplant und enthalten konkrete Zielbereiche in min/km.
+28. Pace-basierte Quality Sessions müssen enthalten: Warm-up, Hauptteil mit Distanz oder Dauer, Zielpace als Bereich, Trab- oder Stehpausen, Cooldown.
+29. Hill Sessions und Trail Runs werden über RPE und Belastungsdauer gesteuert. Es werden keine verbindlichen Pace-Ziele angegeben.
+30. Long Runs auf Trail-, Berg- oder technisch anspruchsvollem Terrain werden über RPE gesteuert. Pace dient dort nicht als Belastungsziel.
+31. Jede Laufeinheit enthält: Distanz, geschätzte Dauer, Intensitätssteuerung, Terrain, elevation_gain_m.
 {terrain_rules}
 
 ERLAUBTE SESSION-TYPEN — NUR diese 14, exakt so geschrieben (kein anderer Wert erlaubt):
@@ -499,6 +668,7 @@ Wochen {week_from} bis {week_to}. day_of_week: 1=Mo bis 7=So. Rest Days nicht ei
 
     plan_json = {"weeks": all_weeks}
     plan_json = apply_post_processing(plan_json)
+    plan_json = validate_and_fix_plan(plan_json, race_date, start_monday)
 
     # ─── In DB speichern ───
     print("DEBUG: starting DB save")
