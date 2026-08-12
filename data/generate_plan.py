@@ -331,6 +331,16 @@ def generate_plan(job_id, data):
 CROSS TRAINING: {cross_training_days}x pro Woche — Typen: {', '.join(cross_training_types) if cross_training_types else 'flexibel'}. Nutze session_type='Cross Training' mit notes=Typ (z.B. 'Rennrad 60 min').
 """
 
+    terrain_rules = ""
+    if terrain in ['trail', 'mixed']:
+        terrain_rules = """
+TERRAIN TRAIL/BERGE:
+24. Long Runs finden bevorzugt auf hügeligem, bergigem oder technischem Terrain statt.
+25. Hill Sessions und Trail Runs sind die primären Quality-Formen. Flache Tempo- oder Intervall-Sessions werden ergänzend eingesetzt.
+26. Die geplanten Höhenmeter werden progressiv aufgebaut und dürfen nicht gleichzeitig mit Laufdistanz und Intensität stark gesteigert werden.
+27. Technische Trail Runs werden nicht allein anhand von Kilometern bewertet. Dauer, Höhenmeter, Untergrund und RPE müssen bei der Belastungsberechnung berücksichtigt werden.
+"""
+
     athlete_analysis_context = build_athlete_analysis(today)
 
     client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
@@ -387,13 +397,57 @@ WOCHENSTRUKTUR — GENAU {days_per_week} Sessions pro Woche:
 {gpx_context}
 {hevy_context}
 {cross_training_context}
-REGELN:
-1. Long Run IMMER an Tag {long_run_day} ({day_names[long_run_day]})
-2. Nie 2 harte Sessions direkt hintereinander
-3. Tag nach Long Run: NUR Easy Run, Rest Day oder Strength Training Oberkörper. KEIN Quality, KEIN Unterkörper-Kraft.
-4. Strength Training NICHT direkt vor Quality Session. Wenn Unterkörper-Kraft geplant: Quality mindestens 1 Tag Abstand danach.
-5. Deload alle 4 Wochen (Volumen -20%)
-6. Trail Run = RPE-basiert, keine Pace
+CAIRN PLAN-GENERATOR – VERBINDLICHE REGELN
+
+REGELPRIORITÄT:
+Bei Konflikten gilt folgende Reihenfolge:
+1. Rennwoche und Race Day
+2. Verletzungs-, Erholungs- und Belastungsregeln
+3. Taper
+4. Deload
+5. Peak
+6. Volumenprogression
+7. Bevorzugte Wochenstruktur
+
+DEFINITIONEN:
+- Harte Sessions: Quality Session, Long Run, Unterkörper-Kraft und Race.
+- Quality Sessions: Tempo, Intervalle, Sprints, Hill Session und intensiver Trail Run.
+- Easy/Recovery Runs sind keine harten Sessions.
+- Wochenvolumen bezeichnet die gesamte geplante Laufdistanz in Kilometern.
+- Abstandsregeln beziehen sich auf Kalendertage.
+- Das Rennen zählt nicht als Long Run oder Quality Session, sondern als Race.
+
+BELASTUNGSREGELN:
+1. Der reguläre Long-Run-Tag ist {day_names[long_run_day]} und wird außerhalb der Rennwoche nicht verschoben.
+2. Am Kalendertag vor und nach dem Long Run sind ausschließlich erlaubt: Easy Run, Recovery Run, Rest Day, Mobility, Oberkörper-Kraft.
+3. Unterkörper-Kraft benötigt mindestens zwei vollständige Kalendertage Abstand vor und nach jeder Quality Session.
+4. Unterkörper-Kraft darf weder am Tag vor noch am Tag nach einem Long Run oder Race stattfinden.
+5. Harte Sessions dürfen niemals an zwei aufeinanderfolgenden Kalendertagen liegen.
+6. Zwischen zwei laufintensiven harten Sessions muss mindestens ein vollständiger leichter oder trainingsfreier Tag liegen.
+7. Bei Konflikten wird zuerst die Quality Session reduziert oder entfernt. Der Long Run bleibt auf seinem festgelegten Tag.
+
+PROGRESSION:
+8. Das Laufvolumen darf gegenüber der vorherigen regulären Belastungswoche um maximal 10% steigen.
+9. Eine Deload- oder Taperwoche bildet keine neue Basis für die 10%-Progression. Nach einer Reduktionswoche darf maximal zum Umfang der letzten regulären Belastungswoche zurückgekehrt werden.
+10. Jede vierte Trainingswoche ist grundsätzlich eine Deload-Woche: Laufvolumen etwa 20% unter der vorherigen Belastungswoche, keine Quality Session, Long Run entsprechend verkürzen, Intensität ausschließlich Easy/Recovery.
+11. Liegt eine planmäßige Deload-Woche innerhalb von Peak, Taper oder Rennwoche, gelten stattdessen die Regeln der jeweiligen Rennphase.
+12. Die Peak-Woche liegt zwei bis drei Wochen vor dem Rennen und enthält das höchste sinnvolle Wochenvolumen des Trainingsblocks.
+13. Der Taper beginnt 14 Tage vor dem Race Day: erste Taperwoche Volumen etwa 30% unter Peak, Rennwoche Volumen etwa 40-60% unter Peak (Race nicht eingerechnet), Intensität darf in kurzen kontrollierten Abschnitten erhalten bleiben.
+
+RENNWOCHE ({race_date}):
+14. Race Day liegt exakt am {race_date} und hat day_of_week={race_dow}. Er darf niemals verschoben werden.
+15. In der Rennwoche gibt es keinen Long Run, keine reguläre Quality Session und kein Unterkörper-Krafttraining.
+16. An den Tagen vor dem Race Day sind ausschließlich erlaubt: Easy Run mit maximal 6 km, kurzer Recovery Run, lockeres Oberkörper-Krafttraining, Mobility, Rest Day.
+17. Spätestens am Tag vor dem Race Day: maximal 20-30 Minuten sehr lockerer Shake-out Run oder Rest, keine zusätzliche Ermüdung erzeugen.
+18. Training nach dem Race Day wird ausschließlich als Recovery geplant.
+
+SESSION-SPEZIFIK:
+19. Tempo-, Intervall- und Sprint-Sessions werden pace-basiert geplant und enthalten konkrete Zielbereiche in min/km.
+20. Pace-basierte Quality Sessions müssen enthalten: Warm-up, Hauptteil mit Distanz oder Dauer, Zielpace als Bereich, Trab- oder Stehpausen, Cooldown.
+21. Hill Sessions und Trail Runs werden über RPE und Belastungsdauer gesteuert. Es werden keine verbindlichen Pace-Ziele angegeben.
+22. Long Runs auf Trail-, Berg- oder technisch anspruchsvollem Terrain werden über RPE gesteuert. Pace dient dort nicht als Belastungsziel.
+23. Jede Laufeinheit enthält: Distanz, geschätzte Dauer, Intensitätssteuerung, Terrain, elevation_gain_m.
+{terrain_rules}
 
 ERLAUBTE SESSION-TYPEN — NUR diese 14, exakt so geschrieben (kein anderer Wert erlaubt):
 Easy Run, Recovery Run, Long Run, Tempo Session, Interval Session, Sprint Session, Hill Session, Trail Run, Cross Training, Strength Training, Mobility, Rest Day, Time Trial, Race Day
