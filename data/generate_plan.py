@@ -197,10 +197,47 @@ def estimate_avg_weekly_hm(avg_weekly_km, terrain):
 
 
 def compute_longrun_km(target_km, phase, race_distance_km):
+    """Reiner Zielanteil (35-40% normal, bis 45% Peak) — wird von compute_longrun_progression()
+    zusätzlich gegen die eigene +10%/Woche-Progressionskette gedeckelt (niedrigere Distanz gilt)."""
     fraction = 0.425 if phase == 'PEAK' else 0.375
     longrun = target_km * fraction
     ceiling = min(race_distance_km * 0.80, target_km)
     return round(min(longrun, ceiling), 1)
+
+
+def compute_longrun_progression(phase_by_week, total_weeks, avg_weekly_km, km_targets, race_distance_km):
+    """Longrun hat eine EIGENE, von target_km unabhängige +10%/Woche-Progressionskette. Pro Woche gilt
+    die NIEDRIGERE der beiden Distanzen: Zielanteil (compute_longrun_km) vs. Progressionskette.
+    Initialer Longrun (kein Datenpunkt, Woche 1): 35-38% von avg_weekly_km (Mittelwert 36.5%), NICHT
+    von target_km — verhindert dass ein zu niedriges/hohes Wochenziel den ersten Longrun verzerrt.
+    Nach einem Deload vergleicht die nächste Belastungswoche weiterhin gegen den letzten NORMALEN
+    Belastungs-Longrun (die Kette wird während DELOAD nicht aktualisiert)."""
+    longrun_by_week = {}
+    last_normal_longrun = None
+    ceiling = race_distance_km * 0.80
+
+    for week_num in range(1, total_weeks + 1):
+        phase = phase_by_week.get(week_num, 'BUILD')
+        target_km = km_targets.get(week_num, 0)
+
+        if phase in ('BASE', 'BUILD', 'PEAK'):
+            fraction_based = compute_longrun_km(target_km, phase, race_distance_km)
+            if last_normal_longrun is None:
+                progression_based = round(avg_weekly_km * 0.365, 1)  # Mittelwert von 35-38%
+            else:
+                progression_based = round(last_normal_longrun * 1.10, 1)
+            value = round(min(fraction_based, progression_based, ceiling), 1)
+            longrun_by_week[week_num] = value
+            last_normal_longrun = value
+        elif phase == 'DELOAD':
+            reference = last_normal_longrun if last_normal_longrun is not None else avg_weekly_km * 0.365
+            longrun_by_week[week_num] = round(min(reference * 0.775, ceiling), 1)
+        elif phase == 'TAPER':
+            reference = last_normal_longrun if last_normal_longrun is not None else avg_weekly_km * 0.365
+            longrun_by_week[week_num] = round(min(reference * 0.70, ceiling), 1)
+        # RACE: kein Longrun (build_week_skeleton platziert ohnehin keinen)
+
+    return longrun_by_week
 
 
 def compute_longrun_hm(target_hm):
@@ -389,9 +426,12 @@ def build_week_skeleton(week_num, phase, race_dow, is_race_week, actual_start_da
     return sorted(sessions, key=lambda s: s['day_of_week'])
 
 
-def distribute_week_km(target_km, phase, sessions, race_distance_km):
+def distribute_week_km(target_km, phase, sessions, race_distance_km, longrun_km_override=None):
     """Verteilt target_km deterministisch auf die Sessions einer Woche. Summe == target_km
-    (Rundungsdifferenz wird auf Easy Runs gebucht). Race Day zählt NICHT ins Wochenvolumen."""
+    (Rundungsdifferenz wird auf Easy Runs gebucht). Race Day zählt NICHT ins Wochenvolumen.
+    longrun_km_override: vorberechneter Wert aus compute_longrun_progression() (eigene
+    +10%/Woche-Kette, ggf. niedriger als der reine Zielanteil) — falls None, wird der reine
+    Zielanteil verwendet (Fallback, z.B. für Tests die die Progressionskette nicht brauchen)."""
     longrun = [s for s in sessions if s['session_type'] == 'Long Run']
     quality = [s for s in sessions if s['session_type'] in QUALITY_TYPES]
     easy = [s for s in sessions if s['session_type'] in ENDURANCE_RUN_TYPES]
@@ -403,6 +443,8 @@ def distribute_week_km(target_km, phase, sessions, race_distance_km):
             # Longrun ist die einzige Laufsession der Woche (z.B. sehr wenige Ausdauertage) ->
             # trägt das gesamte Wochenvolumen statt nur des üblichen 35-40%-Anteils.
             km = round(min(target_km, race_distance_km * 0.80), 1)
+        elif longrun_km_override is not None:
+            km = longrun_km_override
         else:
             km = compute_longrun_km(target_km, phase, race_distance_km)
         s['distance_km'] = km
@@ -567,7 +609,25 @@ def build_full_skeleton(inputs):
     )
     hm_targets = apply_partial_week1_reduction(hm_targets, dates['actual_start_day'])
 
+    longrun_targets = compute_longrun_progression(phase_by_week, total_weeks, avg_weekly_km, km_targets, race_distance_km)
+
     conflicts = []
+
+    # Identische aufeinanderfolgende Belastungswochen (Zieldecke vor der eigentlichen Peak-Woche
+    # erreicht) sind zulässig, müssen aber dokumentiert werden statt stillschweigend zu passieren.
+    load_phases = ('BASE', 'BUILD', 'PEAK')
+    for week_num in range(2, total_weeks + 1):
+        phase = phase_by_week.get(week_num)
+        prev_phase = phase_by_week.get(week_num - 1)
+        if phase in load_phases and prev_phase in load_phases:
+            if km_targets.get(week_num) == km_targets.get(week_num - 1):
+                conflicts.append(
+                    f"Woche {week_num}: target_km identisch zu Woche {week_num - 1} "
+                    f"({km_targets.get(week_num)} km) — Zielobergrenze (desired_peak_km={desired_peak_km}) "
+                    f"bereits vor der eigentlichen Peak-Woche erreicht, weiteres Wachstum durch "
+                    f"absolute_plan_cap_km/race_distance_km-Formel begrenzt."
+                )
+
     weeks = []
     prev_week_longrun_day = None
     for week_num in range(1, total_weeks + 1):
@@ -588,7 +648,10 @@ def build_full_skeleton(inputs):
         )
         this_longrun = next((s['day_of_week'] for s in sessions if s['session_type'] == 'Long Run'), None)
         prev_week_longrun_day = this_longrun
-        sessions = distribute_week_km(km_targets.get(week_num, 0), phase, sessions, race_distance_km)
+        sessions = distribute_week_km(
+            km_targets.get(week_num, 0), phase, sessions, race_distance_km,
+            longrun_km_override=longrun_targets.get(week_num),
+        )
         sessions = distribute_week_hm(hm_targets.get(week_num, 0), sessions, terrain, race_elevation_m)
 
         for s in sessions:
@@ -597,12 +660,17 @@ def build_full_skeleton(inputs):
                 terrain, inputs.get('athlete_paces'),
             )
 
+        # Cross-Training-Minuten getrennt von target_run_km ausweisen — Laufkm bleiben unberührt.
+        target_cross_minutes = sum(s.get('duration_min', 0) for s in sessions if s['session_type'] == 'Cross Training')
+
         weeks.append({
             'week_number': week_num,
             'week_date': week_monday,
             'phase': phase,
             'target_km': km_targets.get(week_num, 0),
             'target_hm': hm_targets.get(week_num, 0),
+            'target_longrun_km': longrun_targets.get(week_num),
+            'target_cross_minutes': target_cross_minutes,
             'sessions': sessions,
         })
 
@@ -612,6 +680,7 @@ def build_full_skeleton(inputs):
         'total_weeks': total_weeks,
         'taper_weeks': taper_weeks,
         'peak_week': peak_week,
+        'avg_weekly_km': avg_weekly_km,
         'desired_peak_km': desired_peak_km,
         'peak_km_actual': peak_km_actual,
         'desired_peak_hm': desired_peak_hm,
@@ -657,6 +726,35 @@ def validate_skeleton(skeleton, max_km, only_week_num=None):
         # 6. max_km eingehalten
         if w['target_km'] > max_km + 0.01:
             errors.append(f"Woche {week_num}: target_km={w['target_km']} > max_km={max_km}")
+
+        avg_weekly_km = skeleton.get('avg_weekly_km')
+
+        # Startwoche: target_run_km zwischen 90-110% von avg_weekly_km
+        if week_num == 1 and avg_weekly_km and dates['actual_start_day'] == 1:
+            lo, hi = avg_weekly_km * 0.90, avg_weekly_km * 1.10
+            if not (lo - 0.05 <= w['target_km'] <= hi + 0.05):
+                errors.append(f"Woche 1: target_km={w['target_km']} ausserhalb 90-110% von avg_weekly_km={avg_weekly_km} ({lo:.1f}-{hi:.1f})")
+
+        # Peak-Woche: target_run_km >= avg_weekly_km — ABER nur wenn die Zielformel selbst (bei
+        # ausreichender Vorbereitungszeit) mehr hergibt. Ist desired_peak_km bereits durch
+        # race_distance_km*1.50 oder absolute_plan_cap_km unter avg_weekly_km gedeckelt (kurzes
+        # Rennen relativ zur aktuellen Fitness, z.B. Halbmarathon bei hohem Laufniveau), ist das
+        # die korrekte, beabsichtigte Formel-Ausgabe — kein Fehler.
+        desired_peak_km_ref = skeleton.get('desired_peak_km')
+        if w['phase'] == 'PEAK' and avg_weekly_km and desired_peak_km_ref is not None:
+            expected_floor = min(avg_weekly_km, desired_peak_km_ref)
+            if w['target_km'] < expected_floor - 0.05:
+                errors.append(f"Woche {week_num} (PEAK): target_km={w['target_km']} < erwartete Untergrenze {expected_floor:.1f} "
+                              f"(min(avg_weekly_km={avg_weekly_km}, desired_peak_km={desired_peak_km_ref}))")
+
+        # Longrun-Anteil: max 40% normal, max 45% Peak (harte Obergrenze; niedriger ist durch
+        # die eigene Progressionskette/Deckel legitim und wird NICHT als Fehler gewertet)
+        longrun_sessions_check = [s for s in sessions if s['session_type'] == 'Long Run']
+        if longrun_sessions_check and w['target_km'] > 0 and w['phase'] in ('BASE', 'BUILD', 'PEAK'):
+            ratio = longrun_sessions_check[0].get('distance_km', 0) / w['target_km']
+            ceiling_ratio = 0.45 if w['phase'] == 'PEAK' else 0.40
+            if ratio > ceiling_ratio + 0.02:
+                errors.append(f"Woche {week_num}: Longrun-Anteil {ratio:.0%} > {ceiling_ratio:.0%} des Wochenziels")
 
         # 4./5. Wochenkilometer/-HM = target (Toleranz, Race Day ausgenommen)
         actual_km = sum(s.get('distance_km', 0) for s in sessions if s['session_type'] != 'Race Day')
@@ -723,6 +821,20 @@ def validate_skeleton(skeleton, max_km, only_week_num=None):
             actual_date = rw['week_date'] + timedelta(days=rs['day_of_week'] - 1)
             if actual_date != race_day:
                 errors.append(f"Race Day Datum {actual_date} != race_date {race_day}")
+
+    # Build-Wochen progressiv: identische aufeinanderfolgende Belastungswochen nur mit
+    # dokumentiertem Grund (siehe build_full_skeleton's conflicts-Eintrag) zulässig
+    load_phases_check = ('BASE', 'BUILD', 'PEAK')
+    conflicts_text = " ".join(skeleton.get('conflicts', []))
+    for week_num in scope:
+        w = by_week_num[week_num]
+        prev = by_week_num.get(week_num - 1)
+        if not prev or w['phase'] not in load_phases_check or prev['phase'] not in load_phases_check:
+            continue
+        if w['target_km'] == prev['target_km']:
+            documented = f"Woche {week_num}: target_km identisch zu Woche {week_num - 1}" in conflicts_text
+            if not documented:
+                errors.append(f"Woche {week_num}: identisch zu Woche {week_num - 1} (target_km={w['target_km']}) ohne dokumentierten Grund")
 
     # 9b. Wochenübergreifend: Quality am Montag nach Longrun am Sonntag der Vorwoche
     for week_num in scope:
@@ -820,24 +932,37 @@ def pick_cairn_routine_name(focus, routine_by_category):
 
 
 def fetch_athlete_context(today):
-    """DB-Zugriff: avg_weekly_km, max_km, athlete_paces (aus athlete_profile.pace_z1..z5) fliessen in
-    die deterministische Skelett-Berechnung. HRV/Schlaf werden NICHT in der Skelett-Mathematik
-    verwendet (dort nirgends referenziert) — sie sind reiner Kontext für die Flavor-Texte, die das
-    LLM in Phase 2 pro Woche ergänzt."""
+    """DB-Zugriff: avg_weekly_km, max_weekly_km_actual, athlete_paces (aus athlete_profile.pace_z1..z5)
+    fliessen in die deterministische Skelett-Berechnung. HRV/Schlaf werden NICHT in der Skelett-
+    Mathematik verwendet (dort nirgends referenziert) — sie sind reiner Kontext für die Flavor-Texte,
+    die das LLM in Phase 2 pro Woche ergänzt.
+
+    max_weekly_km_actual = höchste TATSÄCHLICHE Wochensumme der letzten 28 Tage (4 Sieben-Tage-
+    Fenster endend heute), NICHT die längste Einzelsession — eine einzelne 22km-Session sagt nichts
+    über die reale Wochenkapazität aus und darf desired_peak_km nicht künstlich deckeln."""
     avg_weekly_km = 0
-    max_km = 0
+    max_weekly_km_actual = 0
     athlete_paces = {}
     avg_hrv = None
     avg_sleep = None
     conn = get_db()
     try:
         cur = conn.cursor()
-        cur.execute("""SELECT type, distance_km FROM trainings WHERE date >= %s""", (today - timedelta(days=28),))
+        cur.execute("""SELECT date, type, distance_km FROM trainings WHERE date >= %s""", (today - timedelta(days=28),))
         rows = cur.fetchall()
         print(f"DEBUG: trainings query returned {len(rows)} rows")
-        run_kms = [float(r[1]) for r in rows if r[0] in ('Run', 'TrailRun') and r[1]]
+        run_rows = [(r[0], float(r[2])) for r in rows if r[1] in ('Run', 'TrailRun') and r[2]]
+        run_kms = [km for _, km in run_rows]
         avg_weekly_km = round(sum(run_kms) / 4.0, 1) if run_kms else 0
-        max_km = round(max(run_kms), 1) if run_kms else 0
+
+        weekly_buckets = [0.0, 0.0, 0.0, 0.0]
+        for d, km in run_rows:
+            days_ago = (today - d).days
+            bucket_idx = min(3, max(0, days_ago // 7))
+            weekly_buckets[bucket_idx] += km
+        max_weekly_km_actual = round(max(weekly_buckets), 1) if run_rows else 0
+        print(f"DEBUG: weekly_buckets(km, aktuellste zuletzt)={list(reversed([round(b,1) for b in weekly_buckets]))}, "
+              f"max_weekly_km_actual={max_weekly_km_actual}")
 
         cur.execute("SELECT pace_z1, pace_z2, pace_z3, pace_z4, pace_z5 FROM athlete_profile ORDER BY id LIMIT 1")
         prow = cur.fetchone()
@@ -862,7 +987,7 @@ def fetch_athlete_context(today):
         traceback.print_exc()
     finally:
         conn.close()
-    return avg_weekly_km, max_km, athlete_paces, avg_hrv, avg_sleep
+    return avg_weekly_km, max_weekly_km_actual, athlete_paces, avg_hrv, avg_sleep
 
 
 def load_training_engine_excerpt():
@@ -967,7 +1092,14 @@ def generate_plan(job_id, data):
 
     today = get_today()
     hevy_context, routine_by_category = build_hevy_context()
-    avg_weekly_km, max_km, athlete_paces, avg_hrv, avg_sleep = fetch_athlete_context(today)
+    avg_weekly_km, max_weekly_km_actual, athlete_paces, avg_hrv, avg_sleep = fetch_athlete_context(today)
+
+    # absolute_plan_cap_km: ein Check-in-Feld dafür existiert im Fragebogen (noch) nicht — falls die
+    # App das je ergänzt, wird data['max_km'] respektiert. Ohne echten Check-in-Wert NIE aus der
+    # Trainingshistorie ableiten (weder längste Einzelsession noch höchste Wochensumme), da das
+    # legitime Wachstum (avg*1.30) künstlich kappen kann — siehe Bug-Analyse. Grosszügiger Fallback,
+    # der die 1.30x-Formel praktisch nie beschneidet.
+    absolute_plan_cap_km = data.get('max_km') or round(avg_weekly_km * 1.8, 1)
 
     inputs = {
         'start_date': start_date, 'race_date': race_date,
@@ -976,7 +1108,8 @@ def generate_plan(job_id, data):
         'strength_sessions': strength_sessions, 'quality_sessions': quality_sessions,
         'days_per_week': days_per_week, 'cross_training': cross_training,
         'cross_training_days': cross_training_days, 'avg_weekly_km': avg_weekly_km,
-        'max_km': max_km, 'athlete_paces': athlete_paces,
+        'max_km': absolute_plan_cap_km, 'max_weekly_km_actual': max_weekly_km_actual,
+        'athlete_paces': athlete_paces,
     }
 
     print("DEBUG: building deterministic skeleton (Phase 1)")
@@ -986,7 +1119,7 @@ def generate_plan(job_id, data):
     for c in skeleton['conflicts']:
         print(f"KONFLIKT (dokumentiert, kein Fehler): {c}")
 
-    is_valid, errors = validate_skeleton(skeleton, max_km or avg_weekly_km * 2)
+    is_valid, errors = validate_skeleton(skeleton, absolute_plan_cap_km)
     if not is_valid:
         for e in errors:
             print(f"SKELETON FEHLER: {e}")
@@ -1000,7 +1133,7 @@ def generate_plan(job_id, data):
                            f"Schlaf {avg_sleep if avg_sleep is not None else 'keine Daten'} h.")
 
     for week in skeleton['weeks']:
-        is_valid_week, week_errors = validate_skeleton(skeleton, max_km or avg_weekly_km * 2, only_week_num=week['week_number'])
+        is_valid_week, week_errors = validate_skeleton(skeleton, absolute_plan_cap_km, only_week_num=week['week_number'])
         if not is_valid_week:
             for e in week_errors:
                 print(f"SKELETON FEHLER (Woche {week['week_number']}): {e}")

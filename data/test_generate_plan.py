@@ -273,6 +273,122 @@ def test_max_eine_session_pro_tag():
 
 
 # ─────────────────────────────────────────────────────────────────────────
+# VOLUMEN-BUGFIX TESTS — konkrete Zahlen aus der Aufgabenstellung
+# ─────────────────────────────────────────────────────────────────────────
+
+def test_volumen_1_startwoche_34_38():
+    inputs = make_inputs(avg_weekly_km=36)
+    skel = gp.build_full_skeleton(inputs)
+    week1 = week_by_num(skel, 1)
+    assert 34 <= week1['target_km'] <= 38, f"Startwoche target_km={week1['target_km']}, erwartet 34-38"
+    valid, errors = gp.validate_skeleton(skel, inputs['max_km'])
+    assert valid, f"Skeleton invalid: {errors}"
+    print(f"OK: test_volumen_1_startwoche_34_38 (target_km={week1['target_km']})")
+
+
+def test_volumen_2_desired_peak_km_46_5():
+    desired = gp.compute_desired_peak_km(avg_weekly_km=36, race_distance_km=31, max_km=55)
+    assert desired == 46.5, f"desired_peak_km={desired}, erwartet 46.5"
+    print(f"OK: test_volumen_2_desired_peak_km_46_5 (desired_peak_km={desired})")
+
+
+def test_volumen_3_peak_woche_44_48():
+    inputs = make_inputs(avg_weekly_km=36, race_distance_km=31, max_km=55)
+    skel = gp.build_full_skeleton(inputs)
+    peak_weeks = [w for w in skel['weeks'] if w['phase'] == 'PEAK']
+    assert peak_weeks, "keine PEAK-Woche im Skelett gefunden"
+    peak = peak_weeks[0]
+    assert 44 <= peak['target_km'] <= 48, f"Peak-Woche target_km={peak['target_km']}, erwartet 44-48"
+    valid, errors = gp.validate_skeleton(skel, inputs['max_km'])
+    assert valid, f"Skeleton invalid: {errors}"
+    print(f"OK: test_volumen_3_peak_woche_44_48 (target_km={peak['target_km']})")
+
+
+def test_volumen_4_peak_longrun_19_21():
+    inputs = make_inputs(avg_weekly_km=36, race_distance_km=31, max_km=55)
+    skel = gp.build_full_skeleton(inputs)
+    peak_weeks = [w for w in skel['weeks'] if w['phase'] == 'PEAK']
+    assert peak_weeks
+    peak = peak_weeks[0]
+    lr = next(s for s in peak['sessions'] if s['session_type'] == 'Long Run')
+    assert 19 <= lr['distance_km'] <= 21, f"Peak-Longrun={lr['distance_km']}, erwartet 19-21"
+    print(f"OK: test_volumen_4_peak_longrun_19_21 (longrun={lr['distance_km']})")
+
+
+def test_volumen_5_build_wochen_progressiv_oder_dokumentiert():
+    inputs = make_inputs(avg_weekly_km=36, race_distance_km=31, max_km=55)
+    skel = gp.build_full_skeleton(inputs)
+    load_phases = ('BASE', 'BUILD', 'PEAK')
+    by_num = {w['week_number']: w for w in skel['weeks']}
+    conflicts_text = " ".join(skel['conflicts'])
+    identical_undocumented = []
+    for n in sorted(by_num):
+        w, prev = by_num[n], by_num.get(n - 1)
+        if not prev or w['phase'] not in load_phases or prev['phase'] not in load_phases:
+            continue
+        if w['target_km'] == prev['target_km']:
+            documented = f"Woche {n}: target_km identisch zu Woche {n - 1}" in conflicts_text
+            if not documented:
+                identical_undocumented.append(n)
+    assert not identical_undocumented, f"Undokumentierte identische Wochen: {identical_undocumented}"
+    valid, errors = gp.validate_skeleton(skel, inputs['max_km'])
+    assert valid, f"Skeleton invalid: {errors}"
+    print("OK: test_volumen_5_build_wochen_progressiv_oder_dokumentiert")
+
+
+def test_volumen_6_nach_deload_vergleich_mit_vordeload():
+    inputs = make_inputs(avg_weekly_km=36, race_distance_km=31, max_km=55)
+    skel = gp.build_full_skeleton(inputs)
+    phase_by_week, _, _ = gp.compute_phase_map(skel['total_weeks'])
+    by_num = {w['week_number']: w for w in skel['weeks']}
+    for n, phase in phase_by_week.items():
+        if phase != 'DELOAD':
+            continue
+        prev_load_num = n - 1
+        while phase_by_week.get(prev_load_num) not in ('BASE', 'BUILD', 'PEAK') and prev_load_num > 0:
+            prev_load_num -= 1
+        if prev_load_num < 1:
+            continue
+        prev_load_km = by_num[prev_load_num]['target_km']
+        next_num = n + 1
+        if next_num in by_num and phase_by_week.get(next_num) in ('BASE', 'BUILD', 'PEAK'):
+            next_km = by_num[next_num]['target_km']
+            assert next_km <= round(prev_load_km * 1.10, 1) + 0.05, (
+                f"Woche {next_num} ({next_km}) sollte gegen Vor-Deload-Woche {prev_load_num} "
+                f"({prev_load_km}) begrenzt sein, nicht gegen die Deload-Woche {n}"
+            )
+        # Deload-Longrun zaehlt nicht als neue Progressionsbasis
+        prev_lr = next((s for s in by_num[prev_load_num]['sessions'] if s['session_type'] == 'Long Run'), None)
+        if next_num in by_num:
+            next_lr = next((s for s in by_num[next_num]['sessions'] if s['session_type'] == 'Long Run'), None)
+            if prev_lr and next_lr:
+                assert next_lr['distance_km'] <= round(prev_lr['distance_km'] * 1.10, 1) + 0.05, (
+                    f"Longrun Woche {next_num} sollte gegen Vor-Deload-Longrun ({prev_lr['distance_km']}) "
+                    f"begrenzt sein"
+                )
+    print("OK: test_volumen_6_nach_deload_vergleich_mit_vordeload")
+
+
+def test_volumen_7_cross_training_reduziert_target_run_km_nicht():
+    inputs_with = make_inputs(avg_weekly_km=36, race_distance_km=31, max_km=55, cross_training=True, cross_training_days=1)
+    inputs_without = make_inputs(avg_weekly_km=36, race_distance_km=31, max_km=55, cross_training=False, cross_training_days=0)
+    skel_with = gp.build_full_skeleton(inputs_with)
+    skel_without = gp.build_full_skeleton(inputs_without)
+    week_with = week_by_num(skel_with, 1)
+    week_without = week_by_num(skel_without, 1)
+    assert week_with['target_km'] == week_without['target_km'], (
+        f"Cross Training hat target_km veraendert: {week_with['target_km']} vs {week_without['target_km']}"
+    )
+    assert week_with['target_km'] >= 34, f"target_km={week_with['target_km']} sollte NICHT von 36 auf 22 gefallen sein"
+    actual_run_km = sum(s.get('distance_km', 0) for s in week_with['sessions'] if s['session_type'] != 'Race Day')
+    assert abs(actual_run_km - week_with['target_km']) <= week_with['target_km'] * 0.05 + 0.15, (
+        f"Cross Training hat die tatsaechlich verteilten Laufkm stillschweigend reduziert: "
+        f"{actual_run_km} vs target {week_with['target_km']}"
+    )
+    print(f"OK: test_volumen_7_cross_training_reduziert_target_run_km_nicht (target_km={week_with['target_km']})")
+
+
+# ─────────────────────────────────────────────────────────────────────────
 # DRY RUN — exakte Szenario-Vorgabe aus der Aufgabenstellung
 # ─────────────────────────────────────────────────────────────────────────
 
@@ -365,6 +481,13 @@ if __name__ == '__main__':
         test_wochenuebergreifende_quality_nach_longrun_regel,
         test_eingabefehler_strength_mismatch,
         test_max_eine_session_pro_tag,
+        test_volumen_1_startwoche_34_38,
+        test_volumen_2_desired_peak_km_46_5,
+        test_volumen_3_peak_woche_44_48,
+        test_volumen_4_peak_longrun_19_21,
+        test_volumen_5_build_wochen_progressiv_oder_dokumentiert,
+        test_volumen_6_nach_deload_vergleich_mit_vordeload,
+        test_volumen_7_cross_training_reduziert_target_run_km_nicht,
     ]
     failed = []
     for t in tests:
