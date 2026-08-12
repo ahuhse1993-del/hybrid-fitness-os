@@ -1,9 +1,10 @@
 """
 CAIRN – Plan-Generierung als GitHub Action Job.
 
-Liest die Fragebogen-Daten eines Jobs aus plan_jobs, baut den kompletten
-Trainingsplan (Athleten-Analyse, CAIRN-Routinen, Web-Search-Recherche,
-Wochen-Generierung, Workout-Vorschläge) und schreibt ihn in die DB.
+Liest die Fragebogen-Daten eines Jobs aus plan_jobs, baut einen minimalen Prompt
+(nur Fixpunkte + Athletenprofil + CAIRN-Routinen + JSON-Schema) und vertraut dem
+Coach + Web Search für Periodisierung, Phasenverteilung und Session-Struktur.
+Ein Validator prüft danach nur noch den Race Day selbst.
 
 Ausführen: python data/generate_plan.py <job_id>
 """
@@ -26,6 +27,9 @@ HEVY_CATEGORIES = {
     'Lower Body + Arms CAIRN': 'unterkörper',
     'Full Body Light CAIRN': 'full_body_light',
 }
+
+DAY_NAMES = ['', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag']
+DAY_ABBR = ['', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So']
 
 
 def get_db():
@@ -74,7 +78,7 @@ def build_hevy_context():
             cairn_routines[title] = exercises or []
 
         if cairn_routines:
-            hevy_lines = ["STRENGTH TRAINING: Verwende NUR diese Workout-Namen (exakt so wie hier geschrieben):"]
+            hevy_lines = ["Verwende NUR diese Workout-Namen (exakt so wie hier geschrieben):"]
             for title, exercises in cairn_routines.items():
                 category = HEVY_CATEGORIES.get(title, 'Ganzkörper')
                 routine_by_category.setdefault(category, title)
@@ -86,7 +90,7 @@ def build_hevy_context():
             if routine_by_category.get('full_body_light'):
                 hevy_lines.append(f"Deload/Taper: {routine_by_category['full_body_light']}")
 
-            hevy_context = "\n" + "\n".join(hevy_lines) + "\n"
+            hevy_context = "\n".join(hevy_lines)
     except Exception as e:
         print(f"Hevy Routinen Fehler: {e}")
     finally:
@@ -95,24 +99,31 @@ def build_hevy_context():
 
 
 def build_athlete_analysis(today):
-    """Athletenprofil + letzte 4 Wochen Aktivitäten + HRV/Schlaf/Befinden aus der DB."""
-    athlete_analysis_context = ""
+    """Aktuelles Laufniveau + HRV/Schlaf + Athletenprofil (HF-Zonen, Ziele, Cross-Training) aus der DB."""
+    avg_weekly_km = 0
+    max_km = 0
+    avg_hrv = None
+    avg_sleep = None
+    hr_zones_str = 'keine hinterlegt'
+    long_term_goals = 'keine angegeben'
+    cross_prefs_str = 'keine Präferenz hinterlegt'
+
     conn = get_db()
     try:
         cur = conn.cursor()
 
-        # Letzte 4 Wochen Aktivitäten
+        # Letzte 4 Wochen Laufumfang
         cur.execute("""
-            SELECT type, distance_km, heart_rate_avg
+            SELECT type, distance_km
             FROM trainings
             WHERE date >= %s
         """, (today - timedelta(days=28),))
         training_rows = cur.fetchall()
         print(f"DEBUG: trainings query returned {len(training_rows)} rows")
 
-        # HRV / Schlaf / Befinden
+        # HRV / Schlaf
         cur.execute("""
-            SELECT hrv_last_night, sleep_duration_h, feel
+            SELECT hrv_last_night, sleep_duration_h
             FROM daily_logs
             WHERE date >= %s
         """, (today - timedelta(days=30),))
@@ -133,33 +144,13 @@ def build_athlete_analysis(today):
         run_rows = [r for r in training_rows if r[0] in ('Run', 'TrailRun')]
         run_kms = [float(r[1]) for r in run_rows if r[1]]
         avg_weekly_km = round(sum(run_kms) / 4.0, 1) if run_kms else 0
-        total_runs = len(run_rows)
         max_km = round(max(run_kms), 1) if run_kms else 0
-
-        hr_values = [float(r[2]) for r in training_rows if r[2]]
-        avg_hr = round(sum(hr_values) / len(hr_values)) if hr_values else None
-
-        type_counts = {}
-        for r in training_rows:
-            t = r[0] or 'Unbekannt'
-            type_counts[t] = type_counts.get(t, 0) + 1
-        top_types = sorted(type_counts.items(), key=lambda x: -x[1])[:3]
-        top_types_str = ', '.join(f"{t} ({c}x)" for t, c in top_types) if top_types else 'keine Daten'
 
         hrv_values = [float(r[0]) for r in log_rows if r[0] is not None]
         avg_hrv = round(sum(hrv_values) / len(hrv_values), 1) if hrv_values else None
 
         sleep_values = [float(r[1]) for r in log_rows if r[1] is not None]
         avg_sleep = round(sum(sleep_values) / len(sleep_values), 1) if sleep_values else None
-
-        feel_values = []
-        for r in log_rows:
-            try:
-                if r[2] is not None:
-                    feel_values.append(float(r[2]))
-            except (TypeError, ValueError):
-                pass
-        avg_feel = round(sum(feel_values) / len(feel_values), 1) if feel_values else None
 
         long_term_goals = (profile_row[0] if profile_row else '') or 'keine angegeben'
 
@@ -179,184 +170,53 @@ def build_athlete_analysis(today):
             if profile_row[14]: cross_prefs.append('Ski')
         cross_prefs_str = ', '.join(cross_prefs) if cross_prefs else 'keine Präferenz hinterlegt'
         print("DEBUG: athlete analysis calculations complete")
-
-        athlete_analysis_context = f"""
-ATHLETEN-ANALYSE (echte Daten — der gesamte Plan muss darauf basieren):
-Aktuelles Laufniveau: Ø {avg_weekly_km} km/Woche über die letzten 4 Wochen ({total_runs} Einheiten)
-Längste Einheit: {max_km} km
-Häufigste Session-Typen: {top_types_str}
-Ø Herzfrequenz: {avg_hr if avg_hr is not None else 'keine Daten'} bpm
-Ø HRV: {avg_hrv if avg_hrv is not None else 'keine Daten'} ms | Ø Schlaf: {avg_sleep if avg_sleep is not None else 'keine Daten'}h | Ø Befinden: {avg_feel if avg_feel is not None else 'keine Daten'}/10
-HF-Zonen: {hr_zones_str}
-Langzeitziele: {long_term_goals}
-Cross Training: {cross_prefs_str}
-
-Der gesamte Trainingsplan — jede Woche, jede Phase, jede Progression — muss auf diesem Athleten-Niveau aufbauen. Nicht zu hoch starten, nicht zu tief. Realistisch progressiv aufbauen basierend auf dem was der Athlet aktuell wirklich leistet. Ein Athlet der Ø 30km/Woche läuft startet anders als einer der Ø 80km/Woche läuft.
-"""
-        print("DEBUG: athlete_analysis_context built")
     except Exception as e:
         print(f"Athleten-Analyse Fehler: {e}")
         traceback.print_exc()
-        athlete_analysis_context = ""
-        avg_weekly_km = 0
-        max_km = 0
     finally:
         conn.close()
-    return athlete_analysis_context, avg_weekly_km, max_km
+
+    return avg_weekly_km, max_km, avg_hrv, avg_sleep, hr_zones_str, long_term_goals, cross_prefs_str
 
 
-# Coaching-Absicht pro Phase, aus knowledge/docs/training_engine.md (Periodisation / Deload Weeks Kapitel)
-PHASE_COACHING_DESCRIPTIONS = {
-    'BASE': "Build aerobic engine. Low intensity. Volume grows gradually. No quality pressure.",
-    'BUILD': "Convert fitness into performance. Quality increases. Specificity increases.",
-    'PEAK': "Everything unnecessary removed. Race-specific. Confidence, not exhaustion.",
-    'TAPER': "Reduce fatigue. Maintain fitness. Athlete arrives feeling slightly undertrained.",
-    'DELOAD': "Reduce accumulated fatigue. Volume -20%. No quality. Easy intensity only.",
-    'RACE WEEK': "Minimal training. Race Day is the only hard effort.",
-}
+def build_training_science_context(client, total_weeks, race_distance_km, terrain):
+    """Drei fokussierte Web-Search-Pre-Calls (Periodisierung, Taper/Peak, Quality-Sessions) statt
+    Live-Suche im Haupt-Call — vermeidet das dokumentierte Empty-Response-Problem, wenn Tool-Nutzung
+    und ein grosses JSON-Output-Budget im selben Call konkurrieren."""
+    queries = [
+        f"{total_weeks} week {terrain} {race_distance_km}km running plan periodization",
+        f"taper peak phase {terrain} ultra running volume intensity",
+        f"{terrain} running quality sessions hill training specificity",
+    ]
+    results = []
+    for query in queries:
+        try:
+            message = client.messages.create(
+                model="claude-sonnet-4-6",
+                max_tokens=2000,
+                tools=[{"type": "web_search_20250305", "name": "web_search"}],
+                system="Answer in max 150 words.",
+                messages=[{"role": "user", "content": query}]
+            )
+            text = "".join(
+                block.text for block in message.content
+                if hasattr(block, 'text') and getattr(block, 'type', None) == 'text'
+            ).strip()
+            if text:
+                results.append(text)
+            print(f"DEBUG: web search pre-call done ({query[:50]}...)")
+        except Exception as e:
+            print(f"Web Search Pre-Call Fehler ({query[:50]}...): {e}")
 
-DAY_ABBR = ['', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So']
-
-
-def compute_phase_map(total_weeks):
-    """Weist jeder Woche 1..total_weeks deterministisch rückwärts vom Race Day eine Phase zu."""
-    phase_by_week = {}
-    if total_weeks >= 1:
-        phase_by_week[total_weeks] = 'RACE WEEK'
-    if total_weeks - 1 >= 1:
-        phase_by_week[total_weeks - 1] = 'TAPER'
-    if total_weeks - 2 >= 1:
-        phase_by_week[total_weeks - 2] = 'PEAK'
-
-    remaining = [w for w in range(1, total_weeks + 1) if w not in phase_by_week]
-    for w in remaining:
-        if w % 4 == 0:
-            phase_by_week[w] = 'DELOAD'
-
-    remaining = [w for w in range(1, total_weeks + 1) if w not in phase_by_week]
-    base_count = round(len(remaining) * 0.35)
-    for i, w in enumerate(remaining):
-        phase_by_week[w] = 'BASE' if i < base_count else 'BUILD'
-
-    return phase_by_week
-
-
-def build_phase_map(total_weeks, start_monday, race_date):
-    """Baut den PHASENZUWEISUNG-Prompt-Block: Datum + Phase + Coaching-Absicht pro Woche."""
-    phase_by_week = compute_phase_map(total_weeks)
-    lines = ["PHASENZUWEISUNG UND COACHING-ABSICHT — VERBINDLICH:"]
-    for week_num in range(1, total_weeks + 1):
-        week_monday = start_monday + timedelta(weeks=week_num - 1)
-        weekday_abbr = DAY_ABBR[week_monday.isoweekday()]
-        date_str = week_monday.strftime('%d.%m')
-        phase = phase_by_week.get(week_num, 'BUILD')
-        description = PHASE_COACHING_DESCRIPTIONS.get(phase, '')
-        lines.append(f"Woche {week_num} ({weekday_abbr} {date_str}) {phase}: {description}")
-    return "\n".join(lines)
-
-
-def build_training_science_context(client, total_weeks, race_distance_km, terrain, avg_weekly_km, race_date, start_monday):
-    """Einmaliger Web-Search-Pre-Call für Trainingswissenschaft (statt pro Wochen-Batch) plus
-    deterministische Phasenzuweisung rückwärts vom Race Day."""
     training_science_context = ""
-    query = f"{total_weeks} week {terrain} running plan {race_distance_km}km periodization base build peak taper weeks distribution {avg_weekly_km}km per week current fitness"
-    try:
-        science_message = client.messages.create(
-            model="claude-sonnet-4-6",
-            max_tokens=4000,
-            tools=[{"type": "web_search_20250305", "name": "web_search"}],
-            system="Answer in max 200 words.",
-            messages=[{"role": "user", "content": query}]
-        )
-        science_text = "".join(
-            block.text for block in science_message.content
-            if hasattr(block, 'text') and getattr(block, 'type', None) == 'text'
-        ).strip()
-        if science_text:
-            training_science_context = "\nTRAININGSWISSENSCHAFT (Recherche):\n" + science_text + "\n"
-        print("DEBUG: training science pre-call done")
-    except Exception as e:
-        print(f"Training Science Pre-Call Fehler: {e}")
-        training_science_context = ""
-
-    phase_map = build_phase_map(total_weeks, start_monday, race_date)
-
-    return training_science_context, phase_map
-
-
-def apply_post_processing(plan_json):
-    """Trainingsregeln durchsetzen: kein Quality nach Unterkörper-Kraft, kein Quality direkt vor Long Run."""
-    print(f"DEBUG: starting post-processing, {len(plan_json.get('weeks', []))} weeks total")
-    quality_types = {'Tempo Session', 'Interval Session', 'Sprint Session', 'Hill Session'}
-    swap_fields = (
-        'session_type', 'notes', 'distance_km', 'duration_min', 'session_zone',
-        'warmup_km', 'warmup_min', 'main_sets', 'main_distance_m', 'main_pace',
-        'recovery_m', 'cooldown_km', 'cooldown_min',
-    )
-
-    for week in plan_json.get('weeks', []):
-        sessions = week.get('sessions', [])
-        by_day = {s.get('day_of_week'): s for s in sessions if s.get('day_of_week') is not None}
-
-        for day in sorted(by_day.keys()):
-            s = by_day[day]
-            next_s = by_day.get(day + 1)
-            if not next_s:
-                continue
-
-            notes_lower = (s.get('notes') or '').lower()
-            is_lower = (s.get('session_type') == 'Strength Training' and
-                       ('lower' in notes_lower or 'unterk' in notes_lower or
-                        'bein' in notes_lower or 'leg' in notes_lower or
-                        'squat' in notes_lower or 'deadlift' in notes_lower or
-                        'kreuzheben' in notes_lower or 'bulgar' in notes_lower))
-            is_quality_before_long = (s.get('session_type') in quality_types and
-                                     next_s.get('session_type') == 'Long Run')
-
-            if (is_lower and next_s.get('session_type') in quality_types) or is_quality_before_long:
-                swap_target = None
-                for other_day in sorted(by_day.keys()):
-                    if other_day in (day, day + 1):
-                        continue
-                    if by_day[other_day].get('session_type') in {'Easy Run', 'Trail Run', 'Recovery Run'}:
-                        swap_target = by_day[other_day]
-                        break
-                if swap_target:
-                    for field in swap_fields:
-                        next_s[field], swap_target[field] = swap_target.get(field), next_s.get(field)
-
-    print("DEBUG: post-processing complete")
-    return plan_json
-
-
-QUALITY_TYPES = {'Tempo Session', 'Interval Session', 'Sprint Session', 'Hill Session'}
-
-
-def _is_lower_body_strength(session):
-    notes_lower = (session.get('notes') or '').lower()
-    return (session.get('session_type') == 'Strength Training' and
-            ('lower' in notes_lower or 'unterk' in notes_lower or
-             'bein' in notes_lower or 'leg' in notes_lower or
-             'squat' in notes_lower or 'deadlift' in notes_lower or
-             'kreuzheben' in notes_lower or 'bulgar' in notes_lower))
-
-
-def _is_hard_session(session):
-    """Harte Einheit = Quality Session, Long Run oder Unterkörper-Kraft."""
-    return (session.get('session_type') in QUALITY_TYPES or
-            session.get('session_type') == 'Long Run' or
-            _is_lower_body_strength(session))
-
-
-def _is_leg_loading(session):
-    """Beinbelastend = harte Einheit oder Trail Run."""
-    return _is_hard_session(session) or session.get('session_type') == 'Trail Run'
+    if results:
+        training_science_context = "TRAININGSWISSENSCHAFT (Recherche):\n" + "\n\n".join(results)
+    return training_science_context
 
 
 def validate_and_fix_plan(plan_json, race_date, race_dow, start_monday):
-    """Prüft den generierten Plan gegen die Belastungsregeln. Für jeden Verstoss wird versucht,
-    die betroffene Session mit einem kompatiblen Easy Run oder einem freien (Rest Day) Kalendertag
-    in derselben Woche zu tauschen. Ist kein kompatibler Tausch möglich, bleibt die Session stehen."""
+    """Prüft nur den Race Day selbst: liegt er exakt auf race_date, und ist der Tag davor kein Long Run.
+    Alles andere überlässt CAIRN vollständig dem Coach + Web Search."""
     print("DEBUG: starting plan validation")
     print(f"VALIDATOR: race_date={race_date}, race_dow={race_dow}")
 
@@ -385,28 +245,11 @@ def validate_and_fix_plan(plan_json, race_date, race_dow, start_monday):
             return day, True  # freier Kalendertag (Rest Day), Session wird verschoben
         return None, None
 
-    def swap_or_move(by_day, offending_day, offending_session, exclude_days):
-        target_day, is_move = find_swap_target(by_day, exclude_days | {offending_day})
-        if target_day is None:
-            print(f"KEIN TAUSCH MÖGLICH: {offending_session}")
-            return
-        if is_move:
-            offending_session['day_of_week'] = target_day
-            by_day[target_day] = offending_session
-            del by_day[offending_day]
-        else:
-            target_session = by_day[target_day]
-            for field in swap_fields:
-                offending_session[field], target_session[field] = target_session.get(field), offending_session.get(field)
-
     def convert_to_easy_run(session):
-        # Ein Tausch mit einem anderen Tag INNERHALB der Rennwoche würde die verbotene
-        # Session nur verschieben, nicht entfernen — die ganze Woche unterliegt derselben
-        # Beschränkung. Deshalb wird direkt umgewandelt statt getauscht.
         session['session_type'] = 'Easy Run'
         session['distance_km'] = min(session.get('distance_km') or 6, 6)
         session['session_zone'] = 'Z1-Z2'
-        session['notes'] = 'Sehr leicht, Rennwoche.'
+        session['notes'] = 'Sehr leicht, Tag vor dem Rennen.'
         for field in ('warmup_km', 'warmup_min', 'main_sets', 'main_distance_m',
                       'main_pace', 'recovery_m', 'cooldown_km', 'cooldown_min'):
             session[field] = None
@@ -417,77 +260,37 @@ def validate_and_fix_plan(plan_json, race_date, race_dow, start_monday):
         by_day = {s.get('day_of_week'): s for s in sessions if s.get('day_of_week') is not None}
 
         week_monday = start_monday + timedelta(weeks=week_num - 1)
-        print(f"VALIDATOR: week {week.get('week_number')} starts {start_monday + timedelta(weeks=week.get('week_number', 1) - 1)}, race_week_monday={race_week_monday}")
+        print(f"VALIDATOR: week {week_num} starts {week_monday}, race_week_monday={race_week_monday}")
         is_race_week = bool(race_week_monday) and week_monday == race_week_monday
+        if not is_race_week or race_dow is None:
+            continue
 
-        # Race Day liegt nicht exakt auf race_date
-        if is_race_week:
-            for day in sorted(by_day.keys()):
-                s = by_day[day]
-                print(f"VALIDATOR CHECK: session day_of_week={s.get('day_of_week')}, expected race_dow={race_dow}, session_type={s.get('session_type')}")
-            if by_day.get(race_dow, {}).get('session_type') != 'Race Day':
-                print(f"VALIDATOR FEHLER: Race Day liegt nicht exakt auf {race_date} (Woche {week_num})")
-                race_days = [d for d, s in by_day.items() if s.get('session_type') == 'Race Day']
-                if race_days:
-                    wrong_day = race_days[0]
-                    race_session = by_day[wrong_day]
-                    if race_dow in by_day:
-                        target_session = by_day[race_dow]
-                        for field in swap_fields:
-                            race_session[field], target_session[field] = target_session.get(field), race_session.get(field)
-                    else:
-                        race_session['day_of_week'] = race_dow
-                        by_day[race_dow] = race_session
-                        del by_day[wrong_day]
+        # 1. Race Day liegt exakt auf race_date
+        for day in sorted(by_day.keys()):
+            s = by_day[day]
+            print(f"VALIDATOR CHECK: session day_of_week={s.get('day_of_week')}, expected race_dow={race_dow}, session_type={s.get('session_type')}")
+        if by_day.get(race_dow, {}).get('session_type') != 'Race Day':
+            print(f"VALIDATOR FEHLER: Race Day liegt nicht exakt auf {race_date} (Woche {week_num})")
+            race_days = [d for d, s in by_day.items() if s.get('session_type') == 'Race Day']
+            if race_days:
+                wrong_day = race_days[0]
+                race_session = by_day[wrong_day]
+                if race_dow in by_day:
+                    target_session = by_day[race_dow]
+                    for field in swap_fields:
+                        race_session[field], target_session[field] = target_session.get(field), race_session.get(field)
                 else:
-                    print(f"KEIN TAUSCH MÖGLICH: kein Race Day in Rennwoche {week_num} gefunden")
+                    race_session['day_of_week'] = race_dow
+                    by_day[race_dow] = race_session
+                    del by_day[wrong_day]
+            else:
+                print(f"KEIN TAUSCH MÖGLICH: kein Race Day in Rennwoche {week_num} gefunden")
 
-        # Quality, Long Run oder Unterkörper-Kraft in der Rennwoche
-        if is_race_week:
-            for day in sorted(by_day.keys()):
-                s = by_day[day]
-                if s.get('session_type') == 'Race Day':
-                    continue
-                if (s.get('session_type') in QUALITY_TYPES or
-                        s.get('session_type') == 'Long Run' or
-                        _is_lower_body_strength(s)):
-                    print(f"VALIDATOR FEHLER: {s.get('session_type')} in der Rennwoche (Woche {week_num}, Tag {day})")
-                    convert_to_easy_run(s)
-
-        # Tages-Checks laufen zweimal: ein Tausch kann an anderer Stelle eine neue
-        # Verletzung erzeugen (z.B. Unterkörper-Kraft landet neu vor einer Quality Session),
-        # der zweite Durchlauf fängt diese kaskadierten Fälle ab.
-        for _pass in range(2):
-            # Quality Session am Tag nach Long Run
-            for day in sorted(by_day.keys()):
-                s = by_day[day]
-                next_s = by_day.get(day + 1)
-                if s.get('session_type') == 'Long Run' and next_s and next_s.get('session_type') in QUALITY_TYPES:
-                    print(f"VALIDATOR FEHLER: Quality Session am Tag nach Long Run (Woche {week_num}, Tag {day + 1})")
-                    swap_or_move(by_day, day + 1, next_s, {day, day + 1})
-
-            # Unterkörper-Kraft am Tag vor Quality Session
-            for day in sorted(by_day.keys()):
-                s = by_day[day]
-                next_s = by_day.get(day + 1)
-                if _is_lower_body_strength(s) and next_s and next_s.get('session_type') in QUALITY_TYPES:
-                    print(f"VALIDATOR FEHLER: Unterkörper-Kraft am Tag vor Quality Session (Woche {week_num}, Tag {day})")
-                    swap_or_move(by_day, day, s, {day, day + 1})
-
-            # Harte Einheit am Tag vor Long Run
-            for day in sorted(by_day.keys()):
-                s = by_day[day]
-                next_s = by_day.get(day + 1)
-                if next_s and next_s.get('session_type') == 'Long Run' and _is_hard_session(s):
-                    print(f"VALIDATOR FEHLER: Harte Einheit am Tag vor Long Run (Woche {week_num}, Tag {day})")
-                    swap_or_move(by_day, day, s, {day, day + 1})
-
-            # Drei beinbelastende Tage hintereinander
-            for day in sorted(by_day.keys()):
-                d1, d2, d3 = by_day.get(day), by_day.get(day + 1), by_day.get(day + 2)
-                if d1 and d2 and d3 and _is_leg_loading(d1) and _is_leg_loading(d2) and _is_leg_loading(d3):
-                    print(f"VALIDATOR FEHLER: Drei beinbelastende Tage hintereinander (Woche {week_num}, Tag {day}-{day + 2})")
-                    swap_or_move(by_day, day + 2, d3, {day, day + 1, day + 2})
+        # 2. Long Run am Tag direkt vor Race Day -> Easy Run
+        day_before_race = by_day.get(race_dow - 1)
+        if day_before_race and day_before_race.get('session_type') == 'Long Run':
+            print(f"VALIDATOR FEHLER: Long Run am Tag direkt vor Race Day (Woche {week_num}, Tag {race_dow - 1})")
+            convert_to_easy_run(day_before_race)
 
     print("DEBUG: plan validation complete")
     return plan_json
@@ -495,20 +298,17 @@ def validate_and_fix_plan(plan_json, race_date, race_dow, start_monday):
 
 def generate_plan(job_id, data):
     goal_type = data.get('goal_type', 'race')
-    race_type = data.get('race_type', '')
     race_name = data.get('race_name', '')
     race_date = data.get('race_date', '')
     race_distance_km = data.get('race_distance_km', 0)
     terrain = data.get('terrain', '')
     race_elevation_m = data.get('race_elevation_m', 0)
-    gpx_data = data.get('gpx_data', None)
     days_per_week = data.get('days_per_week', 5)
     long_run_day = data.get('long_run_day', 6)
     quality_sessions = data.get('quality_sessions', 1)
     strength_sessions = data.get('strength_sessions', 2)
     strength_days = data.get('strength_days', [])
     total_weeks = data.get('total_weeks', 16)
-    phases = data.get('phases', [])
     start_date = data.get('start_date', None)
     cross_training = data.get('cross_training', False)
     cross_training_types = data.get('cross_training_types', [])
@@ -526,196 +326,47 @@ def generate_plan(job_id, data):
     else:
         start_monday = today
         actual_start_day = 1
-    day_names = ['', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag']
-    gain_per_km = (race_elevation_m / race_distance_km) if race_distance_km else 0
+
     try:
         race_dow = date.fromisoformat(race_date).isoweekday() if race_date else None  # 1=Mo, 7=So
     except Exception:
         race_dow = None
 
-    half = total_weeks // 2
-    week_ranges = [(1, half), (half + 1, total_weeks)] if total_weeks > 10 else [(1, total_weeks)]
+    hevy_context, _ = build_hevy_context()
 
-    all_weeks = []
-
-    hevy_context, routine_by_category = build_hevy_context()
-
-    cross_training_context = ""
-    if cross_training:
-        cross_training_context = f"""
-CROSS TRAINING: {cross_training_days}x pro Woche — Typen: {', '.join(cross_training_types) if cross_training_types else 'flexibel'}. Nutze session_type='Cross Training' mit notes=Typ (z.B. 'Rennrad 60 min').
-"""
-
-    terrain_rules = ""
-    if terrain in ['trail', 'mixed']:
-        terrain_rules = """
-TERRAIN TRAIL/BERGE:
-32. Long Runs finden bevorzugt auf hügeligem, bergigem oder technischem Terrain statt.
-33. Hill Sessions und Trail Runs sind die primären Quality-Formen. Flache Tempo- oder Intervall-Sessions werden ergänzend eingesetzt.
-34. Die geplanten Höhenmeter werden progressiv aufgebaut und dürfen nicht gleichzeitig mit Laufdistanz und Intensität stark gesteigert werden.
-35. Technische Trail Runs werden nicht allein anhand von Kilometern bewertet. Dauer, Höhenmeter, Untergrund und RPE müssen bei der Belastungsberechnung berücksichtigt werden.
-"""
-
-    athlete_analysis_context, avg_weekly_km, max_km = build_athlete_analysis(today)
+    (avg_weekly_km, max_km, avg_hrv, avg_sleep,
+     hr_zones_str, long_term_goals, cross_prefs_str) = build_athlete_analysis(today)
 
     client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
     print("DEBUG: anthropic client created")
 
-    training_science_context, phase_map = build_training_science_context(
-        client, total_weeks, race_distance_km, terrain, avg_weekly_km, race_date, start_monday
+    training_science_context = build_training_science_context(client, total_weeks, race_distance_km, terrain)
+
+    strength_days_str = ', '.join(DAY_ABBR[d] for d in strength_days) if strength_days else 'flexibel'
+    cross_training_str = (
+        f"{cross_training_days}x/Woche — {', '.join(cross_training_types) if cross_training_types else 'flexibel'}"
+        if cross_training else 'keine'
     )
 
-    for (week_from, week_to) in week_ranges:
-        phase_context = []
-        for ph in phases:
-            phase_context.append(f"{ph.get('name','').upper()}: {ph.get('weeks',0)} Wochen")
+    athleten_daten = f"""- Aktuelles Laufniveau: Ø {avg_weekly_km} km/Woche über die letzten 4 Wochen
+- Längste Einheit: {max_km} km
+- HRV: {avg_hrv if avg_hrv is not None else 'keine Daten'} ms | Schlaf: {avg_sleep if avg_sleep is not None else 'keine Daten'} h
+- HF-Zonen: {hr_zones_str}
+- Langzeitziele: {long_term_goals}
+- Cross Training: {cross_prefs_str} · geplant: {cross_training_str}"""
 
-        gpx_context = ""
-        if gpx_data:
-            gpx_context = f"""
-STRECKENPROFIL (GPX-Analyse):
-- Distanz: {gpx_data.get('distance_km')} km
-- Höhenmeter aufwärts: {gpx_data.get('elevation_gain_m')} m
-- Höhenmeter pro km: {gpx_data.get('gain_per_km')} m/km
-- Profil: {gpx_data.get('profile_de')}
-- Max. Steigung: {gpx_data.get('max_grade_pct')} %
-"""
-
-        previous_weeks_summary = ""
-        if week_from > 1 and all_weeks:
-            summary_lines = [
-                f"- Woche {w.get('week_number')} ({w.get('phase', '?')}): {w.get('total_km', '?')} km"
-                for w in all_weeks
-            ]
-            previous_weeks_summary = (
-                f"BEREITS GENERIERTE WOCHEN 1-{half}:\n" + "\n".join(summary_lines) +
-                "\nBaue Progression, Deload und Taper konsistent auf diesen Wochen auf.\n\n"
-            )
-
-        prompt = f"""{previous_weeks_summary}Du bist CAIRN Coach. Erstelle Woche {week_from} bis {week_to} eines {total_weeks}-Wochen Trainingsplans.
-
-ATHLETENPROFIL:
-- Ziel: {goal_type}
-- Rennen: {race_name} ({race_type}) · {race_distance_km if race_distance_km else '?'} km
+    renn_daten = f"""- Rennen: {race_name or '(kein Name)'}
 - Renndatum: {race_date}
-- Terrain: {terrain} · Distanz: {race_distance_km}km · Höhenmeter: {race_elevation_m}m · D+ pro km: {gain_per_km:.0f}m/km
-- Gesamtplan: {total_weeks} Wochen · Phasen: {', '.join(phase_context)}
+- Distanz: {race_distance_km} km
+- Terrain: {terrain}
+- Höhenmeter: {race_elevation_m} m
+- Plandauer: {total_weeks} Wochen
+- Trainingstage: {days_per_week}/Woche
+- Long Run Tag: {DAY_NAMES[long_run_day]}
+- Krafttage: {strength_days_str}
+- Quality Sessions: {quality_sessions}/Woche"""
 
-RACE DAY FIXPUNKT: {race_date} ist der Renntag. Dieser Tag ist ABSOLUT unveränderlich.
-Der Race Day muss exakt auf dieses Datum fallen – unabhängig vom üblichen Long Run Tag.
-Berechne alle Phasen rückwärts von diesem Datum.
-
-PLANUNGSLOGIK — REIHENFOLGE VERBINDLICH:
-
-1. Plane den Wettkampf und die wettkampfnahen Phasen zuerst rückwärts:
-   - Race Day exakt auf {race_date} (day_of_week={race_dow})
-   - Race Week enthält {race_date}
-   - Tag vor Race Day: maximal 20-30 Minuten Shakeout oder Rest — kein Long Run, keine harte Session
-   - Taper: 10–14 Tage vor {race_date}
-   - Peak-Longrun: 14–21 Tage vor {race_date}
-   - Rennspezifische Build-Phase davor
-   - Deload-Wochen passend integriert
-
-2. Plane anschließend vom Startdatum vorwärts:
-   - Ausgangspunkt: aktuelles Wochenvolumen {avg_weekly_km} km/Woche, längster Lauf {max_km} km
-   - Erhöhe Belastung nur so weit wie individuell verträglich
-   - Long Run, Wochenumfang und Höhenmeter getrennt bewerten
-
-3. Verbinde beide Planungen:
-   - Vorwärts-Aufbau muss rückwärts gesetzten Peak sicher erreichen
-   - Wenn nicht möglich: Peak-Ziel reduzieren, nicht Progression erzwingen
-
-4. FIXPUNKTE — dürfen niemals verschoben werden:
-   - race_date = {race_date}
-   - Long Run Tag = {day_names[long_run_day]}
-   - Krafttage = {strength_days}
-
-5. FLEXIBLE INHALTE:
-   - Genaue Quality-Art
-   - Verteilung Easy Run und Cross Training
-   - Distanzen innerhalb sicherer Progression
-   - Höhenmeter
-   - Reduzierte Kraftbelastung in Peak und Taper
-
-{phase_map}
-
-{athlete_analysis_context}
-{training_science_context}
-Plane basierend auf diesen wissenschaftlichen Erkenntnissen UND den Athletendaten.
-
-WOCHENSTRUKTUR — GENAU {days_per_week} Sessions pro Woche:
-- {strength_sessions}x Strength Training — NUR an: {', '.join([['','Mo','Di','Mi','Do','Fr','Sa','So'][d] for d in strength_days]) if strength_days else 'flexibel'}
-- 1x Long Run — IMMER an {day_names[long_run_day]} (Tag {long_run_day}), AUSSER in der Rennwoche (Woche die {race_date} enthält) und AUSSER am Tag direkt vor Race Day
-- {quality_sessions}x Quality (Tempo Session / Interval Session / Sprint Session / Hill Session)
-- {days_per_week - strength_sessions - 1 - quality_sessions}x Easy Run oder Trail Run
-- {7 - days_per_week}x Rest Day — diese Tage komplett leer lassen, KEIN Eintrag
-{gpx_context}
-{hevy_context}
-{cross_training_context}
-CAIRN PLAN-GENERATOR – VERBINDLICHE REGELN
-
-REGELPRIORITÄT:
-Bei Konflikten gilt folgende Reihenfolge:
-1. Rennwoche und Race Day
-2. Verletzungs-, Erholungs- und Belastungsregeln
-3. Taper
-4. Deload
-5. Peak
-6. Volumenprogression
-7. Bevorzugte Wochenstruktur
-
-DEFINITIONEN:
-- Harte Sessions: Quality Session, Long Run, Unterkörper-Kraft und Race.
-- Quality Sessions: Tempo, Intervalle, Sprints, Hill Session und intensiver Trail Run.
-- Easy/Recovery Runs sind keine harten Sessions.
-- Wochenvolumen bezeichnet die gesamte geplante Laufdistanz in Kilometern.
-- Abstandsregeln beziehen sich auf Kalendertage.
-- Das Rennen zählt nicht als Long Run oder Quality Session, sondern als Race.
-
-BELASTUNGSREGELN:
-1. Der reguläre Long-Run-Tag ist {day_names[long_run_day]} und wird außerhalb der Rennwoche nicht verschoben.
-2. Am Kalendertag vor und nach dem Long Run sind ausschließlich erlaubt: Easy Run, Recovery Run, Rest Day, Mobility, Oberkörper-Kraft.
-
-BELASTUNGSVERTEILUNG KRAFT UND QUALITY:
-3. Unterkörper-Kraft und Quality Session dürfen nicht am selben Tag stattfinden.
-4. Unterkörper-Kraft am Tag vor einer Quality Session ist zu vermeiden.
-5. Wenn zwei Krafttage verfügbar sind: Oberkörper bevorzugt auf den Tag unmittelbar vor der Quality Session, Unterkörper bevorzugt auf den Tag danach.
-6. Unterkörper-Kraft darf am Tag nach einer Quality Session stattfinden. In diesem Fall: reduziertes Beinvolumen, RPE 6-7, 2-3 Wiederholungen im Tank, kein Muskelversagen, keine neue Übung.
-7. Oberkörper-Kraft gilt nicht als harte Beineinheit und darf vor oder nach Quality Sessions und Longruns eingeplant werden.
-8. Nie drei beinbelastende Tage hintereinander. Beinbelastend = Quality Session, Long Run, Unterkörper-Kraft, anspruchsvoller Trail Run.
-9. Tag nach Long Run: bevorzugt Easy Run, Recovery Run, lockeres Cross Training, Oberkörper-Kraft oder Rest. Kein hartes Unterkörpertraining, keine Quality Session.
-10. Tag vor Long Run: nur Easy Run, Recovery Run, lockeres Cross Training, Oberkörper-Kraft oder Rest.
-11. Priorität bei Konflikten: Race Day > Long Run > Quality Session > Unterkörper-Kraft > Easy Run/Cross Training.
-12. Wenn Trainingstage keine ideale Verteilung ermöglichen: zuerst Umfang und Intensität Unterkörper reduzieren, nicht Quality oder Long Run verschieben.
-
-13. Harte Sessions dürfen niemals an zwei aufeinanderfolgenden Kalendertagen liegen.
-14. Zwischen zwei laufintensiven harten Sessions muss mindestens ein vollständiger leichter oder trainingsfreier Tag liegen.
-15. Bei Konflikten wird zuerst die Quality Session reduziert oder entfernt. Der Long Run bleibt auf seinem festgelegten Tag.
-
-PROGRESSION:
-16. Das Laufvolumen darf gegenüber der vorherigen regulären Belastungswoche um maximal 10% steigen.
-17. Eine Deload- oder Taperwoche bildet keine neue Basis für die 10%-Progression. Nach einer Reduktionswoche darf maximal zum Umfang der letzten regulären Belastungswoche zurückgekehrt werden.
-18. Jede vierte Trainingswoche ist grundsätzlich eine Deload-Woche: Laufvolumen etwa 20% unter der vorherigen Belastungswoche, keine Quality Session, Long Run entsprechend verkürzen, Intensität ausschließlich Easy/Recovery.
-19. Liegt eine planmäßige Deload-Woche innerhalb von Peak, Taper oder Rennwoche, gelten stattdessen die Regeln der jeweiligen Rennphase.
-20. Die Peak-Woche liegt zwei bis drei Wochen vor dem Rennen und enthält das höchste sinnvolle Wochenvolumen des Trainingsblocks.
-21. Der Taper beginnt 14 Tage vor dem Race Day: erste Taperwoche Volumen etwa 30% unter Peak, Rennwoche Volumen etwa 40-60% unter Peak (Race nicht eingerechnet), Intensität darf in kurzen kontrollierten Abschnitten erhalten bleiben.
-
-RENNWOCHE ({race_date}):
-22. Race Day liegt exakt am {race_date} und hat day_of_week={race_dow}. Er darf niemals verschoben werden.
-23. In der Rennwoche gibt es keinen Long Run, keine reguläre Quality Session und kein Unterkörper-Krafttraining.
-24. An den Tagen vor dem Race Day sind ausschließlich erlaubt: Easy Run mit maximal 6 km, kurzer Recovery Run, lockeres Oberkörper-Krafttraining, Mobility, Rest Day.
-25. Spätestens am Tag vor dem Race Day: maximal 20-30 Minuten sehr lockerer Shake-out Run oder Rest, keine zusätzliche Ermüdung erzeugen.
-26. Training nach dem Race Day wird ausschließlich als Recovery geplant.
-
-SESSION-SPEZIFIK:
-27. Tempo-, Intervall- und Sprint-Sessions werden pace-basiert geplant und enthalten konkrete Zielbereiche in min/km.
-28. Pace-basierte Quality Sessions müssen enthalten: Warm-up, Hauptteil mit Distanz oder Dauer, Zielpace als Bereich, Trab- oder Stehpausen, Cooldown.
-29. Hill Sessions und Trail Runs werden über RPE und Belastungsdauer gesteuert. Es werden keine verbindlichen Pace-Ziele angegeben.
-30. Long Runs auf Trail-, Berg- oder technisch anspruchsvollem Terrain werden über RPE gesteuert. Pace dient dort nicht als Belastungsziel.
-31. Jede Laufeinheit enthält: Distanz, geschätzte Dauer, Intensitätssteuerung, Terrain, elevation_gain_m.
-{terrain_rules}
-
-ERLAUBTE SESSION-TYPEN — NUR diese 14, exakt so geschrieben (kein anderer Wert erlaubt):
+    json_schema = f"""ERLAUBTE SESSION-TYPEN — NUR diese 14, exakt so geschrieben (kein anderer Wert erlaubt):
 Easy Run, Recovery Run, Long Run, Tempo Session, Interval Session, Sprint Session, Hill Session, Trail Run, Cross Training, Strength Training, Mobility, Rest Day, Time Trial, Race Day
 
 Strength Training hat KEINE eigenen session_type-Unterkategorien. Oberkörper A/B, Unterkörper A/B oder Full Body gehören ausschließlich ins notes-Feld, z.B. session_type: "Strength Training", notes: "Oberkörper A".
@@ -727,44 +378,59 @@ STRUKTURIERTE FELDER — NUR für Quality Sessions (Tempo/Interval/Sprint/Hill S
 - cooldown_km, cooldown_min: Auslaufen
 notes fasst das in einem lesbaren Satz zusammen, z.B. "2km Einlaufen · 8×400m bei 4:00/km · 200m Trabpause · 2km Auslaufen".
 
-elevation_gain_m (INTEGER) — für JEDE Lauf-Session (Easy Run, Long Run, Trail Run, Hill Session etc.) die geschätzten Höhenmeter dieser Einheit, passend zum Terrain und D+ pro km des Rennens. Bei Terrain "road" meist 0 oder gering, bei "trail"/"mixed" realistisch nach Streckenprofil.
+elevation_gain_m (INTEGER) — für JEDE Lauf-Session die geschätzten Höhenmeter, passend zum Terrain.
 
 WICHTIG: Antworte NUR mit JSON. Kein Text davor oder danach. Kein plan_meta. Beginne direkt mit {{
-{{"weeks": [{{"week_number": {week_from}, "phase": "base", "total_km": 40, "sessions": [{{"day_of_week": 1, "session_type": "Interval Session", "distance_km": 10, "duration_min": 55, "session_zone": "Z4-Z5", "warmup_km": 2, "warmup_min": 12, "main_sets": 8, "main_distance_m": 400, "main_pace": "4:00/km", "recovery_m": 200, "cooldown_km": 2, "cooldown_min": 10, "elevation_gain_m": 50, "notes": "2km Einlaufen · 8×400m bei 4:00/km · 200m Trabpause · 2km Auslaufen"}}]}}]}}
+{{"weeks": [{{"week_number": 1, "phase": "base", "total_km": 40, "sessions": [{{"day_of_week": 1, "session_type": "Interval Session", "distance_km": 10, "duration_min": 55, "session_zone": "Z4-Z5", "warmup_km": 2, "warmup_min": 12, "main_sets": 8, "main_distance_m": 400, "main_pace": "4:00/km", "recovery_m": 200, "cooldown_km": 2, "cooldown_min": 10, "elevation_gain_m": 50, "notes": "2km Einlaufen · 8×400m bei 4:00/km · 200m Trabpause · 2km Auslaufen"}}]}}]}}
 
-Wochen {week_from} bis {week_to}. day_of_week: 1=Mo bis 7=So. Rest Days nicht eintragen. Genau {days_per_week} Sessions pro Woche."""
+day_of_week: 1=Mo bis 7=So. Rest Days nicht eintragen. Genau {total_weeks} Wochen, week_number von 1 bis {total_weeks}, jede Woche GENAU {days_per_week} Sessions."""
 
-        print(f"DEBUG: calling anthropic for weeks {week_from}-{week_to}")
-        with client.messages.stream(
-            model="claude-sonnet-4-6",
-            max_tokens=32000,
-            messages=[{"role": "user", "content": prompt}]
-        ) as stream:
-            message = stream.get_final_message()
-        print(f"DEBUG: anthropic call for weeks {week_from}-{week_to} returned, stop_reason={message.stop_reason}, blocks={len(message.content)}")
+    prompt = f"""Du bist CAIRN Coach. Erstelle einen {total_weeks}-Wochen Trainingsplan für einen Läufer.
 
-        raw = ""
-        for block in message.content:
-            if hasattr(block, 'text') and getattr(block, 'type', None) == 'text':
-                raw += block.text
-        raw = raw.replace('```json', '').replace('```', '').strip()
-        if not raw.startswith('{'):
-            json_match = re.search(r'\{[\s\S]*"weeks"[\s\S]*\}', raw)
-            if json_match:
-                raw = json_match.group(0)
-        try:
-            part_json = json.loads(raw)
-            all_weeks.extend(part_json.get('weeks', []))
-            print(f"OK weeks {week_from}-{week_to}: {len(part_json.get('weeks', []))} weeks")
-        except Exception as parse_err:
-            print(f"JSON parse error for weeks {week_from}-{week_to}: {parse_err}")
-            print(f"Raw length: {len(raw)}")
-            print(f"Raw start: {raw[:500]}")
-            print(f"Stop reason: {message.stop_reason}")
-            continue
+ATHLETENPROFIL:
+{athleten_daten}
 
-    plan_json = {"weeks": all_weeks}
-    plan_json = apply_post_processing(plan_json)
+RENNDATEN:
+{renn_daten}
+
+CAIRN ROUTINEN (für Strength Training):
+{hevy_context}
+
+Nutze Web Search um den besten Plan für diesen Athleten zu erstellen. Berücksichtige aktuelle Trainingswissenschaft für {terrain} Running, Periodisierung, Phasenverteilung und optimale Session-Struktur.
+
+{training_science_context}
+
+{json_schema}"""
+
+    print("DEBUG: calling anthropic")
+    with client.messages.stream(
+        model="claude-sonnet-4-6",
+        max_tokens=32000,
+        messages=[{"role": "user", "content": prompt}]
+    ) as stream:
+        message = stream.get_final_message()
+    print(f"DEBUG: anthropic call returned, stop_reason={message.stop_reason}, blocks={len(message.content)}")
+
+    raw = ""
+    for block in message.content:
+        if hasattr(block, 'text') and getattr(block, 'type', None) == 'text':
+            raw += block.text
+    raw = raw.replace('```json', '').replace('```', '').strip()
+    if not raw.startswith('{'):
+        json_match = re.search(r'\{[\s\S]*"weeks"[\s\S]*\}', raw)
+        if json_match:
+            raw = json_match.group(0)
+
+    try:
+        plan_json = json.loads(raw)
+        print(f"OK: {len(plan_json.get('weeks', []))} weeks parsed")
+    except Exception as parse_err:
+        print(f"JSON parse error: {parse_err}")
+        print(f"Raw length: {len(raw)}")
+        print(f"Raw start: {raw[:500]}")
+        print(f"Stop reason: {message.stop_reason}")
+        plan_json = {"weeks": []}
+
     plan_json = validate_and_fix_plan(plan_json, race_date, race_dow, start_monday)
 
     # ─── In DB speichern ───
@@ -865,7 +531,7 @@ Wochen {week_from} bis {week_to}. day_of_week: 1=Mo bis 7=So. Rest Days nicht ei
                 profile_conn.close()
             print("DEBUG: athlete_profile (workout suggestions) query complete")
 
-            long_term_goals = (profile_row[0] if profile_row else '') or 'keine angegeben'
+            long_term_goals_sugg = (profile_row[0] if profile_row else '') or 'keine angegeben'
             cross_prefs = []
             if profile_row:
                 if profile_row[1]: cross_prefs.append('Rennrad')
@@ -873,7 +539,7 @@ Wochen {week_from} bis {week_to}. day_of_week: 1=Mo bis 7=So. Rest Days nicht ei
                 if profile_row[3]: cross_prefs.append('Wandern')
                 if profile_row[4]: cross_prefs.append('Ski')
 
-            athlete_profile_context = f"ATHLETENPROFIL LANGZEITZIELE: {long_term_goals}"
+            athlete_profile_context = f"ATHLETENPROFIL LANGZEITZIELE: {long_term_goals_sugg}"
             if cross_prefs:
                 athlete_profile_context += f"\nCROSS TRAINING PRÄFERENZEN: {', '.join(cross_prefs)}"
 
