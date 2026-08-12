@@ -198,9 +198,11 @@ Der gesamte Trainingsplan — jede Woche, jede Phase, jede Progression — muss 
         print(f"Athleten-Analyse Fehler: {e}")
         traceback.print_exc()
         athlete_analysis_context = ""
+        avg_weekly_km = 0
+        max_km = 0
     finally:
         conn.close()
-    return athlete_analysis_context
+    return athlete_analysis_context, avg_weekly_km, max_km
 
 
 def build_training_science_context(client, terrain='', race_elevation_m=0):
@@ -505,7 +507,7 @@ TERRAIN TRAIL/BERGE:
 35. Technische Trail Runs werden nicht allein anhand von Kilometern bewertet. Dauer, Höhenmeter, Untergrund und RPE müssen bei der Belastungsberechnung berücksichtigt werden.
 """
 
-    athlete_analysis_context = build_athlete_analysis(today)
+    athlete_analysis_context, avg_weekly_km, max_km = build_athlete_analysis(today)
 
     client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
     print("DEBUG: anthropic client created")
@@ -540,6 +542,38 @@ ATHLETENPROFIL:
 RACE DAY FIXPUNKT: {race_date} ist der Renntag. Dieser Tag ist ABSOLUT unveränderlich.
 Der Race Day muss exakt auf dieses Datum fallen – unabhängig vom üblichen Long Run Tag.
 Berechne alle Phasen rückwärts von diesem Datum.
+
+PLANUNGSLOGIK — REIHENFOLGE VERBINDLICH:
+
+1. Plane den Wettkampf und die wettkampfnahen Phasen zuerst rückwärts:
+   - Race Day exakt auf {race_date} (day_of_week={race_dow})
+   - Race Week enthält {race_date}
+   - Tag vor Race Day: maximal 20-30 Minuten Shakeout oder Rest — kein Long Run, keine harte Session
+   - Taper: 10–14 Tage vor {race_date}
+   - Peak-Longrun: 14–21 Tage vor {race_date}
+   - Rennspezifische Build-Phase davor
+   - Deload-Wochen passend integriert
+
+2. Plane anschließend vom Startdatum vorwärts:
+   - Ausgangspunkt: aktuelles Wochenvolumen {avg_weekly_km} km/Woche, längster Lauf {max_km} km
+   - Erhöhe Belastung nur so weit wie individuell verträglich
+   - Long Run, Wochenumfang und Höhenmeter getrennt bewerten
+
+3. Verbinde beide Planungen:
+   - Vorwärts-Aufbau muss rückwärts gesetzten Peak sicher erreichen
+   - Wenn nicht möglich: Peak-Ziel reduzieren, nicht Progression erzwingen
+
+4. FIXPUNKTE — dürfen niemals verschoben werden:
+   - race_date = {race_date}
+   - Long Run Tag = {day_names[long_run_day]}
+   - Krafttage = {strength_days}
+
+5. FLEXIBLE INHALTE:
+   - Genaue Quality-Art
+   - Verteilung Easy Run und Cross Training
+   - Distanzen innerhalb sicherer Progression
+   - Höhenmeter
+   - Reduzierte Kraftbelastung in Peak und Taper
 
 RENNWOCHE REGELN (Woche die {race_date} enthält) — ABSOLUT UNVERÄNDERLICH:
 - KEIN Long Run
