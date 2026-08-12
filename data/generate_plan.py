@@ -503,6 +503,39 @@ Wochen {week_from} bis {week_to}. day_of_week: 1=Mo bis 7=So. Rest Days nicht ei
     finally:
         conn.close()
 
+    # ─── Race Day Fix: Race Day exakt auf race_date, Long Run direkt davor -> Easy Run (Shakeout) ───
+    if race_date:
+        try:
+            race_date_obj = date.fromisoformat(race_date)
+            race_dow = race_date_obj.isoweekday()  # 1=Mo, 7=So
+            race_week_monday = race_date_obj - timedelta(days=race_date_obj.weekday())
+
+            fix_conn = get_db()
+            try:
+                fix_cur = fix_conn.cursor()
+
+                fix_cur.execute("""
+                    UPDATE training_plan
+                    SET day_of_week = %s
+                    WHERE plan_id = %s AND session_type = 'Race Day'
+                """, (race_dow, plan_id))
+
+                day_before = race_dow - 1 if race_dow > 1 else 7
+                fix_cur.execute("""
+                    UPDATE training_plan
+                    SET session_type = 'Easy Run',
+                        distance_km = LEAST(distance_km, 8),
+                        notes = 'Shakeout vor dem Rennen.'
+                    WHERE plan_id = %s AND week_date = %s AND day_of_week = %s AND session_type = 'Long Run'
+                """, (plan_id, race_week_monday, day_before))
+
+                fix_conn.commit()
+            finally:
+                fix_conn.close()
+            print(f"DEBUG: Race Day fixed to {race_date}")
+        except Exception as e:
+            print(f"Race Day Fix Fehler: {e}")
+
     # ─── Workout-Vorschläge: Coach vergleicht geplante Strength-Sessions mit den CAIRN-Routinen ───
     print("DEBUG: starting workout suggestions")
     try:
