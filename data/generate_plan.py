@@ -1,12 +1,20 @@
-
-Generate plan fixed · PY
 """
-CAIRN – Plan-Generierung als GitHub Action Job.
- 
-Liest die Fragebogen-Daten eines Jobs aus plan_jobs, baut den kompletten
-Trainingsplan (Athleten-Analyse, CAIRN-Routinen, Web-Search-Recherche,
-Wochen-Generierung, Workout-Vorschläge) und schreibt ihn in die DB.
- 
+CAIRN – Plan-Generierung, hybrider Ansatz.
+
+Phase 1 (deterministisch, kein LLM): Aus den Fragebogen-Daten + Athletenprofil wird ein
+vollständiges "Skelett" gebaut — jede Session bekommt day_of_week, session_type,
+distance_km, elevation_gain_m und duration_min bereits fest zugewiesen. Ein Validator
+prüft dieses Skelett zweimal (Gesamtplan + nochmal pro Woche) BEVOR irgendein LLM-Aufruf
+passiert. Bei einem ungültigen Skelett wird kein Plan erzeugt.
+
+Phase 2 (LLM, pro Woche ein Call): Der Coach bekommt das fixe Skelett einer Woche und darf
+nur "Flavor"-Felder ergänzen (notes, session_zone, warmup/main/cooldown-Struktur). Die
+fixierten Felder werden danach mit den Skelett-Werten überschrieben, falls das Modell sie
+trotzdem angefasst hat.
+
+Die reine Skelett-Logik (Daten, Phasen, Zielvolumen, Höhenmeter, Tages-Layout, Validator)
+ist frei von DB-/API-Zugriffen und direkt testbar — siehe data/test_generate_plan.py.
+
 Ausführen: python data/generate_plan.py <job_id>
 """
 import os
@@ -15,26 +23,740 @@ import json
 import re
 import traceback
 from datetime import date, timedelta, datetime
- 
+
 import psycopg2
 from psycopg2.extras import Json
 import anthropic
 from dotenv import load_dotenv
- 
+
 load_dotenv()
- 
+
 HEVY_CATEGORIES = {
     'Upper Body CAIRN': 'oberkörper',
     'Lower Body + Arms CAIRN': 'unterkörper',
     'Full Body Light CAIRN': 'full_body_light',
 }
- 
- 
+
+DAY_NAMES = ['', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag']
+DAY_ABBR = ['', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So']
+
+QUALITY_TYPES = {'Tempo Session', 'Interval Session', 'Sprint Session', 'Hill Session'}
+ENDURANCE_RUN_TYPES = {'Easy Run', 'Trail Run', 'Recovery Run'}
+
+# Kein Pace hinterlegt -> Default-Paces (min/km)
+DEFAULT_PACE_MIN_PER_KM = {
+    'easy': 6.5,      # 6:30/km
+    'trail': 8.0,     # 8:00/km + HM-Zuschlag
+    'quality': 5.5,   # 5:30/km
+    'long_run': 7.0,  # 7:00/km
+}
+
+# Grobe HM/km-Schätzung falls kein reales HM-Trainingsdatum vorliegt (avg_weekly_hm nicht
+# aus der DB ableitbar, da trainings-Tabelle keine Höhenmeter-Historie führt).
+TERRAIN_HM_PER_KM_ESTIMATE = {'trail': 15, 'mixed': 10, 'road': 3}
+
+FLAVOR_FIELDS = ('notes', 'session_zone', 'warmup_km', 'warmup_min', 'main_sets',
+                  'main_distance_m', 'main_pace', 'recovery_m', 'cooldown_km', 'cooldown_min')
+FIXED_FIELDS = ('day_of_week', 'session_type', 'distance_km', 'elevation_gain_m', 'duration_min')
+
+
+class SkeletonError(Exception):
+    """Eingabefehler oder ungültiges Skelett — es wird kein Plan erzeugt, kein LLM-Aufruf."""
+    pass
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# ═══ Reine Domänenlogik — keine DB/API-Zugriffe, direkt testbar ═══
+# ══════════════════════════════════════════════════════════════════════════
+
+def validate_inputs(strength_sessions, strength_days, days_per_week):
+    """Klarstellung 2: strength_sessions muss der Anzahl eindeutiger, gültiger strength_days
+    entsprechen. Klarstellung 3: belegte Trainingstage (Kraft inbegriffen) <= days_per_week."""
+    for d in strength_days:
+        if not isinstance(d, int) or d < 1 or d > 7:
+            raise SkeletonError(f"Eingabefehler: ungültiger strength_day {d!r} (erwartet 1-7)")
+    unique_days = set(strength_days)
+    if len(unique_days) != strength_sessions:
+        raise SkeletonError(
+            f"Eingabefehler: strength_sessions={strength_sessions} entspricht nicht der Anzahl "
+            f"eindeutiger strength_days={sorted(unique_days)} ({len(unique_days)})"
+        )
+    ausdauer_days = days_per_week - strength_sessions
+    if ausdauer_days < 0:
+        raise SkeletonError(
+            f"Eingabefehler: strength_sessions={strength_sessions} > days_per_week={days_per_week}"
+        )
+    return ausdauer_days
+
+
+def normalize_dates(start_date_str, race_date_str):
+    """Berechnet start_monday, race_week_monday, total_weeks, actual_start_day, race_dow
+    deterministisch. total_weeks wird NIE vom LLM bestimmt (Klarstellung 6)."""
+    start_day = date.fromisoformat(start_date_str)
+    race_day = date.fromisoformat(race_date_str)
+    if race_day < start_day:
+        raise SkeletonError(f"Eingabefehler: race_date {race_date_str} liegt vor start_date {start_date_str}")
+
+    start_monday = start_day - timedelta(days=start_day.weekday())
+    race_week_monday = race_day - timedelta(days=race_day.weekday())
+    total_weeks = round((race_week_monday - start_monday).days / 7) + 1
+
+    return {
+        'start_day': start_day,
+        'start_monday': start_monday,
+        'race_day': race_day,
+        'race_week_monday': race_week_monday,
+        'total_weeks': total_weeks,
+        'actual_start_day': start_day.isoweekday(),   # 1=Mo..7=So
+        'race_dow': race_day.isoweekday(),
+    }
+
+
+def compute_phase_map(total_weeks):
+    """Phasenzuweisung rückwärts von race_date (letzte Woche = RACE)."""
+    taper_weeks = 1 if total_weeks <= 12 else 2
+    phase_by_week = {}
+
+    if total_weeks >= 1:
+        phase_by_week[total_weeks] = 'RACE'
+    for i in range(1, taper_weeks + 1):
+        wk = total_weeks - i
+        if wk >= 1:
+            phase_by_week[wk] = 'TAPER'
+    peak_week = total_weeks - taper_weeks - 1
+    if peak_week >= 1:
+        phase_by_week[peak_week] = 'PEAK'
+
+    remaining = [w for w in range(1, total_weeks + 1) if w not in phase_by_week]
+    for w in remaining:
+        if w % 4 == 0:
+            phase_by_week[w] = 'DELOAD'
+
+    remaining = [w for w in range(1, total_weeks + 1) if w not in phase_by_week]
+    base_count = round(len(remaining) * 0.35)
+    for i, w in enumerate(remaining):
+        phase_by_week[w] = 'BASE' if i < base_count else 'BUILD'
+
+    return phase_by_week, taper_weeks, peak_week
+
+
+def compute_weekly_progression(phase_by_week, total_weeks, start_value, desired_peak, max_value,
+                                deload_pct=0.775, taper_pct=0.70, race_pct=0.35,
+                                race_week_available_ratio=1.0):
+    """Generische +10%/Woche-Progression, unabhängig für km ODER hm aufrufbar.
+    Nach einem Deload wird die nächste Belastungswoche gegen die letzte Belastungswoche VOR
+    dem Deload verglichen (last_load wird während DELOAD nicht aktualisiert)."""
+    targets = {}
+    last_load = start_value
+    peak_actual = None
+
+    for week_num in range(1, total_weeks + 1):
+        phase = phase_by_week.get(week_num, 'BUILD')
+        if phase in ('BASE', 'BUILD', 'PEAK'):
+            if week_num == 1:
+                candidate = min(start_value, max_value)
+            else:
+                candidate = min(last_load * 1.10, desired_peak, max_value)
+            candidate = min(candidate, max_value)
+            targets[week_num] = round(candidate, 1)
+            last_load = candidate
+            if phase == 'PEAK':
+                peak_actual = candidate
+        elif phase == 'DELOAD':
+            targets[week_num] = round(last_load * deload_pct, 1)
+        elif phase == 'TAPER':
+            reference = peak_actual if peak_actual is not None else last_load
+            targets[week_num] = round(reference * taper_pct, 1)
+        elif phase == 'RACE':
+            reference = peak_actual if peak_actual is not None else last_load
+            targets[week_num] = round(reference * race_pct * race_week_available_ratio, 1)
+
+    return targets, peak_actual
+
+
+def apply_partial_week1_reduction(targets, actual_start_day):
+    """Angebrochene erste Woche: target proportional zu verfügbaren Tagen reduzieren."""
+    if actual_start_day > 1 and 1 in targets:
+        available_days = 7 - actual_start_day + 1
+        targets[1] = round(targets[1] * (available_days / 7), 1)
+    return targets
+
+
+def compute_desired_peak_km(avg_weekly_km, race_distance_km, max_km):
+    return min(avg_weekly_km * 1.30, race_distance_km * 1.50, max_km)
+
+
+def compute_desired_peak_hm(avg_weekly_hm, race_elevation_m):
+    return min(race_elevation_m * 0.85, avg_weekly_hm * 1.30)
+
+
+def estimate_avg_weekly_hm(avg_weekly_km, terrain):
+    """Fallback wenn keine reale HM-Trainingshistorie vorliegt."""
+    per_km = TERRAIN_HM_PER_KM_ESTIMATE.get(terrain, TERRAIN_HM_PER_KM_ESTIMATE['road'])
+    return avg_weekly_km * per_km
+
+
+def compute_longrun_km(target_km, phase, race_distance_km):
+    fraction = 0.425 if phase == 'PEAK' else 0.375
+    longrun = target_km * fraction
+    ceiling = min(race_distance_km * 0.80, target_km)
+    return round(min(longrun, ceiling), 1)
+
+
+def compute_longrun_hm(target_hm):
+    return round(target_hm * 0.55)
+
+
+def opposite_adjacent_days(day):
+    """Tag davor / danach innerhalb derselben Kalenderwoche (kein Wrap über Wochengrenzen)."""
+    before = day - 1 if day > 1 else None
+    after = day + 1 if day < 7 else None
+    return before, after
+
+
+def solve_week_layout(open_days, gym_days, longrun_day, quality_target, is_race_week, is_deload, is_taper,
+                       extra_forbidden_quality_days=None):
+    """Löst Quality-Tage und Lower-/Upper-Body-Zuweisung GEMEINSAM (Klarstellung 5) über eine
+    kleine Kombinatorik (max. wenige Gymtage). Bevorzugt: möglichst viele Quality-Slots
+    gefunden, Lower Body sinnvoll platziert wenn Phase das zulässt."""
+    forbidden_for_quality = set(extra_forbidden_quality_days or ())
+    if longrun_day:
+        b, a = opposite_adjacent_days(longrun_day)
+        if b: forbidden_for_quality.add(b)
+        if a: forbidden_for_quality.add(a)
+
+    def dist_from_longrun(d):
+        if not longrun_day:
+            return 99
+        diff = abs(d - longrun_day)
+        return min(diff, 7 - diff)
+
+    quality_pool_base = sorted(
+        [d for d in open_days if d not in gym_days and d not in forbidden_for_quality],
+        key=lambda d: -dist_from_longrun(d)
+    )
+
+    lower_candidates = [None]
+    if not (is_race_week or is_deload):
+        lower_candidates += sorted(gym_days)
+
+    best = None
+    for lower_day in lower_candidates:
+        if lower_day is not None and longrun_day:
+            b, a = opposite_adjacent_days(longrun_day)
+            if lower_day in (b, a):
+                continue  # Lower Body Tag vor/nach Longrun verboten
+
+        local_pool = list(quality_pool_base)
+        if lower_day is not None:
+            _, after_lower = opposite_adjacent_days(lower_day)
+            if after_lower:
+                local_pool = [d for d in local_pool if d != after_lower]  # Lower Body -> Tag danach kein Quality
+
+        chosen_quality = local_pool[:quality_target]
+        score = len(chosen_quality) * 100
+        if lower_day is not None and not is_taper:
+            score += 10
+
+        candidate = {
+            'quality_days': sorted(chosen_quality),
+            'lower_body_day': lower_day,
+            'upper_body_days': sorted(d for d in gym_days if d != lower_day),
+        }
+        if best is None or score > best[0]:
+            best = (score, candidate)
+
+    return best[1] if best else {'quality_days': [], 'lower_body_day': None, 'upper_body_days': sorted(gym_days)}
+
+
+def pick_quality_type(index, terrain):
+    if terrain in ('trail', 'mixed'):
+        types = ['Hill Session', 'Tempo Session', 'Interval Session']
+    else:
+        types = ['Tempo Session', 'Interval Session', 'Sprint Session']
+    return types[index % len(types)]
+
+
+def build_week_skeleton(week_num, phase, race_dow, is_race_week, actual_start_day, is_week1,
+                         long_run_day, strength_days, quality_sessions_input, cross_training,
+                         cross_training_days, ausdauer_days, terrain, conflicts,
+                         week_monday=None, race_day=None, prev_week_longrun_day=None):
+    """TERMINIERUNG Schritt 1-7. Gibt eine sortierte Liste von Session-Skeletten
+    (ohne distance_km/elevation_gain_m/duration_min, die kommen erst danach) zurück."""
+    sessions = []
+
+    available_days = set(range(1, 8))
+    if is_week1 and actual_start_day > 1:
+        available_days = set(range(actual_start_day, 8))
+    if is_race_week:
+        available_days = {d for d in available_days if d <= race_dow}  # keine Sessions nach Race Day
+
+    reserved = set()
+
+    # 1. Race Day
+    if is_race_week:
+        sessions.append({'day_of_week': race_dow, 'session_type': 'Race Day'})
+        reserved.add(race_dow)
+
+    # 2. Longrun (ausser Rennwoche, nur wenn Datum im Planzeitraum, und nie am Tag direkt vor Race Day)
+    longrun_placed_day = None
+    longrun_is_day_before_race = False
+    if week_monday is not None and race_day is not None and long_run_day in available_days:
+        longrun_date = week_monday + timedelta(days=long_run_day - 1)
+        longrun_is_day_before_race = (longrun_date == race_day - timedelta(days=1))
+    if not is_race_week and not longrun_is_day_before_race and long_run_day in available_days:
+        longrun_placed_day = long_run_day
+        sessions.append({'day_of_week': long_run_day, 'session_type': 'Long Run'})
+        reserved.add(long_run_day)
+    elif longrun_is_day_before_race and not is_race_week:
+        conflicts.append(f"Woche {week_num}: Longrun-Tag {long_run_day} fällt auf den Tag vor Race Day, "
+                          f"Longrun entfällt (nur Shakeout/Easy erlaubt).")
+
+    # 3. Gymtage reservieren (Kollision Race Day/Longrun -> Gym entfällt, wird NICHT nachgeholt)
+    gym_days = sorted(d for d in strength_days if d in available_days and d not in reserved)
+    if len(gym_days) < len(set(strength_days) & available_days):
+        pass  # (kann strukturell nicht auftreten, gym_days ist bereits die Schnittmenge)
+    dropped_gym_days = sorted((set(strength_days) & available_days) - set(gym_days))
+    for d in dropped_gym_days:
+        conflicts.append(f"Woche {week_num}: Gymtag {d} kollidiert mit Race Day/Longrun, entfällt.")
+
+    # 4. Quality-Tage + Lower/Upper gemeinsam lösen
+    if is_race_week or phase == 'DELOAD':
+        quality_target = 0
+    elif phase == 'TAPER':
+        quality_target = min(1, quality_sessions_input)
+    else:
+        quality_target = quality_sessions_input
+
+    open_for_layout = available_days - reserved
+    # Wochenübergreifend: Sonntag-Longrun der Vorwoche verbietet Quality am Montag dieser Woche
+    extra_forbidden_quality = {1} if prev_week_longrun_day == 7 and 1 in open_for_layout else None
+
+    layout = solve_week_layout(
+        open_days=open_for_layout,
+        gym_days=set(gym_days),
+        longrun_day=longrun_placed_day,
+        quality_target=quality_target,
+        is_race_week=is_race_week,
+        is_deload=(phase == 'DELOAD'),
+        is_taper=(phase == 'TAPER'),
+        extra_forbidden_quality_days=extra_forbidden_quality,
+    )
+    if len(layout['quality_days']) < quality_target:
+        conflicts.append(
+            f"Woche {week_num}: kein sinnvoller Quality-Slot für {quality_target - len(layout['quality_days'])} "
+            f"von {quality_target} geplanten Quality Sessions gefunden — entfällt."
+        )
+
+    for i, d in enumerate(layout['quality_days']):
+        sessions.append({'day_of_week': d, 'session_type': pick_quality_type(i, terrain)})
+    reserved |= set(layout['quality_days'])
+
+    for d in gym_days:
+        if d == layout['lower_body_day']:
+            day_before_lower, _ = opposite_adjacent_days(d)
+            focus = 'lower_moderate' if day_before_lower in layout['quality_days'] else 'lower'
+        elif phase == 'DELOAD':
+            focus = 'full_light'
+        elif phase == 'TAPER' or is_race_week:
+            focus = 'upper_light'
+        else:
+            focus = 'upper'
+        sessions.append({'day_of_week': d, 'session_type': 'Strength Training', '_strength_focus': focus})
+    if layout['lower_body_day'] is None and gym_days and not (is_race_week or phase == 'DELOAD'):
+        conflicts.append(f"Woche {week_num}: kein geeigneter Lower-Body-Slot verfügbar, alle Gymtage als Upper Body.")
+    reserved |= set(gym_days)
+
+    # 5. Cross Training platzieren (ersetzt Easy Run)
+    remaining_days = sorted(available_days - reserved)
+    cross_count = 0
+    if cross_training and not is_race_week and phase != 'DELOAD' and cross_training_days > 0:
+        cross_count = min(cross_training_days, len(remaining_days))
+        for d in remaining_days[:cross_count]:
+            sessions.append({'day_of_week': d, 'session_type': 'Cross Training'})
+        reserved |= set(remaining_days[:cross_count])
+
+    # 6. Easy Runs platzieren
+    remaining_days = sorted(available_days - reserved)
+    endurance_used = (1 if longrun_placed_day else 0) + len(layout['quality_days']) + cross_count + (1 if is_race_week else 0)
+    easy_slots = max(0, ausdauer_days - endurance_used)
+    easy_days = remaining_days[:easy_slots]
+    for d in easy_days:
+        sessions.append({'day_of_week': d, 'session_type': 'Easy Run'})
+
+    # 7. Resttage: keine Session = Rest Day, wird nicht gespeichert
+
+    return sorted(sessions, key=lambda s: s['day_of_week'])
+
+
+def distribute_week_km(target_km, phase, sessions, race_distance_km):
+    """Verteilt target_km deterministisch auf die Sessions einer Woche. Summe == target_km
+    (Rundungsdifferenz wird auf Easy Runs gebucht). Race Day zählt NICHT ins Wochenvolumen."""
+    longrun = [s for s in sessions if s['session_type'] == 'Long Run']
+    quality = [s for s in sessions if s['session_type'] in QUALITY_TYPES]
+    easy = [s for s in sessions if s['session_type'] in ENDURANCE_RUN_TYPES]
+
+    remaining = target_km
+
+    for s in longrun:
+        if not easy and not quality:
+            # Longrun ist die einzige Laufsession der Woche (z.B. sehr wenige Ausdauertage) ->
+            # trägt das gesamte Wochenvolumen statt nur des üblichen 35-40%-Anteils.
+            km = round(min(target_km, race_distance_km * 0.80), 1)
+        else:
+            km = compute_longrun_km(target_km, phase, race_distance_km)
+        s['distance_km'] = km
+        remaining -= km
+
+    quality_total = round(min(target_km * 0.225, max(remaining, 0)), 1)
+    if quality:
+        per_quality = round(quality_total / len(quality), 1)
+        for s in quality:
+            s['distance_km'] = per_quality
+        remaining -= per_quality * len(quality)
+
+    if easy:
+        per_easy = remaining / len(easy)
+        for s in easy:
+            s['distance_km'] = round(max(per_easy, 0), 1)
+        assigned = sum(s['distance_km'] for s in sessions
+                        if s['session_type'] in ENDURANCE_RUN_TYPES or s['session_type'] == 'Long Run'
+                        or s['session_type'] in QUALITY_TYPES)
+        diff = round(target_km - assigned, 1)
+        easy[-1]['distance_km'] = round(max(easy[-1]['distance_km'] + diff, 0), 1)
+    elif quality:
+        # keine Easy Runs diese Woche -> Rundungsdifferenz auf die letzte Quality Session buchen
+        assigned = sum(s['distance_km'] for s in sessions
+                        if s['session_type'] == 'Long Run' or s['session_type'] in QUALITY_TYPES)
+        diff = round(target_km - assigned, 1)
+        quality[-1]['distance_km'] = round(max(quality[-1]['distance_km'] + diff, 0), 1)
+
+    for s in sessions:
+        if s['session_type'] in ('Cross Training', 'Strength Training', 'Mobility'):
+            s['distance_km'] = 0
+        if s['session_type'] == 'Race Day':
+            s['distance_km'] = race_distance_km
+
+    return sessions
+
+
+def distribute_week_hm(target_hm, sessions, terrain, race_elevation_m):
+    """Analog zu distribute_week_km, für Höhenmeter."""
+    longrun = [s for s in sessions if s['session_type'] == 'Long Run']
+    quality = [s for s in sessions if s['session_type'] in QUALITY_TYPES]
+    easy = [s for s in sessions if s['session_type'] in ENDURANCE_RUN_TYPES]
+
+    remaining = target_hm
+
+    for s in longrun:
+        if not easy and not quality:
+            hm = round(target_hm)
+        else:
+            hm = compute_longrun_hm(target_hm)
+        s['elevation_gain_m'] = hm
+        remaining -= hm
+
+    quality_fraction = 0.55 if terrain in ('trail', 'mixed') else 0.15
+    quality_total = round(max(remaining, 0) * quality_fraction)
+    if quality:
+        per_quality = round(quality_total / len(quality))
+        for s in quality:
+            s['elevation_gain_m'] = per_quality
+        remaining -= per_quality * len(quality)
+
+    if easy:
+        per_easy = remaining / len(easy)
+        for s in easy:
+            s['elevation_gain_m'] = max(0, round(per_easy))
+        assigned = sum(s['elevation_gain_m'] for s in sessions
+                        if s['session_type'] in ENDURANCE_RUN_TYPES or s['session_type'] == 'Long Run'
+                        or s['session_type'] in QUALITY_TYPES)
+        diff = round(target_hm - assigned)
+        easy[-1]['elevation_gain_m'] = max(0, easy[-1]['elevation_gain_m'] + diff)
+    elif quality:
+        assigned = sum(s['elevation_gain_m'] for s in sessions
+                        if s['session_type'] == 'Long Run' or s['session_type'] in QUALITY_TYPES)
+        diff = round(target_hm - assigned)
+        quality[-1]['elevation_gain_m'] = max(0, quality[-1]['elevation_gain_m'] + diff)
+
+    for s in sessions:
+        if s['session_type'] in ('Cross Training', 'Strength Training', 'Mobility'):
+            s['elevation_gain_m'] = 0
+        if s['session_type'] == 'Race Day':
+            s['elevation_gain_m'] = race_elevation_m
+
+    return sessions
+
+
+def parse_pace_to_min_per_km(pace_str):
+    """'5:30' -> 5.5"""
+    if not pace_str:
+        return None
+    try:
+        m, s = str(pace_str).split(':')
+        return int(m) + int(s) / 60
+    except Exception:
+        return None
+
+
+def compute_duration_min(session_type, distance_km, elevation_gain_m, terrain, athlete_paces=None):
+    """duration_min ist deterministisch — das LLM darf diesen Wert nicht anfassen."""
+    athlete_paces = athlete_paces or {}
+    distance_km = distance_km or 0
+    elevation_gain_m = elevation_gain_m or 0
+
+    if session_type == 'Strength Training':
+        return 45
+    if session_type == 'Mobility':
+        return 20
+    if session_type == 'Cross Training':
+        return 60
+    if session_type == 'Race Day':
+        pace = athlete_paces.get('long_run') or DEFAULT_PACE_MIN_PER_KM['long_run']
+        return round(distance_km * pace + elevation_gain_m / 100)
+    if session_type == 'Trail Run':
+        pace = athlete_paces.get('trail') or DEFAULT_PACE_MIN_PER_KM['trail']
+        return round(distance_km * pace + elevation_gain_m / 100)
+    if session_type == 'Long Run':
+        pace = athlete_paces.get('long_run') or DEFAULT_PACE_MIN_PER_KM['long_run']
+        surcharge = elevation_gain_m / 100 * 0.7 if terrain in ('trail', 'mixed') else 0
+        return round(distance_km * pace + surcharge)
+    if session_type in QUALITY_TYPES:
+        pace = athlete_paces.get('quality') or DEFAULT_PACE_MIN_PER_KM['quality']
+        return round(distance_km * pace)
+    # Easy Run / Recovery Run
+    pace = athlete_paces.get('easy') or DEFAULT_PACE_MIN_PER_KM['easy']
+    surcharge = elevation_gain_m / 100 * 0.7 if terrain in ('trail', 'mixed') else 0
+    return round(distance_km * pace + surcharge)
+
+
+def build_full_skeleton(inputs):
+    """Baut das komplette, deterministische Plan-Skelett. `inputs` ist ein dict mit:
+    start_date, race_date, race_distance_km, race_elevation_m, terrain, long_run_day,
+    strength_days, strength_sessions, quality_sessions, days_per_week, cross_training,
+    cross_training_days, avg_weekly_km, max_km, athlete_paces (dict, optional)."""
+    ausdauer_days = validate_inputs(
+        inputs['strength_sessions'], inputs['strength_days'], inputs['days_per_week']
+    )
+    dates = normalize_dates(inputs['start_date'], inputs['race_date'])
+    total_weeks = dates['total_weeks']
+    phase_by_week, taper_weeks, peak_week = compute_phase_map(total_weeks)
+
+    avg_weekly_km = inputs['avg_weekly_km']
+    max_km = inputs['max_km'] or avg_weekly_km * 2  # kein Limit hinterlegt -> grosszügiger Fallback
+    race_distance_km = inputs['race_distance_km']
+    race_elevation_m = inputs['race_elevation_m']
+    terrain = inputs['terrain']
+
+    desired_peak_km = compute_desired_peak_km(avg_weekly_km, race_distance_km, max_km)
+    avg_weekly_hm = inputs.get('avg_weekly_hm') or estimate_avg_weekly_hm(avg_weekly_km, terrain)
+    desired_peak_hm = compute_desired_peak_hm(avg_weekly_hm, race_elevation_m)
+
+    available_days_before_race = dates['race_dow'] - 1
+    race_week_ratio = available_days_before_race / 6
+
+    km_targets, peak_km_actual = compute_weekly_progression(
+        phase_by_week, total_weeks, avg_weekly_km, desired_peak_km, max_km,
+        race_week_available_ratio=race_week_ratio,
+    )
+    km_targets = apply_partial_week1_reduction(km_targets, dates['actual_start_day'])
+
+    hm_targets, peak_hm_actual = compute_weekly_progression(
+        phase_by_week, total_weeks, avg_weekly_hm, desired_peak_hm, desired_peak_hm * 1.5,
+        race_week_available_ratio=race_week_ratio,
+    )
+    hm_targets = apply_partial_week1_reduction(hm_targets, dates['actual_start_day'])
+
+    conflicts = []
+    weeks = []
+    prev_week_longrun_day = None
+    for week_num in range(1, total_weeks + 1):
+        phase = phase_by_week.get(week_num, 'BUILD')
+        is_race_week = (phase == 'RACE')
+        is_week1 = (week_num == 1)
+        week_monday = dates['start_monday'] + timedelta(weeks=week_num - 1)
+
+        sessions = build_week_skeleton(
+            week_num=week_num, phase=phase, race_dow=dates['race_dow'],
+            is_race_week=is_race_week, actual_start_day=dates['actual_start_day'], is_week1=is_week1,
+            long_run_day=inputs['long_run_day'], strength_days=inputs['strength_days'],
+            quality_sessions_input=inputs['quality_sessions'], cross_training=inputs['cross_training'],
+            cross_training_days=inputs['cross_training_days'], ausdauer_days=ausdauer_days,
+            terrain=terrain, conflicts=conflicts,
+            week_monday=week_monday, race_day=dates['race_day'],
+            prev_week_longrun_day=prev_week_longrun_day,
+        )
+        this_longrun = next((s['day_of_week'] for s in sessions if s['session_type'] == 'Long Run'), None)
+        prev_week_longrun_day = this_longrun
+        sessions = distribute_week_km(km_targets.get(week_num, 0), phase, sessions, race_distance_km)
+        sessions = distribute_week_hm(hm_targets.get(week_num, 0), sessions, terrain, race_elevation_m)
+
+        for s in sessions:
+            s['duration_min'] = compute_duration_min(
+                s['session_type'], s.get('distance_km', 0), s.get('elevation_gain_m', 0),
+                terrain, inputs.get('athlete_paces'),
+            )
+
+        weeks.append({
+            'week_number': week_num,
+            'week_date': week_monday,
+            'phase': phase,
+            'target_km': km_targets.get(week_num, 0),
+            'target_hm': hm_targets.get(week_num, 0),
+            'sessions': sessions,
+        })
+
+    return {
+        'weeks': weeks,
+        'dates': dates,
+        'total_weeks': total_weeks,
+        'taper_weeks': taper_weeks,
+        'peak_week': peak_week,
+        'desired_peak_km': desired_peak_km,
+        'peak_km_actual': peak_km_actual,
+        'desired_peak_hm': desired_peak_hm,
+        'peak_hm_actual': peak_hm_actual,
+        'conflicts': conflicts,
+    }
+
+
+def _is_lower_body(session):
+    return session.get('session_type') == 'Strength Training' and session.get('_strength_focus', '').startswith('lower')
+
+
+def validate_skeleton(skeleton, max_km, only_week_num=None):
+    """Prüft das Skelett gegen alle geforderten Regeln. Gibt (is_valid, errors) zurück.
+    only_week_num: falls gesetzt, werden nur Fehler INNERHALB dieser Woche gemeldet (Nachbarwochen
+    dienen weiterhin als Kontext für wochenübergreifende Prüfungen) — für den zweiten Lauf
+    "pro Woche vor LLM"."""
+    errors = []
+    weeks = skeleton['weeks']
+    dates = skeleton['dates']
+    race_dow = dates['race_dow']
+    race_day = dates['race_day']
+
+    by_week_num = {w['week_number']: w for w in weeks}
+    scope = [only_week_num] if only_week_num is not None else sorted(by_week_num.keys())
+
+    for week_num in scope:
+        w = by_week_num[week_num]
+        sessions = w['sessions']
+        is_race_week = (w['phase'] == 'RACE')
+
+        # 3. Keine Tagesdoppelbelegung
+        days_seen = [s['day_of_week'] for s in sessions]
+        if len(days_seen) != len(set(days_seen)):
+            errors.append(f"Woche {week_num}: Tagesdoppelbelegung ({days_seen})")
+
+        # 2. Keine Session nach race_date
+        for s in sessions:
+            session_date = w['week_date'] + timedelta(days=s['day_of_week'] - 1)
+            if session_date > race_day:
+                errors.append(f"Woche {week_num}: Session am {session_date} liegt nach race_date {race_day}")
+
+        # 6. max_km eingehalten
+        if w['target_km'] > max_km + 0.01:
+            errors.append(f"Woche {week_num}: target_km={w['target_km']} > max_km={max_km}")
+
+        # 4./5. Wochenkilometer/-HM = target (Toleranz, Race Day ausgenommen)
+        actual_km = sum(s.get('distance_km', 0) for s in sessions if s['session_type'] != 'Race Day')
+        if w['target_km'] > 0 and abs(actual_km - w['target_km']) > w['target_km'] * 0.05 + 0.15:
+            errors.append(f"Woche {week_num}: Summe Distanz {actual_km} weicht von target_km {w['target_km']} ab (>5%)")
+
+        actual_hm = sum(s.get('elevation_gain_m', 0) for s in sessions if s['session_type'] != 'Race Day')
+        if w['target_hm'] > 5 and abs(actual_hm - w['target_hm']) > w['target_hm'] * 0.10 + 5:
+            errors.append(f"Woche {week_num}: Summe HM {actual_hm} weicht von target_hm {w['target_hm']} ab (>10%)")
+
+        # 7. Longrun korrekt platziert
+        longrun_sessions = [s for s in sessions if s['session_type'] == 'Long Run']
+        if is_race_week and longrun_sessions:
+            errors.append(f"Woche {week_num}: Long Run in der Rennwoche nicht erlaubt")
+        if len(longrun_sessions) > 1:
+            errors.append(f"Woche {week_num}: mehr als ein Long Run")
+
+        # 8. actual_quality == planned_quality (0 in Race/Deload, max 1 in Taper)
+        actual_quality = len([s for s in sessions if s['session_type'] in QUALITY_TYPES])
+        if is_race_week and actual_quality != 0:
+            errors.append(f"Woche {week_num}: Quality Sessions in der Rennwoche (erwartet 0, gefunden {actual_quality})")
+        if w['phase'] == 'DELOAD' and actual_quality != 0:
+            errors.append(f"Woche {week_num}: Quality Sessions im Deload (erwartet 0, gefunden {actual_quality})")
+        if w['phase'] == 'TAPER' and actual_quality > 1:
+            errors.append(f"Woche {week_num}: mehr als 1 Quality Session im Taper (gefunden {actual_quality})")
+
+        # 10. Keine harte Beineinheit am Tag vor Longrun (innerhalb der Woche)
+        if longrun_sessions:
+            lr_day = longrun_sessions[0]['day_of_week']
+            before, _ = opposite_adjacent_days(lr_day)
+            if before:
+                before_s = next((s for s in sessions if s['day_of_week'] == before), None)
+                if before_s and (before_s['session_type'] in QUALITY_TYPES or before_s['session_type'] == 'Long Run' or _is_lower_body(before_s)):
+                    errors.append(f"Woche {week_num}: harte Beineinheit ({before_s['session_type']}) am Tag vor Longrun")
+
+        # 9. Keine Quality am Tag nach Longrun (innerhalb der Woche)
+        if longrun_sessions:
+            lr_day = longrun_sessions[0]['day_of_week']
+            _, after = opposite_adjacent_days(lr_day)
+            if after:
+                after_s = next((s for s in sessions if s['day_of_week'] == after), None)
+                if after_s and after_s['session_type'] in QUALITY_TYPES:
+                    errors.append(f"Woche {week_num}: Quality Session am Tag nach Longrun")
+
+        # 11. Rennwoche: kein Longrun, keine Quality, kein Lower/Full Body
+        if is_race_week:
+            for s in sessions:
+                if s['session_type'] == 'Strength Training' and s.get('_strength_focus') in ('lower', 'lower_moderate', 'full_light'):
+                    errors.append(f"Woche {week_num}: Lower/Full Body Strength Training in der Rennwoche")
+
+    # 1. Race Day exakt auf race_date (Gesamtplan-Check, unabhängig von only_week_num)
+    race_weeks = [w for w in weeks if w['phase'] == 'RACE']
+    if not race_weeks:
+        errors.append("Keine Rennwoche im Skelett gefunden")
+    else:
+        rw = race_weeks[0]
+        race_day_sessions = [s for s in rw['sessions'] if s['session_type'] == 'Race Day']
+        if len(race_day_sessions) != 1:
+            errors.append(f"Rennwoche enthält {len(race_day_sessions)} Race-Day-Sessions statt genau 1")
+        else:
+            rs = race_day_sessions[0]
+            if rs['day_of_week'] != race_dow:
+                errors.append(f"Race Day liegt auf Tag {rs['day_of_week']} statt {race_dow}")
+            actual_date = rw['week_date'] + timedelta(days=rs['day_of_week'] - 1)
+            if actual_date != race_day:
+                errors.append(f"Race Day Datum {actual_date} != race_date {race_day}")
+
+    # 9b. Wochenübergreifend: Quality am Montag nach Longrun am Sonntag der Vorwoche
+    for week_num in scope:
+        w = by_week_num[week_num]
+        prev = by_week_num.get(week_num - 1)
+        if not prev:
+            continue
+        prev_sunday = next((s for s in prev['sessions'] if s['day_of_week'] == 7 and s['session_type'] == 'Long Run'), None)
+        this_monday = next((s for s in w['sessions'] if s['day_of_week'] == 1), None)
+        if prev_sunday and this_monday and this_monday['session_type'] in QUALITY_TYPES:
+            errors.append(f"Woche {week_num}: Quality Session am Montag direkt nach Longrun am Sonntag (Woche {week_num - 1})")
+
+    # 1b. Kein Long Run am Kalendertag direkt vor Race Day (auch wochenübergreifend)
+    for week_num in scope:
+        w = by_week_num[week_num]
+        for s in w['sessions']:
+            if s['session_type'] != 'Long Run':
+                continue
+            session_date = w['week_date'] + timedelta(days=s['day_of_week'] - 1)
+            if session_date == race_day - timedelta(days=1):
+                errors.append(f"Woche {week_num}: Long Run am {session_date}, direkt vor Race Day {race_day}")
+
+    return (len(errors) == 0, errors)
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# ═══ DB / LLM I/O ═══
+# ══════════════════════════════════════════════════════════════════════════
+
 def get_db():
     database_url = os.getenv("DATABASE_URL") or os.getenv("RAILWAY_DATABASE_URL")
     return psycopg2.connect(database_url)
- 
- 
+
+
 def get_today():
     try:
         import pytz
@@ -42,8 +764,8 @@ def get_today():
         return datetime.now(zurich).date()
     except Exception:
         return (datetime.utcnow() + timedelta(hours=2)).date()
- 
- 
+
+
 def update_job_status(job_id, status, error=None):
     conn = get_db()
     try:
@@ -55,8 +777,8 @@ def update_job_status(job_id, status, error=None):
         conn.commit()
     finally:
         conn.close()
- 
- 
+
+
 def build_hevy_context():
     """CAIRN-Routinen aus der cairn_routines Tabelle (per hevy_routines_sync.py aus Hevy synchronisiert)."""
     hevy_context = ""
@@ -67,371 +789,224 @@ def build_hevy_context():
         cur.execute("SELECT title, exercises FROM cairn_routines")
         rows = cur.fetchall()
         print(f"DEBUG: cairn_routines query returned {len(rows)} rows")
- 
+
         cairn_routines = {}
         for title, exercises in rows:
             title = (title or '').strip()
             if not title or title in cairn_routines:
-                continue  # Duplikat ignorieren
+                continue
             cairn_routines[title] = exercises or []
- 
+
         if cairn_routines:
-            hevy_lines = ["STRENGTH TRAINING: Verwende NUR diese Workout-Namen (exakt so wie hier geschrieben):"]
+            hevy_lines = ["Verfügbare CAIRN-Routinen (NUR diese Namen verwenden):"]
             for title, exercises in cairn_routines.items():
                 category = HEVY_CATEGORIES.get(title, 'Ganzkörper')
                 routine_by_category.setdefault(category, title)
                 hevy_lines.append(f"- {title} [{category}]: {', '.join(exercises[:4])}")
-            hevy_lines.append("Jeder andere Strength Training Name ist VERBOTEN.")
- 
-            if routine_by_category.get('oberkörper') and routine_by_category.get('unterkörper'):
-                hevy_lines.append(f"Normale Wochen: {routine_by_category['oberkörper']} und {routine_by_category['unterkörper']} abwechselnd")
-            if routine_by_category.get('full_body_light'):
-                hevy_lines.append(f"Deload/Taper: {routine_by_category['full_body_light']}")
- 
-            hevy_context = "\n" + "\n".join(hevy_lines) + "\n"
+            hevy_context = "\n".join(hevy_lines)
     except Exception as e:
         print(f"Hevy Routinen Fehler: {e}")
     finally:
         conn.close()
     return hevy_context, routine_by_category
- 
- 
-def build_athlete_analysis(today):
-    """Athletenprofil + letzte 4 Wochen Aktivitäten + HRV/Schlaf/Befinden aus der DB."""
-    athlete_analysis_context = ""
+
+
+def pick_cairn_routine_name(focus, routine_by_category):
+    if focus in ('lower', 'lower_moderate'):
+        return routine_by_category.get('unterkörper') or routine_by_category.get('oberkörper') or 'Strength Training'
+    if focus == 'full_light':
+        return routine_by_category.get('full_body_light') or routine_by_category.get('oberkörper') or 'Strength Training'
+    return routine_by_category.get('oberkörper') or 'Strength Training'
+
+
+def fetch_athlete_context(today):
+    """DB-Zugriff: avg_weekly_km, max_km, athlete_paces (aus athlete_profile.pace_z1..z5) fliessen in
+    die deterministische Skelett-Berechnung. HRV/Schlaf werden NICHT in der Skelett-Mathematik
+    verwendet (dort nirgends referenziert) — sie sind reiner Kontext für die Flavor-Texte, die das
+    LLM in Phase 2 pro Woche ergänzt."""
+    avg_weekly_km = 0
+    max_km = 0
+    athlete_paces = {}
+    avg_hrv = None
+    avg_sleep = None
     conn = get_db()
     try:
         cur = conn.cursor()
- 
-        # Letzte 4 Wochen Aktivitäten
-        cur.execute("""
-            SELECT type, distance_km, heart_rate_avg
-            FROM trainings
-            WHERE date >= %s
-        """, (today - timedelta(days=28),))
-        training_rows = cur.fetchall()
-        print(f"DEBUG: trainings query returned {len(training_rows)} rows")
- 
-        # HRV / Schlaf / Befinden
-        cur.execute("""
-            SELECT hrv_last_night, sleep_duration_h, feel
-            FROM daily_logs
-            WHERE date >= %s
-        """, (today - timedelta(days=30),))
-        log_rows = cur.fetchall()
-        print(f"DEBUG: daily_logs query returned {len(log_rows)} rows")
- 
-        # Athletenprofil
-        cur.execute("""
-            SELECT long_term_goals,
-                   hr_z1_min, hr_z1_max, hr_z2_min, hr_z2_max, hr_z3_min, hr_z3_max,
-                   hr_z4_min, hr_z4_max, hr_z5_min, hr_z5_max,
-                   cross_rennrad, cross_schwimmen, cross_wandern, cross_ski
-            FROM athlete_profile ORDER BY id LIMIT 1
-        """)
-        profile_row = cur.fetchone()
-        print(f"DEBUG: athlete_profile query returned {'1 row' if profile_row else 'no row'}")
- 
-        run_rows = [r for r in training_rows if r[0] in ('Run', 'TrailRun')]
-        run_kms = [float(r[1]) for r in run_rows if r[1]]
+        cur.execute("""SELECT type, distance_km FROM trainings WHERE date >= %s""", (today - timedelta(days=28),))
+        rows = cur.fetchall()
+        print(f"DEBUG: trainings query returned {len(rows)} rows")
+        run_kms = [float(r[1]) for r in rows if r[0] in ('Run', 'TrailRun') and r[1]]
         avg_weekly_km = round(sum(run_kms) / 4.0, 1) if run_kms else 0
-        total_runs = len(run_rows)
         max_km = round(max(run_kms), 1) if run_kms else 0
- 
-        hr_values = [float(r[2]) for r in training_rows if r[2]]
-        avg_hr = round(sum(hr_values) / len(hr_values)) if hr_values else None
- 
-        type_counts = {}
-        for r in training_rows:
-            t = r[0] or 'Unbekannt'
-            type_counts[t] = type_counts.get(t, 0) + 1
-        top_types = sorted(type_counts.items(), key=lambda x: -x[1])[:3]
-        top_types_str = ', '.join(f"{t} ({c}x)" for t, c in top_types) if top_types else 'keine Daten'
- 
+
+        cur.execute("SELECT pace_z1, pace_z2, pace_z3, pace_z4, pace_z5 FROM athlete_profile ORDER BY id LIMIT 1")
+        prow = cur.fetchone()
+        print(f"DEBUG: athlete_profile query returned {'1 row' if prow else 'no row'}")
+        if prow:
+            z1, z2, z3, z4, z5 = [parse_pace_to_min_per_km(p) for p in prow]
+            if z2:
+                athlete_paces['easy'] = z2
+                athlete_paces['long_run'] = z2
+                athlete_paces['trail'] = z2
+            if z4:
+                athlete_paces['quality'] = z4
+
+        cur.execute("SELECT hrv_last_night, sleep_duration_h FROM daily_logs WHERE date >= %s", (today - timedelta(days=14),))
+        log_rows = cur.fetchall()
         hrv_values = [float(r[0]) for r in log_rows if r[0] is not None]
         avg_hrv = round(sum(hrv_values) / len(hrv_values), 1) if hrv_values else None
- 
         sleep_values = [float(r[1]) for r in log_rows if r[1] is not None]
         avg_sleep = round(sum(sleep_values) / len(sleep_values), 1) if sleep_values else None
- 
-        feel_values = []
-        for r in log_rows:
-            try:
-                if r[2] is not None:
-                    feel_values.append(float(r[2]))
-            except (TypeError, ValueError):
-                pass
-        avg_feel = round(sum(feel_values) / len(feel_values), 1) if feel_values else None
- 
-        long_term_goals = (profile_row[0] if profile_row else '') or 'keine angegeben'
- 
-        hr_zone_parts = []
-        if profile_row:
-            for i, label in enumerate(['Z1', 'Z2', 'Z3', 'Z4', 'Z5']):
-                lo, hi = profile_row[1 + i * 2], profile_row[2 + i * 2]
-                if lo is not None and hi is not None:
-                    hr_zone_parts.append(f"{label} {lo}-{hi}")
-        hr_zones_str = ', '.join(hr_zone_parts) if hr_zone_parts else 'keine hinterlegt'
- 
-        cross_prefs = []
-        if profile_row:
-            if profile_row[11]: cross_prefs.append('Rennrad')
-            if profile_row[12]: cross_prefs.append('Schwimmen')
-            if profile_row[13]: cross_prefs.append('Wandern')
-            if profile_row[14]: cross_prefs.append('Ski')
-        cross_prefs_str = ', '.join(cross_prefs) if cross_prefs else 'keine Präferenz hinterlegt'
-        print("DEBUG: athlete analysis calculations complete")
- 
-        athlete_analysis_context = f"""
-ATHLETEN-ANALYSE (echte Daten — der gesamte Plan muss darauf basieren):
-Aktuelles Laufniveau: Ø {avg_weekly_km} km/Woche über die letzten 4 Wochen ({total_runs} Einheiten)
-Längste Einheit: {max_km} km
-Häufigste Session-Typen: {top_types_str}
-Ø Herzfrequenz: {avg_hr if avg_hr is not None else 'keine Daten'} bpm
-Ø HRV: {avg_hrv if avg_hrv is not None else 'keine Daten'} ms | Ø Schlaf: {avg_sleep if avg_sleep is not None else 'keine Daten'}h | Ø Befinden: {avg_feel if avg_feel is not None else 'keine Daten'}/10
-HF-Zonen: {hr_zones_str}
-Langzeitziele: {long_term_goals}
-Cross Training: {cross_prefs_str}
- 
-Der gesamte Trainingsplan — jede Woche, jede Phase, jede Progression — muss auf diesem Athleten-Niveau aufbauen. Nicht zu hoch starten, nicht zu tief. Realistisch progressiv aufbauen basierend auf dem was der Athlet aktuell wirklich leistet. Ein Athlet der Ø 30km/Woche läuft startet anders als einer der Ø 80km/Woche läuft.
-"""
-        print("DEBUG: athlete_analysis_context built")
     except Exception as e:
-        print(f"Athleten-Analyse Fehler: {e}")
+        print(f"Athleten-Kontext Fehler: {e}")
         traceback.print_exc()
-        athlete_analysis_context = ""
     finally:
         conn.close()
-    return athlete_analysis_context
- 
- 
-def build_training_science_context(client, terrain='', race_elevation_m=0):
-    """Einmaliger Web-Search-Pre-Call für Trainingswissenschaft (statt pro Wochen-Batch)."""
-    training_science_context = ""
-    if terrain == 'trail':
-        query = f"trail ultra running training elevation hill sessions periodization {race_elevation_m}m gain"
-    elif terrain == 'road':
-        query = "road running training plan interval tempo quality sessions periodization"
-    else:
-        query = "Key principles for hybrid athlete training plan (running + strength): optimal sequence, quality session placement, interference effect avoidance."
+    return avg_weekly_km, max_km, athlete_paces, avg_hrv, avg_sleep
+
+
+def load_training_engine_excerpt():
+    """Fallback-Kontext, nur genutzt wenn Terrain fehlt (siehe build_context_notes)."""
     try:
-        science_message = client.messages.create(
-            model="claude-sonnet-4-6",
-            max_tokens=4000,
-            tools=[{"type": "web_search_20250305", "name": "web_search"}],
-            system="Answer in max 200 words.",
-            messages=[{"role": "user", "content": query}]
-        )
-        science_text = "".join(
-            block.text for block in science_message.content
-            if hasattr(block, 'text') and getattr(block, 'type', None) == 'text'
-        ).strip()
-        if science_text:
-            training_science_context = "\nTRAININGSWISSENSCHAFT (Recherche):\n" + science_text + "\n"
-        print("DEBUG: training science pre-call done")
+        path = os.path.join(os.path.dirname(__file__), '..', 'knowledge', 'docs', 'training_engine.md')
+        with open(path, 'r', encoding='utf-8') as f:
+            content = f.read()
+        return content[:2000]
     except Exception as e:
-        print(f"Training Science Pre-Call Fehler: {e}")
-        training_science_context = ""
-    return training_science_context
- 
- 
-def apply_post_processing(plan_json):
-    """Trainingsregeln durchsetzen: kein Quality nach Unterkörper-Kraft, kein Quality direkt vor Long Run."""
-    print(f"DEBUG: starting post-processing, {len(plan_json.get('weeks', []))} weeks total")
-    quality_types = {'Tempo Session', 'Interval Session', 'Sprint Session', 'Hill Session'}
-    swap_fields = (
-        'session_type', 'notes', 'distance_km', 'duration_min', 'session_zone',
-        'warmup_km', 'warmup_min', 'main_sets', 'main_distance_m', 'main_pace',
-        'recovery_m', 'cooldown_km', 'cooldown_min',
-    )
- 
-    for week in plan_json.get('weeks', []):
-        sessions = week.get('sessions', [])
-        by_day = {s.get('day_of_week'): s for s in sessions if s.get('day_of_week') is not None}
- 
-        for day in sorted(by_day.keys()):
-            s = by_day[day]
-            next_s = by_day.get(day + 1)
-            if not next_s:
-                continue
- 
-            notes_lower = (s.get('notes') or '').lower()
-            is_lower = (s.get('session_type') == 'Strength Training' and
-                       ('lower' in notes_lower or 'unterk' in notes_lower or
-                        'bein' in notes_lower or 'leg' in notes_lower or
-                        'squat' in notes_lower or 'deadlift' in notes_lower or
-                        'kreuzheben' in notes_lower or 'bulgar' in notes_lower))
-            is_quality_before_long = (s.get('session_type') in quality_types and
-                                     next_s.get('session_type') == 'Long Run')
- 
-            if (is_lower and next_s.get('session_type') in quality_types) or is_quality_before_long:
-                swap_target = None
-                for other_day in sorted(by_day.keys()):
-                    if other_day in (day, day + 1):
-                        continue
-                    if by_day[other_day].get('session_type') in {'Easy Run', 'Trail Run', 'Recovery Run'}:
-                        swap_target = by_day[other_day]
-                        break
-                if swap_target:
-                    for field in swap_fields:
-                        next_s[field], swap_target[field] = swap_target.get(field), next_s.get(field)
- 
-    print("DEBUG: post-processing complete")
-    return plan_json
- 
- 
+        print(f"training_engine.md Fehler: {e}")
+        return ""
+
+
+def build_context_notes(terrain):
+    """WEB SEARCH ist optional und nur bei fehlendem Terrain-Kontext relevant — primär wird
+    knowledge/docs/training_engine.md geladen, keine Live-Websuche im Regelfall."""
+    if terrain:
+        return ""
+    excerpt = load_training_engine_excerpt()
+    if excerpt:
+        return "TRAININGSPHILOSOPHIE (knowledge/docs/training_engine.md):\n" + excerpt
+    return ""
+
+
+def enrich_week_with_llm(client, week, terrain, routine_by_category, context_notes):
+    """Phase 2: ein LLM-Call pro Woche. Darf NUR Flavor-Felder ergänzen, NICHT die fixierten
+    Skelett-Felder ändern. Fixierte Felder werden danach hart mit den Skelett-Werten überschrieben."""
+    skeleton_sessions = [{f: s.get(f) for f in FIXED_FIELDS} for s in week['sessions']]
+
+    strength_hints = []
+    for s in week['sessions']:
+        if s['session_type'] == 'Strength Training':
+            focus = s.get('_strength_focus', 'upper')
+            routine_name = pick_cairn_routine_name(focus, routine_by_category)
+            strength_hints.append(f"- Tag {s['day_of_week']} ({focus}): notes MUSS exakt \"{routine_name}\" sein.")
+
+    prompt = f"""Du bist CAIRN Coach. Hier ist das FIXE Skelett für Woche {week['week_number']} (Phase: {week['phase']}), Terrain: {terrain}.
+
+{json.dumps(skeleton_sessions, ensure_ascii=False)}
+
+Diese Felder sind FIX und dürfen NICHT geändert werden: day_of_week, session_type, distance_km, elevation_gain_m, duration_min.
+Du darfst NUR folgende Felder ergänzen: notes, session_zone, warmup_km, warmup_min, main_sets, main_distance_m, main_pace, recovery_m, cooldown_km, cooldown_min.
+
+Für Quality Sessions (Tempo/Interval/Sprint/Hill Session): fülle warmup_km, warmup_min, main_sets, main_distance_m, main_pace, recovery_m, cooldown_km, cooldown_min passend zu distance_km/duration_min. notes fasst das in einem Satz zusammen.
+Für Strength Training gilt zwingend:
+{chr(10).join(strength_hints) if strength_hints else '(keine Strength Training Session diese Woche)'}
+Für alle anderen Session-Typen NUR notes und session_zone.
+notes IMMER auf Deutsch, im ruhigen, direkten CAIRN-Coach-Ton.
+{context_notes}
+
+Antworte NUR mit JSON: {{"sessions": [{{"day_of_week": 1, "notes": "...", "session_zone": "...", "warmup_km": null, "warmup_min": null, "main_sets": null, "main_distance_m": null, "main_pace": null, "recovery_m": null, "cooldown_km": null, "cooldown_min": null}}]}}"""
+
+    enrichment = []
+    try:
+        message = client.messages.create(
+            model="claude-sonnet-4-6",
+            max_tokens=3000,
+            messages=[{"role": "user", "content": prompt}]
+        )
+        raw = "".join(b.text for b in message.content if hasattr(b, 'text') and getattr(b, 'type', None) == 'text').strip()
+        raw = raw.replace('```json', '').replace('```', '').strip()
+        if not raw.startswith('{'):
+            m = re.search(r'\{[\s\S]*"sessions"[\s\S]*\}', raw)
+            if m:
+                raw = m.group(0)
+        enrichment = json.loads(raw).get('sessions', [])
+        print(f"DEBUG: LLM enrichment Woche {week['week_number']} ok, {len(enrichment)} sessions")
+    except Exception as e:
+        print(f"LLM Enrichment Fehler Woche {week['week_number']}: {e}")
+
+    enrichment_by_day = {e.get('day_of_week'): e for e in enrichment}
+    for s in week['sessions']:
+        fixed_snapshot = {f: s[f] for f in FIXED_FIELDS if f in s}
+        llm_data = enrichment_by_day.get(s['day_of_week'], {})
+        for f in FLAVOR_FIELDS:
+            if f in llm_data:
+                s[f] = llm_data[f]
+        s.update(fixed_snapshot)  # fixierte Felder mit Skelett-Werten überschreiben
+
+    return week
+
+
 def generate_plan(job_id, data):
     goal_type = data.get('goal_type', 'race')
-    race_type = data.get('race_type', '')
     race_name = data.get('race_name', '')
     race_date = data.get('race_date', '')
     race_distance_km = data.get('race_distance_km', 0)
     terrain = data.get('terrain', '')
     race_elevation_m = data.get('race_elevation_m', 0)
-    gpx_data = data.get('gpx_data', None)
     days_per_week = data.get('days_per_week', 5)
     long_run_day = data.get('long_run_day', 6)
     quality_sessions = data.get('quality_sessions', 1)
     strength_sessions = data.get('strength_sessions', 2)
     strength_days = data.get('strength_days', [])
-    total_weeks = data.get('total_weeks', 16)
-    phases = data.get('phases', [])
     start_date = data.get('start_date', None)
     cross_training = data.get('cross_training', False)
-    cross_training_types = data.get('cross_training_types', [])
     cross_training_days = data.get('cross_training_days', 0)
- 
+
+    if not race_date or not start_date:
+        raise SkeletonError("Eingabefehler: race_date und start_date sind zwingend erforderlich")
+
     today = get_today()
-    if start_date:
-        try:
-            start_day = date.fromisoformat(start_date)
-            start_monday = start_day - timedelta(days=start_day.weekday())
-            actual_start_day = start_day.isoweekday()  # 1=Mo, 7=So
-        except Exception:
-            start_monday = today
-            actual_start_day = 1
-    else:
-        start_monday = today
-        actual_start_day = 1
-    day_names = ['', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag']
-    gain_per_km = (race_elevation_m / race_distance_km) if race_distance_km else 0
- 
-    half = total_weeks // 2
-    week_ranges = [(1, half), (half + 1, total_weeks)] if total_weeks > 10 else [(1, total_weeks)]
- 
-    all_weeks = []
- 
     hevy_context, routine_by_category = build_hevy_context()
- 
-    cross_training_context = ""
-    if cross_training:
-        cross_training_context = f"""
-CROSS TRAINING: {cross_training_days}x pro Woche — Typen: {', '.join(cross_training_types) if cross_training_types else 'flexibel'}. Nutze session_type='Cross Training' mit notes=Typ (z.B. 'Rennrad 60 min').
-"""
- 
-    athlete_analysis_context = build_athlete_analysis(today)
- 
+    avg_weekly_km, max_km, athlete_paces, avg_hrv, avg_sleep = fetch_athlete_context(today)
+
+    inputs = {
+        'start_date': start_date, 'race_date': race_date,
+        'race_distance_km': race_distance_km, 'race_elevation_m': race_elevation_m,
+        'terrain': terrain, 'long_run_day': long_run_day, 'strength_days': strength_days,
+        'strength_sessions': strength_sessions, 'quality_sessions': quality_sessions,
+        'days_per_week': days_per_week, 'cross_training': cross_training,
+        'cross_training_days': cross_training_days, 'avg_weekly_km': avg_weekly_km,
+        'max_km': max_km, 'athlete_paces': athlete_paces,
+    }
+
+    print("DEBUG: building deterministic skeleton (Phase 1)")
+    skeleton = build_full_skeleton(inputs)
+    print(f"DEBUG: skeleton built, total_weeks={skeleton['total_weeks']}, "
+          f"desired_peak_km={skeleton['desired_peak_km']}, peak_km_actual={skeleton['peak_km_actual']}")
+    for c in skeleton['conflicts']:
+        print(f"KONFLIKT (dokumentiert, kein Fehler): {c}")
+
+    is_valid, errors = validate_skeleton(skeleton, max_km or avg_weekly_km * 2)
+    if not is_valid:
+        for e in errors:
+            print(f"SKELETON FEHLER: {e}")
+        raise SkeletonError(f"Skelett ungültig ({len(errors)} Fehler) — kein LLM-Aufruf, kein Plan erzeugt.")
+    print("DEBUG: Skeleton-Validierung (Gesamtplan) OK")
+
     client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
-    print("DEBUG: anthropic client created")
- 
-    training_science_context = build_training_science_context(client, terrain, race_elevation_m)
- 
-    for (week_from, week_to) in week_ranges:
-        phase_context = []
-        for ph in phases:
-            phase_context.append(f"{ph.get('name','').upper()}: {ph.get('weeks',0)} Wochen")
- 
-        gpx_context = ""
-        if gpx_data:
-            gpx_context = f"""
-STRECKENPROFIL (GPX-Analyse):
-- Distanz: {gpx_data.get('distance_km')} km
-- Höhenmeter aufwärts: {gpx_data.get('elevation_gain_m')} m
-- Höhenmeter pro km: {gpx_data.get('gain_per_km')} m/km
-- Profil: {gpx_data.get('profile_de')}
-- Max. Steigung: {gpx_data.get('max_grade_pct')} %
-"""
- 
-        prompt = f"""Du bist CAIRN Coach. Erstelle Woche {week_from} bis {week_to} eines {total_weeks}-Wochen Trainingsplans.
- 
-ATHLETENPROFIL:
-- Ziel: {goal_type}
-- Rennen: {race_name} ({race_type}) · {race_distance_km if race_distance_km else '?'} km
-- Renndatum: {race_date}
-- Terrain: {terrain} · Distanz: {race_distance_km}km · Höhenmeter: {race_elevation_m}m · D+ pro km: {gain_per_km:.0f}m/km
-- Gesamtplan: {total_weeks} Wochen · Phasen: {', '.join(phase_context)}
-{athlete_analysis_context}
-{training_science_context}
-Plane basierend auf diesen wissenschaftlichen Erkenntnissen UND den Athletendaten.
- 
-WOCHENSTRUKTUR — GENAU {days_per_week} Sessions pro Woche:
-- {strength_sessions}x Strength Training — NUR an: {', '.join([['','Mo','Di','Mi','Do','Fr','Sa','So'][d] for d in strength_days]) if strength_days else 'flexibel'}
-- 1x Long Run — IMMER an {day_names[long_run_day]} (Tag {long_run_day})
-- {quality_sessions}x Quality (Tempo Session / Interval Session / Sprint Session / Hill Session)
-- {days_per_week - strength_sessions - 1 - quality_sessions}x Easy Run oder Trail Run
-- {7 - days_per_week}x Rest Day — diese Tage komplett leer lassen, KEIN Eintrag
-{gpx_context}
-{hevy_context}
-{cross_training_context}
-REGELN:
-1. Long Run IMMER an Tag {long_run_day} ({day_names[long_run_day]})
-2. Nie 2 harte Sessions direkt hintereinander
-3. Nach Long Run: Rest Day oder Easy Run
-4. Strength Training nicht direkt vor Quality Session
-5. Deload alle 4 Wochen (Volumen -20%)
-6. Trail Run = RPE-basiert, keine Pace
- 
-ERLAUBTE SESSION-TYPEN — NUR diese 14, exakt so geschrieben (kein anderer Wert erlaubt):
-Easy Run, Recovery Run, Long Run, Tempo Session, Interval Session, Sprint Session, Hill Session, Trail Run, Cross Training, Strength Training, Mobility, Rest Day, Time Trial, Race Day
- 
-Strength Training hat KEINE eigenen session_type-Unterkategorien. Oberkörper A/B, Unterkörper A/B oder Full Body gehören ausschließlich ins notes-Feld, z.B. session_type: "Strength Training", notes: "Oberkörper A".
- 
-STRUKTURIERTE FELDER — NUR für Quality Sessions (Tempo/Interval/Sprint/Hill Session) ausfüllen, für alle anderen Session-Typen weglassen/null:
-- warmup_km, warmup_min: Einlaufen
-- main_sets, main_distance_m, main_pace: Hauptteil (Sätze × Distanz in Metern bei Zielpace)
-- recovery_m: Trabpause zwischen den Sätzen in Metern
-- cooldown_km, cooldown_min: Auslaufen
-notes fasst das in einem lesbaren Satz zusammen, z.B. "2km Einlaufen · 8×400m bei 4:00/km · 200m Trabpause · 2km Auslaufen".
- 
-elevation_gain_m (INTEGER) — für JEDE Lauf-Session (Easy Run, Long Run, Trail Run, Hill Session etc.) die geschätzten Höhenmeter dieser Einheit, passend zum Terrain und D+ pro km des Rennens. Bei Terrain "road" meist 0 oder gering, bei "trail"/"mixed" realistisch nach Streckenprofil.
- 
-WICHTIG: Antworte NUR mit JSON. Kein Text davor oder danach. Kein plan_meta. Beginne direkt mit {{
-{{"weeks": [{{"week_number": {week_from}, "phase": "base", "total_km": 40, "sessions": [{{"day_of_week": 1, "session_type": "Interval Session", "distance_km": 10, "duration_min": 55, "session_zone": "Z4-Z5", "warmup_km": 2, "warmup_min": 12, "main_sets": 8, "main_distance_m": 400, "main_pace": "4:00/km", "recovery_m": 200, "cooldown_km": 2, "cooldown_min": 10, "elevation_gain_m": 50, "notes": "2km Einlaufen · 8×400m bei 4:00/km · 200m Trabpause · 2km Auslaufen"}}]}}]}}
- 
-Wochen {week_from} bis {week_to}. day_of_week: 1=Mo bis 7=So. Rest Days nicht eintragen. Genau {days_per_week} Sessions pro Woche."""
- 
-        print(f"DEBUG: calling anthropic for weeks {week_from}-{week_to}")
-        with client.messages.stream(
-            model="claude-sonnet-4-6",
-            max_tokens=32000,
-            messages=[{"role": "user", "content": prompt}]
-        ) as stream:
-            message = stream.get_final_message()
-        print(f"DEBUG: anthropic call for weeks {week_from}-{week_to} returned, stop_reason={message.stop_reason}, blocks={len(message.content)}")
- 
-        raw = ""
-        for block in message.content:
-            if hasattr(block, 'text') and getattr(block, 'type', None) == 'text':
-                raw += block.text
-        raw = raw.replace('```json', '').replace('```', '').strip()
-        if not raw.startswith('{'):
-            json_match = re.search(r'\{[\s\S]*"weeks"[\s\S]*\}', raw)
-            if json_match:
-                raw = json_match.group(0)
-        try:
-            part_json = json.loads(raw)
-            all_weeks.extend(part_json.get('weeks', []))
-            print(f"OK weeks {week_from}-{week_to}: {len(part_json.get('weeks', []))} weeks")
-        except Exception as parse_err:
-            print(f"JSON parse error for weeks {week_from}-{week_to}: {parse_err}")
-            print(f"Raw length: {len(raw)}")
-            print(f"Raw start: {raw[:500]}")
-            print(f"Stop reason: {message.stop_reason}")
-            continue
- 
-    plan_json = {"weeks": all_weeks}
-    plan_json = apply_post_processing(plan_json)
- 
+    context_notes = build_context_notes(terrain)
+    if avg_hrv is not None or avg_sleep is not None:
+        context_notes += (f"\nAthleten-Kontext letzte 14 Tage: HRV {avg_hrv if avg_hrv is not None else 'keine Daten'} ms, "
+                           f"Schlaf {avg_sleep if avg_sleep is not None else 'keine Daten'} h.")
+
+    for week in skeleton['weeks']:
+        is_valid_week, week_errors = validate_skeleton(skeleton, max_km or avg_weekly_km * 2, only_week_num=week['week_number'])
+        if not is_valid_week:
+            for e in week_errors:
+                print(f"SKELETON FEHLER (Woche {week['week_number']}): {e}")
+            raise SkeletonError(f"Skelett für Woche {week['week_number']} ungültig — kein LLM-Aufruf.")
+        enrich_week_with_llm(client, week, terrain, routine_by_category, context_notes)
+
     # ─── In DB speichern ───
     print("DEBUG: starting DB save")
     conn = get_db()
@@ -443,32 +1018,20 @@ Wochen {week_from} bis {week_to}. day_of_week: 1=Mo bis 7=So. Rest Days nicht ei
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'active')
             RETURNING id
         """, (
-            race_name or f"{goal_type} Plan {total_weeks}W",
-            goal_type, race_name,
-            race_date if race_date else None,
-            race_distance_km or 0,
-            total_weeks, days_per_week, long_run_day,
+            race_name or f"{goal_type} Plan {skeleton['total_weeks']}W",
+            goal_type, race_name, race_date, race_distance_km or 0,
+            skeleton['total_weeks'], days_per_week, long_run_day,
             quality_sessions, strength_sessions
         ))
         plan_id = cur.fetchone()[0]
         print(f"DEBUG: plan metadata inserted, plan_id={plan_id}")
- 
+
         cur.execute("UPDATE plans SET status='archived' WHERE status='active' AND id != %s", (plan_id,))
-        print("DEBUG: old plans archived")
- 
         cur.execute("DELETE FROM training_plan WHERE plan_id = %s OR plan_id IS NULL", (plan_id,))
-        print("DEBUG: old training_plan rows deleted")
- 
+
         sessions_inserted = 0
-        for week in plan_json.get('weeks', []):
-            week_num = week.get('week_number', 1)
-            phase = week.get('phase', 'base')
-            week_monday = start_monday + timedelta(weeks=week_num - 1)
- 
-            for session in week.get('sessions', []):
-                day_of_week = session.get('day_of_week', 1)
-                if week_num == 1 and day_of_week < actual_start_day:
-                    continue
+        for week in skeleton['weeks']:
+            for s in week['sessions']:
                 cur.execute("""
                     INSERT INTO training_plan
                     (week_date, day_of_week, session_type, session_zone,
@@ -477,109 +1040,33 @@ Wochen {week_from} bis {week_to}. day_of_week: 1=Mo bis 7=So. Rest Days nicht ei
                      recovery_m, cooldown_km, cooldown_min, elevation_gain_m)
                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """, (
-                    week_monday,
-                    day_of_week,
-                    session.get('session_type', 'Easy Run'),
-                    session.get('session_zone', ''),
-                    session.get('duration_min', 0),
-                    session.get('distance_km', 0),
-                    session.get('notes', ''),
-                    phase,
-                    plan_id,
-                    week_num,
-                    session.get('warmup_km'),
-                    session.get('warmup_min'),
-                    session.get('main_sets'),
-                    session.get('main_distance_m'),
-                    session.get('main_pace'),
-                    session.get('recovery_m'),
-                    session.get('cooldown_km'),
-                    session.get('cooldown_min'),
-                    session.get('elevation_gain_m'),
+                    week['week_date'], s['day_of_week'], s['session_type'], s.get('session_zone', ''),
+                    s.get('duration_min', 0), s.get('distance_km', 0), s.get('notes', ''),
+                    week['phase'], plan_id, week['week_number'],
+                    s.get('warmup_km'), s.get('warmup_min'), s.get('main_sets'), s.get('main_distance_m'),
+                    s.get('main_pace'), s.get('recovery_m'), s.get('cooldown_km'), s.get('cooldown_min'),
+                    s.get('elevation_gain_m'),
                 ))
                 sessions_inserted += 1
         print(f"DEBUG: sessions insert loop complete, sessions_inserted={sessions_inserted}")
- 
+
         conn.commit()
         print("DEBUG: DB transaction committed")
     finally:
         conn.close()
- 
-    # ─── Race Day Fix: Race Day deterministisch einfügen/korrigieren ───
-    if race_date:
-        try:
-            race_date_obj = date.fromisoformat(race_date)
-            race_dow = race_date_obj.isoweekday()  # 1=Mo, 7=So
-            race_week_monday = race_date_obj - timedelta(days=race_date_obj.weekday())
- 
-            fix_conn = get_db()
-            try:
-                fix_cur = fix_conn.cursor()
- 
-                # Prüfen ob Race Day existiert
-                fix_cur.execute(
-                    "SELECT COUNT(*) FROM training_plan WHERE plan_id = %s AND session_type = 'Race Day'",
-                    (plan_id,)
-                )
-                race_exists = fix_cur.fetchone()[0]
- 
-                if race_exists:
-                    # Race Day auf korrekten Wochentag verschieben
-                    fix_cur.execute("""
-                        UPDATE training_plan
-                        SET day_of_week = %s
-                        WHERE plan_id = %s AND session_type = 'Race Day'
-                    """, (race_dow, plan_id))
-                    print(f"DEBUG: Race Day updated to dow={race_dow}")
-                else:
-                    # Race Day deterministisch einfügen
-                    fix_cur.execute("""
-                        INSERT INTO training_plan
-                        (week_date, day_of_week, session_type, distance_km, duration_min,
-                         notes, phase, plan_id, plan_week, elevation_gain_m)
-                        VALUES (%s, %s, 'Race Day', %s, %s, %s, 'race', %s, %s, %s)
-                    """, (
-                        str(race_week_monday),
-                        race_dow,
-                        race_distance_km or 31,
-                        int((race_distance_km or 31) * 7),
-                        f"Race Day – {race_name}. Alles geben.",
-                        plan_id,
-                        total_weeks,
-                        race_elevation_m or 0
-                    ))
-                    print(f"DEBUG: Race Day inserted at {race_date} (dow={race_dow})")
- 
-                # Harte Session am Tag direkt vor Race Day → Easy Run (Shakeout)
-                day_before = race_dow - 1 if race_dow > 1 else 7
-                fix_cur.execute("""
-                    UPDATE training_plan
-                    SET session_type = 'Easy Run',
-                        distance_km = LEAST(COALESCE(distance_km, 6), 6),
-                        notes = 'Shakeout vor dem Rennen. Sehr locker, kein Druck.'
-                    WHERE plan_id = %s AND week_date = %s AND day_of_week = %s
-                    AND session_type IN ('Long Run', 'Hill Session', 'Tempo Session', 'Interval Session', 'Sprint Session')
-                """, (plan_id, str(race_week_monday), day_before))
- 
-                fix_conn.commit()
-            finally:
-                fix_conn.close()
-            print(f"DEBUG: Race Day fixed to {race_date}")
-        except Exception as e:
-            print(f"Race Day Fix Fehler: {e}")
- 
+
     # ─── Workout-Vorschläge: Coach vergleicht geplante Strength-Sessions mit den CAIRN-Routinen ───
     print("DEBUG: starting workout suggestions")
     try:
         strength_notes = []
-        for week in plan_json.get('weeks', []):
-            for session in week.get('sessions', []):
-                if session.get('session_type') == 'Strength Training':
-                    note = session.get('notes', '') or 'Strength Training'
+        for week in skeleton['weeks']:
+            for s in week['sessions']:
+                if s['session_type'] == 'Strength Training':
+                    note = s.get('notes') or pick_cairn_routine_name(s.get('_strength_focus', 'upper'), routine_by_category)
                     if note not in strength_notes:
                         strength_notes.append(note)
         print(f"DEBUG: found {len(strength_notes)} distinct strength session notes")
- 
+
         if strength_notes and hevy_context:
             profile_conn = get_db()
             try:
@@ -591,8 +1078,7 @@ Wochen {week_from} bis {week_to}. day_of_week: 1=Mo bis 7=So. Rest Days nicht ei
                 profile_row = profile_cur.fetchone()
             finally:
                 profile_conn.close()
-            print("DEBUG: athlete_profile (workout suggestions) query complete")
- 
+
             long_term_goals = (profile_row[0] if profile_row else '') or 'keine angegeben'
             cross_prefs = []
             if profile_row:
@@ -600,50 +1086,46 @@ Wochen {week_from} bis {week_to}. day_of_week: 1=Mo bis 7=So. Rest Days nicht ei
                 if profile_row[2]: cross_prefs.append('Schwimmen')
                 if profile_row[3]: cross_prefs.append('Wandern')
                 if profile_row[4]: cross_prefs.append('Ski')
- 
+
             athlete_profile_context = f"ATHLETENPROFIL LANGZEITZIELE: {long_term_goals}"
             if cross_prefs:
                 athlete_profile_context += f"\nCROSS TRAINING PRÄFERENZEN: {', '.join(cross_prefs)}"
- 
+
             suggestion_prompt = f"""Du bist CAIRN Coach. Du hast gerade einen neuen Trainingsplan erstellt.
- 
+
 {athlete_profile_context}
- 
+
 GEPLANTE STRENGTH-TRAINING-EINHEITEN IN DIESEM PLAN:
 {chr(10).join('- ' + n for n in strength_notes)}
- 
+
 {hevy_context}
- 
+
 AUFGABE:
 Vergleiche die geplanten Einheiten mit den offiziellen CAIRN-Routinen und deren Übungsauswahl.
 Wo sinnvoll: schlage konkrete Anpassungen vor — Übungen ergänzen, streichen oder anpassen.
 Nur wenn es wirklich etwas zu verbessern gibt, nicht erzwingen. Maximal 4 Vorschläge. Wenn nichts zu verbessern ist: leere Liste.
-Berücksichtige die Langzeitziele des Athleten. Wenn Optik oder ästhetische Ziele genannt sind, haben diese Vorrang vor reinem Functional Training. Schlage nur Änderungen vor die WIRKLICH fehlen — prüfe die Übungsliste sorgfältig bevor du etwas vorschlägst.
- 
+Berücksichtige die Langzeitziele des Athleten.
+
 Für jeden Vorschlag:
 - workout_name: exakt einer der oben genannten geplanten Einheiten-Namen
 - change: was konkret ändern (1 Satz, mit konkreten Übungsnamen)
 - reason: warum (1-2 Sätze, CAIRN-Ton — ruhig, direkt, wie ein erfahrener Bergführer, nie wie Software)
- 
+
 Antworte NUR mit JSON:
 {{"suggestions": [{{"workout_name": "...", "change": "...", "reason": "..."}}]}}"""
- 
+
             sugg_message = client.messages.create(
                 model="claude-sonnet-4-6",
                 max_tokens=1200,
                 messages=[{"role": "user", "content": suggestion_prompt}]
             )
-            print(f"DEBUG: workout suggestions anthropic call complete, stop_reason={sugg_message.stop_reason}")
-            sugg_raw = ""
-            for block in sugg_message.content:
-                if hasattr(block, 'text'):
-                    sugg_raw += block.text
+            sugg_raw = "".join(b.text for b in sugg_message.content if hasattr(b, 'text')).strip()
             sugg_raw = sugg_raw.replace('```json', '').replace('```', '').strip()
             if not sugg_raw.startswith('{'):
                 m = re.search(r'\{[\s\S]*"suggestions"[\s\S]*\}', sugg_raw)
                 if m:
                     sugg_raw = m.group(0)
- 
+
             raw_suggestions = json.loads(sugg_raw).get('suggestions', [])
             print(f"DEBUG: parsed {len(raw_suggestions)} workout suggestions")
             now_iso = datetime.utcnow().isoformat()
@@ -660,7 +1142,7 @@ Antworte NUR mit JSON:
                 }
                 for i, s in enumerate(raw_suggestions)
             ]
- 
+
             if workout_suggestions:
                 sugg_conn = get_db()
                 try:
@@ -675,18 +1157,18 @@ Antworte NUR mit JSON:
                     sugg_conn.close()
     except Exception as sugg_err:
         print(f"Workout-Vorschläge Fehler: {sugg_err}")
- 
+
     print(f"generate_plan completed, sessions={sessions_inserted}")
     return sessions_inserted
- 
- 
+
+
 def main():
     if len(sys.argv) < 2:
         print("Usage: python data/generate_plan.py <job_id>")
         sys.exit(1)
     job_id = sys.argv[1]
     print(f"generate_plan started (job_id={job_id})")
- 
+
     conn = get_db()
     try:
         cur = conn.cursor()
@@ -694,14 +1176,14 @@ def main():
         row = cur.fetchone()
     finally:
         conn.close()
- 
+
     if not row:
         print(f"Job {job_id} nicht gefunden")
         sys.exit(1)
- 
+
     data = row[0]
     update_job_status(job_id, 'running')
- 
+
     try:
         sessions_inserted = generate_plan(job_id, data)
         update_job_status(job_id, 'done')
@@ -711,8 +1193,7 @@ def main():
         print(f"Job {job_id} fehlgeschlagen: {e}\n{trace}")
         update_job_status(job_id, 'error', error=str(e))
         sys.exit(1)
- 
- 
+
+
 if __name__ == "__main__":
     main()
- 
