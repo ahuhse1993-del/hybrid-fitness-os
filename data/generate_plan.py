@@ -530,7 +530,18 @@ STRECKENPROFIL (GPX-Analyse):
 - Max. Steigung: {gpx_data.get('max_grade_pct')} %
 """
 
-        prompt = f"""Du bist CAIRN Coach. Erstelle Woche {week_from} bis {week_to} eines {total_weeks}-Wochen Trainingsplans.
+        previous_weeks_summary = ""
+        if week_from > 1 and all_weeks:
+            summary_lines = [
+                f"- Woche {w.get('week_number')} ({w.get('phase', '?')}): {w.get('total_km', '?')} km"
+                for w in all_weeks
+            ]
+            previous_weeks_summary = (
+                f"BEREITS GENERIERTE WOCHEN 1-{half}:\n" + "\n".join(summary_lines) +
+                "\nBaue Progression, Deload und Taper konsistent auf diesen Wochen auf.\n\n"
+            )
+
+        prompt = f"""{previous_weeks_summary}Du bist CAIRN Coach. Erstelle Woche {week_from} bis {week_to} eines {total_weeks}-Wochen Trainingsplans.
 
 ATHLETENPROFIL:
 - Ziel: {goal_type}
@@ -575,20 +586,13 @@ PLANUNGSLOGIK — REIHENFOLGE VERBINDLICH:
    - Höhenmeter
    - Reduzierte Kraftbelastung in Peak und Taper
 
-RENNWOCHE REGELN (Woche die {race_date} enthält) — ABSOLUT UNVERÄNDERLICH:
-- KEIN Long Run
-- KEIN Quality Session (Tempo/Interval/Hill/Sprint)
-- KEIN Unterkörper-Kraft (Lower Body)
-- Erlaubt: Easy Run (max 6km), Upper Body Kraft, Mobility, Rest Day, Race Day
-- Race Day = {race_date} (day_of_week={race_dow}) mit session_type='Race Day'
-- Alle anderen Tage der Rennwoche: sehr leicht oder Ruhe
 {athlete_analysis_context}
 {training_science_context}
 Plane basierend auf diesen wissenschaftlichen Erkenntnissen UND den Athletendaten.
 
 WOCHENSTRUKTUR — GENAU {days_per_week} Sessions pro Woche:
 - {strength_sessions}x Strength Training — NUR an: {', '.join([['','Mo','Di','Mi','Do','Fr','Sa','So'][d] for d in strength_days]) if strength_days else 'flexibel'}
-- 1x Long Run — IMMER an {day_names[long_run_day]} (Tag {long_run_day})
+- 1x Long Run — IMMER an {day_names[long_run_day]} (Tag {long_run_day}), AUSSER in der Rennwoche (Woche die {race_date} enthält) und AUSSER am Tag direkt vor Race Day
 - {quality_sessions}x Quality (Tempo Session / Interval Session / Sprint Session / Hill Session)
 - {days_per_week - strength_sessions - 1 - quality_sessions}x Easy Run oder Trail Run
 - {7 - days_per_week}x Rest Day — diese Tage komplett leer lassen, KEIN Eintrag
