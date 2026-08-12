@@ -594,9 +594,11 @@ function changeNum(type, delta) {
 
 function getWeeks() {
   if (planData.goal_type === 'race' && planData.race_date) {
-    var today = new Date();
-    var race = new Date(planData.race_date);
-    var weeks = Math.ceil((race - today) / (7 * 24 * 3600 * 1000));
+    var startMonday = new Date(planData.start_date + 'T12:00:00');
+    startMonday.setDate(startMonday.getDate() - ((startMonday.getDay() + 6) % 7));
+    var raceMonday = new Date(planData.race_date + 'T12:00:00');
+    raceMonday.setDate(raceMonday.getDate() - ((raceMonday.getDay() + 6) % 7));
+    var weeks = Math.round((raceMonday - startMonday) / (7 * 24 * 3600 * 1000)) + 1;
     return Math.max(4, Math.min(weeks, 52));
   }
   var defaults = {fitness:12, maintain:8};
