@@ -98,3 +98,4 @@ if __name__ == "__main__":
         import_hr_for_activity(client, training_id, garmin_id, force=True)
     else:
         print("Usage: python garmin_import_hr.py <training_id> <garmin_id>")
+        
