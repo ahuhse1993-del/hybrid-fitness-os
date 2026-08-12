@@ -205,15 +205,61 @@ Der gesamte Trainingsplan — jede Woche, jede Phase, jede Progression — muss 
     return athlete_analysis_context, avg_weekly_km, max_km
 
 
-def build_training_science_context(client, terrain='', race_elevation_m=0):
-    """Einmaliger Web-Search-Pre-Call für Trainingswissenschaft (statt pro Wochen-Batch)."""
+# Coaching-Absicht pro Phase, aus knowledge/docs/training_engine.md (Periodisation / Deload Weeks Kapitel)
+PHASE_COACHING_DESCRIPTIONS = {
+    'BASE': "Build aerobic engine. Low intensity. Volume grows gradually. No quality pressure.",
+    'BUILD': "Convert fitness into performance. Quality increases. Specificity increases.",
+    'PEAK': "Everything unnecessary removed. Race-specific. Confidence, not exhaustion.",
+    'TAPER': "Reduce fatigue. Maintain fitness. Athlete arrives feeling slightly undertrained.",
+    'DELOAD': "Reduce accumulated fatigue. Volume -20%. No quality. Easy intensity only.",
+    'RACE WEEK': "Minimal training. Race Day is the only hard effort.",
+}
+
+DAY_ABBR = ['', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So']
+
+
+def compute_phase_map(total_weeks):
+    """Weist jeder Woche 1..total_weeks deterministisch rückwärts vom Race Day eine Phase zu."""
+    phase_by_week = {}
+    if total_weeks >= 1:
+        phase_by_week[total_weeks] = 'RACE WEEK'
+    if total_weeks - 1 >= 1:
+        phase_by_week[total_weeks - 1] = 'TAPER'
+    if total_weeks - 2 >= 1:
+        phase_by_week[total_weeks - 2] = 'PEAK'
+
+    remaining = [w for w in range(1, total_weeks + 1) if w not in phase_by_week]
+    for w in remaining:
+        if w % 4 == 0:
+            phase_by_week[w] = 'DELOAD'
+
+    remaining = [w for w in range(1, total_weeks + 1) if w not in phase_by_week]
+    base_count = round(len(remaining) * 0.35)
+    for i, w in enumerate(remaining):
+        phase_by_week[w] = 'BASE' if i < base_count else 'BUILD'
+
+    return phase_by_week
+
+
+def build_phase_map(total_weeks, start_monday, race_date):
+    """Baut den PHASENZUWEISUNG-Prompt-Block: Datum + Phase + Coaching-Absicht pro Woche."""
+    phase_by_week = compute_phase_map(total_weeks)
+    lines = ["PHASENZUWEISUNG UND COACHING-ABSICHT — VERBINDLICH:"]
+    for week_num in range(1, total_weeks + 1):
+        week_monday = start_monday + timedelta(weeks=week_num - 1)
+        weekday_abbr = DAY_ABBR[week_monday.isoweekday()]
+        date_str = week_monday.strftime('%d.%m')
+        phase = phase_by_week.get(week_num, 'BUILD')
+        description = PHASE_COACHING_DESCRIPTIONS.get(phase, '')
+        lines.append(f"Woche {week_num} ({weekday_abbr} {date_str}) {phase}: {description}")
+    return "\n".join(lines)
+
+
+def build_training_science_context(client, total_weeks, race_distance_km, terrain, avg_weekly_km, race_date, start_monday):
+    """Einmaliger Web-Search-Pre-Call für Trainingswissenschaft (statt pro Wochen-Batch) plus
+    deterministische Phasenzuweisung rückwärts vom Race Day."""
     training_science_context = ""
-    if terrain == 'trail':
-        query = f"trail ultra running training elevation hill sessions periodization {race_elevation_m}m gain taper week race week training reduction"
-    elif terrain == 'road':
-        query = "road running training plan interval tempo quality sessions periodization taper week race week training reduction"
-    else:
-        query = "Key principles for hybrid athlete training plan (running + strength): optimal sequence, quality session placement, interference effect avoidance, taper week race week training reduction"
+    query = f"{total_weeks} week {terrain} running plan {race_distance_km}km periodization base build peak taper weeks distribution {avg_weekly_km}km per week current fitness"
     try:
         science_message = client.messages.create(
             model="claude-sonnet-4-6",
@@ -232,7 +278,10 @@ def build_training_science_context(client, terrain='', race_elevation_m=0):
     except Exception as e:
         print(f"Training Science Pre-Call Fehler: {e}")
         training_science_context = ""
-    return training_science_context
+
+    phase_map = build_phase_map(total_weeks, start_monday, race_date)
+
+    return training_science_context, phase_map
 
 
 def apply_post_processing(plan_json):
@@ -512,7 +561,9 @@ TERRAIN TRAIL/BERGE:
     client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
     print("DEBUG: anthropic client created")
 
-    training_science_context = build_training_science_context(client, terrain, race_elevation_m)
+    training_science_context, phase_map = build_training_science_context(
+        client, total_weeks, race_distance_km, terrain, avg_weekly_km, race_date, start_monday
+    )
 
     for (week_from, week_to) in week_ranges:
         phase_context = []
@@ -585,6 +636,8 @@ PLANUNGSLOGIK — REIHENFOLGE VERBINDLICH:
    - Distanzen innerhalb sicherer Progression
    - Höhenmeter
    - Reduzierte Kraftbelastung in Peak und Taper
+
+{phase_map}
 
 {athlete_analysis_context}
 {training_science_context}
