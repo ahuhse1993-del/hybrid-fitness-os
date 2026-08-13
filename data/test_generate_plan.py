@@ -1,23 +1,21 @@
-
-Test generate plan · PY
 """
 Tests für die deterministische Skelett-Logik in data/generate_plan.py.
 Reine Domänenlogik, keine DB-/API-Zugriffe.
- 
+
 Ausführen: python data/test_generate_plan.py
 """
 import importlib.util
 import os
 import re
 from datetime import date
- 
+
 spec = importlib.util.spec_from_file_location(
     'generate_plan', os.path.join(os.path.dirname(__file__), 'generate_plan.py')
 )
 gp = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(gp)
- 
- 
+
+
 def make_inputs(**overrides):
     base = dict(
         start_date='2026-08-17', race_date='2026-10-26',
@@ -29,18 +27,18 @@ def make_inputs(**overrides):
     )
     base.update(overrides)
     return base
- 
- 
+
+
 def all_sessions(skeleton):
     return [s for w in skeleton['weeks'] for s in w['sessions']]
- 
- 
+
+
 def week_by_num(skeleton, n):
     return next(w for w in skeleton['weeks'] if w['week_number'] == n)
- 
- 
+
+
 # ─────────────────────────────────────────────────────────────────────────
- 
+
 def test_race_day_montag():
     inputs = make_inputs(race_date='2026-10-26')  # Montag
     skel = gp.build_full_skeleton(inputs)
@@ -52,8 +50,8 @@ def test_race_day_montag():
     assert race_days[0]['day_of_week'] == 1
     assert race_week['target_km'] == 0, f"Montag-Rennen sollte target_km=0 ergeben, war {race_week['target_km']}"
     print("OK: test_race_day_montag")
- 
- 
+
+
 def test_race_day_samstag():
     inputs = make_inputs(race_date='2026-10-24')  # Samstag
     skel = gp.build_full_skeleton(inputs)
@@ -64,8 +62,8 @@ def test_race_day_samstag():
     assert len(race_days) == 1 and race_days[0]['day_of_week'] == 6
     assert race_week['target_km'] > 0
     print("OK: test_race_day_samstag")
- 
- 
+
+
 def test_race_day_sonntag():
     inputs = make_inputs(race_date='2026-10-25')  # Sonntag
     skel = gp.build_full_skeleton(inputs)
@@ -75,8 +73,8 @@ def test_race_day_sonntag():
     race_days = [s for s in race_week['sessions'] if s['session_type'] == 'Race Day']
     assert len(race_days) == 1 and race_days[0]['day_of_week'] == 7
     print("OK: test_race_day_sonntag")
- 
- 
+
+
 def test_angebrochene_erste_woche():
     # Start Mittwoch statt Montag -> Woche 1 nur Mi-So verfuegbar
     inputs = make_inputs(start_date='2026-08-19')  # Mittwoch
@@ -91,8 +89,8 @@ def test_angebrochene_erste_woche():
     valid, errors = gp.validate_skeleton(skel, inputs['max_km'])
     assert valid, f"Skeleton invalid: {errors}"
     print("OK: test_angebrochene_erste_woche")
- 
- 
+
+
 def test_race_date_nicht_am_longrun_tag():
     inputs = make_inputs(long_run_day=6, race_date='2026-10-28')  # Mittwoch-Rennen, Longrun sonst Samstag
     skel = gp.build_full_skeleton(inputs)
@@ -102,8 +100,8 @@ def test_race_date_nicht_am_longrun_tag():
     assert not any(s['session_type'] == 'Long Run' for s in race_week['sessions'])
     # vorletzte Woche (Taper) sollte weiterhin Longrun-frei sein falls sie selbst nicht Taper... pruefe nur Race Week
     print("OK: test_race_date_nicht_am_longrun_tag")
- 
- 
+
+
 def test_wechselnde_gym_days():
     for days in ([1, 3], [2, 5], [3, 6], [1, 4]):
         inputs = make_inputs(strength_days=days, strength_sessions=2)
@@ -111,8 +109,8 @@ def test_wechselnde_gym_days():
         valid, errors = gp.validate_skeleton(skel, inputs['max_km'])
         assert valid, f"strength_days={days}: {errors}"
     print("OK: test_wechselnde_gym_days")
- 
- 
+
+
 def test_gymtag_kollidiert_mit_longrun():
     inputs = make_inputs(long_run_day=2, strength_days=[2, 4], strength_sessions=2)
     skel = gp.build_full_skeleton(inputs)
@@ -124,8 +122,8 @@ def test_gymtag_kollidiert_mit_longrun():
     assert strength_count == 1, f"Gym an Tag 2 sollte entfallen, gefunden {strength_count} Strength Sessions"
     assert any('kollidiert mit Race Day/Longrun' in c for c in skel['conflicts'])
     print("OK: test_gymtag_kollidiert_mit_longrun")
- 
- 
+
+
 def test_gymtag_kollidiert_mit_race_day():
     inputs = make_inputs(race_date='2026-10-27', strength_days=[2, 4], strength_sessions=2)  # Dienstag-Rennen
     skel = gp.build_full_skeleton(inputs)
@@ -136,8 +134,8 @@ def test_gymtag_kollidiert_mit_race_day():
     strength_count = len([s for s in race_week['sessions'] if s['session_type'] == 'Strength Training'])
     assert strength_count <= 1
     print("OK: test_gymtag_kollidiert_mit_race_day")
- 
- 
+
+
 def test_kein_lower_slot_verfuegbar():
     # Nur 1 Gymtag, direkt neben dem Longrun-Tag (Sa) -> fuer Lower Body verboten (Tag vor/nach Longrun)
     inputs = make_inputs(long_run_day=6, strength_days=[5], strength_sessions=1, quality_sessions=1)
@@ -150,8 +148,8 @@ def test_kein_lower_slot_verfuegbar():
     valid, errors = gp.validate_skeleton(skel, inputs['max_km'])
     assert valid, f"Skeleton invalid: {errors}"
     print("OK: test_kein_lower_slot_verfuegbar")
- 
- 
+
+
 def test_quality_sessions_0_1_mehrere():
     for q in (0, 1, 2):
         inputs = make_inputs(quality_sessions=q, days_per_week=6, strength_sessions=1, strength_days=[3])
@@ -163,8 +161,8 @@ def test_quality_sessions_0_1_mehrere():
         valid, errors = gp.validate_skeleton(skel, inputs['max_km'])
         assert valid, f"quality_sessions={q}: {errors}"
     print("OK: test_quality_sessions_0_1_mehrere")
- 
- 
+
+
 def test_deload_rueckkehr_korrekt():
     inputs = make_inputs(total_weeks=None)
     skel = gp.build_full_skeleton(inputs)
@@ -180,7 +178,7 @@ def test_deload_rueckkehr_korrekt():
             continue
         prev_load_km = week_by_num(skel, prev_load_week_num)['target_km']
         assert deload_week['target_km'] <= prev_load_km, "Deload muss unter der vorherigen Belastungswoche liegen"
- 
+
         # Woche NACH dem Deload: Vergleich mit Woche VOR dem Deload (nicht mit der reduzierten Deload-Woche)
         next_week_num = dw + 1
         if next_week_num <= skel['total_weeks'] and phase_by_week.get(next_week_num) in ('BASE', 'BUILD', 'PEAK'):
@@ -190,8 +188,8 @@ def test_deload_rueckkehr_korrekt():
                 f"({prev_load_km}) begrenzt sein, nicht gegen die Deload-Woche selbst"
             )
     print("OK: test_deload_rueckkehr_korrekt")
- 
- 
+
+
 def test_peak_ziel_nicht_erreichbar_max_km():
     inputs = make_inputs(avg_weekly_km=36, max_km=38, race_distance_km=31)
     skel = gp.build_full_skeleton(inputs)
@@ -202,8 +200,8 @@ def test_peak_ziel_nicht_erreichbar_max_km():
     valid, errors = gp.validate_skeleton(skel, inputs['max_km'])
     assert valid, f"Skeleton invalid: {errors}"
     print("OK: test_peak_ziel_nicht_erreichbar_max_km")
- 
- 
+
+
 def test_cross_training_ersetzt_ausdauer():
     inputs_with = make_inputs(cross_training=True, cross_training_days=1, days_per_week=6, strength_sessions=2, strength_days=[2, 4])
     inputs_without = make_inputs(cross_training=False, cross_training_days=0, days_per_week=6, strength_sessions=2, strength_days=[2, 4])
@@ -220,8 +218,8 @@ def test_cross_training_ersetzt_ausdauer():
         if s['session_type'] == 'Cross Training':
             assert s['distance_km'] == 0
     print("OK: test_cross_training_ersetzt_ausdauer")
- 
- 
+
+
 def test_wochensummen_nach_rundung_korrekt():
     inputs = make_inputs()
     skel = gp.build_full_skeleton(inputs)
@@ -233,8 +231,8 @@ def test_wochensummen_nach_rundung_korrekt():
                 f"Woche {w['week_number']}: Summe {actual_km} vs actual_target_run_km {ref}"
             )
     print("OK: test_wochensummen_nach_rundung_korrekt")
- 
- 
+
+
 def test_wochenuebergreifende_quality_nach_longrun_regel():
     # Konstruiere ein Skelett manuell und verletze absichtlich die Regel, um den Validator zu pruefen
     inputs = make_inputs(long_run_day=7)  # Longrun am Sonntag
@@ -253,8 +251,8 @@ def test_wochenuebergreifende_quality_nach_longrun_regel():
     assert not valid, "Validator sollte Quality Montag nach Longrun Sonntag als Fehler erkennen"
     assert any('Montag direkt nach Longrun' in e for e in errors)
     print("OK: test_wochenuebergreifende_quality_nach_longrun_regel")
- 
- 
+
+
 def test_eingabefehler_strength_mismatch():
     inputs = make_inputs(strength_sessions=2, strength_days=[2, 2, 4])  # 2 eindeutige Tage waeren 2 (2,4) -> eigentlich ok
     # Echter Widerspruch: strength_sessions=3 aber nur 2 eindeutige Tage
@@ -265,8 +263,8 @@ def test_eingabefehler_strength_mismatch():
     except gp.SkeletonError:
         pass
     print("OK: test_eingabefehler_strength_mismatch")
- 
- 
+
+
 def test_max_eine_session_pro_tag():
     inputs = make_inputs()
     skel = gp.build_full_skeleton(inputs)
@@ -274,12 +272,12 @@ def test_max_eine_session_pro_tag():
         days = [s['day_of_week'] for s in w['sessions']]
         assert len(days) == len(set(days)), f"Woche {w['week_number']}: Doppelbelegung {days}"
     print("OK: test_max_eine_session_pro_tag")
- 
- 
+
+
 # ─────────────────────────────────────────────────────────────────────────
 # VOLUMEN-BUGFIX TESTS — konkrete Zahlen aus der Aufgabenstellung
 # ─────────────────────────────────────────────────────────────────────────
- 
+
 def test_volumen_1_startwoche_34_38():
     inputs = make_inputs(avg_weekly_km=36)
     skel = gp.build_full_skeleton(inputs)
@@ -288,14 +286,14 @@ def test_volumen_1_startwoche_34_38():
     valid, errors = gp.validate_skeleton(skel, inputs['max_km'])
     assert valid, f"Skeleton invalid: {errors}"
     print(f"OK: test_volumen_1_startwoche_34_38 (target_km={week1['target_km']})")
- 
- 
+
+
 def test_volumen_2_desired_peak_km_46_5():
     desired = gp.compute_desired_peak_km(avg_weekly_km=36, race_distance_km=31, max_km=55)
     assert desired == 46.5, f"desired_peak_km={desired}, erwartet 46.5"
     print(f"OK: test_volumen_2_desired_peak_km_46_5 (desired_peak_km={desired})")
- 
- 
+
+
 def test_volumen_3_peak_woche_44_48():
     inputs = make_inputs(avg_weekly_km=36, race_distance_km=31, max_km=55)
     skel = gp.build_full_skeleton(inputs)
@@ -306,8 +304,8 @@ def test_volumen_3_peak_woche_44_48():
     valid, errors = gp.validate_skeleton(skel, inputs['max_km'])
     assert valid, f"Skeleton invalid: {errors}"
     print(f"OK: test_volumen_3_peak_woche_44_48 (target_km={peak['target_km']})")
- 
- 
+
+
 def test_volumen_4_peak_longrun_19_21():
     inputs = make_inputs(avg_weekly_km=36, race_distance_km=31, max_km=55)
     skel = gp.build_full_skeleton(inputs)
@@ -317,8 +315,8 @@ def test_volumen_4_peak_longrun_19_21():
     lr = next(s for s in peak['sessions'] if s['session_type'] == 'Long Run')
     assert 19 <= lr['distance_km'] <= 21, f"Peak-Longrun={lr['distance_km']}, erwartet 19-21"
     print(f"OK: test_volumen_4_peak_longrun_19_21 (longrun={lr['distance_km']})")
- 
- 
+
+
 def test_volumen_5_build_wochen_progressiv_oder_dokumentiert():
     inputs = make_inputs(avg_weekly_km=36, race_distance_km=31, max_km=55)
     skel = gp.build_full_skeleton(inputs)
@@ -338,8 +336,8 @@ def test_volumen_5_build_wochen_progressiv_oder_dokumentiert():
     valid, errors = gp.validate_skeleton(skel, inputs['max_km'])
     assert valid, f"Skeleton invalid: {errors}"
     print("OK: test_volumen_5_build_wochen_progressiv_oder_dokumentiert")
- 
- 
+
+
 def test_volumen_6_nach_deload_vergleich_mit_vordeload():
     inputs = make_inputs(avg_weekly_km=36, race_distance_km=31, max_km=55)
     skel = gp.build_full_skeleton(inputs)
@@ -371,8 +369,8 @@ def test_volumen_6_nach_deload_vergleich_mit_vordeload():
                     f"begrenzt sein"
                 )
     print("OK: test_volumen_6_nach_deload_vergleich_mit_vordeload")
- 
- 
+
+
 def test_volumen_7_cross_replaces_run_false_reduziert_laufziel_nicht():
     """Root-Cause-Fix (PDF Problem 1): historical_run_baseline_km/base_target_run_km und die
     tatsaechlich reduzierte actual_target_run_km sind jetzt getrennte Konzepte. Bei
@@ -387,7 +385,7 @@ def test_volumen_7_cross_replaces_run_false_reduziert_laufziel_nicht():
     skel_without = gp.build_full_skeleton(inputs_without)
     week_with = week_by_num(skel_with, 1)
     week_without = week_by_num(skel_without, 1)
- 
+
     assert week_with['target_km'] == week_without['target_km'] == week_with['base_target_run_km'], (
         f"base target_km/base_target_run_km sollte durch Cross unveraendert bleiben: "
         f"{week_with['target_km']} vs {week_without['target_km']}"
@@ -402,8 +400,8 @@ def test_volumen_7_cross_replaces_run_false_reduziert_laufziel_nicht():
     )
     assert skel_with['historical_run_baseline_km'] == 36, "historical_run_baseline_km sollte die unveraenderte Trainingshistorie sein"
     print(f"OK: test_volumen_7_cross_replaces_run_false_reduziert_laufziel_nicht (base={base}, actual_target_run_km={actual})")
- 
- 
+
+
 def test_volumen_7b_cross_replaces_run_true_reduziert_kontrolliert():
     """Gegenstück zu test_volumen_7: cross_replaces_run=True ersetzt bewusst eine Laufeinheit —
     das Laufziel wird reduziert, aber anhand eines geschaetzten ersetzten Easy-Run-Anteils, weiterhin
@@ -417,12 +415,12 @@ def test_volumen_7b_cross_replaces_run_true_reduziert_kontrolliert():
     assert actual < base, f"cross_replaces_run=True sollte das Laufziel reduzieren, war {actual} von base={base}"
     assert actual >= base * 0.80 - 0.05, f"actual_target_run_km={actual} unterschreitet die 80%-Untergrenze von base={base}"
     print(f"OK: test_volumen_7b_cross_replaces_run_true_reduziert_kontrolliert (base={base}, actual_target_run_km={actual})")
- 
- 
+
+
 # ─────────────────────────────────────────────────────────────────────────
 # NEUE VALIDATOR-TESTS (Session-Verteilung, Deload, Taper, Build-Plateau)
 # ─────────────────────────────────────────────────────────────────────────
- 
+
 def test_neu_6tage_2gym_1cross_3laeufe_easy_nicht_ueber_longrun():
     inputs = make_inputs(days_per_week=6, strength_sessions=2, strength_days=[2, 4],
                           cross_training=True, cross_training_days=1, quality_sessions=1)
@@ -441,8 +439,8 @@ def test_neu_6tage_2gym_1cross_3laeufe_easy_nicht_ueber_longrun():
                     f"Woche {w['week_number']}: Easy Run {e['distance_km']} > Longrun {longrun['distance_km']}"
                 )
     print("OK: test_neu_6tage_2gym_1cross_3laeufe_easy_nicht_ueber_longrun")
- 
- 
+
+
 def test_neu_kein_easy_ueber_35_prozent():
     inputs = make_inputs(days_per_week=6, strength_sessions=2, strength_days=[2, 4],
                           cross_training=True, cross_training_days=1, quality_sessions=1)
@@ -460,8 +458,8 @@ def test_neu_kein_easy_ueber_35_prozent():
                     f"Woche {w['week_number']}: Easy Run {s['distance_km']} liegt in der verbotenen 15-19km-Zone"
                 )
     print("OK: test_neu_kein_easy_ueber_35_prozent")
- 
- 
+
+
 def test_neu_cross_bleibt_in_deload():
     inputs = make_inputs(cross_training=True, cross_training_days=1)
     skel = gp.build_full_skeleton(inputs)
@@ -473,8 +471,8 @@ def test_neu_cross_bleibt_in_deload():
         for c in cross_sessions:
             assert c['duration_min'] < 60, f"Woche {w['week_number']} (DELOAD): Cross-Dauer {c['duration_min']} nicht reduziert (Regel 10: -20-30%)"
     print("OK: test_neu_cross_bleibt_in_deload")
- 
- 
+
+
 def test_neu_deload_kein_4_lauf():
     inputs = make_inputs(days_per_week=6, strength_sessions=2, strength_days=[2, 4],
                           cross_training=True, cross_training_days=1, quality_sessions=1)
@@ -489,8 +487,8 @@ def test_neu_deload_kein_4_lauf():
             f"Cross Training sollte einen Ausdauertag belegen statt eines 4. Laufs"
         )
     print("OK: test_neu_deload_kein_4_lauf")
- 
- 
+
+
 def test_neu_taper_vor_montagsrennen_fr_sa_und_sonntag_rest():
     inputs = make_inputs(race_date='2026-10-26')  # Montag
     skel = gp.build_full_skeleton(inputs)
@@ -505,8 +503,8 @@ def test_neu_taper_vor_montagsrennen_fr_sa_und_sonntag_rest():
     combined = (fri.get('distance_km', 0) if fri else 0) + (sat.get('distance_km', 0) if sat else 0)
     assert combined <= 14.05, f"Fr+Sa zusammen {combined}km > 14km (Regel 16)"
     print(f"OK: test_neu_taper_vor_montagsrennen_fr_sa_und_sonntag_rest (Fr+Sa={combined}km)")
- 
- 
+
+
 def test_neu_max_2_identische_build_wochen():
     for max_km_val in (40, 46, 55, 70):
         inputs = make_inputs(max_km=max_km_val)
@@ -522,12 +520,12 @@ def test_neu_max_2_identische_build_wochen():
             else:
                 run_len = 1
     print("OK: test_neu_max_2_identische_build_wochen")
- 
- 
+
+
 # ─────────────────────────────────────────────────────────────────────────
 # BUGFIX-TESTS — Cross-Tag-Flexibilitaet, Peak-HM, Taper-Hill-Session, Warning-Konsistenz
 # ─────────────────────────────────────────────────────────────────────────
- 
+
 def test_bugfix_cross_training_tag_flexibel_nicht_immer_montag():
     """Root-Cause-Fix Punkt 1: Cross Training darf sich am Wochenlayout orientieren statt immer den
     ersten freien Tag (i.d.R. Montag) zu nehmen. Verschiedene Wochenstrukturen muessen zu
@@ -554,8 +552,8 @@ def test_bugfix_cross_training_tag_flexibel_nicht_immer_montag():
         f"Cross-Tag sollte sich mit der Wochenstruktur aendern, war fuer alle Kombinationen {cross_days_seen}"
     )
     print(f"OK: test_bugfix_cross_training_tag_flexibel_nicht_immer_montag (gesehene Tage: {sorted(cross_days_seen)})")
- 
- 
+
+
 def test_bugfix_desired_peak_hm_rennverankert():
     """Root-Cause-Fix Punkt 2: compute_desired_peak_hm() war vorher min(race*0.85, avg_hm*1.30) —
     bei einer (mangels HM-Historie) geschaetzten avg_weekly_hm dominierte praktisch immer der
@@ -564,8 +562,8 @@ def test_bugfix_desired_peak_hm_rennverankert():
     desired = gp.compute_desired_peak_hm(avg_weekly_hm=540, race_elevation_m=1246)
     assert desired == 1308.3, f"desired_peak_hm={desired}, erwartet 1308.3 (renn-verankert, nicht mehr 702)"
     print(f"OK: test_bugfix_desired_peak_hm_rennverankert (desired_peak_hm={desired})")
- 
- 
+
+
 def test_bugfix_peak_hm_und_peak_longrun_hm_erreichbar():
     """Bei ausreichender Vorbereitungszeit (17 Wochen) muss die Peak-Woche nahe an die renn-
     verankerte Ziel-HM herankommen (vorher: 702 Ziel, 702 erreicht — aber Ziel selbst zu niedrig).
@@ -586,8 +584,8 @@ def test_bugfix_peak_hm_und_peak_longrun_hm_erreichbar():
     )
     print(f"OK: test_bugfix_peak_hm_und_peak_longrun_hm_erreichbar "
           f"(peak_hm_actual={skel['peak_hm_actual']}, peak_longrun_hm={lr['elevation_gain_m']})")
- 
- 
+
+
 def test_bugfix_peak_longrun_km_hoeher_als_vorher_und_validator_gueltig():
     """Root-Cause-Fix Punkt 3: Peak-Longrun war strukturell auf ~19-20km begrenzt (fixer 42.5%-
     Anteil an einem bereits durch race_distance_km*1.50 gedeckelten Wochenziel). Jetzt renn-
@@ -603,8 +601,8 @@ def test_bugfix_peak_longrun_km_hoeher_als_vorher_und_validator_gueltig():
     assert lr['distance_km'] >= 20.0, f"Peak-Longrun={lr['distance_km']}km, erwartet deutlich > alte ~19.7km"
     assert lr['distance_km'] / peak['target_km'] <= 0.47, "Longrun-Anteil verletzt die Validator-Obergrenze"
     print(f"OK: test_bugfix_peak_longrun_km_hoeher_als_vorher_und_validator_gueltig (peak_longrun_km={lr['distance_km']})")
- 
- 
+
+
 def test_bugfix_taper_keine_hill_session():
     """Root-Cause-Fix Punkt 3 (PDF): in der Taper-Woche darf die (einzige) Quality Session keine
     Hill Session mehr sein (vorher: pick_quality_type waehlte fuer Trail/Mixed IMMER 'Hill Session'
@@ -628,8 +626,8 @@ def test_bugfix_taper_keine_hill_session():
                 )
     assert found_quality, "Testszenario sollte mindestens eine Taper-Quality-Session enthalten"
     print("OK: test_bugfix_taper_keine_hill_session")
- 
- 
+
+
 def test_bugfix_warning_konsistenz_finaler_wert():
     """Root-Cause-Fix Bonusfund: jede 'Laufziel von X auf Y reduziert'-Konfliktmeldung muss den
     tatsaechlich finalen, gespeicherten actual_target_run_km referenzieren (vorher: eine fruehe
@@ -653,12 +651,12 @@ def test_bugfix_warning_konsistenz_finaler_wert():
             checked += 1
     assert checked > 0, "Testszenario sollte mindestens eine Laufziel-Reduktions-Meldung erzeugen"
     print(f"OK: test_bugfix_warning_konsistenz_finaler_wert ({checked} Meldungen geprueft)")
- 
- 
+
+
 # ─────────────────────────────────────────────────────────────────────────
 # DRY RUN — exakte Szenario-Vorgabe aus der Aufgabenstellung
 # ─────────────────────────────────────────────────────────────────────────
- 
+
 def dry_run():
     inputs = dict(
         start_date='2026-08-17', race_date='2026-10-26',
@@ -671,22 +669,22 @@ def dry_run():
     )
     ausdauer_days = gp.validate_inputs(inputs['strength_sessions'], inputs['strength_days'], inputs['days_per_week'])
     assert ausdauer_days == 4, f"ausdauer_days sollte 4 sein, war {ausdauer_days}"
- 
+
     skel = gp.build_full_skeleton(inputs)
     valid, errors = gp.validate_skeleton(skel, inputs['max_km'])
     assert valid, f"DRY RUN Skeleton invalid: {errors}"
- 
+
     dates = skel['dates']
     assert dates['race_day'] == date(2026, 10, 26)
     assert dates['race_dow'] == 1, f"26.10.2026 sollte Montag (dow=1) sein, war {dates['race_dow']}"
- 
+
     race_week = week_by_num(skel, skel['total_weeks'])
     race_sessions = [s for s in race_week['sessions'] if s['session_type'] == 'Race Day']
     assert len(race_sessions) == 1
     race_date_check = race_week['week_date'] + gp.timedelta(days=race_sessions[0]['day_of_week'] - 1)
     assert race_date_check == date(2026, 10, 26), f"Race Day landet auf {race_date_check}, erwartet 2026-10-26"
     print(f"DRY RUN: Race Day exakt {race_date_check} ({'Montag' if dates['race_dow']==1 else '?'}) — OK")
- 
+
     # Kein Longrun So 25.10.2026 (Vorwoche)
     all_lr_dates = []
     for w in skel['weeks']:
@@ -696,14 +694,14 @@ def dry_run():
                 all_lr_dates.append(d)
     assert date(2026, 10, 25) not in all_lr_dates, f"Longrun am 25.10.2026 gefunden: {all_lr_dates}"
     print(f"DRY RUN: kein Longrun am 25.10.2026 — OK (Longrun-Termine: {all_lr_dates[-3:]})")
- 
+
     # Keine Session nach Race Day
     for w in skel['weeks']:
         for s in w['sessions']:
             d = w['week_date'] + gp.timedelta(days=s['day_of_week'] - 1)
             assert d <= date(2026, 10, 26), f"Session am {d} liegt nach Race Day"
     print("DRY RUN: keine Session nach Race Day — OK")
- 
+
     # Rennwoche ohne Quality und ohne Lower/Full Body
     quality_in_race_week = [s for s in race_week['sessions'] if s['session_type'] in gp.QUALITY_TYPES]
     lower_full_in_race_week = [
@@ -713,7 +711,7 @@ def dry_run():
     assert not quality_in_race_week, f"Quality in Rennwoche gefunden: {quality_in_race_week}"
     assert not lower_full_in_race_week, f"Lower/Full Body in Rennwoche gefunden: {lower_full_in_race_week}"
     print("DRY RUN: Rennwoche ohne Quality und ohne Lower/Full Body — OK")
- 
+
     print(f"\nDRY RUN Zusammenfassung: total_weeks={skel['total_weeks']}, "
           f"desired_peak_km={skel['desired_peak_km']}, peak_km_actual={skel['peak_km_actual']}, "
           f"desired_peak_hm={round(skel['desired_peak_hm'])}, peak_hm_actual={round(skel['peak_hm_actual'] or 0)}")
@@ -725,10 +723,10 @@ def dry_run():
         print("  Konflikte (dokumentiert):")
         for c in skel['conflicts']:
             print(f"    - {c}")
- 
+
     print("\nDRY RUN: ALLE ERWARTUNGEN ERFÜLLT")
- 
- 
+
+
 def dry_run_16_wochen():
     """16-Wochen-Dry-Run, wie im PDF-Szenario gefordert (36 km/Woche historische Laufbasis, 1x
     Cross Training/Rennrad, Trailrennen 31km/1246 HM). Zeigt zusaetzlich zur Standard-Zusammenfassung
@@ -746,7 +744,7 @@ def dry_run_16_wochen():
     valid, errors = gp.validate_skeleton(skel, inputs['max_km'])
     assert valid, f"DRY RUN (16 Wochen) Skeleton invalid: {errors}"
     assert skel['total_weeks'] == 16, f"total_weeks={skel['total_weeks']}, erwartet 16"
- 
+
     print(f"\nDRY RUN (16 Wochen, PDF-Szenario): historical_run_baseline_km={skel['historical_run_baseline_km']}, "
           f"cross_replaces_run={skel['cross_replaces_run']}, desired_peak_km={skel['desired_peak_km']}, "
           f"peak_km_actual={skel['peak_km_actual']}, desired_peak_hm={round(skel['desired_peak_hm'], 1)}, "
@@ -763,8 +761,8 @@ def dry_run_16_wochen():
         for c in skel['conflicts']:
             print(f"    - {c}")
     print("\nDRY RUN (16 Wochen): ALLE ERWARTUNGEN ERFÜLLT")
- 
- 
+
+
 if __name__ == '__main__':
     tests = [
         test_race_day_montag,
@@ -815,7 +813,7 @@ if __name__ == '__main__':
         except Exception as e:
             failed.append((t.__name__, str(e)))
             print(f"ERROR: {t.__name__}: {e}")
- 
+
     print()
     if failed:
         print(f"{len(failed)}/{len(tests)} TESTS FEHLGESCHLAGEN")
@@ -824,15 +822,13 @@ if __name__ == '__main__':
         raise SystemExit(1)
     else:
         print(f"ALLE {len(tests)} TESTS GRÜN")
- 
+
     print("\n" + "=" * 70)
     print("DRY RUN")
     print("=" * 70)
     dry_run()
- 
+
     print("\n" + "=" * 70)
     print("DRY RUN (16 WOCHEN, PDF-SZENARIO)")
     print("=" * 70)
     dry_run_16_wochen()
- 
-
