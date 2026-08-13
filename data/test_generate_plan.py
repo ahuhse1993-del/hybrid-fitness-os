@@ -653,6 +653,34 @@ def test_bugfix_warning_konsistenz_finaler_wert():
     print(f"OK: test_bugfix_warning_konsistenz_finaler_wert ({checked} Meldungen geprueft)")
 
 
+def test_bugfix_flavor_field_maxlen_verhindert_db_crash():
+    """Root-Cause-Fix: die GitHub-Actions-Live-Verifikation (job gha-verify-1786620435) crashte im
+    training_plan-INSERT mit psycopg2.errors.StringDataRightTruncation ('value too long for type
+    character varying(20)'), weil das LLM einen session_zone-Wert (DB-Spalte VARCHAR(20)) laenger
+    als 20 Zeichen zurueckgab und keine Stelle im Code das vor dem INSERT abgefangen hat.
+    clamp_flavor_field_lengths() muss ueberlange session_zone/main_pace-Werte auf die tatsaechliche
+    DB-Spaltenlaenge kuerzen (20 bzw. 50 Zeichen), kurze Werte unveraendert lassen und Nicht-Strings
+    (None, Zahlen) unangetastet durchreichen."""
+    zu_lang_zone = "Zone 2 (aerober Grundlagenbereich)"  # 35 Zeichen, > 20
+    zu_lang_pace = "irgendwo zwischen 4:00 und 4:30 pro Kilometer, je nach Tagesform"  # > 50 Zeichen
+    llm_data = {
+        'day_of_week': 3, 'notes': 'Ruhiger Lauf.', 'session_zone': zu_lang_zone,
+        'main_pace': zu_lang_pace, 'warmup_km': None, 'main_sets': 4,
+    }
+    result = gp.clamp_flavor_field_lengths(dict(llm_data))
+    assert len(result['session_zone']) <= 20, f"session_zone zu lang: {result['session_zone']!r}"
+    assert len(result['main_pace']) <= 50, f"main_pace zu lang: {result['main_pace']!r}"
+    assert result['session_zone'] == zu_lang_zone[:20].rstrip()
+    assert result['notes'] == 'Ruhiger Lauf.', "notes (kein Laengenlimit) darf nicht veraendert werden"
+    assert result['warmup_km'] is None
+    assert result['main_sets'] == 4
+
+    kurz = gp.clamp_flavor_field_lengths({'session_zone': 'Zone 2', 'main_pace': '4:15/km'})
+    assert kurz['session_zone'] == 'Zone 2', "kurze Werte duerfen nicht veraendert werden"
+    assert kurz['main_pace'] == '4:15/km'
+    print("OK: test_bugfix_flavor_field_maxlen_verhindert_db_crash")
+
+
 # ─────────────────────────────────────────────────────────────────────────
 # DRY RUN — exakte Szenario-Vorgabe aus der Aufgabenstellung
 # ─────────────────────────────────────────────────────────────────────────
@@ -802,6 +830,7 @@ if __name__ == '__main__':
         test_bugfix_peak_longrun_km_hoeher_als_vorher_und_validator_gueltig,
         test_bugfix_taper_keine_hill_session,
         test_bugfix_warning_konsistenz_finaler_wert,
+        test_bugfix_flavor_field_maxlen_verhindert_db_crash,
     ]
     failed = []
     for t in tests:

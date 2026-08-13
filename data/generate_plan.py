@@ -59,6 +59,12 @@ FLAVOR_FIELDS = ('notes', 'session_zone', 'warmup_km', 'warmup_min', 'main_sets'
                   'main_distance_m', 'main_pace', 'recovery_m', 'cooldown_km', 'cooldown_min')
 FIXED_FIELDS = ('day_of_week', 'session_type', 'distance_km', 'elevation_gain_m', 'duration_min')
 
+# DB-Spaltenlaengen (training_plan) fuer String-Flavor-Felder, die das LLM frei befuellt. Der
+# Prompt bittet um kurze Werte, aber ohne harten Cutoff crasht ein zu langer LLM-Wert den INSERT
+# mit psycopg2.errors.StringDataRightTruncation (character varying(N)) erst NACH bereits erfolgtem
+# plan-metadata-INSERT, mitten in der Session-Insert-Schleife.
+FLAVOR_FIELD_MAXLEN = {'session_zone': 20, 'main_pace': 50}
+
 
 class SkeletonError(Exception):
     """Eingabefehler oder ungültiges Skelett — es wird kein Plan erzeugt, kein LLM-Aufruf."""
@@ -437,6 +443,17 @@ def pick_quality_type(index, terrain, phase=None):
     else:
         types = ['Tempo Session', 'Interval Session', 'Sprint Session']
     return types[index % len(types)]
+
+
+def clamp_flavor_field_lengths(llm_data):
+    """Schneidet LLM-generierte Flavor-Felder auf die DB-Spaltenlaenge (FLAVOR_FIELD_MAXLEN), damit
+    ein zu langer Wert (LLM ignoriert den Prompt-Hinweis) nicht mehr den training_plan-INSERT mit
+    StringDataRightTruncation crasht. Aendert llm_data in-place und gibt es zurueck."""
+    for f, maxlen in FLAVOR_FIELD_MAXLEN.items():
+        v = llm_data.get(f)
+        if isinstance(v, str) and len(v) > maxlen:
+            llm_data[f] = v[:maxlen].rstrip()
+    return llm_data
 
 
 def pick_cross_training_days(candidate_days, cross_count, hard_days):
@@ -1377,6 +1394,7 @@ def enrich_week_with_llm(client, week, terrain, routine_by_category, context_not
 
 Diese Felder sind FIX und dürfen NICHT geändert werden: day_of_week, session_type, distance_km, elevation_gain_m, duration_min.
 Du darfst NUR folgende Felder ergänzen: notes, session_zone, warmup_km, warmup_min, main_sets, main_distance_m, main_pace, recovery_m, cooldown_km, cooldown_min.
+session_zone: max. 20 Zeichen (z.B. "Zone 2", "Schwelle", "VO2max"). main_pace: max. 50 Zeichen (z.B. "4:15-4:30/km").
 
 Für Quality Sessions (Tempo/Interval/Sprint/Hill Session): fülle warmup_km, warmup_min, main_sets, main_distance_m, main_pace, recovery_m, cooldown_km, cooldown_min passend zu distance_km/duration_min. notes fasst das in einem Satz zusammen.
 Für Strength Training gilt zwingend:
@@ -1400,7 +1418,7 @@ Antworte NUR mit JSON: {{"sessions": [{{"day_of_week": 1, "notes": "...", "sessi
             m = re.search(r'\{[\s\S]*"sessions"[\s\S]*\}', raw)
             if m:
                 raw = m.group(0)
-        enrichment = json.loads(raw).get('sessions', [])
+        enrichment = [clamp_flavor_field_lengths(e) for e in json.loads(raw).get('sessions', [])]
         print(f"DEBUG: LLM enrichment Woche {week['week_number']} ok, {len(enrichment)} sessions")
     except Exception as e:
         print(f"LLM Enrichment Fehler Woche {week['week_number']}: {e}")
