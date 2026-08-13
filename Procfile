@@ -1,1 +1,1 @@
-web: python -m coach.api
+web: uvicorn coach.main:app --host 0.0.0.0 --port $PORT
