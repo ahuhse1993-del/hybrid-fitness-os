@@ -143,9 +143,25 @@ def compute_phase_map(total_weeks):
 def compute_weekly_progression(phase_by_week, total_weeks, start_value, desired_peak, max_value,
                                 deload_pct=0.775, taper_pct=0.70, race_pct=0.35,
                                 race_week_available_ratio=1.0):
-    """Generische +10%/Woche-Progression, unabhängig für km ODER hm aufrufbar.
+    """Progression über die Belastungswochen (BASE/BUILD/PEAK), unabhängig für km ODER hm aufrufbar.
     Nach einem Deload wird die nächste Belastungswoche gegen die letzte Belastungswoche VOR
-    dem Deload verglichen (last_load wird während DELOAD nicht aktualisiert)."""
+    dem Deload verglichen (last_load wird während DELOAD nicht aktualisiert).
+
+    Statt naiv jede Woche maximal +10% zu wachsen (was die Zielobergrenze oft schon Wochen vor
+    der eigentlichen Peak-Woche erreicht und danach mehrfach identisch plateauen lässt — siehe
+    BUILD-PLATEAU-Regeln), wird die ideale GLEICHMÄSSIGE geometrische Wachstumsrate über alle
+    Belastungswochen bis zur Peak-Woche berechnet und als Schrittweite verwendet (weiterhin
+    gedeckelt bei max. +10%/Woche als Sicherheitsobergrenze). Ist selbst +10%/Woche zu wenig um
+    das Ziel rechtzeitig zu erreichen (desired_peak zu hoch für die verfügbare Zeit), bleibt die
+    bisherige Maximalprogression aktiv und die Peak-Woche erreicht das Ziel entsprechend nicht."""
+    load_week_nums = [w for w in range(1, total_weeks + 1) if phase_by_week.get(w) in ('BASE', 'BUILD', 'PEAK')]
+    n_load_weeks = len(load_week_nums)
+    if n_load_weeks >= 2 and start_value > 0 and desired_peak > start_value:
+        ideal_ratio = (desired_peak / start_value) ** (1 / (n_load_weeks - 1))
+    else:
+        ideal_ratio = 1.10
+    step_ratio = min(1.10, ideal_ratio)
+
     targets = {}
     last_load = start_value
     peak_actual = None
@@ -156,7 +172,7 @@ def compute_weekly_progression(phase_by_week, total_weeks, start_value, desired_
             if week_num == 1:
                 candidate = min(start_value, max_value)
             else:
-                candidate = min(last_load * 1.10, desired_peak, max_value)
+                candidate = min(last_load * step_ratio, desired_peak, max_value)
             candidate = min(candidate, max_value)
             targets[week_num] = round(candidate, 1)
             last_load = candidate
@@ -172,6 +188,32 @@ def compute_weekly_progression(phase_by_week, total_weeks, start_value, desired_
             targets[week_num] = round(reference * race_pct * race_week_available_ratio, 1)
 
     return targets, peak_actual
+
+
+def enforce_max_plateau(targets, phase_by_week, load_phases, conflicts, label, max_run=2):
+    """BUILD-PLATEAU Regel 13: maximal 2 identische aufeinanderfolgende Belastungswochen. Bei
+    einer 3. (oder weiteren) identischen Woche in Folge wird leicht reduziert und dokumentiert —
+    ein Sicherheitsnetz für Fälle, in denen die geometrische Glättung (compute_weekly_progression)
+    wegen einer bindenden Obergrenze (max_km/race_distance_km) trotzdem ins Plateau läuft."""
+    weeks_sorted = sorted(w for w in targets if phase_by_week.get(w) in load_phases)
+    i = 0
+    while i < len(weeks_sorted):
+        j = i + 1
+        while j < len(weeks_sorted) and targets[weeks_sorted[j]] == targets[weeks_sorted[i]]:
+            j += 1
+        run_len = j - i
+        if run_len > max_run:
+            for k in range(i + max_run, j):
+                wk = weeks_sorted[k]
+                steps = k - (i + max_run) + 1
+                new_val = round(targets[wk] * (1 - 0.02 * steps), 1)
+                conflicts.append(
+                    f"Woche {wk}: {label} von {targets[wk]} auf {new_val} reduziert — maximal "
+                    f"{max_run} identische Belastungswochen in Folge erlaubt."
+                )
+                targets[wk] = new_val
+        i = j
+    return targets
 
 
 def apply_partial_week1_reduction(targets, actual_start_day):
@@ -206,34 +248,62 @@ def compute_longrun_km(target_km, phase, race_distance_km):
 
 
 def compute_longrun_progression(phase_by_week, total_weeks, avg_weekly_km, km_targets, race_distance_km):
-    """Longrun hat eine EIGENE, von target_km unabhängige +10%/Woche-Progressionskette. Pro Woche gilt
-    die NIEDRIGERE der beiden Distanzen: Zielanteil (compute_longrun_km) vs. Progressionskette.
-    Initialer Longrun (kein Datenpunkt, Woche 1): 35-38% von avg_weekly_km (Mittelwert 36.5%), NICHT
-    von target_km — verhindert dass ein zu niedriges/hohes Wochenziel den ersten Longrun verzerrt.
+    """Longrun als Quote von target_km, wobei die Quote selbst über die Belastungswochen linear von
+    36.5% (Mittelwert 35-38%, Woche 1) auf 42.5% (Mittelwert bis 45%, Peak-Woche) ansteigt.
+
+    Eine rein unabhängige geometrische Progression (nur am Startwert und am Zielwert der Peak-Woche
+    orientiert) driftet bei langen Plänen von target_km's eigener Kurve ab, weil beide Kurven mit
+    unterschiedlichen Raten wachsen — nach vielen Wochen kann der Longrun-Anteil dadurch schon lange
+    vor der Peak-Woche über die 40%-Grenze steigen. Die quote-basierte Berechnung hält den Anteil pro
+    Woche IMMER innerhalb [36.5%, 42.5%] (sicher unter den 40%/45%-Validator-Obergrenzen), UND wächst
+    dabei automatisch mit, da target_km selbst wöchentlich wächst. Zusätzlich als Sicherheitsnetz
+    weiterhin max. +10%/Woche gegenüber der letzten Belastungswoche.
+
     Nach einem Deload vergleicht die nächste Belastungswoche weiterhin gegen den letzten NORMALEN
-    Belastungs-Longrun (die Kette wird während DELOAD nicht aktualisiert)."""
+    Belastungs-Longrun (die Kette wird während DELOAD/TAPER nicht aktualisiert)."""
+    load_week_nums = [w for w in range(1, total_weeks + 1) if phase_by_week.get(w) in ('BASE', 'BUILD', 'PEAK')]
+    START_FRACTION = 0.365      # Mittelwert 35-38%
+    BASE_BUILD_CEILING = 0.395  # sicher unter der 40%-Validator-Obergrenze für Nicht-Peak-Wochen
+    PEAK_FRACTION = 0.425       # Mittelwert bis 45%, nur für die tatsächliche Peak-Woche
+
+    # Interpolation läuft NUR über BASE/BUILD-Wochen (Ziel: 39.5%, sicher unter 40%). Die PEAK-Woche
+    # bekommt die Quote fix — sonst nähert sich die Interpolation kurz vor der Peak-Woche schon der
+    # 42.5%-Peak-Quote an, obwohl für BUILD-Wochen nur 40% erlaubt sind (Validator prüft phasenabhängig).
+    non_peak_load_weeks = [w for w in load_week_nums if phase_by_week.get(w) != 'PEAK']
+    n_non_peak = len(non_peak_load_weeks)
+
+    fraction_by_week = {}
+    for idx, wn in enumerate(non_peak_load_weeks):
+        progress = idx / (n_non_peak - 1) if n_non_peak > 1 else 1.0
+        fraction_by_week[wn] = START_FRACTION + (BASE_BUILD_CEILING - START_FRACTION) * progress
+    for wn in load_week_nums:
+        if phase_by_week.get(wn) == 'PEAK':
+            fraction_by_week[wn] = PEAK_FRACTION
+
+    start_value = round(avg_weekly_km * START_FRACTION, 1)
+    ceiling = race_distance_km * 0.80
+
     longrun_by_week = {}
     last_normal_longrun = None
-    ceiling = race_distance_km * 0.80
 
     for week_num in range(1, total_weeks + 1):
         phase = phase_by_week.get(week_num, 'BUILD')
-        target_km = km_targets.get(week_num, 0)
 
         if phase in ('BASE', 'BUILD', 'PEAK'):
-            fraction_based = compute_longrun_km(target_km, phase, race_distance_km)
+            target_km = km_targets.get(week_num, 0)
+            fraction_based = round(target_km * fraction_by_week.get(week_num, START_FRACTION), 1)
             if last_normal_longrun is None:
-                progression_based = round(avg_weekly_km * 0.365, 1)  # Mittelwert von 35-38%
+                candidate = fraction_based if fraction_based > 0 else start_value
             else:
-                progression_based = round(last_normal_longrun * 1.10, 1)
-            value = round(min(fraction_based, progression_based, ceiling), 1)
+                candidate = min(fraction_based, round(last_normal_longrun * 1.10, 1))
+            value = round(min(candidate, ceiling), 1)
             longrun_by_week[week_num] = value
             last_normal_longrun = value
         elif phase == 'DELOAD':
-            reference = last_normal_longrun if last_normal_longrun is not None else avg_weekly_km * 0.365
+            reference = last_normal_longrun if last_normal_longrun is not None else start_value
             longrun_by_week[week_num] = round(min(reference * 0.775, ceiling), 1)
         elif phase == 'TAPER':
-            reference = last_normal_longrun if last_normal_longrun is not None else avg_weekly_km * 0.365
+            reference = last_normal_longrun if last_normal_longrun is not None else start_value
             longrun_by_week[week_num] = round(min(reference * 0.70, ceiling), 1)
         # RACE: kein Longrun (build_week_skeleton platziert ohnehin keinen)
 
@@ -317,9 +387,12 @@ def pick_quality_type(index, terrain):
 def build_week_skeleton(week_num, phase, race_dow, is_race_week, actual_start_day, is_week1,
                          long_run_day, strength_days, quality_sessions_input, cross_training,
                          cross_training_days, ausdauer_days, terrain, conflicts,
-                         week_monday=None, race_day=None, prev_week_longrun_day=None):
+                         week_monday=None, race_day=None, prev_week_longrun_day=None,
+                         is_final_taper_week=False):
     """TERMINIERUNG Schritt 1-7. Gibt eine sortierte Liste von Session-Skeletten
-    (ohne distance_km/elevation_gain_m/duration_min, die kommen erst danach) zurück."""
+    (ohne distance_km/elevation_gain_m/duration_min, die kommen erst danach) zurück.
+    is_final_taper_week: die Kalenderwoche unmittelbar vor der Rennwoche (Klarstellung 3) —
+    dort gilt Sonntag zwingend als Rest und Cross Training nur früh in der Woche (Regel 16)."""
     sessions = []
 
     available_days = set(range(1, 8))
@@ -327,6 +400,8 @@ def build_week_skeleton(week_num, phase, race_dow, is_race_week, actual_start_da
         available_days = set(range(actual_start_day, 8))
     if is_race_week:
         available_days = {d for d in available_days if d <= race_dow}  # keine Sessions nach Race Day
+    if is_final_taper_week:
+        available_days.discard(7)  # Sonntag = zwingend Rest (Regel 16)
 
     reserved = set()
 
@@ -335,18 +410,21 @@ def build_week_skeleton(week_num, phase, race_dow, is_race_week, actual_start_da
         sessions.append({'day_of_week': race_dow, 'session_type': 'Race Day'})
         reserved.add(race_dow)
 
-    # 2. Longrun (ausser Rennwoche, nur wenn Datum im Planzeitraum, und nie am Tag direkt vor Race Day)
+    # 2. Longrun (ausser Rennwoche, nur wenn Datum im Planzeitraum). Regel 15: der letzte längere
+    # Lauf muss mindestens 8 Tage vor Race Day liegen — in der letzten Taper-Woche ist das für
+    # KEINEN Tag mehr erfüllbar (siehe Klarstellung 3), daher entfällt der Longrun dort komplett.
     longrun_placed_day = None
-    longrun_is_day_before_race = False
+    longrun_too_close_to_race = False
     if week_monday is not None and race_day is not None and long_run_day in available_days:
         longrun_date = week_monday + timedelta(days=long_run_day - 1)
-        longrun_is_day_before_race = (longrun_date == race_day - timedelta(days=1))
-    if not is_race_week and not longrun_is_day_before_race and long_run_day in available_days:
+        days_before_race = (race_day - longrun_date).days
+        longrun_too_close_to_race = days_before_race < 8
+    if not is_race_week and not longrun_too_close_to_race and long_run_day in available_days:
         longrun_placed_day = long_run_day
         sessions.append({'day_of_week': long_run_day, 'session_type': 'Long Run'})
         reserved.add(long_run_day)
-    elif longrun_is_day_before_race and not is_race_week:
-        conflicts.append(f"Woche {week_num}: Longrun-Tag {long_run_day} fällt auf den Tag vor Race Day, "
+    elif longrun_too_close_to_race and not is_race_week:
+        conflicts.append(f"Woche {week_num}: Longrun-Tag {long_run_day} liegt weniger als 8 Tage vor Race Day, "
                           f"Longrun entfällt (nur Shakeout/Easy erlaubt).")
 
     # 3. Gymtage reservieren (Kollision Race Day/Longrun -> Gym entfällt, wird NICHT nachgeholt)
@@ -404,14 +482,22 @@ def build_week_skeleton(week_num, phase, race_dow, is_race_week, actual_start_da
         conflicts.append(f"Woche {week_num}: kein geeigneter Lower-Body-Slot verfügbar, alle Gymtage als Upper Body.")
     reserved |= set(gym_days)
 
-    # 5. Cross Training platzieren (ersetzt Easy Run)
+    # 5. Cross Training platzieren (ersetzt Easy Run). Regel 10/11: Cross bleibt auch im Deload
+    # bestehen (nur Dauer/Intensität werden reduziert, siehe compute_duration_min-Nachbearbeitung
+    # weiter unten) — wird NICHT durch einen Easy Run ersetzt. Regel 16: in der letzten Taper-
+    # Woche nur früh in der Woche (Tag 1-3), locker.
     remaining_days = sorted(available_days - reserved)
     cross_count = 0
-    if cross_training and not is_race_week and phase != 'DELOAD' and cross_training_days > 0:
-        cross_count = min(cross_training_days, len(remaining_days))
-        for d in remaining_days[:cross_count]:
+    if cross_training and not is_race_week and cross_training_days > 0:
+        if is_final_taper_week:
+            candidate_days = [d for d in remaining_days if d <= 3] + [d for d in remaining_days if d > 3]
+        else:
+            candidate_days = remaining_days
+        cross_count = min(cross_training_days, len(candidate_days))
+        chosen_cross_days = sorted(candidate_days[:cross_count])
+        for d in chosen_cross_days:
             sessions.append({'day_of_week': d, 'session_type': 'Cross Training'})
-        reserved |= set(remaining_days[:cross_count])
+        reserved |= set(chosen_cross_days)
 
     # 6. Easy Runs platzieren
     remaining_days = sorted(available_days - reserved)
@@ -426,51 +512,96 @@ def build_week_skeleton(week_num, phase, race_dow, is_race_week, actual_start_da
     return sorted(sessions, key=lambda s: s['day_of_week'])
 
 
-def distribute_week_km(target_km, phase, sessions, race_distance_km, longrun_km_override=None):
-    """Verteilt target_km deterministisch auf die Sessions einer Woche. Summe == target_km
-    (Rundungsdifferenz wird auf Easy Runs gebucht). Race Day zählt NICHT ins Wochenvolumen.
-    longrun_km_override: vorberechneter Wert aus compute_longrun_progression() (eigene
-    +10%/Woche-Kette, ggf. niedriger als der reine Zielanteil) — falls None, wird der reine
-    Zielanteil verwendet (Fallback, z.B. für Tests die die Progressionskette nicht brauchen)."""
+def distribute_week_km(target_km, phase, sessions, race_distance_km, longrun_km_override=None,
+                        conflicts=None, week_num=None):
+    """Verteilt Laufkilometer deterministisch auf die Sessions einer Woche. Race Day zählt NICHT
+    ins Wochenvolumen. Gibt (sessions, actual_target_run_km) zurück.
+
+    CROSS ALS LAUFERSATZ (Regeln 1-5, Klarstellung 1): target_km ist das reine, unbeeinflusste
+    Progressions-Laufziel (base_target_run_km). Cross-Sessions reduzieren die TATSÄCHLICH zu
+    verteilenden Laufkilometer (actual_target_run_km) um insgesamt maximal 20% — unabhängig davon
+    ob 1 oder mehrere Cross-Sessions geplant sind (cross_reduction_factor = min(0.20,
+    cross_sessions*0.20)); weitere Cross-Sessions verteilen nur target_cross_minutes auf mehrere
+    Einheiten, reduzieren aber nicht zusätzlich.
+
+    SESSION-VERTEILUNG bei 3 Läufen/Woche (Regeln 6-9, Klarstellung 2): Longrun zuerst aus der
+    sicheren Progressionskette (longrun_km_override) gesetzt — wird durch Cross NICHT reduziert.
+    Quality erhält 20-25% von actual_target_run_km. Easy erhält den Rest, begrenzt auf das Minimum
+    aus (Longrun-Distanz, 35% von actual_target_run_km, 14.9km — NIEMALS 15-19km). Verletzt der
+    Rest diese Grenze, wird NUR actual_target_run_km über den Easy-Anteil reduziert (Longrun bleibt
+    unangetastet) und ein Konflikt dokumentiert; die tatsächlich verteilten Sessionkilometer
+    entsprechen danach exakt dem reduzierten actual_target_run_km."""
+    conflicts = conflicts if conflicts is not None else []
+
     longrun = [s for s in sessions if s['session_type'] == 'Long Run']
     quality = [s for s in sessions if s['session_type'] in QUALITY_TYPES]
     easy = [s for s in sessions if s['session_type'] in ENDURANCE_RUN_TYPES]
+    cross_count = len([s for s in sessions if s['session_type'] == 'Cross Training'])
 
-    remaining = target_km
+    cross_reduction_factor = min(0.20, cross_count * 0.20)
+    actual_target_run_km = round(target_km * (1 - cross_reduction_factor), 1)
 
+    # 1. Longrun zuerst, aus der sicheren Progressionskette.
+    longrun_km = 0
     for s in longrun:
         if not easy and not quality:
             # Longrun ist die einzige Laufsession der Woche (z.B. sehr wenige Ausdauertage) ->
             # trägt das gesamte Wochenvolumen statt nur des üblichen 35-40%-Anteils.
-            km = round(min(target_km, race_distance_km * 0.80), 1)
+            km = round(min(actual_target_run_km, race_distance_km * 0.80), 1)
         elif longrun_km_override is not None:
             km = longrun_km_override
         else:
-            km = compute_longrun_km(target_km, phase, race_distance_km)
+            km = compute_longrun_km(actual_target_run_km, phase, race_distance_km)
         s['distance_km'] = km
-        remaining -= km
+        longrun_km = km
 
-    quality_total = round(min(target_km * 0.225, max(remaining, 0)), 1)
+    # 2. Quality: 20-25% von actual_target_run_km.
+    quality_total = round(min(actual_target_run_km * 0.225, max(actual_target_run_km - longrun_km, 0)), 1)
     if quality:
         per_quality = round(quality_total / len(quality), 1)
         for s in quality:
             s['distance_km'] = per_quality
-        remaining -= per_quality * len(quality)
+        quality_total = round(per_quality * len(quality), 1)
+    else:
+        quality_total = 0
 
+    # 3. Easy: Rest, mit Obergrenzen (Regel 9).
+    remaining = round(actual_target_run_km - longrun_km - quality_total, 1)
     if easy:
-        per_easy = remaining / len(easy)
+        n = len(easy)
+        per_easy = remaining / n
+        max_easy = min(
+            longrun_km if longrun_km > 0 else remaining,
+            actual_target_run_km * 0.35,
+            14.9,  # NIEMALS 15-19km aufblasen (Regel 9)
+        )
+        if per_easy > max_easy + 0.05:
+            new_remaining = round(max_easy * n, 1)
+            new_actual = round(longrun_km + quality_total + new_remaining, 1)
+            conflicts.append(
+                f"Woche {week_num}: actual_target_run_km von {actual_target_run_km} auf {new_actual} reduziert — "
+                f"Easy Run hätte sonst {per_easy:.1f}km betragen (Obergrenze {max_easy:.1f}km: nicht länger als "
+                f"Longrun, max. 35% des Laufziels, nie 15-19km)."
+            )
+            actual_target_run_km = new_actual
+            remaining = new_remaining
+            per_easy = max_easy
         for s in easy:
             s['distance_km'] = round(max(per_easy, 0), 1)
         assigned = sum(s['distance_km'] for s in sessions
                         if s['session_type'] in ENDURANCE_RUN_TYPES or s['session_type'] == 'Long Run'
                         or s['session_type'] in QUALITY_TYPES)
-        diff = round(target_km - assigned, 1)
-        easy[-1]['distance_km'] = round(max(easy[-1]['distance_km'] + diff, 0), 1)
+        diff = round(actual_target_run_km - assigned, 1)
+        # Rundungsdifferenz nur verbuchen wenn dadurch die Easy-Obergrenze nicht verletzt wird
+        if easy[-1]['distance_km'] + diff <= max_easy + 0.05:
+            easy[-1]['distance_km'] = round(max(easy[-1]['distance_km'] + diff, 0), 1)
+        else:
+            actual_target_run_km = round(actual_target_run_km - diff, 1)
     elif quality:
         # keine Easy Runs diese Woche -> Rundungsdifferenz auf die letzte Quality Session buchen
         assigned = sum(s['distance_km'] for s in sessions
                         if s['session_type'] == 'Long Run' or s['session_type'] in QUALITY_TYPES)
-        diff = round(target_km - assigned, 1)
+        diff = round(actual_target_run_km - assigned, 1)
         quality[-1]['distance_km'] = round(max(quality[-1]['distance_km'] + diff, 0), 1)
 
     for s in sessions:
@@ -479,7 +610,7 @@ def distribute_week_km(target_km, phase, sessions, race_distance_km, longrun_km_
         if s['session_type'] == 'Race Day':
             s['distance_km'] = race_distance_km
 
-    return sessions
+    return sessions, actual_target_run_km
 
 
 def distribute_week_hm(target_hm, sessions, terrain, race_elevation_m):
@@ -528,6 +659,47 @@ def distribute_week_hm(target_hm, sessions, terrain, race_elevation_m):
             s['elevation_gain_m'] = race_elevation_m
 
     return sessions
+
+
+def enforce_final_taper_week_constraints(sessions, actual_target_run_km, week_num, conflicts):
+    """Regel 16 (letzte Woche vor Race Day): kein einzelner Easy Run > 8km, Freitag+Samstag
+    zusammen maximal 12-14km, Sonntag = Rest (bereits durch build_week_skeleton sichergestellt).
+    Regel 17: das Wochenziel darf dabei unterschritten werden statt unvernünftige Sessions zu
+    erzwingen — die Reduktion wird dokumentiert, kein harter Fehler."""
+    changed = False
+
+    for s in sessions:
+        if s['session_type'] in ENDURANCE_RUN_TYPES and s.get('distance_km', 0) > 8.0:
+            conflicts.append(
+                f"Woche {week_num} (letzte Taper-Woche): Easy Run von {s['distance_km']}km auf "
+                f"8.0km reduziert (Regel 16, Klarstellung 17: Prozentziel darf unterschritten werden)."
+            )
+            s['distance_km'] = 8.0
+            changed = True
+
+    fri = next((s for s in sessions if s['day_of_week'] == 5), None)
+    sat = next((s for s in sessions if s['day_of_week'] == 6), None)
+    fri_km = fri.get('distance_km', 0) if fri else 0
+    sat_km = sat.get('distance_km', 0) if sat else 0
+    combined = round(fri_km + sat_km, 1)
+    if combined > 14.0 and combined > 0:
+        scale = 13.0 / combined
+        if fri:
+            fri['distance_km'] = round(fri_km * scale, 1)
+        if sat:
+            sat['distance_km'] = round(sat_km * scale, 1)
+        conflicts.append(
+            f"Woche {week_num} (letzte Taper-Woche): Fr+Sa von {combined}km auf ~13.0km reduziert "
+            f"(Regel 16: max. 12-14km zusammen)."
+        )
+        changed = True
+
+    if changed:
+        actual_target_run_km = round(sum(
+            s.get('distance_km', 0) for s in sessions if s['session_type'] != 'Race Day'
+        ), 1)
+
+    return actual_target_run_km
 
 
 def parse_pace_to_min_per_km(pace_str):
@@ -597,11 +769,15 @@ def build_full_skeleton(inputs):
     available_days_before_race = dates['race_dow'] - 1
     race_week_ratio = available_days_before_race / 6
 
+    conflicts = []
+
     km_targets, peak_km_actual = compute_weekly_progression(
         phase_by_week, total_weeks, avg_weekly_km, desired_peak_km, max_km,
         race_week_available_ratio=race_week_ratio,
     )
     km_targets = apply_partial_week1_reduction(km_targets, dates['actual_start_day'])
+    load_phases = ('BASE', 'BUILD', 'PEAK')
+    km_targets = enforce_max_plateau(km_targets, phase_by_week, load_phases, conflicts, 'target_km', max_run=2)
 
     hm_targets, peak_hm_actual = compute_weekly_progression(
         phase_by_week, total_weeks, avg_weekly_hm, desired_peak_hm, desired_peak_hm * 1.5,
@@ -610,12 +786,10 @@ def build_full_skeleton(inputs):
     hm_targets = apply_partial_week1_reduction(hm_targets, dates['actual_start_day'])
 
     longrun_targets = compute_longrun_progression(phase_by_week, total_weeks, avg_weekly_km, km_targets, race_distance_km)
+    longrun_targets = apply_partial_week1_reduction(longrun_targets, dates['actual_start_day'])
 
-    conflicts = []
-
-    # Identische aufeinanderfolgende Belastungswochen (Zieldecke vor der eigentlichen Peak-Woche
-    # erreicht) sind zulässig, müssen aber dokumentiert werden statt stillschweigend zu passieren.
-    load_phases = ('BASE', 'BUILD', 'PEAK')
+    # Identische aufeinanderfolgende Belastungswochen (max. 2 erlaubt, siehe enforce_max_plateau
+    # oben) sind zulässig, müssen aber dokumentiert werden statt stillschweigend zu passieren.
     for week_num in range(2, total_weeks + 1):
         phase = phase_by_week.get(week_num)
         prev_phase = phase_by_week.get(week_num - 1)
@@ -636,6 +810,8 @@ def build_full_skeleton(inputs):
         is_week1 = (week_num == 1)
         week_monday = dates['start_monday'] + timedelta(weeks=week_num - 1)
 
+        is_final_taper_week = (week_num == total_weeks - 1) and phase == 'TAPER'
+
         sessions = build_week_skeleton(
             week_num=week_num, phase=phase, race_dow=dates['race_dow'],
             is_race_week=is_race_week, actual_start_day=dates['actual_start_day'], is_week1=is_week1,
@@ -645,20 +821,33 @@ def build_full_skeleton(inputs):
             terrain=terrain, conflicts=conflicts,
             week_monday=week_monday, race_day=dates['race_day'],
             prev_week_longrun_day=prev_week_longrun_day,
+            is_final_taper_week=is_final_taper_week,
         )
         this_longrun = next((s['day_of_week'] for s in sessions if s['session_type'] == 'Long Run'), None)
         prev_week_longrun_day = this_longrun
-        sessions = distribute_week_km(
+        sessions, actual_target_run_km = distribute_week_km(
             km_targets.get(week_num, 0), phase, sessions, race_distance_km,
             longrun_km_override=longrun_targets.get(week_num),
+            conflicts=conflicts, week_num=week_num,
         )
         sessions = distribute_week_hm(hm_targets.get(week_num, 0), sessions, terrain, race_elevation_m)
+
+        if is_final_taper_week:
+            # Regel 16: letzte Woche vor Race Day — Fr+Sa zusammen max 12-14km, kein Easy > 8km.
+            actual_target_run_km = enforce_final_taper_week_constraints(sessions, actual_target_run_km, week_num, conflicts)
 
         for s in sessions:
             s['duration_min'] = compute_duration_min(
                 s['session_type'], s.get('distance_km', 0), s.get('elevation_gain_m', 0),
                 terrain, inputs.get('athlete_paces'),
             )
+
+        # Regel 10: Cross Training bleibt im Deload bestehen, aber Dauer -20-30% und Z1-Z2.
+        if phase == 'DELOAD':
+            for s in sessions:
+                if s['session_type'] == 'Cross Training':
+                    s['duration_min'] = round(s['duration_min'] * 0.75)  # Mittelwert von -20% bis -30%
+                    s['_deload_cross_zone'] = 'Z1-Z2'
 
         # Cross-Training-Minuten getrennt von target_run_km ausweisen — Laufkm bleiben unberührt.
         target_cross_minutes = sum(s.get('duration_min', 0) for s in sessions if s['session_type'] == 'Cross Training')
@@ -668,6 +857,7 @@ def build_full_skeleton(inputs):
             'week_date': week_monday,
             'phase': phase,
             'target_km': km_targets.get(week_num, 0),
+            'actual_target_run_km': actual_target_run_km,
             'target_hm': hm_targets.get(week_num, 0),
             'target_longrun_km': longrun_targets.get(week_num),
             'target_cross_minutes': target_cross_minutes,
@@ -748,7 +938,10 @@ def validate_skeleton(skeleton, max_km, only_week_num=None):
                               f"(min(avg_weekly_km={avg_weekly_km}, desired_peak_km={desired_peak_km_ref}))")
 
         # Longrun-Anteil: max 40% normal, max 45% Peak (harte Obergrenze; niedriger ist durch
-        # die eigene Progressionskette/Deckel legitim und wird NICHT als Fehler gewertet)
+        # die eigene Progressionskette/Deckel legitim und wird NICHT als Fehler gewertet).
+        # Bezugsgrösse ist target_km (Basis, unreduziert) — der Longrun wird durch Cross Training
+        # bewusst NICHT verkürzt (Klarstellung 2), sein Anteil an der kleineren actual_target_run_km
+        # ist entsprechend höher und kein Fehler.
         longrun_sessions_check = [s for s in sessions if s['session_type'] == 'Long Run']
         if longrun_sessions_check and w['target_km'] > 0 and w['phase'] in ('BASE', 'BUILD', 'PEAK'):
             ratio = longrun_sessions_check[0].get('distance_km', 0) / w['target_km']
@@ -756,10 +949,14 @@ def validate_skeleton(skeleton, max_km, only_week_num=None):
             if ratio > ceiling_ratio + 0.02:
                 errors.append(f"Woche {week_num}: Longrun-Anteil {ratio:.0%} > {ceiling_ratio:.0%} des Wochenziels")
 
-        # 4./5. Wochenkilometer/-HM = target (Toleranz, Race Day ausgenommen)
+        # 4./5. Wochenkilometer/-HM = target (Toleranz, Race Day ausgenommen). Regel 4: die
+        # tatsächlich verteilten Laufkm müssen actual_target_run_km entsprechen (NICHT dem
+        # unreduzierten base target_km — Cross Training reduziert das Laufziel gezielt, siehe
+        # distribute_week_km), Fallback auf target_km für Aufrufer ohne Cross-Reduktion.
+        run_km_reference = w.get('actual_target_run_km', w['target_km'])
         actual_km = sum(s.get('distance_km', 0) for s in sessions if s['session_type'] != 'Race Day')
-        if w['target_km'] > 0 and abs(actual_km - w['target_km']) > w['target_km'] * 0.05 + 0.15:
-            errors.append(f"Woche {week_num}: Summe Distanz {actual_km} weicht von target_km {w['target_km']} ab (>5%)")
+        if run_km_reference > 0 and abs(actual_km - run_km_reference) > run_km_reference * 0.05 + 0.15:
+            errors.append(f"Woche {week_num}: Summe Distanz {actual_km} weicht von actual_target_run_km {run_km_reference} ab (>5%)")
 
         actual_hm = sum(s.get('elevation_gain_m', 0) for s in sessions if s['session_type'] != 'Race Day')
         if w['target_hm'] > 5 and abs(actual_hm - w['target_hm']) > w['target_hm'] * 0.10 + 5:

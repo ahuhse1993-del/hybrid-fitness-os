@@ -224,9 +224,10 @@ def test_wochensummen_nach_rundung_korrekt():
     skel = gp.build_full_skeleton(inputs)
     for w in skel['weeks']:
         actual_km = sum(s.get('distance_km', 0) for s in w['sessions'] if s['session_type'] != 'Race Day')
-        if w['target_km'] > 0:
-            assert abs(actual_km - w['target_km']) <= max(w['target_km'] * 0.05, 0.2) + 0.01, (
-                f"Woche {w['week_number']}: Summe {actual_km} vs target {w['target_km']}"
+        ref = w.get('actual_target_run_km', w['target_km'])
+        if ref > 0:
+            assert abs(actual_km - ref) <= max(ref * 0.05, 0.2) + 0.01, (
+                f"Woche {w['week_number']}: Summe {actual_km} vs actual_target_run_km {ref}"
             )
     print("OK: test_wochensummen_nach_rundung_korrekt")
 
@@ -370,22 +371,139 @@ def test_volumen_6_nach_deload_vergleich_mit_vordeload():
 
 
 def test_volumen_7_cross_training_reduziert_target_run_km_nicht():
+    """Cross Training reduziert das TATSÄCHLICHE Laufziel (actual_target_run_km) kontrolliert um
+    maximal 20% (Klarstellung 1) — NICHT das unreduzierte Progressions-Basisziel (base target_km,
+    Regel 3), und NICHT stillschweigend/unbegrenzt (z.B. von 36 auf 22km, was ~39% wären)."""
     inputs_with = make_inputs(avg_weekly_km=36, race_distance_km=31, max_km=55, cross_training=True, cross_training_days=1)
     inputs_without = make_inputs(avg_weekly_km=36, race_distance_km=31, max_km=55, cross_training=False, cross_training_days=0)
     skel_with = gp.build_full_skeleton(inputs_with)
     skel_without = gp.build_full_skeleton(inputs_without)
     week_with = week_by_num(skel_with, 1)
     week_without = week_by_num(skel_without, 1)
+
+    # Regel 3: die Progression (base target_km) wird OHNE Cross-Ersatz berechnet -> identisch
     assert week_with['target_km'] == week_without['target_km'], (
-        f"Cross Training hat target_km veraendert: {week_with['target_km']} vs {week_without['target_km']}"
+        f"Cross Training hat base target_km (Progressionsbasis) veraendert: {week_with['target_km']} vs {week_without['target_km']}"
     )
-    assert week_with['target_km'] >= 34, f"target_km={week_with['target_km']} sollte NICHT von 36 auf 22 gefallen sein"
+
+    # Klarstellung 1: max. 20% Reduktion, Untergrenze 80% von base target_km — NICHT auf ~22km (61%)
+    base = week_with['target_km']
+    actual = week_with['actual_target_run_km']
+    assert actual >= base * 0.80 - 0.05, f"actual_target_run_km={actual} unterschreitet die 80%-Untergrenze von base={base}"
+    assert actual == round(base * 0.80, 1), f"bei 1 Cross-Session erwartet: actual=80% von base={base} ({round(base*0.80,1)}), war {actual}"
+
+    # Regel 4: tatsaechlich verteilte Laufkm entsprechen exakt actual_target_run_km (transparent
+    # getrackt, nicht stillschweigend irgendwo verloren)
     actual_run_km = sum(s.get('distance_km', 0) for s in week_with['sessions'] if s['session_type'] != 'Race Day')
-    assert abs(actual_run_km - week_with['target_km']) <= week_with['target_km'] * 0.05 + 0.15, (
-        f"Cross Training hat die tatsaechlich verteilten Laufkm stillschweigend reduziert: "
-        f"{actual_run_km} vs target {week_with['target_km']}"
+    assert abs(actual_run_km - actual) <= actual * 0.05 + 0.15, (
+        f"Verteilte Laufkm {actual_run_km} weichen von actual_target_run_km {actual} ab"
     )
-    print(f"OK: test_volumen_7_cross_training_reduziert_target_run_km_nicht (target_km={week_with['target_km']})")
+    print(f"OK: test_volumen_7_cross_training_reduziert_target_run_km_nicht (base={base}, actual_target_run_km={actual})")
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# NEUE VALIDATOR-TESTS (Session-Verteilung, Deload, Taper, Build-Plateau)
+# ─────────────────────────────────────────────────────────────────────────
+
+def test_neu_6tage_2gym_1cross_3laeufe_easy_nicht_ueber_longrun():
+    inputs = make_inputs(days_per_week=6, strength_sessions=2, strength_days=[2, 4],
+                          cross_training=True, cross_training_days=1, quality_sessions=1)
+    skel = gp.build_full_skeleton(inputs)
+    valid, errors = gp.validate_skeleton(skel, inputs['max_km'])
+    assert valid, f"Skeleton invalid: {errors}"
+    for w in skel['weeks']:
+        if w['phase'] not in ('BASE', 'BUILD', 'PEAK'):
+            continue
+        longrun = next((s for s in w['sessions'] if s['session_type'] == 'Long Run'), None)
+        easy_sessions = [s for s in w['sessions'] if s['session_type'] in gp.ENDURANCE_RUN_TYPES]
+        run_count = len(easy_sessions) + (1 if longrun else 0) + len([s for s in w['sessions'] if s['session_type'] in gp.QUALITY_TYPES])
+        if run_count == 3 and longrun:
+            for e in easy_sessions:
+                assert e['distance_km'] <= longrun['distance_km'] + 0.05, (
+                    f"Woche {w['week_number']}: Easy Run {e['distance_km']} > Longrun {longrun['distance_km']}"
+                )
+    print("OK: test_neu_6tage_2gym_1cross_3laeufe_easy_nicht_ueber_longrun")
+
+
+def test_neu_kein_easy_ueber_35_prozent():
+    inputs = make_inputs(days_per_week=6, strength_sessions=2, strength_days=[2, 4],
+                          cross_training=True, cross_training_days=1, quality_sessions=1)
+    skel = gp.build_full_skeleton(inputs)
+    for w in skel['weeks']:
+        ref = w.get('actual_target_run_km', w['target_km'])
+        if ref <= 0:
+            continue
+        for s in w['sessions']:
+            if s['session_type'] in gp.ENDURANCE_RUN_TYPES:
+                assert s['distance_km'] <= ref * 0.35 + 0.15, (
+                    f"Woche {w['week_number']}: Easy Run {s['distance_km']} > 35% von actual_target_run_km={ref}"
+                )
+                assert not (15.0 <= s['distance_km'] <= 19.0), (
+                    f"Woche {w['week_number']}: Easy Run {s['distance_km']} liegt in der verbotenen 15-19km-Zone"
+                )
+    print("OK: test_neu_kein_easy_ueber_35_prozent")
+
+
+def test_neu_cross_bleibt_in_deload():
+    inputs = make_inputs(cross_training=True, cross_training_days=1)
+    skel = gp.build_full_skeleton(inputs)
+    deload_weeks = [w for w in skel['weeks'] if w['phase'] == 'DELOAD']
+    assert deload_weeks, "Testszenario sollte mindestens eine Deload-Woche enthalten"
+    for w in deload_weeks:
+        cross_sessions = [s for s in w['sessions'] if s['session_type'] == 'Cross Training']
+        assert cross_sessions, f"Woche {w['week_number']} (DELOAD): Cross Training fehlt, wurde durch Easy Run ersetzt"
+        for c in cross_sessions:
+            assert c['duration_min'] < 60, f"Woche {w['week_number']} (DELOAD): Cross-Dauer {c['duration_min']} nicht reduziert (Regel 10: -20-30%)"
+    print("OK: test_neu_cross_bleibt_in_deload")
+
+
+def test_neu_deload_kein_4_lauf():
+    inputs = make_inputs(days_per_week=6, strength_sessions=2, strength_days=[2, 4],
+                          cross_training=True, cross_training_days=1, quality_sessions=1)
+    skel = gp.build_full_skeleton(inputs)
+    deload_weeks = [w for w in skel['weeks'] if w['phase'] == 'DELOAD']
+    assert deload_weeks
+    for w in deload_weeks:
+        run_types = {'Long Run'} | gp.ENDURANCE_RUN_TYPES | gp.QUALITY_TYPES
+        run_sessions = [s for s in w['sessions'] if s['session_type'] in run_types]
+        assert len(run_sessions) <= 3, (
+            f"Woche {w['week_number']} (DELOAD): {len(run_sessions)} Laufsessions gefunden, "
+            f"Cross Training sollte einen Ausdauertag belegen statt eines 4. Laufs"
+        )
+    print("OK: test_neu_deload_kein_4_lauf")
+
+
+def test_neu_taper_vor_montagsrennen_fr_sa_und_sonntag_rest():
+    inputs = make_inputs(race_date='2026-10-26')  # Montag
+    skel = gp.build_full_skeleton(inputs)
+    valid, errors = gp.validate_skeleton(skel, inputs['max_km'])
+    assert valid, f"Skeleton invalid: {errors}"
+    taper_week = week_by_num(skel, skel['total_weeks'] - 1)
+    assert taper_week['phase'] == 'TAPER'
+    sunday_session = next((s for s in taper_week['sessions'] if s['day_of_week'] == 7), None)
+    assert sunday_session is None, f"Sonntag der letzten Taper-Woche sollte Rest sein, gefunden: {sunday_session}"
+    fri = next((s for s in taper_week['sessions'] if s['day_of_week'] == 5), None)
+    sat = next((s for s in taper_week['sessions'] if s['day_of_week'] == 6), None)
+    combined = (fri.get('distance_km', 0) if fri else 0) + (sat.get('distance_km', 0) if sat else 0)
+    assert combined <= 14.05, f"Fr+Sa zusammen {combined}km > 14km (Regel 16)"
+    print(f"OK: test_neu_taper_vor_montagsrennen_fr_sa_und_sonntag_rest (Fr+Sa={combined}km)")
+
+
+def test_neu_max_2_identische_build_wochen():
+    for max_km_val in (40, 46, 55, 70):
+        inputs = make_inputs(max_km=max_km_val)
+        skel = gp.build_full_skeleton(inputs)
+        load_phases = ('BASE', 'BUILD', 'PEAK')
+        by_num = {w['week_number']: w for w in skel['weeks']}
+        run_len = 1
+        for n in sorted(by_num):
+            w, prev = by_num[n], by_num.get(n - 1)
+            if prev and w['phase'] in load_phases and prev['phase'] in load_phases and w['target_km'] == prev['target_km']:
+                run_len += 1
+                assert run_len <= 2, f"max_km={max_km_val}: {run_len} identische Wochen in Folge bei Woche {n} (max. 2 erlaubt)"
+            else:
+                run_len = 1
+    print("OK: test_neu_max_2_identische_build_wochen")
 
 
 # ─────────────────────────────────────────────────────────────────────────
@@ -488,6 +606,12 @@ if __name__ == '__main__':
         test_volumen_5_build_wochen_progressiv_oder_dokumentiert,
         test_volumen_6_nach_deload_vergleich_mit_vordeload,
         test_volumen_7_cross_training_reduziert_target_run_km_nicht,
+        test_neu_6tage_2gym_1cross_3laeufe_easy_nicht_ueber_longrun,
+        test_neu_kein_easy_ueber_35_prozent,
+        test_neu_cross_bleibt_in_deload,
+        test_neu_deload_kein_4_lauf,
+        test_neu_taper_vor_montagsrennen_fr_sa_und_sonntag_rest,
+        test_neu_max_2_identische_build_wochen,
     ]
     failed = []
     for t in tests:
