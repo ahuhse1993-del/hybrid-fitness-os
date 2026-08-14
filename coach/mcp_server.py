@@ -105,7 +105,7 @@ def get_athlete_profile() -> dict:
     profile = _fetchone("SELECT * FROM athlete_profile ORDER BY id DESC LIMIT 1")
     plan = _fetchone(
         "SELECT id, goal_type, race_name, race_date, race_distance_km, "
-        "start_date, end_date, status, created_at "
+        "total_weeks, current_week, status, created_at "
         "FROM plans ORDER BY created_at DESC LIMIT 1"
     )
     context = _fetchone("SELECT * FROM coach_context ORDER BY id DESC LIMIT 1")
@@ -119,17 +119,19 @@ def get_athlete_profile() -> dict:
 @mcp.tool()
 def get_recent_activities(days: int = 28) -> list[dict]:
     """
-    Return recent Garmin activities from the last N days (default 28).
-    Includes distance, duration, elevation, heart rate, and training load.
+    Return recent activities from the last N days (default 28).
+    Includes type, distance, duration, and average heart rate. The trainings
+    table has no elevation/pace/training-load columns — elevation, if known,
+    is embedded as free text in notes (e.g. "... | +320m"), not queryable
+    as a number.
     """
     return _fetchall(
         """
-        SELECT activity_id, activity_name, activity_type, start_time,
-               distance_km, duration_secs, elevation_gain_m,
-               avg_hr, max_hr, avg_pace_per_km, training_load
+        SELECT id, date, type, duration_minutes, distance_km,
+               heart_rate_avg, notes, garmin_id
         FROM trainings
-        WHERE start_time >= now() - (INTERVAL '1 day' * %s)
-        ORDER BY start_time DESC
+        WHERE date >= CURRENT_DATE - (INTERVAL '1 day' * %s)
+        ORDER BY date DESC
         """,
         (days,),
     )
@@ -139,19 +141,19 @@ def get_recent_activities(days: int = 28) -> list[dict]:
 def get_training_summary(weeks: int = 4) -> dict:
     """
     Return weekly training volume for the last N weeks (default 4).
-    Shows total km, duration, elevation gain, and average heart rate per week.
+    Shows session count, total km, total duration, and average heart rate
+    per week. No elevation column exists in trainings (see get_recent_activities).
     """
     rows = _fetchall(
         """
         SELECT
-            date_trunc('week', start_time)::date    AS week_start,
+            date_trunc('week', date)::date          AS week_start,
             COUNT(*)                                 AS sessions,
             ROUND(SUM(distance_km)::numeric, 2)     AS total_km,
-            SUM(duration_secs)                      AS total_secs,
-            ROUND(AVG(avg_hr)::numeric, 1)           AS avg_hr,
-            SUM(elevation_gain_m)                   AS total_elevation_m
+            SUM(duration_minutes)                   AS total_duration_min,
+            ROUND(AVG(heart_rate_avg)::numeric, 1)   AS avg_hr
         FROM trainings
-        WHERE start_time >= now() - (INTERVAL '1 week' * %s)
+        WHERE date >= CURRENT_DATE - (INTERVAL '1 week' * %s)
         GROUP BY week_start
         ORDER BY week_start DESC
         """,
@@ -170,8 +172,8 @@ def get_health_data(days: int = 7) -> list[dict]:
         """
         SELECT *
         FROM daily_logs
-        WHERE log_date >= CURRENT_DATE - (INTERVAL '1 day' * %s)
-        ORDER BY log_date DESC
+        WHERE date >= CURRENT_DATE - (INTERVAL '1 day' * %s)
+        ORDER BY date DESC
         """,
         (days,),
     )
@@ -185,11 +187,11 @@ def get_checkins(days: int = 14) -> list[dict]:
     """
     return _fetchall(
         """
-        SELECT log_date, feel, notes, athlete_text
+        SELECT date, feel, notes, athlete_text
         FROM daily_logs
-        WHERE log_date >= CURRENT_DATE - (INTERVAL '1 day' * %s)
+        WHERE date >= CURRENT_DATE - (INTERVAL '1 day' * %s)
           AND (feel IS NOT NULL OR notes IS NOT NULL OR athlete_text IS NOT NULL)
-        ORDER BY log_date DESC
+        ORDER BY date DESC
         """,
         (days,),
     )
@@ -201,15 +203,16 @@ def get_races_and_goals() -> dict:
     plans = _fetchall(
         """
         SELECT id, goal_type, race_name, race_date, race_distance_km,
-               start_date, end_date, status, created_at
+               total_weeks, current_week, status, created_at
         FROM plans
         ORDER BY created_at DESC
         LIMIT 5
         """
     )
+    # athlete_profile has no goal/current_fitness_level/weekly_volume_km columns —
+    # long_term_goals is the only goal-related field that actually exists.
     profile = _fetchone(
-        "SELECT goal, current_fitness_level, weekly_volume_km "
-        "FROM athlete_profile ORDER BY id DESC LIMIT 1"
+        "SELECT long_term_goals FROM athlete_profile ORDER BY id DESC LIMIT 1"
     )
     return {"plans": plans, "profile_goals": profile}
 
@@ -220,15 +223,20 @@ def get_planned_workouts(days: int = 14) -> list[dict]:
     Return planned training sessions for the next N days (default 14).
     Includes session type, distance, target zone, structure, and Garmin workout ID if already pushed.
     """
+    # training_plan has no direct date column — a session's calendar date is
+    # week_date (the Monday of that week) + day_of_week (1=Mon..7=Sun), and
+    # session_zone (not "zone") holds the target zone.
     return _fetchall(
         """
-        SELECT id, session_date, session_type, distance_km, duration_min,
-               notes, zone, warmup_km, main_sets, main_pace,
+        SELECT id,
+               (week_date + (day_of_week - 1) * INTERVAL '1 day')::date AS session_date,
+               session_type, distance_km, duration_min, notes,
+               session_zone AS zone, warmup_km, main_sets, main_pace,
                elevation_gain_m, garmin_workout_id
         FROM training_plan
-        WHERE session_date BETWEEN CURRENT_DATE
-                               AND CURRENT_DATE + (INTERVAL '1 day' * %s)
-        ORDER BY session_date ASC
+        WHERE (week_date + (day_of_week - 1) * INTERVAL '1 day')::date
+              BETWEEN CURRENT_DATE AND CURRENT_DATE + (INTERVAL '1 day' * %s)
+        ORDER BY week_date ASC, day_of_week ASC
         """,
         (days,),
     )
@@ -410,7 +418,9 @@ def move_garmin_workout(
     client = garmin_client()
     if old_schedule_id is not None:
         try:
-            client.delete_workout_schedule(old_schedule_id)
+            # garminconnect 0.3.6 has no delete_workout_schedule() method —
+            # the actual API is unschedule_workout(scheduled_workout_id).
+            client.unschedule_workout(old_schedule_id)
             logger.info("Deleted old Garmin schedule_id=%s", old_schedule_id)
         except Exception as exc:
             logger.warning(
