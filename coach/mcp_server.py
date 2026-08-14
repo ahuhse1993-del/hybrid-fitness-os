@@ -444,11 +444,24 @@ def delete_garmin_workout(garmin_workout_id: int) -> dict:
 
 def create_mcp_asgi_app() -> ASGIApp:
     """
-    Return the MCPServer ASGI app wrapped in BearerAuthMiddleware.
+    Return the MCPServer ASGI app — UNAUTHENTICATED.
+
+    KNOWN, TEMPORARY SECURITY TRADE-OFF (2026-08-14, per Alexander):
+    BearerAuthMiddleware is defined above but intentionally NOT applied here.
+    ChatGPT's custom-connector setup rejected our Bearer-token auth ("Fehler
+    beim Erstellen des Konnektors"), so auth was removed to unblock the
+    ChatGPT connector. This means /mcp is reachable by ANYONE who has the
+    URL, with no authentication at all — including create_garmin_workout /
+    move_garmin_workout / delete_garmin_workout (real writes/deletes on
+    Garmin Connect) and every read tool (full training + health history).
+    "URL not publicly advertised" is NOT a real control — Railway subdomains
+    are enumerable and the URL now lives in the ChatGPT connector config.
+    Durable fix: implement proper OAuth (the mcp SDK already exposes
+    AuthSettings/token_verifier/auth_server_provider for this — see
+    MCPServer.__init__), which ChatGPT connectors do support, instead of
+    leaving this endpoint open indefinitely.
 
     The inner app handles POST /mcp (Streamable HTTP transport).
-    BearerAuthMiddleware is applied directly — no Starlette Mount wrapper —
-    so the full path (/mcp) reaches the inner app unchanged.
 
     transport_security: streamable_http_app() auto-enables DNS-rebinding
     protection with allowed_hosts=["127.0.0.1:*", ...] whenever no `host=`
@@ -459,7 +472,8 @@ def create_mcp_asgi_app() -> ASGIApp:
     too. Never disable enable_dns_rebinding_protection outright — that would
     remove the protection entirely rather than fixing the allow-list.
 
-    Requires: mcp>=1.0, MCP_API_KEY env var set.
+    Requires: mcp>=1.0. MCP_API_KEY is no longer read here (BearerAuthMiddleware
+    is not applied) — see the security trade-off note above.
     """
     public_host = os.getenv("MCP_PUBLIC_HOST", "web-production-297f2.up.railway.app")
     transport_security = TransportSecuritySettings(
@@ -472,5 +486,4 @@ def create_mcp_asgi_app() -> ASGIApp:
             "http://[::1]:*",
         ],
     )
-    inner = mcp.streamable_http_app(transport_security=transport_security)
-    return BearerAuthMiddleware(inner)
+    return mcp.streamable_http_app(transport_security=transport_security)
