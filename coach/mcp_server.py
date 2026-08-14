@@ -18,13 +18,14 @@ import logging
 import os
 from typing import Any
 
-from mcp.server import MCPServer as FastMCP
-from starlette.applications import Starlette
-from starlette.middleware import Middleware
+try:
+    from mcp.server import MCPServer as FastMCP  # mcp 2.0+
+except ImportError:
+    from mcp.server import FastMCP  # type: ignore[assignment]  # mcp 1.x
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
-from starlette.routing import Mount
+from starlette.types import ASGIApp
 
 from coach.garmin_push import (
     GarminPushError,
@@ -440,15 +441,15 @@ def delete_garmin_workout(garmin_workout_id: int) -> dict:
 
 # ── ASGI app factory ───────────────────────────────────────────────────────────
 
-def create_mcp_asgi_app() -> Starlette:
+def create_mcp_asgi_app() -> ASGIApp:
     """
-    Return the FastMCP ASGI app wrapped in BearerAuthMiddleware.
-    Mount the result at /mcp in coach/main.py.
+    Return the MCPServer ASGI app wrapped in BearerAuthMiddleware.
+
+    The inner app handles POST /mcp (Streamable HTTP transport).
+    BearerAuthMiddleware is applied directly — no Starlette Mount wrapper —
+    so the full path (/mcp) reaches the inner app unchanged.
 
     Requires: mcp>=1.0, MCP_API_KEY env var set.
     """
     inner = mcp.streamable_http_app()
-    return Starlette(
-        routes=[Mount("/", app=inner)],
-        middleware=[Middleware(BearerAuthMiddleware)],
-    )
+    return BearerAuthMiddleware(inner)
