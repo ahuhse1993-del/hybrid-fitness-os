@@ -25,8 +25,18 @@ async def app(scope: Scope, receive: Receive, send: Send) -> None:
     Path-prefix router — passes the full unmodified path to each sub-app.
     /mcp and /mcp/* → MCP server
     everything else  → Flask
+
+    Lifespan: forwarded to the MCP sub-app only. mcp.streamable_http_app()
+    starts its internal StreamableHTTPSessionManager during ASGI lifespan
+    startup — without this, every POST /mcp request crashes with an
+    Internal Server Error even though routing itself works. Flask/WSGI has
+    no lifespan concept, so it must not receive this scope type.
     """
-    if scope.get("type") == "http":
+    scope_type = scope.get("type")
+    if scope_type == "lifespan":
+        await _mcp_asgi(scope, receive, send)
+        return
+    if scope_type == "http":
         path: str = scope.get("path", "")
         if path == "/mcp" or path.startswith("/mcp/"):
             await _mcp_asgi(scope, receive, send)
