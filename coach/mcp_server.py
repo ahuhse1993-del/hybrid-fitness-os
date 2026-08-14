@@ -22,6 +22,7 @@ try:
     from mcp.server import MCPServer as FastMCP  # mcp 2.0+
 except ImportError:
     from mcp.server import FastMCP  # type: ignore[assignment]  # mcp 1.x
+from mcp.server.transport_security import TransportSecuritySettings
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
@@ -449,7 +450,27 @@ def create_mcp_asgi_app() -> ASGIApp:
     BearerAuthMiddleware is applied directly — no Starlette Mount wrapper —
     so the full path (/mcp) reaches the inner app unchanged.
 
+    transport_security: streamable_http_app() auto-enables DNS-rebinding
+    protection with allowed_hosts=["127.0.0.1:*", ...] whenever no `host=`
+    is passed (its internal default is host="127.0.0.1"). That rejects any
+    real deployment host with "Invalid Host header". We pass an explicit
+    TransportSecuritySettings instead — protection stays ON, but the actual
+    public host (env var, falls back to the known Railway host) is allowed
+    too. Never disable enable_dns_rebinding_protection outright — that would
+    remove the protection entirely rather than fixing the allow-list.
+
     Requires: mcp>=1.0, MCP_API_KEY env var set.
     """
-    inner = mcp.streamable_http_app()
+    public_host = os.getenv("MCP_PUBLIC_HOST", "web-production-297f2.up.railway.app")
+    transport_security = TransportSecuritySettings(
+        enable_dns_rebinding_protection=True,
+        allowed_hosts=[public_host, "127.0.0.1:*", "localhost:*", "[::1]:*"],
+        allowed_origins=[
+            f"https://{public_host}",
+            "http://127.0.0.1:*",
+            "http://localhost:*",
+            "http://[::1]:*",
+        ],
+    )
+    inner = mcp.streamable_http_app(transport_security=transport_security)
     return BearerAuthMiddleware(inner)
