@@ -1,0 +1,5357 @@
+[
+  {
+    "id": 1,
+    "name": "10K Beginner",
+    "label": "10 KM STRASSE / EINSTEIGER",
+    "inputs": {
+      "start_date": "2026-08-03",
+      "race_date": "2026-10-25",
+      "race_distance_km": 10,
+      "race_elevation_m": 50,
+      "terrain": "road",
+      "days_per_week": 4,
+      "strength_sessions": 1,
+      "strength_days": [
+        3
+      ],
+      "quality_sessions": 1,
+      "long_run_day": 7,
+      "cross_training": false,
+      "cross_training_days": 0,
+      "max_km": 32,
+      "avg_weekly_km": 18,
+      "avg_weekly_hm": 50,
+      "athlete_paces": {}
+    },
+    "total_weeks": 12,
+    "validator_valid": false,
+    "validator_errors": [
+      "Woche 9: Longrun-Anteil 42% > 40% des Wochenziels",
+      "Woche 10 (PEAK): target_km=13.5 < erwartete Untergrenze 15.0 (min(avg_weekly_km=18, desired_peak_km=15.0))"
+    ],
+    "category_ratings": {
+      "Struktur": "PASS",
+      "Volumen": "FAIL",
+      "Longrun": "FAIL",
+      "HM/Terrain": "PASS",
+      "Kraft/Cross": "PASS",
+      "Taper": "PASS"
+    },
+    "overall_rating": "FAIL",
+    "findings": [
+      {
+        "category": "Longrun",
+        "severity": "FAIL",
+        "week": null,
+        "session": null,
+        "ist": "Woche 9: Longrun-Anteil 42% > 40% des Wochenziels",
+        "erwartet": "(siehe Regeltext)",
+        "regel": "validate_skeleton() Regelverstoß",
+        "ursache": "compute_longrun_progression() / distribute_week_km() (data/generate_plan.py:279-362, 628-748)"
+      },
+      {
+        "category": "Volumen",
+        "severity": "FAIL",
+        "week": null,
+        "session": null,
+        "ist": "Woche 10 (PEAK): target_km=13.5 < erwartete Untergrenze 15.0 (min(avg_weekly_km=18, desired_peak_km=15.0))",
+        "erwartet": "(siehe Regeltext)",
+        "regel": "validate_skeleton() Regelverstoß",
+        "ursache": "compute_weekly_progression() (data/generate_plan.py:149-196)"
+      },
+      {
+        "category": "Volumen",
+        "severity": "WARNING",
+        "week": null,
+        "session": "(Peak-Woche)",
+        "ist": "peak target_km=18",
+        "erwartet": "~24-30km",
+        "regel": "Peak-Wochenumfang im erwarteten Bereich",
+        "ursache": "compute_desired_peak_km() / compute_weekly_progression() (data/generate_plan.py:233-234, 149-196)"
+      },
+      {
+        "category": "Longrun",
+        "severity": "WARNING",
+        "week": 1,
+        "session": "Long Run",
+        "ist": "6.6km",
+        "erwartet": "~10-12km",
+        "regel": "Peak-Longrun passt zu Renndistanz, Erfahrung und Terrain",
+        "ursache": "compute_desired_peak_longrun_km() / compute_longrun_progression() (data/generate_plan.py:265-362) — Formel ist NICHT terrainabhängig"
+      },
+      {
+        "category": "Longrun",
+        "severity": "WARNING",
+        "week": 2,
+        "session": "Long Run",
+        "ist": "5.6km",
+        "erwartet": ">= Vorwoche (6.6km, Woche 1)",
+        "regel": "Longrun-Progression ist sicher und nachvollziehbar (monoton in Belastungswochen)",
+        "ursache": "compute_longrun_progression() (data/generate_plan.py:279-362)"
+      }
+    ],
+    "weeks": [
+      {
+        "week_number": 1,
+        "week_date": "2026-08-03",
+        "phase": "BASE",
+        "base_target_run_km": 18,
+        "actual_target_run_km": 16.3,
+        "target_hm": 50,
+        "target_cross_minutes": 0,
+        "sessions": [
+          {
+            "day_of_week": 1,
+            "session_type": "Easy Run",
+            "distance_km": 5.7,
+            "elevation_gain_m": 9,
+            "duration_min": 37,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 2,
+            "session_type": "Tempo Session",
+            "distance_km": 4.0,
+            "elevation_gain_m": 2,
+            "duration_min": 22,
+            "strength_focus": null,
+            "session_role": "Quality"
+          },
+          {
+            "day_of_week": 3,
+            "session_type": "Strength Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 45,
+            "strength_focus": "lower_moderate",
+            "session_role": "Kraft"
+          },
+          {
+            "day_of_week": 7,
+            "session_type": "Long Run",
+            "distance_km": 6.6,
+            "elevation_gain_m": 39,
+            "duration_min": 46,
+            "strength_focus": null,
+            "session_role": "Longrun"
+          }
+        ]
+      },
+      {
+        "week_number": 2,
+        "week_date": "2026-08-10",
+        "phase": "BASE",
+        "base_target_run_km": 15.0,
+        "actual_target_run_km": 13.9,
+        "target_hm": 50.3,
+        "target_cross_minutes": 0,
+        "sessions": [
+          {
+            "day_of_week": 1,
+            "session_type": "Easy Run",
+            "distance_km": 4.9,
+            "elevation_gain_m": 9,
+            "duration_min": 32,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 2,
+            "session_type": "Tempo Session",
+            "distance_km": 3.4,
+            "elevation_gain_m": 2,
+            "duration_min": 19,
+            "strength_focus": null,
+            "session_role": "Quality"
+          },
+          {
+            "day_of_week": 3,
+            "session_type": "Strength Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 45,
+            "strength_focus": "lower_moderate",
+            "session_role": "Kraft"
+          },
+          {
+            "day_of_week": 7,
+            "session_type": "Long Run",
+            "distance_km": 5.6,
+            "elevation_gain_m": 39,
+            "duration_min": 39,
+            "strength_focus": null,
+            "session_role": "Longrun"
+          }
+        ]
+      },
+      {
+        "week_number": 3,
+        "week_date": "2026-08-17",
+        "phase": "BUILD",
+        "base_target_run_km": 15.0,
+        "actual_target_run_km": 14.0,
+        "target_hm": 50.7,
+        "target_cross_minutes": 0,
+        "sessions": [
+          {
+            "day_of_week": 1,
+            "session_type": "Easy Run",
+            "distance_km": 4.9,
+            "elevation_gain_m": 9,
+            "duration_min": 32,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 2,
+            "session_type": "Tempo Session",
+            "distance_km": 3.4,
+            "elevation_gain_m": 2,
+            "duration_min": 19,
+            "strength_focus": null,
+            "session_role": "Quality"
+          },
+          {
+            "day_of_week": 3,
+            "session_type": "Strength Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 45,
+            "strength_focus": "lower_moderate",
+            "session_role": "Kraft"
+          },
+          {
+            "day_of_week": 7,
+            "session_type": "Long Run",
+            "distance_km": 5.7,
+            "elevation_gain_m": 40,
+            "duration_min": 40,
+            "strength_focus": null,
+            "session_role": "Longrun"
+          }
+        ]
+      },
+      {
+        "week_number": 4,
+        "week_date": "2026-08-24",
+        "phase": "DELOAD",
+        "base_target_run_km": 11.6,
+        "actual_target_run_km": 11.6,
+        "target_hm": 39.3,
+        "target_cross_minutes": 0,
+        "sessions": [
+          {
+            "day_of_week": 1,
+            "session_type": "Easy Run",
+            "distance_km": 3.6,
+            "elevation_gain_m": 4,
+            "duration_min": 23,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 2,
+            "session_type": "Easy Run",
+            "distance_km": 3.6,
+            "elevation_gain_m": 4,
+            "duration_min": 23,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 3,
+            "session_type": "Strength Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 45,
+            "strength_focus": "full_light",
+            "session_role": "Kraft"
+          },
+          {
+            "day_of_week": 7,
+            "session_type": "Long Run",
+            "distance_km": 4.4,
+            "elevation_gain_m": 31,
+            "duration_min": 31,
+            "strength_focus": null,
+            "session_role": "Longrun"
+          }
+        ]
+      },
+      {
+        "week_number": 5,
+        "week_date": "2026-08-31",
+        "phase": "BUILD",
+        "base_target_run_km": 14.7,
+        "actual_target_run_km": 14.0,
+        "target_hm": 51.1,
+        "target_cross_minutes": 0,
+        "sessions": [
+          {
+            "day_of_week": 1,
+            "session_type": "Easy Run",
+            "distance_km": 4.9,
+            "elevation_gain_m": 9,
+            "duration_min": 32,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 2,
+            "session_type": "Tempo Session",
+            "distance_km": 3.3,
+            "elevation_gain_m": 2,
+            "duration_min": 18,
+            "strength_focus": null,
+            "session_role": "Quality"
+          },
+          {
+            "day_of_week": 3,
+            "session_type": "Strength Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 45,
+            "strength_focus": "lower_moderate",
+            "session_role": "Kraft"
+          },
+          {
+            "day_of_week": 7,
+            "session_type": "Long Run",
+            "distance_km": 5.8,
+            "elevation_gain_m": 40,
+            "duration_min": 41,
+            "strength_focus": null,
+            "session_role": "Longrun"
+          }
+        ]
+      },
+      {
+        "week_number": 6,
+        "week_date": "2026-09-07",
+        "phase": "BUILD",
+        "base_target_run_km": 14.4,
+        "actual_target_run_km": 13.9,
+        "target_hm": 51.4,
+        "target_cross_minutes": 0,
+        "sessions": [
+          {
+            "day_of_week": 1,
+            "session_type": "Easy Run",
+            "distance_km": 4.9,
+            "elevation_gain_m": 9,
+            "duration_min": 32,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 2,
+            "session_type": "Tempo Session",
+            "distance_km": 3.2,
+            "elevation_gain_m": 2,
+            "duration_min": 18,
+            "strength_focus": null,
+            "session_role": "Quality"
+          },
+          {
+            "day_of_week": 3,
+            "session_type": "Strength Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 45,
+            "strength_focus": "lower_moderate",
+            "session_role": "Kraft"
+          },
+          {
+            "day_of_week": 7,
+            "session_type": "Long Run",
+            "distance_km": 5.8,
+            "elevation_gain_m": 40,
+            "duration_min": 41,
+            "strength_focus": null,
+            "session_role": "Longrun"
+          }
+        ]
+      },
+      {
+        "week_number": 7,
+        "week_date": "2026-09-14",
+        "phase": "BUILD",
+        "base_target_run_km": 14.1,
+        "actual_target_run_km": 13.9,
+        "target_hm": 51.8,
+        "target_cross_minutes": 0,
+        "sessions": [
+          {
+            "day_of_week": 1,
+            "session_type": "Easy Run",
+            "distance_km": 4.9,
+            "elevation_gain_m": 10,
+            "duration_min": 32,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 2,
+            "session_type": "Tempo Session",
+            "distance_km": 3.2,
+            "elevation_gain_m": 2,
+            "duration_min": 18,
+            "strength_focus": null,
+            "session_role": "Quality"
+          },
+          {
+            "day_of_week": 3,
+            "session_type": "Strength Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 45,
+            "strength_focus": "lower_moderate",
+            "session_role": "Kraft"
+          },
+          {
+            "day_of_week": 7,
+            "session_type": "Long Run",
+            "distance_km": 5.8,
+            "elevation_gain_m": 40,
+            "duration_min": 41,
+            "strength_focus": null,
+            "session_role": "Longrun"
+          }
+        ]
+      },
+      {
+        "week_number": 8,
+        "week_date": "2026-09-21",
+        "phase": "DELOAD",
+        "base_target_run_km": 11.6,
+        "actual_target_run_km": 11.6,
+        "target_hm": 40.1,
+        "target_cross_minutes": 0,
+        "sessions": [
+          {
+            "day_of_week": 1,
+            "session_type": "Easy Run",
+            "distance_km": 3.5,
+            "elevation_gain_m": 5,
+            "duration_min": 23,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 2,
+            "session_type": "Easy Run",
+            "distance_km": 3.6,
+            "elevation_gain_m": 4,
+            "duration_min": 23,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 3,
+            "session_type": "Strength Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 45,
+            "strength_focus": "full_light",
+            "session_role": "Kraft"
+          },
+          {
+            "day_of_week": 7,
+            "session_type": "Long Run",
+            "distance_km": 4.5,
+            "elevation_gain_m": 31,
+            "duration_min": 32,
+            "strength_focus": null,
+            "session_role": "Longrun"
+          }
+        ]
+      },
+      {
+        "week_number": 9,
+        "week_date": "2026-09-28",
+        "phase": "BUILD",
+        "base_target_run_km": 13.8,
+        "actual_target_run_km": 13.7,
+        "target_hm": 52.1,
+        "target_cross_minutes": 0,
+        "sessions": [
+          {
+            "day_of_week": 1,
+            "session_type": "Easy Run",
+            "distance_km": 4.8,
+            "elevation_gain_m": 9,
+            "duration_min": 31,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 2,
+            "session_type": "Tempo Session",
+            "distance_km": 3.1,
+            "elevation_gain_m": 2,
+            "duration_min": 17,
+            "strength_focus": null,
+            "session_role": "Quality"
+          },
+          {
+            "day_of_week": 3,
+            "session_type": "Strength Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 45,
+            "strength_focus": "lower_moderate",
+            "session_role": "Kraft"
+          },
+          {
+            "day_of_week": 7,
+            "session_type": "Long Run",
+            "distance_km": 5.8,
+            "elevation_gain_m": 41,
+            "duration_min": 41,
+            "strength_focus": null,
+            "session_role": "Longrun"
+          }
+        ]
+      },
+      {
+        "week_number": 10,
+        "week_date": "2026-10-05",
+        "phase": "PEAK",
+        "base_target_run_km": 13.5,
+        "actual_target_run_km": 13.4,
+        "target_hm": 52.5,
+        "target_cross_minutes": 0,
+        "sessions": [
+          {
+            "day_of_week": 1,
+            "session_type": "Easy Run",
+            "distance_km": 4.7,
+            "elevation_gain_m": 10,
+            "duration_min": 31,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 2,
+            "session_type": "Tempo Session",
+            "distance_km": 3.0,
+            "elevation_gain_m": 2,
+            "duration_min": 16,
+            "strength_focus": null,
+            "session_role": "Quality"
+          },
+          {
+            "day_of_week": 3,
+            "session_type": "Strength Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 45,
+            "strength_focus": "lower_moderate",
+            "session_role": "Kraft"
+          },
+          {
+            "day_of_week": 7,
+            "session_type": "Long Run",
+            "distance_km": 5.7,
+            "elevation_gain_m": 41,
+            "duration_min": 40,
+            "strength_focus": null,
+            "session_role": "Longrun"
+          }
+        ]
+      },
+      {
+        "week_number": 11,
+        "week_date": "2026-10-12",
+        "phase": "TAPER",
+        "base_target_run_km": 10.5,
+        "actual_target_run_km": 8.4,
+        "target_hm": 36.7,
+        "target_cross_minutes": 0,
+        "sessions": [
+          {
+            "day_of_week": 1,
+            "session_type": "Easy Run",
+            "distance_km": 3.0,
+            "elevation_gain_m": 17,
+            "duration_min": 20,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 2,
+            "session_type": "Tempo Session",
+            "distance_km": 2.4,
+            "elevation_gain_m": 3,
+            "duration_min": 13,
+            "strength_focus": null,
+            "session_role": "Quality"
+          },
+          {
+            "day_of_week": 3,
+            "session_type": "Strength Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 45,
+            "strength_focus": "upper_light",
+            "session_role": "Kraft"
+          },
+          {
+            "day_of_week": 4,
+            "session_type": "Easy Run",
+            "distance_km": 3.0,
+            "elevation_gain_m": 17,
+            "duration_min": 20,
+            "strength_focus": null,
+            "session_role": "Easy"
+          }
+        ]
+      },
+      {
+        "week_number": 12,
+        "week_date": "2026-10-19",
+        "phase": "RACE",
+        "base_target_run_km": 5.2,
+        "actual_target_run_km": 1.0,
+        "target_hm": 18.4,
+        "target_cross_minutes": 0,
+        "sessions": [
+          {
+            "day_of_week": 1,
+            "session_type": "Easy Run",
+            "distance_km": 0.5,
+            "elevation_gain_m": 9,
+            "duration_min": 3,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 2,
+            "session_type": "Easy Run",
+            "distance_km": 0.5,
+            "elevation_gain_m": 9,
+            "duration_min": 3,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 3,
+            "session_type": "Strength Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 45,
+            "strength_focus": "upper_light",
+            "session_role": "Kraft"
+          },
+          {
+            "day_of_week": 7,
+            "session_type": "Race Day",
+            "distance_km": 10,
+            "elevation_gain_m": 50,
+            "duration_min": 70,
+            "strength_focus": null,
+            "session_role": "Race"
+          }
+        ]
+      }
+    ],
+    "conflicts": [
+      "Woche 5: target_km von 15.0 auf 14.7 reduziert — maximal 2 identische Belastungswochen in Folge erlaubt.",
+      "Woche 6: target_km von 15.0 auf 14.4 reduziert — maximal 2 identische Belastungswochen in Folge erlaubt.",
+      "Woche 7: target_km von 15.0 auf 14.1 reduziert — maximal 2 identische Belastungswochen in Folge erlaubt.",
+      "Woche 9: target_km von 15.0 auf 13.8 reduziert — maximal 2 identische Belastungswochen in Folge erlaubt.",
+      "Woche 10: target_km von 15.0 auf 13.5 reduziert — maximal 2 identische Belastungswochen in Folge erlaubt.",
+      "Woche 3: target_km identisch zu Woche 2 (15.0 km) — Zielobergrenze (desired_peak_km=15.0) bereits vor der eigentlichen Peak-Woche erreicht, weiteres Wachstum durch absolute_plan_cap_km/race_distance_km-Formel begrenzt.",
+      "Woche 1: Laufziel von 18km auf 16.3km reduziert (Easy-Run-/Taper-Obergrenzen) — finaler, tatsächlich gespeicherter Wert.",
+      "Woche 2: Laufziel von 15.0km auf 13.9km reduziert (Easy-Run-/Taper-Obergrenzen) — finaler, tatsächlich gespeicherter Wert.",
+      "Woche 3: Laufziel von 15.0km auf 14.0km reduziert (Easy-Run-/Taper-Obergrenzen) — finaler, tatsächlich gespeicherter Wert.",
+      "Woche 5: Laufziel von 14.7km auf 14.0km reduziert (Easy-Run-/Taper-Obergrenzen) — finaler, tatsächlich gespeicherter Wert.",
+      "Woche 6: Laufziel von 14.4km auf 13.9km reduziert (Easy-Run-/Taper-Obergrenzen) — finaler, tatsächlich gespeicherter Wert.",
+      "Woche 7: Laufziel von 14.1km auf 13.9km reduziert (Easy-Run-/Taper-Obergrenzen) — finaler, tatsächlich gespeicherter Wert.",
+      "Woche 11: kein geeigneter Lower-Body-Slot verfügbar, alle Gymtage als Upper Body.",
+      "Woche 11: Laufziel von 10.5km auf 8.4km reduziert (Easy-Run-/Taper-Obergrenzen) — finaler, tatsächlich gespeicherter Wert.",
+      "Woche 12: Laufziel von 5.2km auf 1.0km reduziert (Easy-Run-/Taper-Obergrenzen) — finaler, tatsächlich gespeicherter Wert."
+    ]
+  },
+  {
+    "id": 2,
+    "name": "HM Intermediate",
+    "label": "HALBMARATHON STRASSE / INTERMEDIÄR",
+    "inputs": {
+      "start_date": "2026-07-20",
+      "race_date": "2026-11-01",
+      "race_distance_km": 21.1,
+      "race_elevation_m": 120,
+      "terrain": "road",
+      "days_per_week": 5,
+      "strength_sessions": 1,
+      "strength_days": [
+        2
+      ],
+      "quality_sessions": 1,
+      "long_run_day": 7,
+      "cross_training": true,
+      "cross_training_days": 1,
+      "cross_replaces_run": false,
+      "max_km": 50,
+      "avg_weekly_km": 32,
+      "avg_weekly_hm": 150,
+      "athlete_paces": {}
+    },
+    "total_weeks": 15,
+    "validator_valid": false,
+    "validator_errors": [
+      "Woche 12 (PEAK): target_km=27.3 < erwartete Untergrenze 31.7 (min(avg_weekly_km=32, desired_peak_km=31.650000000000002))"
+    ],
+    "category_ratings": {
+      "Struktur": "PASS",
+      "Volumen": "FAIL",
+      "Longrun": "WARNING",
+      "HM/Terrain": "PASS",
+      "Kraft/Cross": "PASS",
+      "Taper": "PASS"
+    },
+    "overall_rating": "FAIL",
+    "findings": [
+      {
+        "category": "Volumen",
+        "severity": "FAIL",
+        "week": null,
+        "session": null,
+        "ist": "Woche 12 (PEAK): target_km=27.3 < erwartete Untergrenze 31.7 (min(avg_weekly_km=32, desired_peak_km=31.650000000000002))",
+        "erwartet": "(siehe Regeltext)",
+        "regel": "validate_skeleton() Regelverstoß",
+        "ursache": "compute_weekly_progression() (data/generate_plan.py:149-196)"
+      },
+      {
+        "category": "Volumen",
+        "severity": "WARNING",
+        "week": null,
+        "session": "(Peak-Woche)",
+        "ist": "peak target_km=32",
+        "erwartet": "~40-50km",
+        "regel": "Peak-Wochenumfang im erwarteten Bereich",
+        "ursache": "compute_desired_peak_km() / compute_weekly_progression() (data/generate_plan.py:233-234, 149-196)"
+      },
+      {
+        "category": "Longrun",
+        "severity": "WARNING",
+        "week": 12,
+        "session": "Long Run",
+        "ist": "12.7km",
+        "erwartet": "~18-22km",
+        "regel": "Peak-Longrun passt zu Renndistanz, Erfahrung und Terrain",
+        "ursache": "compute_desired_peak_longrun_km() / compute_longrun_progression() (data/generate_plan.py:265-362) — Formel ist NICHT terrainabhängig"
+      }
+    ],
+    "weeks": [
+      {
+        "week_number": 1,
+        "week_date": "2026-07-20",
+        "phase": "BASE",
+        "base_target_run_km": 32,
+        "actual_target_run_km": 29.1,
+        "target_hm": 150,
+        "target_cross_minutes": 60,
+        "sessions": [
+          {
+            "day_of_week": 1,
+            "session_type": "Cross Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 60,
+            "strength_focus": null,
+            "session_role": "Cross"
+          },
+          {
+            "day_of_week": 2,
+            "session_type": "Strength Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 45,
+            "strength_focus": "lower",
+            "session_role": "Kraft"
+          },
+          {
+            "day_of_week": 3,
+            "session_type": "Easy Run",
+            "distance_km": 10.2,
+            "elevation_gain_m": 28,
+            "duration_min": 66,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 4,
+            "session_type": "Tempo Session",
+            "distance_km": 7.2,
+            "elevation_gain_m": 5,
+            "duration_min": 40,
+            "strength_focus": null,
+            "session_role": "Quality"
+          },
+          {
+            "day_of_week": 7,
+            "session_type": "Long Run",
+            "distance_km": 11.7,
+            "elevation_gain_m": 117,
+            "duration_min": 82,
+            "strength_focus": null,
+            "session_role": "Longrun"
+          }
+        ]
+      },
+      {
+        "week_number": 2,
+        "week_date": "2026-07-27",
+        "phase": "BASE",
+        "base_target_run_km": 31.7,
+        "actual_target_run_km": 29.1,
+        "target_hm": 150.8,
+        "target_cross_minutes": 60,
+        "sessions": [
+          {
+            "day_of_week": 1,
+            "session_type": "Cross Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 60,
+            "strength_focus": null,
+            "session_role": "Cross"
+          },
+          {
+            "day_of_week": 2,
+            "session_type": "Strength Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 45,
+            "strength_focus": "lower",
+            "session_role": "Kraft"
+          },
+          {
+            "day_of_week": 3,
+            "session_type": "Easy Run",
+            "distance_km": 10.2,
+            "elevation_gain_m": 28,
+            "duration_min": 66,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 4,
+            "session_type": "Tempo Session",
+            "distance_km": 7.1,
+            "elevation_gain_m": 5,
+            "duration_min": 39,
+            "strength_focus": null,
+            "session_role": "Quality"
+          },
+          {
+            "day_of_week": 7,
+            "session_type": "Long Run",
+            "distance_km": 11.8,
+            "elevation_gain_m": 118,
+            "duration_min": 83,
+            "strength_focus": null,
+            "session_role": "Longrun"
+          }
+        ]
+      },
+      {
+        "week_number": 3,
+        "week_date": "2026-08-03",
+        "phase": "BASE",
+        "base_target_run_km": 31.7,
+        "actual_target_run_km": 29.4,
+        "target_hm": 151.6,
+        "target_cross_minutes": 60,
+        "sessions": [
+          {
+            "day_of_week": 1,
+            "session_type": "Cross Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 60,
+            "strength_focus": null,
+            "session_role": "Cross"
+          },
+          {
+            "day_of_week": 2,
+            "session_type": "Strength Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 45,
+            "strength_focus": "lower",
+            "session_role": "Kraft"
+          },
+          {
+            "day_of_week": 3,
+            "session_type": "Easy Run",
+            "distance_km": 10.3,
+            "elevation_gain_m": 29,
+            "duration_min": 67,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 4,
+            "session_type": "Tempo Session",
+            "distance_km": 7.1,
+            "elevation_gain_m": 5,
+            "duration_min": 39,
+            "strength_focus": null,
+            "session_role": "Quality"
+          },
+          {
+            "day_of_week": 7,
+            "session_type": "Long Run",
+            "distance_km": 12.0,
+            "elevation_gain_m": 118,
+            "duration_min": 84,
+            "strength_focus": null,
+            "session_role": "Longrun"
+          }
+        ]
+      },
+      {
+        "week_number": 4,
+        "week_date": "2026-08-10",
+        "phase": "DELOAD",
+        "base_target_run_km": 24.5,
+        "actual_target_run_km": 24.5,
+        "target_hm": 117.5,
+        "target_cross_minutes": 45,
+        "sessions": [
+          {
+            "day_of_week": 1,
+            "session_type": "Easy Run",
+            "distance_km": 7.6,
+            "elevation_gain_m": 13,
+            "duration_min": 49,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 2,
+            "session_type": "Strength Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 45,
+            "strength_focus": "full_light",
+            "session_role": "Kraft"
+          },
+          {
+            "day_of_week": 3,
+            "session_type": "Easy Run",
+            "distance_km": 7.6,
+            "elevation_gain_m": 13,
+            "duration_min": 49,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 4,
+            "session_type": "Cross Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 45,
+            "_deload_cross_zone": "Z1-Z2",
+            "strength_focus": null,
+            "session_role": "Cross"
+          },
+          {
+            "day_of_week": 7,
+            "session_type": "Long Run",
+            "distance_km": 9.3,
+            "elevation_gain_m": 92,
+            "duration_min": 65,
+            "strength_focus": null,
+            "session_role": "Longrun"
+          }
+        ]
+      },
+      {
+        "week_number": 5,
+        "week_date": "2026-08-17",
+        "phase": "BUILD",
+        "base_target_run_km": 31.1,
+        "actual_target_run_km": 29.3,
+        "target_hm": 152.5,
+        "target_cross_minutes": 60,
+        "sessions": [
+          {
+            "day_of_week": 1,
+            "session_type": "Cross Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 60,
+            "strength_focus": null,
+            "session_role": "Cross"
+          },
+          {
+            "day_of_week": 2,
+            "session_type": "Strength Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 45,
+            "strength_focus": "lower",
+            "session_role": "Kraft"
+          },
+          {
+            "day_of_week": 3,
+            "session_type": "Easy Run",
+            "distance_km": 10.3,
+            "elevation_gain_m": 28,
+            "duration_min": 67,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 4,
+            "session_type": "Tempo Session",
+            "distance_km": 7.0,
+            "elevation_gain_m": 5,
+            "duration_min": 38,
+            "strength_focus": null,
+            "session_role": "Quality"
+          },
+          {
+            "day_of_week": 7,
+            "session_type": "Long Run",
+            "distance_km": 12.0,
+            "elevation_gain_m": 119,
+            "duration_min": 84,
+            "strength_focus": null,
+            "session_role": "Longrun"
+          }
+        ]
+      },
+      {
+        "week_number": 6,
+        "week_date": "2026-08-24",
+        "phase": "BUILD",
+        "base_target_run_km": 30.4,
+        "actual_target_run_km": 28.8,
+        "target_hm": 153.3,
+        "target_cross_minutes": 60,
+        "sessions": [
+          {
+            "day_of_week": 1,
+            "session_type": "Cross Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 60,
+            "strength_focus": null,
+            "session_role": "Cross"
+          },
+          {
+            "day_of_week": 2,
+            "session_type": "Strength Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 45,
+            "strength_focus": "lower",
+            "session_role": "Kraft"
+          },
+          {
+            "day_of_week": 3,
+            "session_type": "Easy Run",
+            "distance_km": 10.1,
+            "elevation_gain_m": 28,
+            "duration_min": 66,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 4,
+            "session_type": "Tempo Session",
+            "distance_km": 6.8,
+            "elevation_gain_m": 5,
+            "duration_min": 37,
+            "strength_focus": null,
+            "session_role": "Quality"
+          },
+          {
+            "day_of_week": 7,
+            "session_type": "Long Run",
+            "distance_km": 11.9,
+            "elevation_gain_m": 120,
+            "duration_min": 83,
+            "strength_focus": null,
+            "session_role": "Longrun"
+          }
+        ]
+      },
+      {
+        "week_number": 7,
+        "week_date": "2026-08-31",
+        "phase": "BUILD",
+        "base_target_run_km": 29.8,
+        "actual_target_run_km": 28.6,
+        "target_hm": 154.1,
+        "target_cross_minutes": 60,
+        "sessions": [
+          {
+            "day_of_week": 1,
+            "session_type": "Cross Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 60,
+            "strength_focus": null,
+            "session_role": "Cross"
+          },
+          {
+            "day_of_week": 2,
+            "session_type": "Strength Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 45,
+            "strength_focus": "lower",
+            "session_role": "Kraft"
+          },
+          {
+            "day_of_week": 3,
+            "session_type": "Easy Run",
+            "distance_km": 10.0,
+            "elevation_gain_m": 29,
+            "duration_min": 65,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 4,
+            "session_type": "Tempo Session",
+            "distance_km": 6.7,
+            "elevation_gain_m": 5,
+            "duration_min": 37,
+            "strength_focus": null,
+            "session_role": "Quality"
+          },
+          {
+            "day_of_week": 7,
+            "session_type": "Long Run",
+            "distance_km": 11.9,
+            "elevation_gain_m": 120,
+            "duration_min": 83,
+            "strength_focus": null,
+            "session_role": "Longrun"
+          }
+        ]
+      },
+      {
+        "week_number": 8,
+        "week_date": "2026-09-07",
+        "phase": "DELOAD",
+        "base_target_run_km": 24.5,
+        "actual_target_run_km": 24.5,
+        "target_hm": 119.4,
+        "target_cross_minutes": 45,
+        "sessions": [
+          {
+            "day_of_week": 1,
+            "session_type": "Easy Run",
+            "distance_km": 7.7,
+            "elevation_gain_m": 13,
+            "duration_min": 50,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 2,
+            "session_type": "Strength Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 45,
+            "strength_focus": "full_light",
+            "session_role": "Kraft"
+          },
+          {
+            "day_of_week": 3,
+            "session_type": "Easy Run",
+            "distance_km": 7.6,
+            "elevation_gain_m": 13,
+            "duration_min": 49,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 4,
+            "session_type": "Cross Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 45,
+            "_deload_cross_zone": "Z1-Z2",
+            "strength_focus": null,
+            "session_role": "Cross"
+          },
+          {
+            "day_of_week": 7,
+            "session_type": "Long Run",
+            "distance_km": 9.2,
+            "elevation_gain_m": 93,
+            "duration_min": 64,
+            "strength_focus": null,
+            "session_role": "Longrun"
+          }
+        ]
+      },
+      {
+        "week_number": 9,
+        "week_date": "2026-09-14",
+        "phase": "BUILD",
+        "base_target_run_km": 29.2,
+        "actual_target_run_km": 28.3,
+        "target_hm": 155.0,
+        "target_cross_minutes": 60,
+        "sessions": [
+          {
+            "day_of_week": 1,
+            "session_type": "Cross Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 60,
+            "strength_focus": null,
+            "session_role": "Cross"
+          },
+          {
+            "day_of_week": 2,
+            "session_type": "Strength Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 45,
+            "strength_focus": "lower",
+            "session_role": "Kraft"
+          },
+          {
+            "day_of_week": 3,
+            "session_type": "Easy Run",
+            "distance_km": 9.9,
+            "elevation_gain_m": 29,
+            "duration_min": 64,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 4,
+            "session_type": "Tempo Session",
+            "distance_km": 6.6,
+            "elevation_gain_m": 5,
+            "duration_min": 36,
+            "strength_focus": null,
+            "session_role": "Quality"
+          },
+          {
+            "day_of_week": 7,
+            "session_type": "Long Run",
+            "distance_km": 11.8,
+            "elevation_gain_m": 121,
+            "duration_min": 83,
+            "strength_focus": null,
+            "session_role": "Longrun"
+          }
+        ]
+      },
+      {
+        "week_number": 10,
+        "week_date": "2026-09-21",
+        "phase": "BUILD",
+        "base_target_run_km": 28.5,
+        "actual_target_run_km": 27.9,
+        "target_hm": 155.8,
+        "target_cross_minutes": 60,
+        "sessions": [
+          {
+            "day_of_week": 1,
+            "session_type": "Cross Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 60,
+            "strength_focus": null,
+            "session_role": "Cross"
+          },
+          {
+            "day_of_week": 2,
+            "session_type": "Strength Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 45,
+            "strength_focus": "lower",
+            "session_role": "Kraft"
+          },
+          {
+            "day_of_week": 3,
+            "session_type": "Easy Run",
+            "distance_km": 9.8,
+            "elevation_gain_m": 29,
+            "duration_min": 64,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 4,
+            "session_type": "Tempo Session",
+            "distance_km": 6.4,
+            "elevation_gain_m": 5,
+            "duration_min": 35,
+            "strength_focus": null,
+            "session_role": "Quality"
+          },
+          {
+            "day_of_week": 7,
+            "session_type": "Long Run",
+            "distance_km": 11.7,
+            "elevation_gain_m": 122,
+            "duration_min": 82,
+            "strength_focus": null,
+            "session_role": "Longrun"
+          }
+        ]
+      },
+      {
+        "week_number": 11,
+        "week_date": "2026-09-28",
+        "phase": "BUILD",
+        "base_target_run_km": 27.9,
+        "actual_target_run_km": 27.7,
+        "target_hm": 156.6,
+        "target_cross_minutes": 60,
+        "sessions": [
+          {
+            "day_of_week": 1,
+            "session_type": "Cross Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 60,
+            "strength_focus": null,
+            "session_role": "Cross"
+          },
+          {
+            "day_of_week": 2,
+            "session_type": "Strength Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 45,
+            "strength_focus": "lower",
+            "session_role": "Kraft"
+          },
+          {
+            "day_of_week": 3,
+            "session_type": "Easy Run",
+            "distance_km": 9.7,
+            "elevation_gain_m": 30,
+            "duration_min": 63,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 4,
+            "session_type": "Tempo Session",
+            "distance_km": 6.3,
+            "elevation_gain_m": 5,
+            "duration_min": 35,
+            "strength_focus": null,
+            "session_role": "Quality"
+          },
+          {
+            "day_of_week": 7,
+            "session_type": "Long Run",
+            "distance_km": 11.7,
+            "elevation_gain_m": 122,
+            "duration_min": 82,
+            "strength_focus": null,
+            "session_role": "Longrun"
+          }
+        ]
+      },
+      {
+        "week_number": 12,
+        "week_date": "2026-10-05",
+        "phase": "PEAK",
+        "base_target_run_km": 27.3,
+        "actual_target_run_km": 27.3,
+        "target_hm": 157.5,
+        "target_cross_minutes": 60,
+        "sessions": [
+          {
+            "day_of_week": 1,
+            "session_type": "Cross Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 60,
+            "strength_focus": null,
+            "session_role": "Cross"
+          },
+          {
+            "day_of_week": 2,
+            "session_type": "Strength Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 45,
+            "strength_focus": "lower",
+            "session_role": "Kraft"
+          },
+          {
+            "day_of_week": 3,
+            "session_type": "Easy Run",
+            "distance_km": 8.5,
+            "elevation_gain_m": 30,
+            "duration_min": 55,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 4,
+            "session_type": "Tempo Session",
+            "distance_km": 6.1,
+            "elevation_gain_m": 5,
+            "duration_min": 34,
+            "strength_focus": null,
+            "session_role": "Quality"
+          },
+          {
+            "day_of_week": 7,
+            "session_type": "Long Run",
+            "distance_km": 12.7,
+            "elevation_gain_m": 123,
+            "duration_min": 89,
+            "strength_focus": null,
+            "session_role": "Longrun"
+          }
+        ]
+      },
+      {
+        "week_number": 13,
+        "week_date": "2026-10-12",
+        "phase": "TAPER",
+        "base_target_run_km": 22.2,
+        "actual_target_run_km": 21.4,
+        "target_hm": 110.2,
+        "target_cross_minutes": 60,
+        "sessions": [
+          {
+            "day_of_week": 1,
+            "session_type": "Easy Run",
+            "distance_km": 7.5,
+            "elevation_gain_m": 22,
+            "duration_min": 49,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 2,
+            "session_type": "Strength Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 45,
+            "strength_focus": "upper_light",
+            "session_role": "Kraft"
+          },
+          {
+            "day_of_week": 3,
+            "session_type": "Tempo Session",
+            "distance_km": 5.0,
+            "elevation_gain_m": 2,
+            "duration_min": 28,
+            "strength_focus": null,
+            "session_role": "Quality"
+          },
+          {
+            "day_of_week": 5,
+            "session_type": "Cross Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 60,
+            "strength_focus": null,
+            "session_role": "Cross"
+          },
+          {
+            "day_of_week": 7,
+            "session_type": "Long Run",
+            "distance_km": 8.9,
+            "elevation_gain_m": 86,
+            "duration_min": 62,
+            "strength_focus": null,
+            "session_role": "Longrun"
+          }
+        ]
+      },
+      {
+        "week_number": 14,
+        "week_date": "2026-10-19",
+        "phase": "TAPER",
+        "base_target_run_km": 22.2,
+        "actual_target_run_km": 17.4,
+        "target_hm": 110.2,
+        "target_cross_minutes": 60,
+        "sessions": [
+          {
+            "day_of_week": 1,
+            "session_type": "Cross Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 60,
+            "strength_focus": null,
+            "session_role": "Cross"
+          },
+          {
+            "day_of_week": 2,
+            "session_type": "Strength Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 45,
+            "strength_focus": "upper_light",
+            "session_role": "Kraft"
+          },
+          {
+            "day_of_week": 3,
+            "session_type": "Tempo Session",
+            "distance_km": 5.0,
+            "elevation_gain_m": 9,
+            "duration_min": 28,
+            "strength_focus": null,
+            "session_role": "Quality"
+          },
+          {
+            "day_of_week": 4,
+            "session_type": "Easy Run",
+            "distance_km": 6.2,
+            "elevation_gain_m": 51,
+            "duration_min": 40,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 5,
+            "session_type": "Easy Run",
+            "distance_km": 6.2,
+            "elevation_gain_m": 50,
+            "duration_min": 40,
+            "strength_focus": null,
+            "session_role": "Easy"
+          }
+        ]
+      },
+      {
+        "week_number": 15,
+        "week_date": "2026-10-26",
+        "phase": "RACE",
+        "base_target_run_km": 11.1,
+        "actual_target_run_km": 11.1,
+        "target_hm": 55.1,
+        "target_cross_minutes": 0,
+        "sessions": [
+          {
+            "day_of_week": 1,
+            "session_type": "Easy Run",
+            "distance_km": 3.7,
+            "elevation_gain_m": 18,
+            "duration_min": 24,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 2,
+            "session_type": "Strength Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 45,
+            "strength_focus": "upper_light",
+            "session_role": "Kraft"
+          },
+          {
+            "day_of_week": 3,
+            "session_type": "Easy Run",
+            "distance_km": 3.7,
+            "elevation_gain_m": 18,
+            "duration_min": 24,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 4,
+            "session_type": "Easy Run",
+            "distance_km": 3.7,
+            "elevation_gain_m": 19,
+            "duration_min": 24,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 7,
+            "session_type": "Race Day",
+            "distance_km": 21.1,
+            "elevation_gain_m": 120,
+            "duration_min": 149,
+            "strength_focus": null,
+            "session_role": "Race"
+          }
+        ]
+      }
+    ],
+    "conflicts": [
+      "Woche 5: target_km von 31.7 auf 31.1 reduziert — maximal 2 identische Belastungswochen in Folge erlaubt.",
+      "Woche 6: target_km von 31.7 auf 30.4 reduziert — maximal 2 identische Belastungswochen in Folge erlaubt.",
+      "Woche 7: target_km von 31.7 auf 29.8 reduziert — maximal 2 identische Belastungswochen in Folge erlaubt.",
+      "Woche 9: target_km von 31.7 auf 29.2 reduziert — maximal 2 identische Belastungswochen in Folge erlaubt.",
+      "Woche 10: target_km von 31.7 auf 28.5 reduziert — maximal 2 identische Belastungswochen in Folge erlaubt.",
+      "Woche 11: target_km von 31.7 auf 27.9 reduziert — maximal 2 identische Belastungswochen in Folge erlaubt.",
+      "Woche 12: target_km von 31.7 auf 27.3 reduziert — maximal 2 identische Belastungswochen in Folge erlaubt.",
+      "Woche 12 (PEAK): renn-verankertes Longrun-Ziel 16.5km bei verfügbarer Vorbereitungszeit/Basis nicht sicher erreichbar, Peak-Longrun bleibt bei 12.7km (sichere +10%/Woche-Progression greift).",
+      "Woche 3: target_km identisch zu Woche 2 (31.7 km) — Zielobergrenze (desired_peak_km=31.650000000000002) bereits vor der eigentlichen Peak-Woche erreicht, weiteres Wachstum durch absolute_plan_cap_km/race_distance_km-Formel begrenzt.",
+      "Woche 1: Laufziel von 32km auf 29.1km reduziert (Easy-Run-/Taper-Obergrenzen) — finaler, tatsächlich gespeicherter Wert.",
+      "Woche 2: Laufziel von 31.7km auf 29.1km reduziert (Easy-Run-/Taper-Obergrenzen) — finaler, tatsächlich gespeicherter Wert.",
+      "Woche 3: Laufziel von 31.7km auf 29.4km reduziert (Easy-Run-/Taper-Obergrenzen) — finaler, tatsächlich gespeicherter Wert.",
+      "Woche 5: Laufziel von 31.1km auf 29.3km reduziert (Easy-Run-/Taper-Obergrenzen) — finaler, tatsächlich gespeicherter Wert.",
+      "Woche 6: Laufziel von 30.4km auf 28.8km reduziert (Easy-Run-/Taper-Obergrenzen) — finaler, tatsächlich gespeicherter Wert.",
+      "Woche 7: Laufziel von 29.8km auf 28.6km reduziert (Easy-Run-/Taper-Obergrenzen) — finaler, tatsächlich gespeicherter Wert.",
+      "Woche 9: Laufziel von 29.2km auf 28.3km reduziert (Easy-Run-/Taper-Obergrenzen) — finaler, tatsächlich gespeicherter Wert.",
+      "Woche 10: Laufziel von 28.5km auf 27.9km reduziert (Easy-Run-/Taper-Obergrenzen) — finaler, tatsächlich gespeicherter Wert.",
+      "Woche 11: Laufziel von 27.9km auf 27.7km reduziert (Easy-Run-/Taper-Obergrenzen) — finaler, tatsächlich gespeicherter Wert.",
+      "Woche 13: kein geeigneter Lower-Body-Slot verfügbar, alle Gymtage als Upper Body.",
+      "Woche 13: Laufziel von 22.2km auf 21.4km reduziert (Easy-Run-/Taper-Obergrenzen) — finaler, tatsächlich gespeicherter Wert.",
+      "Woche 14: kein geeigneter Lower-Body-Slot verfügbar, alle Gymtage als Upper Body.",
+      "Woche 14: Laufziel von 22.2km auf 17.4km reduziert (Easy-Run-/Taper-Obergrenzen) — finaler, tatsächlich gespeicherter Wert."
+    ]
+  },
+  {
+    "id": 3,
+    "name": "Marathon Advanced",
+    "label": "MARATHON STRASSE / FORTGESCHRITTEN",
+    "inputs": {
+      "start_date": "2026-06-29",
+      "race_date": "2026-11-08",
+      "race_distance_km": 42.195,
+      "race_elevation_m": 180,
+      "terrain": "road",
+      "days_per_week": 6,
+      "strength_sessions": 1,
+      "strength_days": [
+        3
+      ],
+      "quality_sessions": 2,
+      "long_run_day": 7,
+      "cross_training": false,
+      "cross_training_days": 0,
+      "max_km": 80,
+      "avg_weekly_km": 52,
+      "avg_weekly_hm": 250,
+      "athlete_paces": {}
+    },
+    "total_weeks": 19,
+    "validator_valid": true,
+    "validator_errors": [],
+    "category_ratings": {
+      "Struktur": "PASS",
+      "Volumen": "PASS",
+      "Longrun": "WARNING",
+      "HM/Terrain": "PASS",
+      "Kraft/Cross": "PASS",
+      "Taper": "PASS"
+    },
+    "overall_rating": "WARNING",
+    "findings": [
+      {
+        "category": "Longrun",
+        "severity": "WARNING",
+        "week": 16,
+        "session": "Long Run",
+        "ist": "26.9km",
+        "erwartet": "~30-34km",
+        "regel": "Peak-Longrun passt zu Renndistanz, Erfahrung und Terrain",
+        "ursache": "compute_desired_peak_longrun_km() / compute_longrun_progression() (data/generate_plan.py:265-362) — Formel ist NICHT terrainabhängig"
+      }
+    ],
+    "weeks": [
+      {
+        "week_number": 1,
+        "week_date": "2026-06-29",
+        "phase": "BASE",
+        "base_target_run_km": 52,
+        "actual_target_run_km": 52,
+        "target_hm": 250,
+        "target_cross_minutes": 0,
+        "sessions": [
+          {
+            "day_of_week": 1,
+            "session_type": "Easy Run",
+            "distance_km": 10.7,
+            "elevation_gain_m": 24,
+            "duration_min": 70,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 2,
+            "session_type": "Tempo Session",
+            "distance_km": 5.8,
+            "elevation_gain_m": 4,
+            "duration_min": 32,
+            "strength_focus": null,
+            "session_role": "Quality"
+          },
+          {
+            "day_of_week": 3,
+            "session_type": "Strength Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 45,
+            "strength_focus": "lower_moderate",
+            "session_role": "Kraft"
+          },
+          {
+            "day_of_week": 4,
+            "session_type": "Easy Run",
+            "distance_km": 10.7,
+            "elevation_gain_m": 23,
+            "duration_min": 70,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 5,
+            "session_type": "Interval Session",
+            "distance_km": 5.8,
+            "elevation_gain_m": 4,
+            "duration_min": 32,
+            "strength_focus": null,
+            "session_role": "Quality"
+          },
+          {
+            "day_of_week": 7,
+            "session_type": "Long Run",
+            "distance_km": 19.0,
+            "elevation_gain_m": 195,
+            "duration_min": 133,
+            "strength_focus": null,
+            "session_role": "Longrun"
+          }
+        ]
+      },
+      {
+        "week_number": 2,
+        "week_date": "2026-07-06",
+        "phase": "BASE",
+        "base_target_run_km": 52.9,
+        "actual_target_run_km": 52.9,
+        "target_hm": 251.0,
+        "target_cross_minutes": 0,
+        "sessions": [
+          {
+            "day_of_week": 1,
+            "session_type": "Easy Run",
+            "distance_km": 10.7,
+            "elevation_gain_m": 24,
+            "duration_min": 70,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 2,
+            "session_type": "Tempo Session",
+            "distance_km": 6.0,
+            "elevation_gain_m": 4,
+            "duration_min": 33,
+            "strength_focus": null,
+            "session_role": "Quality"
+          },
+          {
+            "day_of_week": 3,
+            "session_type": "Strength Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 45,
+            "strength_focus": "lower_moderate",
+            "session_role": "Kraft"
+          },
+          {
+            "day_of_week": 4,
+            "session_type": "Easy Run",
+            "distance_km": 10.6,
+            "elevation_gain_m": 23,
+            "duration_min": 69,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 5,
+            "session_type": "Interval Session",
+            "distance_km": 6.0,
+            "elevation_gain_m": 4,
+            "duration_min": 33,
+            "strength_focus": null,
+            "session_role": "Quality"
+          },
+          {
+            "day_of_week": 7,
+            "session_type": "Long Run",
+            "distance_km": 19.6,
+            "elevation_gain_m": 196,
+            "duration_min": 137,
+            "strength_focus": null,
+            "session_role": "Longrun"
+          }
+        ]
+      },
+      {
+        "week_number": 3,
+        "week_date": "2026-07-13",
+        "phase": "BASE",
+        "base_target_run_km": 53.7,
+        "actual_target_run_km": 53.7,
+        "target_hm": 252.0,
+        "target_cross_minutes": 0,
+        "sessions": [
+          {
+            "day_of_week": 1,
+            "session_type": "Easy Run",
+            "distance_km": 10.8,
+            "elevation_gain_m": 24,
+            "duration_min": 70,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 2,
+            "session_type": "Tempo Session",
+            "distance_km": 6.0,
+            "elevation_gain_m": 4,
+            "duration_min": 33,
+            "strength_focus": null,
+            "session_role": "Quality"
+          },
+          {
+            "day_of_week": 3,
+            "session_type": "Strength Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 45,
+            "strength_focus": "lower_moderate",
+            "session_role": "Kraft"
+          },
+          {
+            "day_of_week": 4,
+            "session_type": "Easy Run",
+            "distance_km": 10.8,
+            "elevation_gain_m": 23,
+            "duration_min": 70,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 5,
+            "session_type": "Interval Session",
+            "distance_km": 6.0,
+            "elevation_gain_m": 4,
+            "duration_min": 33,
+            "strength_focus": null,
+            "session_role": "Quality"
+          },
+          {
+            "day_of_week": 7,
+            "session_type": "Long Run",
+            "distance_km": 20.1,
+            "elevation_gain_m": 197,
+            "duration_min": 141,
+            "strength_focus": null,
+            "session_role": "Longrun"
+          }
+        ]
+      },
+      {
+        "week_number": 4,
+        "week_date": "2026-07-20",
+        "phase": "DELOAD",
+        "base_target_run_km": 41.6,
+        "actual_target_run_km": 41.6,
+        "target_hm": 195.3,
+        "target_cross_minutes": 0,
+        "sessions": [
+          {
+            "day_of_week": 1,
+            "session_type": "Easy Run",
+            "distance_km": 6.5,
+            "elevation_gain_m": 11,
+            "duration_min": 42,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 2,
+            "session_type": "Easy Run",
+            "distance_km": 6.5,
+            "elevation_gain_m": 11,
+            "duration_min": 42,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 3,
+            "session_type": "Strength Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 45,
+            "strength_focus": "full_light",
+            "session_role": "Kraft"
+          },
+          {
+            "day_of_week": 4,
+            "session_type": "Easy Run",
+            "distance_km": 6.5,
+            "elevation_gain_m": 11,
+            "duration_min": 42,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 5,
+            "session_type": "Easy Run",
+            "distance_km": 6.5,
+            "elevation_gain_m": 10,
+            "duration_min": 42,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 7,
+            "session_type": "Long Run",
+            "distance_km": 15.6,
+            "elevation_gain_m": 152,
+            "duration_min": 109,
+            "strength_focus": null,
+            "session_role": "Longrun"
+          }
+        ]
+      },
+      {
+        "week_number": 5,
+        "week_date": "2026-07-27",
+        "phase": "BASE",
+        "base_target_run_km": 54.6,
+        "actual_target_run_km": 54.6,
+        "target_hm": 253.1,
+        "target_cross_minutes": 0,
+        "sessions": [
+          {
+            "day_of_week": 1,
+            "session_type": "Easy Run",
+            "distance_km": 10.8,
+            "elevation_gain_m": 24,
+            "duration_min": 70,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 2,
+            "session_type": "Tempo Session",
+            "distance_km": 6.2,
+            "elevation_gain_m": 4,
+            "duration_min": 34,
+            "strength_focus": null,
+            "session_role": "Quality"
+          },
+          {
+            "day_of_week": 3,
+            "session_type": "Strength Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 45,
+            "strength_focus": "lower_moderate",
+            "session_role": "Kraft"
+          },
+          {
+            "day_of_week": 4,
+            "session_type": "Easy Run",
+            "distance_km": 10.7,
+            "elevation_gain_m": 24,
+            "duration_min": 70,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 5,
+            "session_type": "Interval Session",
+            "distance_km": 6.2,
+            "elevation_gain_m": 4,
+            "duration_min": 34,
+            "strength_focus": null,
+            "session_role": "Quality"
+          },
+          {
+            "day_of_week": 7,
+            "session_type": "Long Run",
+            "distance_km": 20.7,
+            "elevation_gain_m": 197,
+            "duration_min": 145,
+            "strength_focus": null,
+            "session_role": "Longrun"
+          }
+        ]
+      },
+      {
+        "week_number": 6,
+        "week_date": "2026-08-03",
+        "phase": "BUILD",
+        "base_target_run_km": 55.5,
+        "actual_target_run_km": 55.5,
+        "target_hm": 254.1,
+        "target_cross_minutes": 0,
+        "sessions": [
+          {
+            "day_of_week": 1,
+            "session_type": "Easy Run",
+            "distance_km": 10.9,
+            "elevation_gain_m": 24,
+            "duration_min": 71,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 2,
+            "session_type": "Tempo Session",
+            "distance_km": 6.2,
+            "elevation_gain_m": 4,
+            "duration_min": 34,
+            "strength_focus": null,
+            "session_role": "Quality"
+          },
+          {
+            "day_of_week": 3,
+            "session_type": "Strength Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 45,
+            "strength_focus": "lower_moderate",
+            "session_role": "Kraft"
+          },
+          {
+            "day_of_week": 4,
+            "session_type": "Easy Run",
+            "distance_km": 10.9,
+            "elevation_gain_m": 24,
+            "duration_min": 71,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 5,
+            "session_type": "Interval Session",
+            "distance_km": 6.2,
+            "elevation_gain_m": 4,
+            "duration_min": 34,
+            "strength_focus": null,
+            "session_role": "Quality"
+          },
+          {
+            "day_of_week": 7,
+            "session_type": "Long Run",
+            "distance_km": 21.3,
+            "elevation_gain_m": 198,
+            "duration_min": 149,
+            "strength_focus": null,
+            "session_role": "Longrun"
+          }
+        ]
+      },
+      {
+        "week_number": 7,
+        "week_date": "2026-08-10",
+        "phase": "BUILD",
+        "base_target_run_km": 56.4,
+        "actual_target_run_km": 56.4,
+        "target_hm": 255.1,
+        "target_cross_minutes": 0,
+        "sessions": [
+          {
+            "day_of_week": 1,
+            "session_type": "Easy Run",
+            "distance_km": 10.9,
+            "elevation_gain_m": 24,
+            "duration_min": 71,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 2,
+            "session_type": "Tempo Session",
+            "distance_km": 6.3,
+            "elevation_gain_m": 4,
+            "duration_min": 35,
+            "strength_focus": null,
+            "session_role": "Quality"
+          },
+          {
+            "day_of_week": 3,
+            "session_type": "Strength Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 45,
+            "strength_focus": "lower_moderate",
+            "session_role": "Kraft"
+          },
+          {
+            "day_of_week": 4,
+            "session_type": "Easy Run",
+            "distance_km": 11.0,
+            "elevation_gain_m": 24,
+            "duration_min": 72,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 5,
+            "session_type": "Interval Session",
+            "distance_km": 6.3,
+            "elevation_gain_m": 4,
+            "duration_min": 35,
+            "strength_focus": null,
+            "session_role": "Quality"
+          },
+          {
+            "day_of_week": 7,
+            "session_type": "Long Run",
+            "distance_km": 21.9,
+            "elevation_gain_m": 199,
+            "duration_min": 153,
+            "strength_focus": null,
+            "session_role": "Longrun"
+          }
+        ]
+      },
+      {
+        "week_number": 8,
+        "week_date": "2026-08-17",
+        "phase": "DELOAD",
+        "base_target_run_km": 43.7,
+        "actual_target_run_km": 43.7,
+        "target_hm": 197.7,
+        "target_cross_minutes": 0,
+        "sessions": [
+          {
+            "day_of_week": 1,
+            "session_type": "Easy Run",
+            "distance_km": 6.7,
+            "elevation_gain_m": 11,
+            "duration_min": 44,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 2,
+            "session_type": "Easy Run",
+            "distance_km": 6.7,
+            "elevation_gain_m": 11,
+            "duration_min": 44,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 3,
+            "session_type": "Strength Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 45,
+            "strength_focus": "full_light",
+            "session_role": "Kraft"
+          },
+          {
+            "day_of_week": 4,
+            "session_type": "Easy Run",
+            "distance_km": 6.7,
+            "elevation_gain_m": 11,
+            "duration_min": 44,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 5,
+            "session_type": "Easy Run",
+            "distance_km": 6.6,
+            "elevation_gain_m": 11,
+            "duration_min": 43,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 7,
+            "session_type": "Long Run",
+            "distance_km": 17.0,
+            "elevation_gain_m": 154,
+            "duration_min": 119,
+            "strength_focus": null,
+            "session_role": "Longrun"
+          }
+        ]
+      },
+      {
+        "week_number": 9,
+        "week_date": "2026-08-24",
+        "phase": "BUILD",
+        "base_target_run_km": 57.4,
+        "actual_target_run_km": 57.4,
+        "target_hm": 256.2,
+        "target_cross_minutes": 0,
+        "sessions": [
+          {
+            "day_of_week": 1,
+            "session_type": "Easy Run",
+            "distance_km": 10.9,
+            "elevation_gain_m": 24,
+            "duration_min": 71,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 2,
+            "session_type": "Tempo Session",
+            "distance_km": 6.5,
+            "elevation_gain_m": 4,
+            "duration_min": 36,
+            "strength_focus": null,
+            "session_role": "Quality"
+          },
+          {
+            "day_of_week": 3,
+            "session_type": "Strength Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 45,
+            "strength_focus": "lower_moderate",
+            "session_role": "Kraft"
+          },
+          {
+            "day_of_week": 4,
+            "session_type": "Easy Run",
+            "distance_km": 10.9,
+            "elevation_gain_m": 24,
+            "duration_min": 71,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 5,
+            "session_type": "Interval Session",
+            "distance_km": 6.5,
+            "elevation_gain_m": 4,
+            "duration_min": 36,
+            "strength_focus": null,
+            "session_role": "Quality"
+          },
+          {
+            "day_of_week": 7,
+            "session_type": "Long Run",
+            "distance_km": 22.6,
+            "elevation_gain_m": 200,
+            "duration_min": 158,
+            "strength_focus": null,
+            "session_role": "Longrun"
+          }
+        ]
+      },
+      {
+        "week_number": 10,
+        "week_date": "2026-08-31",
+        "phase": "BUILD",
+        "base_target_run_km": 58.3,
+        "actual_target_run_km": 58.3,
+        "target_hm": 257.2,
+        "target_cross_minutes": 0,
+        "sessions": [
+          {
+            "day_of_week": 1,
+            "session_type": "Easy Run",
+            "distance_km": 11.1,
+            "elevation_gain_m": 24,
+            "duration_min": 72,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 2,
+            "session_type": "Tempo Session",
+            "distance_km": 6.5,
+            "elevation_gain_m": 4,
+            "duration_min": 36,
+            "strength_focus": null,
+            "session_role": "Quality"
+          },
+          {
+            "day_of_week": 3,
+            "session_type": "Strength Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 45,
+            "strength_focus": "lower_moderate",
+            "session_role": "Kraft"
+          },
+          {
+            "day_of_week": 4,
+            "session_type": "Easy Run",
+            "distance_km": 11.0,
+            "elevation_gain_m": 24,
+            "duration_min": 72,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 5,
+            "session_type": "Interval Session",
+            "distance_km": 6.5,
+            "elevation_gain_m": 4,
+            "duration_min": 36,
+            "strength_focus": null,
+            "session_role": "Quality"
+          },
+          {
+            "day_of_week": 7,
+            "session_type": "Long Run",
+            "distance_km": 23.2,
+            "elevation_gain_m": 201,
+            "duration_min": 162,
+            "strength_focus": null,
+            "session_role": "Longrun"
+          }
+        ]
+      },
+      {
+        "week_number": 11,
+        "week_date": "2026-09-07",
+        "phase": "BUILD",
+        "base_target_run_km": 59.3,
+        "actual_target_run_km": 59.3,
+        "target_hm": 258.3,
+        "target_cross_minutes": 0,
+        "sessions": [
+          {
+            "day_of_week": 1,
+            "session_type": "Easy Run",
+            "distance_km": 11.0,
+            "elevation_gain_m": 25,
+            "duration_min": 72,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 2,
+            "session_type": "Tempo Session",
+            "distance_km": 6.7,
+            "elevation_gain_m": 4,
+            "duration_min": 37,
+            "strength_focus": null,
+            "session_role": "Quality"
+          },
+          {
+            "day_of_week": 3,
+            "session_type": "Strength Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 45,
+            "strength_focus": "lower_moderate",
+            "session_role": "Kraft"
+          },
+          {
+            "day_of_week": 4,
+            "session_type": "Easy Run",
+            "distance_km": 11.0,
+            "elevation_gain_m": 24,
+            "duration_min": 72,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 5,
+            "session_type": "Interval Session",
+            "distance_km": 6.7,
+            "elevation_gain_m": 4,
+            "duration_min": 37,
+            "strength_focus": null,
+            "session_role": "Quality"
+          },
+          {
+            "day_of_week": 7,
+            "session_type": "Long Run",
+            "distance_km": 23.9,
+            "elevation_gain_m": 201,
+            "duration_min": 167,
+            "strength_focus": null,
+            "session_role": "Longrun"
+          }
+        ]
+      },
+      {
+        "week_number": 12,
+        "week_date": "2026-09-14",
+        "phase": "DELOAD",
+        "base_target_run_km": 45.9,
+        "actual_target_run_km": 45.9,
+        "target_hm": 200.2,
+        "target_cross_minutes": 0,
+        "sessions": [
+          {
+            "day_of_week": 1,
+            "session_type": "Easy Run",
+            "distance_km": 6.8,
+            "elevation_gain_m": 11,
+            "duration_min": 44,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 2,
+            "session_type": "Easy Run",
+            "distance_km": 6.8,
+            "elevation_gain_m": 11,
+            "duration_min": 44,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 3,
+            "session_type": "Strength Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 45,
+            "strength_focus": "full_light",
+            "session_role": "Kraft"
+          },
+          {
+            "day_of_week": 4,
+            "session_type": "Easy Run",
+            "distance_km": 6.8,
+            "elevation_gain_m": 11,
+            "duration_min": 44,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 5,
+            "session_type": "Easy Run",
+            "distance_km": 7.0,
+            "elevation_gain_m": 11,
+            "duration_min": 46,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 7,
+            "session_type": "Long Run",
+            "distance_km": 18.5,
+            "elevation_gain_m": 156,
+            "duration_min": 130,
+            "strength_focus": null,
+            "session_role": "Longrun"
+          }
+        ]
+      },
+      {
+        "week_number": 13,
+        "week_date": "2026-09-21",
+        "phase": "BUILD",
+        "base_target_run_km": 60.3,
+        "actual_target_run_km": 60.3,
+        "target_hm": 259.3,
+        "target_cross_minutes": 0,
+        "sessions": [
+          {
+            "day_of_week": 1,
+            "session_type": "Easy Run",
+            "distance_km": 11.1,
+            "elevation_gain_m": 25,
+            "duration_min": 72,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 2,
+            "session_type": "Tempo Session",
+            "distance_km": 6.8,
+            "elevation_gain_m": 4,
+            "duration_min": 37,
+            "strength_focus": null,
+            "session_role": "Quality"
+          },
+          {
+            "day_of_week": 3,
+            "session_type": "Strength Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 45,
+            "strength_focus": "lower_moderate",
+            "session_role": "Kraft"
+          },
+          {
+            "day_of_week": 4,
+            "session_type": "Easy Run",
+            "distance_km": 11.0,
+            "elevation_gain_m": 24,
+            "duration_min": 72,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 5,
+            "session_type": "Interval Session",
+            "distance_km": 6.8,
+            "elevation_gain_m": 4,
+            "duration_min": 37,
+            "strength_focus": null,
+            "session_role": "Quality"
+          },
+          {
+            "day_of_week": 7,
+            "session_type": "Long Run",
+            "distance_km": 24.6,
+            "elevation_gain_m": 202,
+            "duration_min": 172,
+            "strength_focus": null,
+            "session_role": "Longrun"
+          }
+        ]
+      },
+      {
+        "week_number": 14,
+        "week_date": "2026-09-28",
+        "phase": "BUILD",
+        "base_target_run_km": 61.3,
+        "actual_target_run_km": 61.3,
+        "target_hm": 260.4,
+        "target_cross_minutes": 0,
+        "sessions": [
+          {
+            "day_of_week": 1,
+            "session_type": "Easy Run",
+            "distance_km": 11.1,
+            "elevation_gain_m": 25,
+            "duration_min": 72,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 2,
+            "session_type": "Tempo Session",
+            "distance_km": 6.9,
+            "elevation_gain_m": 4,
+            "duration_min": 38,
+            "strength_focus": null,
+            "session_role": "Quality"
+          },
+          {
+            "day_of_week": 3,
+            "session_type": "Strength Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 45,
+            "strength_focus": "lower_moderate",
+            "session_role": "Kraft"
+          },
+          {
+            "day_of_week": 4,
+            "session_type": "Easy Run",
+            "distance_km": 11.1,
+            "elevation_gain_m": 24,
+            "duration_min": 72,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 5,
+            "session_type": "Interval Session",
+            "distance_km": 6.9,
+            "elevation_gain_m": 4,
+            "duration_min": 38,
+            "strength_focus": null,
+            "session_role": "Quality"
+          },
+          {
+            "day_of_week": 7,
+            "session_type": "Long Run",
+            "distance_km": 25.3,
+            "elevation_gain_m": 203,
+            "duration_min": 177,
+            "strength_focus": null,
+            "session_role": "Longrun"
+          }
+        ]
+      },
+      {
+        "week_number": 15,
+        "week_date": "2026-10-05",
+        "phase": "BUILD",
+        "base_target_run_km": 62.3,
+        "actual_target_run_km": 62.3,
+        "target_hm": 261.4,
+        "target_cross_minutes": 0,
+        "sessions": [
+          {
+            "day_of_week": 1,
+            "session_type": "Easy Run",
+            "distance_km": 11.2,
+            "elevation_gain_m": 25,
+            "duration_min": 73,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 2,
+            "session_type": "Tempo Session",
+            "distance_km": 7.0,
+            "elevation_gain_m": 4,
+            "duration_min": 38,
+            "strength_focus": null,
+            "session_role": "Quality"
+          },
+          {
+            "day_of_week": 3,
+            "session_type": "Strength Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 45,
+            "strength_focus": "lower_moderate",
+            "session_role": "Kraft"
+          },
+          {
+            "day_of_week": 4,
+            "session_type": "Easy Run",
+            "distance_km": 11.1,
+            "elevation_gain_m": 24,
+            "duration_min": 72,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 5,
+            "session_type": "Interval Session",
+            "distance_km": 7.0,
+            "elevation_gain_m": 4,
+            "duration_min": 38,
+            "strength_focus": null,
+            "session_role": "Quality"
+          },
+          {
+            "day_of_week": 7,
+            "session_type": "Long Run",
+            "distance_km": 26.0,
+            "elevation_gain_m": 204,
+            "duration_min": 182,
+            "strength_focus": null,
+            "session_role": "Longrun"
+          }
+        ]
+      },
+      {
+        "week_number": 16,
+        "week_date": "2026-10-12",
+        "phase": "PEAK",
+        "base_target_run_km": 63.3,
+        "actual_target_run_km": 63.3,
+        "target_hm": 262.5,
+        "target_cross_minutes": 0,
+        "sessions": [
+          {
+            "day_of_week": 1,
+            "session_type": "Easy Run",
+            "distance_km": 11.1,
+            "elevation_gain_m": 25,
+            "duration_min": 72,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 2,
+            "session_type": "Tempo Session",
+            "distance_km": 7.1,
+            "elevation_gain_m": 4,
+            "duration_min": 39,
+            "strength_focus": null,
+            "session_role": "Quality"
+          },
+          {
+            "day_of_week": 3,
+            "session_type": "Strength Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 45,
+            "strength_focus": "lower_moderate",
+            "session_role": "Kraft"
+          },
+          {
+            "day_of_week": 4,
+            "session_type": "Easy Run",
+            "distance_km": 11.1,
+            "elevation_gain_m": 25,
+            "duration_min": 72,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 5,
+            "session_type": "Interval Session",
+            "distance_km": 7.1,
+            "elevation_gain_m": 4,
+            "duration_min": 39,
+            "strength_focus": null,
+            "session_role": "Quality"
+          },
+          {
+            "day_of_week": 7,
+            "session_type": "Long Run",
+            "distance_km": 26.9,
+            "elevation_gain_m": 205,
+            "duration_min": 188,
+            "strength_focus": null,
+            "session_role": "Longrun"
+          }
+        ]
+      },
+      {
+        "week_number": 17,
+        "week_date": "2026-10-19",
+        "phase": "TAPER",
+        "base_target_run_km": 44.3,
+        "actual_target_run_km": 44.3,
+        "target_hm": 183.8,
+        "target_cross_minutes": 0,
+        "sessions": [
+          {
+            "day_of_week": 1,
+            "session_type": "Easy Run",
+            "distance_km": 5.2,
+            "elevation_gain_m": 13,
+            "duration_min": 34,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 2,
+            "session_type": "Easy Run",
+            "distance_km": 5.2,
+            "elevation_gain_m": 13,
+            "duration_min": 34,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 3,
+            "session_type": "Strength Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 45,
+            "strength_focus": "upper_light",
+            "session_role": "Kraft"
+          },
+          {
+            "day_of_week": 4,
+            "session_type": "Tempo Session",
+            "distance_km": 10.0,
+            "elevation_gain_m": 3,
+            "duration_min": 55,
+            "strength_focus": null,
+            "session_role": "Quality"
+          },
+          {
+            "day_of_week": 5,
+            "session_type": "Easy Run",
+            "distance_km": 5.1,
+            "elevation_gain_m": 12,
+            "duration_min": 33,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 7,
+            "session_type": "Long Run",
+            "distance_km": 18.8,
+            "elevation_gain_m": 143,
+            "duration_min": 132,
+            "strength_focus": null,
+            "session_role": "Longrun"
+          }
+        ]
+      },
+      {
+        "week_number": 18,
+        "week_date": "2026-10-26",
+        "phase": "TAPER",
+        "base_target_run_km": 44.3,
+        "actual_target_run_km": 39.0,
+        "target_hm": 183.8,
+        "target_cross_minutes": 0,
+        "sessions": [
+          {
+            "day_of_week": 1,
+            "session_type": "Easy Run",
+            "distance_km": 8.0,
+            "elevation_gain_m": 42,
+            "duration_min": 52,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 2,
+            "session_type": "Tempo Session",
+            "distance_km": 10.0,
+            "elevation_gain_m": 15,
+            "duration_min": 55,
+            "strength_focus": null,
+            "session_role": "Quality"
+          },
+          {
+            "day_of_week": 3,
+            "session_type": "Strength Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 45,
+            "strength_focus": "upper_light",
+            "session_role": "Kraft"
+          },
+          {
+            "day_of_week": 4,
+            "session_type": "Easy Run",
+            "distance_km": 8.0,
+            "elevation_gain_m": 42,
+            "duration_min": 52,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 5,
+            "session_type": "Easy Run",
+            "distance_km": 6.5,
+            "elevation_gain_m": 42,
+            "duration_min": 42,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 6,
+            "session_type": "Easy Run",
+            "distance_km": 6.5,
+            "elevation_gain_m": 43,
+            "duration_min": 42,
+            "strength_focus": null,
+            "session_role": "Easy"
+          }
+        ]
+      },
+      {
+        "week_number": 19,
+        "week_date": "2026-11-02",
+        "phase": "RACE",
+        "base_target_run_km": 22.2,
+        "actual_target_run_km": 22.2,
+        "target_hm": 91.9,
+        "target_cross_minutes": 0,
+        "sessions": [
+          {
+            "day_of_week": 1,
+            "session_type": "Easy Run",
+            "distance_km": 5.5,
+            "elevation_gain_m": 23,
+            "duration_min": 36,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 2,
+            "session_type": "Easy Run",
+            "distance_km": 5.5,
+            "elevation_gain_m": 23,
+            "duration_min": 36,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 3,
+            "session_type": "Strength Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 45,
+            "strength_focus": "upper_light",
+            "session_role": "Kraft"
+          },
+          {
+            "day_of_week": 4,
+            "session_type": "Easy Run",
+            "distance_km": 5.5,
+            "elevation_gain_m": 23,
+            "duration_min": 36,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 5,
+            "session_type": "Easy Run",
+            "distance_km": 5.7,
+            "elevation_gain_m": 23,
+            "duration_min": 37,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 7,
+            "session_type": "Race Day",
+            "distance_km": 42.195,
+            "elevation_gain_m": 180,
+            "duration_min": 297,
+            "strength_focus": null,
+            "session_role": "Race"
+          }
+        ]
+      }
+    ],
+    "conflicts": [
+      "Woche 17: kein geeigneter Lower-Body-Slot verfügbar, alle Gymtage als Upper Body.",
+      "Woche 18: kein geeigneter Lower-Body-Slot verfügbar, alle Gymtage als Upper Body.",
+      "Woche 18 (letzte Taper-Woche): Easy Run von 8.6km auf 8.0km reduziert (Regel 16, Klarstellung 17: Prozentziel darf unterschritten werden).",
+      "Woche 18 (letzte Taper-Woche): Easy Run von 8.6km auf 8.0km reduziert (Regel 16, Klarstellung 17: Prozentziel darf unterschritten werden).",
+      "Woche 18 (letzte Taper-Woche): Easy Run von 8.6km auf 8.0km reduziert (Regel 16, Klarstellung 17: Prozentziel darf unterschritten werden).",
+      "Woche 18 (letzte Taper-Woche): Easy Run von 8.5km auf 8.0km reduziert (Regel 16, Klarstellung 17: Prozentziel darf unterschritten werden).",
+      "Woche 18 (letzte Taper-Woche): Fr+Sa von 16.0km auf ~13.0km reduziert (Regel 16: max. 12-14km zusammen).",
+      "Woche 18: Laufziel von 44.3km auf 39.0km reduziert (Easy-Run-/Taper-Obergrenzen) — finaler, tatsächlich gespeicherter Wert."
+    ]
+  },
+  {
+    "id": 4,
+    "name": "Trail 31K Hybrid",
+    "label": "31 KM TRAIL / HYBRID-ATHLET",
+    "inputs": {
+      "start_date": "2026-07-13",
+      "race_date": "2026-10-26",
+      "race_distance_km": 30.7,
+      "race_elevation_m": 1246,
+      "terrain": "trail",
+      "days_per_week": 6,
+      "strength_sessions": 2,
+      "strength_days": [
+        2,
+        4
+      ],
+      "quality_sessions": 1,
+      "long_run_day": 7,
+      "cross_training": true,
+      "cross_training_days": 1,
+      "cross_replaces_run": false,
+      "max_km": 55,
+      "avg_weekly_km": 36,
+      "avg_weekly_hm": 450,
+      "athlete_paces": {}
+    },
+    "total_weeks": 16,
+    "validator_valid": true,
+    "validator_errors": [],
+    "category_ratings": {
+      "Struktur": "PASS",
+      "Volumen": "PASS",
+      "Longrun": "WARNING",
+      "HM/Terrain": "WARNING",
+      "Kraft/Cross": "PASS",
+      "Taper": "PASS"
+    },
+    "overall_rating": "WARNING",
+    "findings": [
+      {
+        "category": "Longrun",
+        "severity": "WARNING",
+        "week": 13,
+        "session": "Long Run",
+        "ist": "20.6km",
+        "erwartet": "~22-25km",
+        "regel": "Peak-Longrun passt zu Renndistanz, Erfahrung und Terrain",
+        "ursache": "compute_desired_peak_longrun_km() / compute_longrun_progression() (data/generate_plan.py:265-362) — Formel ist NICHT terrainabhängig"
+      },
+      {
+        "category": "HM/Terrain",
+        "severity": "WARNING",
+        "week": 13,
+        "session": "Long Run",
+        "ist": "828Hm",
+        "erwartet": "~850-1120Hm",
+        "regel": "Peak-Longrun-HM passt zum Rennen",
+        "ursache": "compute_longrun_hm() (data/generate_plan.py:365-369)"
+      }
+    ],
+    "weeks": [
+      {
+        "week_number": 1,
+        "week_date": "2026-07-13",
+        "phase": "BASE",
+        "base_target_run_km": 36,
+        "actual_target_run_km": 32.6,
+        "target_hm": 450,
+        "target_cross_minutes": 60,
+        "sessions": [
+          {
+            "day_of_week": 1,
+            "session_type": "Cross Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 60,
+            "strength_focus": null,
+            "session_role": "Cross"
+          },
+          {
+            "day_of_week": 2,
+            "session_type": "Strength Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 45,
+            "strength_focus": "lower",
+            "session_role": "Kraft"
+          },
+          {
+            "day_of_week": 3,
+            "session_type": "Easy Run",
+            "distance_km": 11.4,
+            "elevation_gain_m": 45,
+            "duration_min": 74,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 4,
+            "session_type": "Strength Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 45,
+            "strength_focus": "upper",
+            "session_role": "Kraft"
+          },
+          {
+            "day_of_week": 5,
+            "session_type": "Hill Session",
+            "distance_km": 8.1,
+            "elevation_gain_m": 54,
+            "duration_min": 45,
+            "strength_focus": null,
+            "session_role": "Quality"
+          },
+          {
+            "day_of_week": 7,
+            "session_type": "Long Run",
+            "distance_km": 13.1,
+            "elevation_gain_m": 351,
+            "duration_min": 94,
+            "strength_focus": null,
+            "session_role": "Longrun"
+          }
+        ]
+      },
+      {
+        "week_number": 2,
+        "week_date": "2026-07-20",
+        "phase": "BASE",
+        "base_target_run_km": 37.0,
+        "actual_target_run_km": 34.0,
+        "target_hm": 495.0,
+        "target_cross_minutes": 60,
+        "sessions": [
+          {
+            "day_of_week": 1,
+            "session_type": "Cross Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 60,
+            "strength_focus": null,
+            "session_role": "Cross"
+          },
+          {
+            "day_of_week": 2,
+            "session_type": "Strength Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 45,
+            "strength_focus": "lower",
+            "session_role": "Kraft"
+          },
+          {
+            "day_of_week": 3,
+            "session_type": "Easy Run",
+            "distance_km": 11.9,
+            "elevation_gain_m": 49,
+            "duration_min": 78,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 4,
+            "session_type": "Strength Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 45,
+            "strength_focus": "upper",
+            "session_role": "Kraft"
+          },
+          {
+            "day_of_week": 5,
+            "session_type": "Hill Session",
+            "distance_km": 8.3,
+            "elevation_gain_m": 60,
+            "duration_min": 46,
+            "strength_focus": null,
+            "session_role": "Quality"
+          },
+          {
+            "day_of_week": 7,
+            "session_type": "Long Run",
+            "distance_km": 13.8,
+            "elevation_gain_m": 386,
+            "duration_min": 99,
+            "strength_focus": null,
+            "session_role": "Longrun"
+          }
+        ]
+      },
+      {
+        "week_number": 3,
+        "week_date": "2026-07-27",
+        "phase": "BASE",
+        "base_target_run_km": 38.0,
+        "actual_target_run_km": 35.4,
+        "target_hm": 544.5,
+        "target_cross_minutes": 60,
+        "sessions": [
+          {
+            "day_of_week": 1,
+            "session_type": "Cross Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 60,
+            "strength_focus": null,
+            "session_role": "Cross"
+          },
+          {
+            "day_of_week": 2,
+            "session_type": "Strength Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 45,
+            "strength_focus": "lower",
+            "session_role": "Kraft"
+          },
+          {
+            "day_of_week": 3,
+            "session_type": "Easy Run",
+            "distance_km": 12.4,
+            "elevation_gain_m": 54,
+            "duration_min": 81,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 4,
+            "session_type": "Strength Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 45,
+            "strength_focus": "upper",
+            "session_role": "Kraft"
+          },
+          {
+            "day_of_week": 5,
+            "session_type": "Hill Session",
+            "distance_km": 8.6,
+            "elevation_gain_m": 66,
+            "duration_min": 47,
+            "strength_focus": null,
+            "session_role": "Quality"
+          },
+          {
+            "day_of_week": 7,
+            "session_type": "Long Run",
+            "distance_km": 14.4,
+            "elevation_gain_m": 425,
+            "duration_min": 104,
+            "strength_focus": null,
+            "session_role": "Longrun"
+          }
+        ]
+      },
+      {
+        "week_number": 4,
+        "week_date": "2026-08-03",
+        "phase": "DELOAD",
+        "base_target_run_km": 29.5,
+        "actual_target_run_km": 29.5,
+        "target_hm": 422.0,
+        "target_cross_minutes": 45,
+        "sessions": [
+          {
+            "day_of_week": 1,
+            "session_type": "Cross Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 45,
+            "_deload_cross_zone": "Z1-Z2",
+            "strength_focus": null,
+            "session_role": "Cross"
+          },
+          {
+            "day_of_week": 2,
+            "session_type": "Strength Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 45,
+            "strength_focus": "full_light",
+            "session_role": "Kraft"
+          },
+          {
+            "day_of_week": 3,
+            "session_type": "Easy Run",
+            "distance_km": 9.2,
+            "elevation_gain_m": 46,
+            "duration_min": 60,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 4,
+            "session_type": "Strength Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 45,
+            "strength_focus": "full_light",
+            "session_role": "Kraft"
+          },
+          {
+            "day_of_week": 5,
+            "session_type": "Easy Run",
+            "distance_km": 9.1,
+            "elevation_gain_m": 47,
+            "duration_min": 59,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 7,
+            "session_type": "Long Run",
+            "distance_km": 11.2,
+            "elevation_gain_m": 329,
+            "duration_min": 81,
+            "strength_focus": null,
+            "session_role": "Longrun"
+          }
+        ]
+      },
+      {
+        "week_number": 5,
+        "week_date": "2026-08-10",
+        "phase": "BUILD",
+        "base_target_run_km": 39.1,
+        "actual_target_run_km": 36.6,
+        "target_hm": 599.0,
+        "target_cross_minutes": 60,
+        "sessions": [
+          {
+            "day_of_week": 1,
+            "session_type": "Cross Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 60,
+            "strength_focus": null,
+            "session_role": "Cross"
+          },
+          {
+            "day_of_week": 2,
+            "session_type": "Strength Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 45,
+            "strength_focus": "lower",
+            "session_role": "Kraft"
+          },
+          {
+            "day_of_week": 3,
+            "session_type": "Easy Run",
+            "distance_km": 12.8,
+            "elevation_gain_m": 59,
+            "duration_min": 84,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 4,
+            "session_type": "Strength Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 45,
+            "strength_focus": "upper",
+            "session_role": "Kraft"
+          },
+          {
+            "day_of_week": 5,
+            "session_type": "Hill Session",
+            "distance_km": 8.8,
+            "elevation_gain_m": 73,
+            "duration_min": 48,
+            "strength_focus": null,
+            "session_role": "Quality"
+          },
+          {
+            "day_of_week": 7,
+            "session_type": "Long Run",
+            "distance_km": 15.0,
+            "elevation_gain_m": 467,
+            "duration_min": 108,
+            "strength_focus": null,
+            "session_role": "Longrun"
+          }
+        ]
+      },
+      {
+        "week_number": 6,
+        "week_date": "2026-08-17",
+        "phase": "BUILD",
+        "base_target_run_km": 40.2,
+        "actual_target_run_km": 38.0,
+        "target_hm": 658.8,
+        "target_cross_minutes": 60,
+        "sessions": [
+          {
+            "day_of_week": 1,
+            "session_type": "Cross Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 60,
+            "strength_focus": null,
+            "session_role": "Cross"
+          },
+          {
+            "day_of_week": 2,
+            "session_type": "Strength Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 45,
+            "strength_focus": "lower",
+            "session_role": "Kraft"
+          },
+          {
+            "day_of_week": 3,
+            "session_type": "Easy Run",
+            "distance_km": 13.3,
+            "elevation_gain_m": 65,
+            "duration_min": 87,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 4,
+            "session_type": "Strength Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 45,
+            "strength_focus": "upper",
+            "session_role": "Kraft"
+          },
+          {
+            "day_of_week": 5,
+            "session_type": "Hill Session",
+            "distance_km": 9.0,
+            "elevation_gain_m": 80,
+            "duration_min": 50,
+            "strength_focus": null,
+            "session_role": "Quality"
+          },
+          {
+            "day_of_week": 7,
+            "session_type": "Long Run",
+            "distance_km": 15.7,
+            "elevation_gain_m": 514,
+            "duration_min": 113,
+            "strength_focus": null,
+            "session_role": "Longrun"
+          }
+        ]
+      },
+      {
+        "week_number": 7,
+        "week_date": "2026-08-24",
+        "phase": "BUILD",
+        "base_target_run_km": 41.3,
+        "actual_target_run_km": 39.6,
+        "target_hm": 724.7,
+        "target_cross_minutes": 60,
+        "sessions": [
+          {
+            "day_of_week": 1,
+            "session_type": "Cross Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 60,
+            "strength_focus": null,
+            "session_role": "Cross"
+          },
+          {
+            "day_of_week": 2,
+            "session_type": "Strength Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 45,
+            "strength_focus": "lower",
+            "session_role": "Kraft"
+          },
+          {
+            "day_of_week": 3,
+            "session_type": "Easy Run",
+            "distance_km": 13.9,
+            "elevation_gain_m": 72,
+            "duration_min": 91,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 4,
+            "session_type": "Strength Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 45,
+            "strength_focus": "upper",
+            "session_role": "Kraft"
+          },
+          {
+            "day_of_week": 5,
+            "session_type": "Hill Session",
+            "distance_km": 9.3,
+            "elevation_gain_m": 88,
+            "duration_min": 51,
+            "strength_focus": null,
+            "session_role": "Quality"
+          },
+          {
+            "day_of_week": 7,
+            "session_type": "Long Run",
+            "distance_km": 16.4,
+            "elevation_gain_m": 565,
+            "duration_min": 119,
+            "strength_focus": null,
+            "session_role": "Longrun"
+          }
+        ]
+      },
+      {
+        "week_number": 8,
+        "week_date": "2026-08-31",
+        "phase": "DELOAD",
+        "base_target_run_km": 32.0,
+        "actual_target_run_km": 32.0,
+        "target_hm": 561.7,
+        "target_cross_minutes": 45,
+        "sessions": [
+          {
+            "day_of_week": 1,
+            "session_type": "Cross Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 45,
+            "_deload_cross_zone": "Z1-Z2",
+            "strength_focus": null,
+            "session_role": "Cross"
+          },
+          {
+            "day_of_week": 2,
+            "session_type": "Strength Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 45,
+            "strength_focus": "full_light",
+            "session_role": "Kraft"
+          },
+          {
+            "day_of_week": 3,
+            "session_type": "Easy Run",
+            "distance_km": 9.7,
+            "elevation_gain_m": 62,
+            "duration_min": 63,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 4,
+            "session_type": "Strength Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 45,
+            "strength_focus": "full_light",
+            "session_role": "Kraft"
+          },
+          {
+            "day_of_week": 5,
+            "session_type": "Easy Run",
+            "distance_km": 9.6,
+            "elevation_gain_m": 62,
+            "duration_min": 63,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 7,
+            "session_type": "Long Run",
+            "distance_km": 12.7,
+            "elevation_gain_m": 438,
+            "duration_min": 92,
+            "strength_focus": null,
+            "session_role": "Longrun"
+          }
+        ]
+      },
+      {
+        "week_number": 9,
+        "week_date": "2026-09-07",
+        "phase": "BUILD",
+        "base_target_run_km": 42.4,
+        "actual_target_run_km": 41.1,
+        "target_hm": 797.2,
+        "target_cross_minutes": 60,
+        "sessions": [
+          {
+            "day_of_week": 1,
+            "session_type": "Cross Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 60,
+            "strength_focus": null,
+            "session_role": "Cross"
+          },
+          {
+            "day_of_week": 2,
+            "session_type": "Strength Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 45,
+            "strength_focus": "lower",
+            "session_role": "Kraft"
+          },
+          {
+            "day_of_week": 3,
+            "session_type": "Easy Run",
+            "distance_km": 14.4,
+            "elevation_gain_m": 79,
+            "duration_min": 94,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 4,
+            "session_type": "Strength Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 45,
+            "strength_focus": "upper",
+            "session_role": "Kraft"
+          },
+          {
+            "day_of_week": 5,
+            "session_type": "Hill Session",
+            "distance_km": 9.5,
+            "elevation_gain_m": 96,
+            "duration_min": 52,
+            "strength_focus": null,
+            "session_role": "Quality"
+          },
+          {
+            "day_of_week": 7,
+            "session_type": "Long Run",
+            "distance_km": 17.2,
+            "elevation_gain_m": 622,
+            "duration_min": 125,
+            "strength_focus": null,
+            "session_role": "Longrun"
+          }
+        ]
+      },
+      {
+        "week_number": 10,
+        "week_date": "2026-09-14",
+        "phase": "BUILD",
+        "base_target_run_km": 43.6,
+        "actual_target_run_km": 42.6,
+        "target_hm": 876.9,
+        "target_cross_minutes": 60,
+        "sessions": [
+          {
+            "day_of_week": 1,
+            "session_type": "Cross Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 60,
+            "strength_focus": null,
+            "session_role": "Cross"
+          },
+          {
+            "day_of_week": 2,
+            "session_type": "Strength Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 45,
+            "strength_focus": "lower",
+            "session_role": "Kraft"
+          },
+          {
+            "day_of_week": 3,
+            "session_type": "Easy Run",
+            "distance_km": 14.9,
+            "elevation_gain_m": 87,
+            "duration_min": 97,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 4,
+            "session_type": "Strength Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 45,
+            "strength_focus": "upper",
+            "session_role": "Kraft"
+          },
+          {
+            "day_of_week": 5,
+            "session_type": "Hill Session",
+            "distance_km": 9.8,
+            "elevation_gain_m": 106,
+            "duration_min": 54,
+            "strength_focus": null,
+            "session_role": "Quality"
+          },
+          {
+            "day_of_week": 7,
+            "session_type": "Long Run",
+            "distance_km": 17.9,
+            "elevation_gain_m": 684,
+            "duration_min": 130,
+            "strength_focus": null,
+            "session_role": "Longrun"
+          }
+        ]
+      },
+      {
+        "week_number": 11,
+        "week_date": "2026-09-21",
+        "phase": "BUILD",
+        "base_target_run_km": 44.8,
+        "actual_target_run_km": 43.7,
+        "target_hm": 964.6,
+        "target_cross_minutes": 60,
+        "sessions": [
+          {
+            "day_of_week": 1,
+            "session_type": "Cross Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 60,
+            "strength_focus": null,
+            "session_role": "Cross"
+          },
+          {
+            "day_of_week": 2,
+            "session_type": "Strength Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 45,
+            "strength_focus": "lower",
+            "session_role": "Kraft"
+          },
+          {
+            "day_of_week": 3,
+            "session_type": "Easy Run",
+            "distance_km": 14.9,
+            "elevation_gain_m": 96,
+            "duration_min": 98,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 4,
+            "session_type": "Strength Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 45,
+            "strength_focus": "upper",
+            "session_role": "Kraft"
+          },
+          {
+            "day_of_week": 5,
+            "session_type": "Hill Session",
+            "distance_km": 10.1,
+            "elevation_gain_m": 117,
+            "duration_min": 56,
+            "strength_focus": null,
+            "session_role": "Quality"
+          },
+          {
+            "day_of_week": 7,
+            "session_type": "Long Run",
+            "distance_km": 18.7,
+            "elevation_gain_m": 752,
+            "duration_min": 136,
+            "strength_focus": null,
+            "session_role": "Longrun"
+          }
+        ]
+      },
+      {
+        "week_number": 12,
+        "week_date": "2026-09-28",
+        "phase": "DELOAD",
+        "base_target_run_km": 34.7,
+        "actual_target_run_km": 34.7,
+        "target_hm": 747.6,
+        "target_cross_minutes": 45,
+        "sessions": [
+          {
+            "day_of_week": 1,
+            "session_type": "Cross Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 45,
+            "_deload_cross_zone": "Z1-Z2",
+            "strength_focus": null,
+            "session_role": "Cross"
+          },
+          {
+            "day_of_week": 2,
+            "session_type": "Strength Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 45,
+            "strength_focus": "full_light",
+            "session_role": "Kraft"
+          },
+          {
+            "day_of_week": 3,
+            "session_type": "Easy Run",
+            "distance_km": 10.1,
+            "elevation_gain_m": 82,
+            "duration_min": 66,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 4,
+            "session_type": "Strength Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 45,
+            "strength_focus": "full_light",
+            "session_role": "Kraft"
+          },
+          {
+            "day_of_week": 5,
+            "session_type": "Easy Run",
+            "distance_km": 10.1,
+            "elevation_gain_m": 83,
+            "duration_min": 66,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 7,
+            "session_type": "Long Run",
+            "distance_km": 14.5,
+            "elevation_gain_m": 583,
+            "duration_min": 106,
+            "strength_focus": null,
+            "session_role": "Longrun"
+          }
+        ]
+      },
+      {
+        "week_number": 13,
+        "week_date": "2026-10-05",
+        "phase": "PEAK",
+        "base_target_run_km": 46.0,
+        "actual_target_run_km": 45.8,
+        "target_hm": 1061.1,
+        "target_cross_minutes": 60,
+        "sessions": [
+          {
+            "day_of_week": 1,
+            "session_type": "Cross Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 60,
+            "strength_focus": null,
+            "session_role": "Cross"
+          },
+          {
+            "day_of_week": 2,
+            "session_type": "Strength Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 45,
+            "strength_focus": "lower",
+            "session_role": "Kraft"
+          },
+          {
+            "day_of_week": 3,
+            "session_type": "Easy Run",
+            "distance_km": 14.9,
+            "elevation_gain_m": 105,
+            "duration_min": 98,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 4,
+            "session_type": "Strength Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 45,
+            "strength_focus": "upper",
+            "session_role": "Kraft"
+          },
+          {
+            "day_of_week": 5,
+            "session_type": "Hill Session",
+            "distance_km": 10.3,
+            "elevation_gain_m": 128,
+            "duration_min": 57,
+            "strength_focus": null,
+            "session_role": "Quality"
+          },
+          {
+            "day_of_week": 7,
+            "session_type": "Long Run",
+            "distance_km": 20.6,
+            "elevation_gain_m": 828,
+            "duration_min": 150,
+            "strength_focus": null,
+            "session_role": "Longrun"
+          }
+        ]
+      },
+      {
+        "week_number": 14,
+        "week_date": "2026-10-12",
+        "phase": "TAPER",
+        "base_target_run_km": 32.2,
+        "actual_target_run_km": 32.2,
+        "target_hm": 742.8,
+        "target_cross_minutes": 60,
+        "sessions": [
+          {
+            "day_of_week": 1,
+            "session_type": "Cross Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 60,
+            "strength_focus": null,
+            "session_role": "Cross"
+          },
+          {
+            "day_of_week": 2,
+            "session_type": "Strength Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 45,
+            "strength_focus": "upper_light",
+            "session_role": "Kraft"
+          },
+          {
+            "day_of_week": 3,
+            "session_type": "Tempo Session",
+            "distance_km": 7.2,
+            "elevation_gain_m": 41,
+            "duration_min": 40,
+            "strength_focus": null,
+            "session_role": "Quality"
+          },
+          {
+            "day_of_week": 4,
+            "session_type": "Strength Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 45,
+            "strength_focus": "upper_light",
+            "session_role": "Kraft"
+          },
+          {
+            "day_of_week": 5,
+            "session_type": "Easy Run",
+            "distance_km": 10.6,
+            "elevation_gain_m": 123,
+            "duration_min": 70,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 7,
+            "session_type": "Long Run",
+            "distance_km": 14.4,
+            "elevation_gain_m": 579,
+            "duration_min": 105,
+            "strength_focus": null,
+            "session_role": "Longrun"
+          }
+        ]
+      },
+      {
+        "week_number": 15,
+        "week_date": "2026-10-19",
+        "phase": "TAPER",
+        "base_target_run_km": 32.2,
+        "actual_target_run_km": 20.2,
+        "target_hm": 742.8,
+        "target_cross_minutes": 60,
+        "sessions": [
+          {
+            "day_of_week": 1,
+            "session_type": "Cross Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 60,
+            "strength_focus": null,
+            "session_role": "Cross"
+          },
+          {
+            "day_of_week": 2,
+            "session_type": "Strength Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 45,
+            "strength_focus": "upper_light",
+            "session_role": "Kraft"
+          },
+          {
+            "day_of_week": 3,
+            "session_type": "Tempo Session",
+            "distance_km": 7.2,
+            "elevation_gain_m": 186,
+            "duration_min": 40,
+            "strength_focus": null,
+            "session_role": "Quality"
+          },
+          {
+            "day_of_week": 4,
+            "session_type": "Strength Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 45,
+            "strength_focus": "upper_light",
+            "session_role": "Kraft"
+          },
+          {
+            "day_of_week": 5,
+            "session_type": "Easy Run",
+            "distance_km": 6.5,
+            "elevation_gain_m": 278,
+            "duration_min": 44,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 6,
+            "session_type": "Easy Run",
+            "distance_km": 6.5,
+            "elevation_gain_m": 279,
+            "duration_min": 44,
+            "strength_focus": null,
+            "session_role": "Easy"
+          }
+        ]
+      },
+      {
+        "week_number": 16,
+        "week_date": "2026-10-26",
+        "phase": "RACE",
+        "base_target_run_km": 0.0,
+        "actual_target_run_km": 0.0,
+        "target_hm": 0.0,
+        "target_cross_minutes": 0,
+        "sessions": [
+          {
+            "day_of_week": 1,
+            "session_type": "Race Day",
+            "distance_km": 30.7,
+            "elevation_gain_m": 1246,
+            "duration_min": 227,
+            "strength_focus": null,
+            "session_role": "Race"
+          }
+        ]
+      }
+    ],
+    "conflicts": [
+      "Woche 13 (PEAK): renn-verankertes Longrun-Ziel 23.9km bei verfügbarer Vorbereitungszeit/Basis nicht sicher erreichbar, Peak-Longrun bleibt bei 20.6km (sichere +10%/Woche-Progression greift).",
+      "Woche 1: Laufziel von 36km auf 32.6km reduziert (Easy-Run-/Taper-Obergrenzen) — finaler, tatsächlich gespeicherter Wert.",
+      "Woche 2: Laufziel von 37.0km auf 34.0km reduziert (Easy-Run-/Taper-Obergrenzen) — finaler, tatsächlich gespeicherter Wert.",
+      "Woche 3: Laufziel von 38.0km auf 35.4km reduziert (Easy-Run-/Taper-Obergrenzen) — finaler, tatsächlich gespeicherter Wert.",
+      "Woche 5: Laufziel von 39.1km auf 36.6km reduziert (Easy-Run-/Taper-Obergrenzen) — finaler, tatsächlich gespeicherter Wert.",
+      "Woche 6: Laufziel von 40.2km auf 38.0km reduziert (Easy-Run-/Taper-Obergrenzen) — finaler, tatsächlich gespeicherter Wert.",
+      "Woche 7: Laufziel von 41.3km auf 39.6km reduziert (Easy-Run-/Taper-Obergrenzen) — finaler, tatsächlich gespeicherter Wert.",
+      "Woche 9: Laufziel von 42.4km auf 41.1km reduziert (Easy-Run-/Taper-Obergrenzen) — finaler, tatsächlich gespeicherter Wert.",
+      "Woche 10: Laufziel von 43.6km auf 42.6km reduziert (Easy-Run-/Taper-Obergrenzen) — finaler, tatsächlich gespeicherter Wert.",
+      "Woche 11: Laufziel von 44.8km auf 43.7km reduziert (Easy-Run-/Taper-Obergrenzen) — finaler, tatsächlich gespeicherter Wert.",
+      "Woche 13: Laufziel von 46.0km auf 45.8km reduziert (Easy-Run-/Taper-Obergrenzen) — finaler, tatsächlich gespeicherter Wert.",
+      "Woche 14: kein geeigneter Lower-Body-Slot verfügbar, alle Gymtage als Upper Body.",
+      "Woche 15: kein geeigneter Lower-Body-Slot verfügbar, alle Gymtage als Upper Body.",
+      "Woche 15 (letzte Taper-Woche): Easy Run von 9.1km auf 8.0km reduziert (Regel 16, Klarstellung 17: Prozentziel darf unterschritten werden).",
+      "Woche 15 (letzte Taper-Woche): Easy Run von 9.1km auf 8.0km reduziert (Regel 16, Klarstellung 17: Prozentziel darf unterschritten werden).",
+      "Woche 15 (letzte Taper-Woche): Fr+Sa von 16.0km auf ~13.0km reduziert (Regel 16: max. 12-14km zusammen).",
+      "Woche 15: Laufziel von 32.2km auf 20.2km reduziert (Easy-Run-/Taper-Obergrenzen) — finaler, tatsächlich gespeicherter Wert."
+    ]
+  },
+  {
+    "id": 5,
+    "name": "Mountain Trail 45K",
+    "label": "BERGTRAIL 45 KM / ERFAHRENER TRAILRUNNER",
+    "inputs": {
+      "start_date": "2026-06-15",
+      "race_date": "2026-10-17",
+      "race_distance_km": 45,
+      "race_elevation_m": 2600,
+      "terrain": "mountain_trail",
+      "days_per_week": 6,
+      "strength_sessions": 1,
+      "strength_days": [
+        2
+      ],
+      "quality_sessions": 1,
+      "long_run_day": 7,
+      "cross_training": true,
+      "cross_training_days": 1,
+      "cross_replaces_run": true,
+      "max_km": 70,
+      "avg_weekly_km": 48,
+      "avg_weekly_hm": 1400,
+      "athlete_paces": {}
+    },
+    "total_weeks": 18,
+    "validator_valid": true,
+    "validator_errors": [],
+    "category_ratings": {
+      "Struktur": "PASS",
+      "Volumen": "PASS",
+      "Longrun": "WARNING",
+      "HM/Terrain": "FAIL",
+      "Kraft/Cross": "PASS",
+      "Taper": "WARNING"
+    },
+    "overall_rating": "FAIL",
+    "findings": [
+      {
+        "category": "Taper",
+        "severity": "WARNING",
+        "week": 18,
+        "session": "Easy Run",
+        "ist": "4.7km am Tag vor Race Day",
+        "erwartet": "<= 3km oder Rest",
+        "regel": "Tag vor dem Rennen ist Rest oder maximal sehr kurzer Shakeout",
+        "ursache": "build_week_skeleton() Rennwoche-Layout (data/generate_plan.py:499-526)"
+      },
+      {
+        "category": "Longrun",
+        "severity": "WARNING",
+        "week": 15,
+        "session": "Long Run",
+        "ist": "26.5km",
+        "erwartet": "~28-35km",
+        "regel": "Peak-Longrun passt zu Renndistanz, Erfahrung und Terrain",
+        "ursache": "compute_desired_peak_longrun_km() / compute_longrun_progression() (data/generate_plan.py:265-362) — Formel ist NICHT terrainabhängig"
+      },
+      {
+        "category": "HM/Terrain",
+        "severity": "FAIL",
+        "week": 1,
+        "session": "Tempo Session",
+        "ist": "terrain='mountain_trail' -> Tempo Session",
+        "erwartet": "terrain='mountain_trail' sollte wie 'trail' behandelt werden -> Hill Session",
+        "regel": "terrain-Wert 'mountain_trail' ist nicht im Code-Enum ('trail','mixed') enthalten",
+        "ursache": "pick_quality_type() prüft `terrain in ('trail', 'mixed')` wörtlich — 'mountain_trail' fällt durch (data/generate_plan.py:441)"
+      },
+      {
+        "category": "HM/Terrain",
+        "severity": "FAIL",
+        "week": 2,
+        "session": "Tempo Session",
+        "ist": "terrain='mountain_trail' -> Tempo Session",
+        "erwartet": "terrain='mountain_trail' sollte wie 'trail' behandelt werden -> Hill Session",
+        "regel": "terrain-Wert 'mountain_trail' ist nicht im Code-Enum ('trail','mixed') enthalten",
+        "ursache": "pick_quality_type() prüft `terrain in ('trail', 'mixed')` wörtlich — 'mountain_trail' fällt durch (data/generate_plan.py:441)"
+      },
+      {
+        "category": "HM/Terrain",
+        "severity": "FAIL",
+        "week": 3,
+        "session": "Tempo Session",
+        "ist": "terrain='mountain_trail' -> Tempo Session",
+        "erwartet": "terrain='mountain_trail' sollte wie 'trail' behandelt werden -> Hill Session",
+        "regel": "terrain-Wert 'mountain_trail' ist nicht im Code-Enum ('trail','mixed') enthalten",
+        "ursache": "pick_quality_type() prüft `terrain in ('trail', 'mixed')` wörtlich — 'mountain_trail' fällt durch (data/generate_plan.py:441)"
+      },
+      {
+        "category": "HM/Terrain",
+        "severity": "FAIL",
+        "week": 5,
+        "session": "Tempo Session",
+        "ist": "terrain='mountain_trail' -> Tempo Session",
+        "erwartet": "terrain='mountain_trail' sollte wie 'trail' behandelt werden -> Hill Session",
+        "regel": "terrain-Wert 'mountain_trail' ist nicht im Code-Enum ('trail','mixed') enthalten",
+        "ursache": "pick_quality_type() prüft `terrain in ('trail', 'mixed')` wörtlich — 'mountain_trail' fällt durch (data/generate_plan.py:441)"
+      },
+      {
+        "category": "HM/Terrain",
+        "severity": "FAIL",
+        "week": 6,
+        "session": "Tempo Session",
+        "ist": "terrain='mountain_trail' -> Tempo Session",
+        "erwartet": "terrain='mountain_trail' sollte wie 'trail' behandelt werden -> Hill Session",
+        "regel": "terrain-Wert 'mountain_trail' ist nicht im Code-Enum ('trail','mixed') enthalten",
+        "ursache": "pick_quality_type() prüft `terrain in ('trail', 'mixed')` wörtlich — 'mountain_trail' fällt durch (data/generate_plan.py:441)"
+      },
+      {
+        "category": "HM/Terrain",
+        "severity": "FAIL",
+        "week": 7,
+        "session": "Tempo Session",
+        "ist": "terrain='mountain_trail' -> Tempo Session",
+        "erwartet": "terrain='mountain_trail' sollte wie 'trail' behandelt werden -> Hill Session",
+        "regel": "terrain-Wert 'mountain_trail' ist nicht im Code-Enum ('trail','mixed') enthalten",
+        "ursache": "pick_quality_type() prüft `terrain in ('trail', 'mixed')` wörtlich — 'mountain_trail' fällt durch (data/generate_plan.py:441)"
+      },
+      {
+        "category": "HM/Terrain",
+        "severity": "FAIL",
+        "week": 9,
+        "session": "Tempo Session",
+        "ist": "terrain='mountain_trail' -> Tempo Session",
+        "erwartet": "terrain='mountain_trail' sollte wie 'trail' behandelt werden -> Hill Session",
+        "regel": "terrain-Wert 'mountain_trail' ist nicht im Code-Enum ('trail','mixed') enthalten",
+        "ursache": "pick_quality_type() prüft `terrain in ('trail', 'mixed')` wörtlich — 'mountain_trail' fällt durch (data/generate_plan.py:441)"
+      },
+      {
+        "category": "HM/Terrain",
+        "severity": "FAIL",
+        "week": 10,
+        "session": "Tempo Session",
+        "ist": "terrain='mountain_trail' -> Tempo Session",
+        "erwartet": "terrain='mountain_trail' sollte wie 'trail' behandelt werden -> Hill Session",
+        "regel": "terrain-Wert 'mountain_trail' ist nicht im Code-Enum ('trail','mixed') enthalten",
+        "ursache": "pick_quality_type() prüft `terrain in ('trail', 'mixed')` wörtlich — 'mountain_trail' fällt durch (data/generate_plan.py:441)"
+      },
+      {
+        "category": "HM/Terrain",
+        "severity": "FAIL",
+        "week": 11,
+        "session": "Tempo Session",
+        "ist": "terrain='mountain_trail' -> Tempo Session",
+        "erwartet": "terrain='mountain_trail' sollte wie 'trail' behandelt werden -> Hill Session",
+        "regel": "terrain-Wert 'mountain_trail' ist nicht im Code-Enum ('trail','mixed') enthalten",
+        "ursache": "pick_quality_type() prüft `terrain in ('trail', 'mixed')` wörtlich — 'mountain_trail' fällt durch (data/generate_plan.py:441)"
+      },
+      {
+        "category": "HM/Terrain",
+        "severity": "FAIL",
+        "week": 13,
+        "session": "Tempo Session",
+        "ist": "terrain='mountain_trail' -> Tempo Session",
+        "erwartet": "terrain='mountain_trail' sollte wie 'trail' behandelt werden -> Hill Session",
+        "regel": "terrain-Wert 'mountain_trail' ist nicht im Code-Enum ('trail','mixed') enthalten",
+        "ursache": "pick_quality_type() prüft `terrain in ('trail', 'mixed')` wörtlich — 'mountain_trail' fällt durch (data/generate_plan.py:441)"
+      },
+      {
+        "category": "HM/Terrain",
+        "severity": "FAIL",
+        "week": 14,
+        "session": "Tempo Session",
+        "ist": "terrain='mountain_trail' -> Tempo Session",
+        "erwartet": "terrain='mountain_trail' sollte wie 'trail' behandelt werden -> Hill Session",
+        "regel": "terrain-Wert 'mountain_trail' ist nicht im Code-Enum ('trail','mixed') enthalten",
+        "ursache": "pick_quality_type() prüft `terrain in ('trail', 'mixed')` wörtlich — 'mountain_trail' fällt durch (data/generate_plan.py:441)"
+      },
+      {
+        "category": "HM/Terrain",
+        "severity": "FAIL",
+        "week": 15,
+        "session": "Tempo Session",
+        "ist": "terrain='mountain_trail' -> Tempo Session",
+        "erwartet": "terrain='mountain_trail' sollte wie 'trail' behandelt werden -> Hill Session",
+        "regel": "terrain-Wert 'mountain_trail' ist nicht im Code-Enum ('trail','mixed') enthalten",
+        "ursache": "pick_quality_type() prüft `terrain in ('trail', 'mixed')` wörtlich — 'mountain_trail' fällt durch (data/generate_plan.py:441)"
+      }
+    ],
+    "weeks": [
+      {
+        "week_number": 1,
+        "week_date": "2026-06-15",
+        "phase": "BASE",
+        "base_target_run_km": 48,
+        "actual_target_run_km": 40.8,
+        "target_hm": 1400,
+        "target_cross_minutes": 60,
+        "sessions": [
+          {
+            "day_of_week": 1,
+            "session_type": "Cross Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 60,
+            "strength_focus": null,
+            "session_role": "Cross"
+          },
+          {
+            "day_of_week": 2,
+            "session_type": "Strength Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 45,
+            "strength_focus": "lower",
+            "session_role": "Kraft"
+          },
+          {
+            "day_of_week": 3,
+            "session_type": "Easy Run",
+            "distance_km": 7.0,
+            "elevation_gain_m": 131,
+            "duration_min": 46,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 4,
+            "session_type": "Tempo Session",
+            "distance_km": 9.2,
+            "elevation_gain_m": 46,
+            "duration_min": 51,
+            "strength_focus": null,
+            "session_role": "Quality"
+          },
+          {
+            "day_of_week": 5,
+            "session_type": "Easy Run",
+            "distance_km": 7.1,
+            "elevation_gain_m": 131,
+            "duration_min": 46,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 7,
+            "session_type": "Long Run",
+            "distance_km": 17.5,
+            "elevation_gain_m": 1092,
+            "duration_min": 122,
+            "strength_focus": null,
+            "session_role": "Longrun"
+          }
+        ]
+      },
+      {
+        "week_number": 2,
+        "week_date": "2026-06-22",
+        "phase": "BASE",
+        "base_target_run_km": 49.2,
+        "actual_target_run_km": 41.8,
+        "target_hm": 1487.6,
+        "target_cross_minutes": 60,
+        "sessions": [
+          {
+            "day_of_week": 1,
+            "session_type": "Cross Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 60,
+            "strength_focus": null,
+            "session_role": "Cross"
+          },
+          {
+            "day_of_week": 2,
+            "session_type": "Strength Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 45,
+            "strength_focus": "lower",
+            "session_role": "Kraft"
+          },
+          {
+            "day_of_week": 3,
+            "session_type": "Easy Run",
+            "distance_km": 7.1,
+            "elevation_gain_m": 139,
+            "duration_min": 46,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 4,
+            "session_type": "Tempo Session",
+            "distance_km": 9.4,
+            "elevation_gain_m": 49,
+            "duration_min": 52,
+            "strength_focus": null,
+            "session_role": "Quality"
+          },
+          {
+            "day_of_week": 5,
+            "session_type": "Easy Run",
+            "distance_km": 7.1,
+            "elevation_gain_m": 140,
+            "duration_min": 46,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 7,
+            "session_type": "Long Run",
+            "distance_km": 18.2,
+            "elevation_gain_m": 1160,
+            "duration_min": 127,
+            "strength_focus": null,
+            "session_role": "Longrun"
+          }
+        ]
+      },
+      {
+        "week_number": 3,
+        "week_date": "2026-06-29",
+        "phase": "BASE",
+        "base_target_run_km": 50.3,
+        "actual_target_run_km": 42.8,
+        "target_hm": 1580.7,
+        "target_cross_minutes": 60,
+        "sessions": [
+          {
+            "day_of_week": 1,
+            "session_type": "Cross Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 60,
+            "strength_focus": null,
+            "session_role": "Cross"
+          },
+          {
+            "day_of_week": 2,
+            "session_type": "Strength Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 45,
+            "strength_focus": "lower",
+            "session_role": "Kraft"
+          },
+          {
+            "day_of_week": 3,
+            "session_type": "Easy Run",
+            "distance_km": 7.2,
+            "elevation_gain_m": 148,
+            "duration_min": 47,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 4,
+            "session_type": "Tempo Session",
+            "distance_km": 9.6,
+            "elevation_gain_m": 52,
+            "duration_min": 53,
+            "strength_focus": null,
+            "session_role": "Quality"
+          },
+          {
+            "day_of_week": 5,
+            "session_type": "Easy Run",
+            "distance_km": 7.1,
+            "elevation_gain_m": 148,
+            "duration_min": 46,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 7,
+            "session_type": "Long Run",
+            "distance_km": 18.9,
+            "elevation_gain_m": 1233,
+            "duration_min": 132,
+            "strength_focus": null,
+            "session_role": "Longrun"
+          }
+        ]
+      },
+      {
+        "week_number": 4,
+        "week_date": "2026-07-06",
+        "phase": "DELOAD",
+        "base_target_run_km": 39.0,
+        "actual_target_run_km": 33.1,
+        "target_hm": 1225.1,
+        "target_cross_minutes": 45,
+        "sessions": [
+          {
+            "day_of_week": 1,
+            "session_type": "Easy Run",
+            "distance_km": 6.2,
+            "elevation_gain_m": 90,
+            "duration_min": 40,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 2,
+            "session_type": "Strength Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 45,
+            "strength_focus": "full_light",
+            "session_role": "Kraft"
+          },
+          {
+            "day_of_week": 3,
+            "session_type": "Easy Run",
+            "distance_km": 6.2,
+            "elevation_gain_m": 90,
+            "duration_min": 40,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 4,
+            "session_type": "Cross Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 45,
+            "_deload_cross_zone": "Z1-Z2",
+            "strength_focus": null,
+            "session_role": "Cross"
+          },
+          {
+            "day_of_week": 5,
+            "session_type": "Easy Run",
+            "distance_km": 6.1,
+            "elevation_gain_m": 89,
+            "duration_min": 40,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 7,
+            "session_type": "Long Run",
+            "distance_km": 14.6,
+            "elevation_gain_m": 956,
+            "duration_min": 102,
+            "strength_focus": null,
+            "session_role": "Longrun"
+          }
+        ]
+      },
+      {
+        "week_number": 5,
+        "week_date": "2026-07-13",
+        "phase": "BASE",
+        "base_target_run_km": 51.6,
+        "actual_target_run_km": 43.9,
+        "target_hm": 1679.7,
+        "target_cross_minutes": 60,
+        "sessions": [
+          {
+            "day_of_week": 1,
+            "session_type": "Cross Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 60,
+            "strength_focus": null,
+            "session_role": "Cross"
+          },
+          {
+            "day_of_week": 2,
+            "session_type": "Strength Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 45,
+            "strength_focus": "lower",
+            "session_role": "Kraft"
+          },
+          {
+            "day_of_week": 3,
+            "session_type": "Easy Run",
+            "distance_km": 7.2,
+            "elevation_gain_m": 157,
+            "duration_min": 47,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 4,
+            "session_type": "Tempo Session",
+            "distance_km": 9.9,
+            "elevation_gain_m": 55,
+            "duration_min": 54,
+            "strength_focus": null,
+            "session_role": "Quality"
+          },
+          {
+            "day_of_week": 5,
+            "session_type": "Easy Run",
+            "distance_km": 7.1,
+            "elevation_gain_m": 158,
+            "duration_min": 46,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 7,
+            "session_type": "Long Run",
+            "distance_km": 19.7,
+            "elevation_gain_m": 1310,
+            "duration_min": 138,
+            "strength_focus": null,
+            "session_role": "Longrun"
+          }
+        ]
+      },
+      {
+        "week_number": 6,
+        "week_date": "2026-07-20",
+        "phase": "BUILD",
+        "base_target_run_km": 52.8,
+        "actual_target_run_km": 44.9,
+        "target_hm": 1784.8,
+        "target_cross_minutes": 60,
+        "sessions": [
+          {
+            "day_of_week": 1,
+            "session_type": "Cross Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 60,
+            "strength_focus": null,
+            "session_role": "Cross"
+          },
+          {
+            "day_of_week": 2,
+            "session_type": "Strength Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 45,
+            "strength_focus": "lower",
+            "session_role": "Kraft"
+          },
+          {
+            "day_of_week": 3,
+            "session_type": "Easy Run",
+            "distance_km": 7.2,
+            "elevation_gain_m": 167,
+            "duration_min": 47,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 4,
+            "session_type": "Tempo Session",
+            "distance_km": 10.1,
+            "elevation_gain_m": 59,
+            "duration_min": 56,
+            "strength_focus": null,
+            "session_role": "Quality"
+          },
+          {
+            "day_of_week": 5,
+            "session_type": "Easy Run",
+            "distance_km": 7.2,
+            "elevation_gain_m": 167,
+            "duration_min": 47,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 7,
+            "session_type": "Long Run",
+            "distance_km": 20.4,
+            "elevation_gain_m": 1392,
+            "duration_min": 143,
+            "strength_focus": null,
+            "session_role": "Longrun"
+          }
+        ]
+      },
+      {
+        "week_number": 7,
+        "week_date": "2026-07-27",
+        "phase": "BUILD",
+        "base_target_run_km": 54.1,
+        "actual_target_run_km": 46.1,
+        "target_hm": 1896.5,
+        "target_cross_minutes": 60,
+        "sessions": [
+          {
+            "day_of_week": 1,
+            "session_type": "Cross Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 60,
+            "strength_focus": null,
+            "session_role": "Cross"
+          },
+          {
+            "day_of_week": 2,
+            "session_type": "Strength Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 45,
+            "strength_focus": "lower",
+            "session_role": "Kraft"
+          },
+          {
+            "day_of_week": 3,
+            "session_type": "Easy Run",
+            "distance_km": 7.2,
+            "elevation_gain_m": 177,
+            "duration_min": 47,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 4,
+            "session_type": "Tempo Session",
+            "distance_km": 10.4,
+            "elevation_gain_m": 63,
+            "duration_min": 57,
+            "strength_focus": null,
+            "session_role": "Quality"
+          },
+          {
+            "day_of_week": 5,
+            "session_type": "Easy Run",
+            "distance_km": 7.3,
+            "elevation_gain_m": 177,
+            "duration_min": 47,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 7,
+            "session_type": "Long Run",
+            "distance_km": 21.2,
+            "elevation_gain_m": 1479,
+            "duration_min": 148,
+            "strength_focus": null,
+            "session_role": "Longrun"
+          }
+        ]
+      },
+      {
+        "week_number": 8,
+        "week_date": "2026-08-03",
+        "phase": "DELOAD",
+        "base_target_run_km": 41.9,
+        "actual_target_run_km": 35.6,
+        "target_hm": 1469.8,
+        "target_cross_minutes": 45,
+        "sessions": [
+          {
+            "day_of_week": 1,
+            "session_type": "Easy Run",
+            "distance_km": 6.4,
+            "elevation_gain_m": 108,
+            "duration_min": 42,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 2,
+            "session_type": "Strength Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 45,
+            "strength_focus": "full_light",
+            "session_role": "Kraft"
+          },
+          {
+            "day_of_week": 3,
+            "session_type": "Easy Run",
+            "distance_km": 6.4,
+            "elevation_gain_m": 108,
+            "duration_min": 42,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 4,
+            "session_type": "Cross Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 45,
+            "_deload_cross_zone": "Z1-Z2",
+            "strength_focus": null,
+            "session_role": "Cross"
+          },
+          {
+            "day_of_week": 5,
+            "session_type": "Easy Run",
+            "distance_km": 6.4,
+            "elevation_gain_m": 108,
+            "duration_min": 42,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 7,
+            "session_type": "Long Run",
+            "distance_km": 16.4,
+            "elevation_gain_m": 1146,
+            "duration_min": 115,
+            "strength_focus": null,
+            "session_role": "Longrun"
+          }
+        ]
+      },
+      {
+        "week_number": 9,
+        "week_date": "2026-08-10",
+        "phase": "BUILD",
+        "base_target_run_km": 55.4,
+        "actual_target_run_km": 47.4,
+        "target_hm": 2015.2,
+        "target_cross_minutes": 60,
+        "sessions": [
+          {
+            "day_of_week": 1,
+            "session_type": "Cross Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 60,
+            "strength_focus": null,
+            "session_role": "Cross"
+          },
+          {
+            "day_of_week": 2,
+            "session_type": "Strength Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 45,
+            "strength_focus": "lower",
+            "session_role": "Kraft"
+          },
+          {
+            "day_of_week": 3,
+            "session_type": "Easy Run",
+            "distance_km": 7.3,
+            "elevation_gain_m": 189,
+            "duration_min": 47,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 4,
+            "session_type": "Tempo Session",
+            "distance_km": 10.7,
+            "elevation_gain_m": 66,
+            "duration_min": 59,
+            "strength_focus": null,
+            "session_role": "Quality"
+          },
+          {
+            "day_of_week": 5,
+            "session_type": "Easy Run",
+            "distance_km": 7.4,
+            "elevation_gain_m": 188,
+            "duration_min": 48,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 7,
+            "session_type": "Long Run",
+            "distance_km": 22.0,
+            "elevation_gain_m": 1572,
+            "duration_min": 154,
+            "strength_focus": null,
+            "session_role": "Longrun"
+          }
+        ]
+      },
+      {
+        "week_number": 10,
+        "week_date": "2026-08-17",
+        "phase": "BUILD",
+        "base_target_run_km": 56.7,
+        "actual_target_run_km": 48.7,
+        "target_hm": 2141.4,
+        "target_cross_minutes": 60,
+        "sessions": [
+          {
+            "day_of_week": 1,
+            "session_type": "Cross Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 60,
+            "strength_focus": null,
+            "session_role": "Cross"
+          },
+          {
+            "day_of_week": 2,
+            "session_type": "Strength Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 45,
+            "strength_focus": "lower",
+            "session_role": "Kraft"
+          },
+          {
+            "day_of_week": 3,
+            "session_type": "Easy Run",
+            "distance_km": 7.5,
+            "elevation_gain_m": 200,
+            "duration_min": 49,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 4,
+            "session_type": "Tempo Session",
+            "distance_km": 11.0,
+            "elevation_gain_m": 71,
+            "duration_min": 60,
+            "strength_focus": null,
+            "session_role": "Quality"
+          },
+          {
+            "day_of_week": 5,
+            "session_type": "Easy Run",
+            "distance_km": 7.4,
+            "elevation_gain_m": 200,
+            "duration_min": 48,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 7,
+            "session_type": "Long Run",
+            "distance_km": 22.8,
+            "elevation_gain_m": 1670,
+            "duration_min": 160,
+            "strength_focus": null,
+            "session_role": "Longrun"
+          }
+        ]
+      },
+      {
+        "week_number": 11,
+        "week_date": "2026-08-24",
+        "phase": "BUILD",
+        "base_target_run_km": 58.1,
+        "actual_target_run_km": 50.1,
+        "target_hm": 2275.4,
+        "target_cross_minutes": 60,
+        "sessions": [
+          {
+            "day_of_week": 1,
+            "session_type": "Cross Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 60,
+            "strength_focus": null,
+            "session_role": "Cross"
+          },
+          {
+            "day_of_week": 2,
+            "session_type": "Strength Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 45,
+            "strength_focus": "lower",
+            "session_role": "Kraft"
+          },
+          {
+            "day_of_week": 3,
+            "session_type": "Easy Run",
+            "distance_km": 7.5,
+            "elevation_gain_m": 213,
+            "duration_min": 49,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 4,
+            "session_type": "Tempo Session",
+            "distance_km": 11.3,
+            "elevation_gain_m": 75,
+            "duration_min": 62,
+            "strength_focus": null,
+            "session_role": "Quality"
+          },
+          {
+            "day_of_week": 5,
+            "session_type": "Easy Run",
+            "distance_km": 7.6,
+            "elevation_gain_m": 212,
+            "duration_min": 49,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 7,
+            "session_type": "Long Run",
+            "distance_km": 23.7,
+            "elevation_gain_m": 1775,
+            "duration_min": 166,
+            "strength_focus": null,
+            "session_role": "Longrun"
+          }
+        ]
+      },
+      {
+        "week_number": 12,
+        "week_date": "2026-08-31",
+        "phase": "DELOAD",
+        "base_target_run_km": 45.0,
+        "actual_target_run_km": 38.2,
+        "target_hm": 1763.5,
+        "target_cross_minutes": 45,
+        "sessions": [
+          {
+            "day_of_week": 1,
+            "session_type": "Easy Run",
+            "distance_km": 6.6,
+            "elevation_gain_m": 129,
+            "duration_min": 43,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 2,
+            "session_type": "Strength Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 45,
+            "strength_focus": "full_light",
+            "session_role": "Kraft"
+          },
+          {
+            "day_of_week": 3,
+            "session_type": "Easy Run",
+            "distance_km": 6.6,
+            "elevation_gain_m": 129,
+            "duration_min": 43,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 4,
+            "session_type": "Cross Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 45,
+            "_deload_cross_zone": "Z1-Z2",
+            "strength_focus": null,
+            "session_role": "Cross"
+          },
+          {
+            "day_of_week": 5,
+            "session_type": "Easy Run",
+            "distance_km": 6.6,
+            "elevation_gain_m": 129,
+            "duration_min": 43,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 7,
+            "session_type": "Long Run",
+            "distance_km": 18.4,
+            "elevation_gain_m": 1376,
+            "duration_min": 129,
+            "strength_focus": null,
+            "session_role": "Longrun"
+          }
+        ]
+      },
+      {
+        "week_number": 13,
+        "week_date": "2026-09-07",
+        "phase": "BUILD",
+        "base_target_run_km": 59.5,
+        "actual_target_run_km": 51.5,
+        "target_hm": 2417.8,
+        "target_cross_minutes": 60,
+        "sessions": [
+          {
+            "day_of_week": 1,
+            "session_type": "Cross Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 60,
+            "strength_focus": null,
+            "session_role": "Cross"
+          },
+          {
+            "day_of_week": 2,
+            "session_type": "Strength Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 45,
+            "strength_focus": "lower",
+            "session_role": "Kraft"
+          },
+          {
+            "day_of_week": 3,
+            "session_type": "Easy Run",
+            "distance_km": 7.7,
+            "elevation_gain_m": 226,
+            "duration_min": 50,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 4,
+            "session_type": "Tempo Session",
+            "distance_km": 11.6,
+            "elevation_gain_m": 80,
+            "duration_min": 64,
+            "strength_focus": null,
+            "session_role": "Quality"
+          },
+          {
+            "day_of_week": 5,
+            "session_type": "Easy Run",
+            "distance_km": 7.6,
+            "elevation_gain_m": 226,
+            "duration_min": 49,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 7,
+            "session_type": "Long Run",
+            "distance_km": 24.6,
+            "elevation_gain_m": 1886,
+            "duration_min": 172,
+            "strength_focus": null,
+            "session_role": "Longrun"
+          }
+        ]
+      },
+      {
+        "week_number": 14,
+        "week_date": "2026-09-14",
+        "phase": "BUILD",
+        "base_target_run_km": 60.9,
+        "actual_target_run_km": 52.9,
+        "target_hm": 2569.2,
+        "target_cross_minutes": 60,
+        "sessions": [
+          {
+            "day_of_week": 1,
+            "session_type": "Cross Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 60,
+            "strength_focus": null,
+            "session_role": "Cross"
+          },
+          {
+            "day_of_week": 2,
+            "session_type": "Strength Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 45,
+            "strength_focus": "lower",
+            "session_role": "Kraft"
+          },
+          {
+            "day_of_week": 3,
+            "session_type": "Easy Run",
+            "distance_km": 7.8,
+            "elevation_gain_m": 240,
+            "duration_min": 51,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 4,
+            "session_type": "Tempo Session",
+            "distance_km": 11.9,
+            "elevation_gain_m": 85,
+            "duration_min": 65,
+            "strength_focus": null,
+            "session_role": "Quality"
+          },
+          {
+            "day_of_week": 5,
+            "session_type": "Easy Run",
+            "distance_km": 7.7,
+            "elevation_gain_m": 240,
+            "duration_min": 50,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 7,
+            "session_type": "Long Run",
+            "distance_km": 25.5,
+            "elevation_gain_m": 2004,
+            "duration_min": 178,
+            "strength_focus": null,
+            "session_role": "Longrun"
+          }
+        ]
+      },
+      {
+        "week_number": 15,
+        "week_date": "2026-09-21",
+        "phase": "PEAK",
+        "base_target_run_km": 62.4,
+        "actual_target_run_km": 54.4,
+        "target_hm": 2730.0,
+        "target_cross_minutes": 60,
+        "sessions": [
+          {
+            "day_of_week": 1,
+            "session_type": "Cross Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 60,
+            "strength_focus": null,
+            "session_role": "Cross"
+          },
+          {
+            "day_of_week": 2,
+            "session_type": "Strength Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 45,
+            "strength_focus": "lower",
+            "session_role": "Kraft"
+          },
+          {
+            "day_of_week": 3,
+            "session_type": "Easy Run",
+            "distance_km": 7.8,
+            "elevation_gain_m": 256,
+            "duration_min": 51,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 4,
+            "session_type": "Tempo Session",
+            "distance_km": 12.2,
+            "elevation_gain_m": 90,
+            "duration_min": 67,
+            "strength_focus": null,
+            "session_role": "Quality"
+          },
+          {
+            "day_of_week": 5,
+            "session_type": "Easy Run",
+            "distance_km": 7.9,
+            "elevation_gain_m": 255,
+            "duration_min": 51,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 7,
+            "session_type": "Long Run",
+            "distance_km": 26.5,
+            "elevation_gain_m": 2129,
+            "duration_min": 186,
+            "strength_focus": null,
+            "session_role": "Longrun"
+          }
+        ]
+      },
+      {
+        "week_number": 16,
+        "week_date": "2026-09-28",
+        "phase": "TAPER",
+        "base_target_run_km": 43.7,
+        "actual_target_run_km": 37.1,
+        "target_hm": 1911.0,
+        "target_cross_minutes": 60,
+        "sessions": [
+          {
+            "day_of_week": 1,
+            "session_type": "Easy Run",
+            "distance_km": 5.2,
+            "elevation_gain_m": 193,
+            "duration_min": 34,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 2,
+            "session_type": "Strength Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 45,
+            "strength_focus": "upper_light",
+            "session_role": "Kraft"
+          },
+          {
+            "day_of_week": 3,
+            "session_type": "Tempo Session",
+            "distance_km": 8.3,
+            "elevation_gain_m": 34,
+            "duration_min": 46,
+            "strength_focus": null,
+            "session_role": "Quality"
+          },
+          {
+            "day_of_week": 4,
+            "session_type": "Easy Run",
+            "distance_km": 5.1,
+            "elevation_gain_m": 193,
+            "duration_min": 33,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 5,
+            "session_type": "Cross Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 60,
+            "strength_focus": null,
+            "session_role": "Cross"
+          },
+          {
+            "day_of_week": 7,
+            "session_type": "Long Run",
+            "distance_km": 18.5,
+            "elevation_gain_m": 1491,
+            "duration_min": 130,
+            "strength_focus": null,
+            "session_role": "Longrun"
+          }
+        ]
+      },
+      {
+        "week_number": 17,
+        "week_date": "2026-10-05",
+        "phase": "TAPER",
+        "base_target_run_km": 43.7,
+        "actual_target_run_km": 29.3,
+        "target_hm": 1911.0,
+        "target_cross_minutes": 60,
+        "sessions": [
+          {
+            "day_of_week": 1,
+            "session_type": "Cross Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 60,
+            "strength_focus": null,
+            "session_role": "Cross"
+          },
+          {
+            "day_of_week": 2,
+            "session_type": "Strength Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 45,
+            "strength_focus": "upper_light",
+            "session_role": "Kraft"
+          },
+          {
+            "day_of_week": 3,
+            "session_type": "Tempo Session",
+            "distance_km": 8.3,
+            "elevation_gain_m": 153,
+            "duration_min": 46,
+            "strength_focus": null,
+            "session_role": "Quality"
+          },
+          {
+            "day_of_week": 4,
+            "session_type": "Easy Run",
+            "distance_km": 8.0,
+            "elevation_gain_m": 586,
+            "duration_min": 52,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 5,
+            "session_type": "Easy Run",
+            "distance_km": 6.5,
+            "elevation_gain_m": 586,
+            "duration_min": 42,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 6,
+            "session_type": "Easy Run",
+            "distance_km": 6.5,
+            "elevation_gain_m": 586,
+            "duration_min": 42,
+            "strength_focus": null,
+            "session_role": "Easy"
+          }
+        ]
+      },
+      {
+        "week_number": 18,
+        "week_date": "2026-10-12",
+        "phase": "RACE",
+        "base_target_run_km": 18.2,
+        "actual_target_run_km": 18.2,
+        "target_hm": 796.2,
+        "target_cross_minutes": 0,
+        "sessions": [
+          {
+            "day_of_week": 1,
+            "session_type": "Easy Run",
+            "distance_km": 4.5,
+            "elevation_gain_m": 199,
+            "duration_min": 29,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 2,
+            "session_type": "Strength Training",
+            "distance_km": 0,
+            "elevation_gain_m": 0,
+            "duration_min": 45,
+            "strength_focus": "upper_light",
+            "session_role": "Kraft"
+          },
+          {
+            "day_of_week": 3,
+            "session_type": "Easy Run",
+            "distance_km": 4.5,
+            "elevation_gain_m": 199,
+            "duration_min": 29,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 4,
+            "session_type": "Easy Run",
+            "distance_km": 4.5,
+            "elevation_gain_m": 199,
+            "duration_min": 29,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 5,
+            "session_type": "Easy Run",
+            "distance_km": 4.7,
+            "elevation_gain_m": 199,
+            "duration_min": 31,
+            "strength_focus": null,
+            "session_role": "Easy"
+          },
+          {
+            "day_of_week": 6,
+            "session_type": "Race Day",
+            "distance_km": 45,
+            "elevation_gain_m": 2600,
+            "duration_min": 341,
+            "strength_focus": null,
+            "session_role": "Race"
+          }
+        ]
+      }
+    ],
+    "conflicts": [
+      "Woche 16: kein geeigneter Lower-Body-Slot verfügbar, alle Gymtage als Upper Body.",
+      "Woche 17: kein geeigneter Lower-Body-Slot verfügbar, alle Gymtage als Upper Body.",
+      "Woche 17 (letzte Taper-Woche): Easy Run von 9.6km auf 8.0km reduziert (Regel 16, Klarstellung 17: Prozentziel darf unterschritten werden).",
+      "Woche 17 (letzte Taper-Woche): Easy Run von 9.6km auf 8.0km reduziert (Regel 16, Klarstellung 17: Prozentziel darf unterschritten werden).",
+      "Woche 17 (letzte Taper-Woche): Easy Run von 9.6km auf 8.0km reduziert (Regel 16, Klarstellung 17: Prozentziel darf unterschritten werden).",
+      "Woche 17 (letzte Taper-Woche): Fr+Sa von 16.0km auf ~13.0km reduziert (Regel 16: max. 12-14km zusammen).",
+      "Woche 17: Laufziel von 37.1km auf 29.3km reduziert (Easy-Run-/Taper-Obergrenzen) — finaler, tatsächlich gespeicherter Wert."
+    ]
+  }
+]

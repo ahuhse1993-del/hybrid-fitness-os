@@ -1,0 +1,1131 @@
+====================================================================================================
+CAIRN — Szenario-Testmatrix data/generate_plan.py (Phase 1, deterministische Skelett-Logik)
+Ausschliesslich build_full_skeleton() + validate_skeleton() — keine DB/LLM/Web-Aufrufe.
+====================================================================================================
+
+####################################################################################################
+SZENARIO 1 — 10 KM STRASSE / EINSTEIGER (10K Beginner)
+####################################################################################################
+
+--- Normalisierte Eingaben (an build_full_skeleton übergeben) ---
+  start_date = '2026-08-03'
+  race_date = '2026-10-25'
+  race_distance_km = 10
+  race_elevation_m = 50
+  terrain = 'road'
+  days_per_week = 4
+  strength_sessions = 1
+  strength_days = [3]
+  quality_sessions = 1
+  long_run_day = 7
+  cross_training = False
+  cross_training_days = 0
+  max_km = 32
+  avg_weekly_km = 18
+  avg_weekly_hm = 50
+  athlete_paces = {}
+
+--- Athlet-Kontext (informativ, teils nicht vom Generator konsumiert) ---
+  aktueller_stabiler_laufumfang_km = 18
+  hoechste_woche_90d_km = 22
+  laengster_relevanter_lauf_90d_km = 8
+  avg_wochen_hm = 50
+  verletzung = False
+  kuerzlich_vergleichbare_distanz = False
+  plan_meta.ziel = 'Finish / erste 10 km'  (informativ, kein Generator-Input)
+
+--- Skelett-Zusammenfassung ---
+  total_weeks=12  race_dow=7 (Sonntag)  desired_peak_km=15.0  peak_km_actual=15.0
+  desired_peak_hm=52.5  peak_hm_actual=52.5
+  validate_skeleton(): UNGÜLTIG (2 Validator-Fehler)
+
+--- Wochenübersicht ---
+  Wo Startdatum   Phase   base_km actual_km cross_min target_hm | sessions L/C/S/Q | LR-km LR-HM
+   1 2026-08-03 BASE      18.0      16.3         0        50 | 3/0/1/1      |   6.6    39   (actual_km_summe=16.3, actual_hm_summe=50)
+   2 2026-08-10 BASE      15.0      13.9         0        50 | 3/0/1/1      |   5.6    39   (actual_km_summe=13.9, actual_hm_summe=50)
+   3 2026-08-17 BUILD     15.0      14.0         0        51 | 3/0/1/1      |   5.7    40   (actual_km_summe=14.0, actual_hm_summe=51)
+   4 2026-08-24 DELOAD    11.6      11.6         0        39 | 3/0/1/0      |   4.4    31   (actual_km_summe=11.6, actual_hm_summe=39)
+   5 2026-08-31 BUILD     14.7      14.0         0        51 | 3/0/1/1      |   5.8    40   (actual_km_summe=14.0, actual_hm_summe=51)
+   6 2026-09-07 BUILD     14.4      13.9         0        51 | 3/0/1/1      |   5.8    40   (actual_km_summe=13.9, actual_hm_summe=51)
+   7 2026-09-14 BUILD     14.1      13.9         0        52 | 3/0/1/1      |   5.8    40   (actual_km_summe=13.9, actual_hm_summe=52)
+   8 2026-09-21 DELOAD    11.6      11.6         0        40 | 3/0/1/0      |   4.5    31   (actual_km_summe=11.6, actual_hm_summe=40)
+   9 2026-09-28 BUILD     13.8      13.7         0        52 | 3/0/1/1      |   5.8    41   (actual_km_summe=13.7, actual_hm_summe=52)
+  10 2026-10-05 PEAK      13.5      13.4         0        52 | 3/0/1/1      |   5.7    41   (actual_km_summe=13.4, actual_hm_summe=53)
+  11 2026-10-12 TAPER     10.5       8.4         0        37 | 3/0/1/1      |     0     0   (actual_km_summe=8.4, actual_hm_summe=37)
+  12 2026-10-19 RACE       5.2       1.0         0        18 | 2/0/1/0      |     0     0   (actual_km_summe=1.0, actual_hm_summe=18)
+
+--- Konflikte/Warnings (aus build_full_skeleton) ---
+    - Woche 5: target_km von 15.0 auf 14.7 reduziert — maximal 2 identische Belastungswochen in Folge erlaubt.
+    - Woche 6: target_km von 15.0 auf 14.4 reduziert — maximal 2 identische Belastungswochen in Folge erlaubt.
+    - Woche 7: target_km von 15.0 auf 14.1 reduziert — maximal 2 identische Belastungswochen in Folge erlaubt.
+    - Woche 9: target_km von 15.0 auf 13.8 reduziert — maximal 2 identische Belastungswochen in Folge erlaubt.
+    - Woche 10: target_km von 15.0 auf 13.5 reduziert — maximal 2 identische Belastungswochen in Folge erlaubt.
+    - Woche 3: target_km identisch zu Woche 2 (15.0 km) — Zielobergrenze (desired_peak_km=15.0) bereits vor der eigentlichen Peak-Woche erreicht, weiteres Wachstum durch absolute_plan_cap_km/race_distance_km-Formel begrenzt.
+    - Woche 1: Laufziel von 18km auf 16.3km reduziert (Easy-Run-/Taper-Obergrenzen) — finaler, tatsächlich gespeicherter Wert.
+    - Woche 2: Laufziel von 15.0km auf 13.9km reduziert (Easy-Run-/Taper-Obergrenzen) — finaler, tatsächlich gespeicherter Wert.
+    - Woche 3: Laufziel von 15.0km auf 14.0km reduziert (Easy-Run-/Taper-Obergrenzen) — finaler, tatsächlich gespeicherter Wert.
+    - Woche 5: Laufziel von 14.7km auf 14.0km reduziert (Easy-Run-/Taper-Obergrenzen) — finaler, tatsächlich gespeicherter Wert.
+    - Woche 6: Laufziel von 14.4km auf 13.9km reduziert (Easy-Run-/Taper-Obergrenzen) — finaler, tatsächlich gespeicherter Wert.
+    - Woche 7: Laufziel von 14.1km auf 13.9km reduziert (Easy-Run-/Taper-Obergrenzen) — finaler, tatsächlich gespeicherter Wert.
+    - Woche 11: kein geeigneter Lower-Body-Slot verfügbar, alle Gymtage als Upper Body.
+    - Woche 11: Laufziel von 10.5km auf 8.4km reduziert (Easy-Run-/Taper-Obergrenzen) — finaler, tatsächlich gespeicherter Wert.
+    - Woche 12: Laufziel von 5.2km auf 1.0km reduziert (Easy-Run-/Taper-Obergrenzen) — finaler, tatsächlich gespeicherter Wert.
+
+--- Alle Sessions ---
+  Datum      Wo Wochentag  Rolle    Session               km    HM  Min  Strength-Fokus   notes_hint
+  2026-08-03  1 Mo        Easy     Easy Run               5.7     9   37  —                (Phase 2/LLM — nicht generiert)
+  2026-08-04  1 Di        Quality  Tempo Session          4.0     2   22  —                (Phase 2/LLM — nicht generiert)
+  2026-08-05  1 Mi        Kraft    Strength Training        0     0   45  lower_moderate   (Phase 2/LLM — nicht generiert)
+  2026-08-09  1 So        Longrun  Long Run               6.6    39   46  —                (Phase 2/LLM — nicht generiert)
+  2026-08-10  2 Mo        Easy     Easy Run               4.9     9   32  —                (Phase 2/LLM — nicht generiert)
+  2026-08-11  2 Di        Quality  Tempo Session          3.4     2   19  —                (Phase 2/LLM — nicht generiert)
+  2026-08-12  2 Mi        Kraft    Strength Training        0     0   45  lower_moderate   (Phase 2/LLM — nicht generiert)
+  2026-08-16  2 So        Longrun  Long Run               5.6    39   39  —                (Phase 2/LLM — nicht generiert)
+  2026-08-17  3 Mo        Easy     Easy Run               4.9     9   32  —                (Phase 2/LLM — nicht generiert)
+  2026-08-18  3 Di        Quality  Tempo Session          3.4     2   19  —                (Phase 2/LLM — nicht generiert)
+  2026-08-19  3 Mi        Kraft    Strength Training        0     0   45  lower_moderate   (Phase 2/LLM — nicht generiert)
+  2026-08-23  3 So        Longrun  Long Run               5.7    40   40  —                (Phase 2/LLM — nicht generiert)
+  2026-08-24  4 Mo        Easy     Easy Run               3.6     4   23  —                (Phase 2/LLM — nicht generiert)
+  2026-08-25  4 Di        Easy     Easy Run               3.6     4   23  —                (Phase 2/LLM — nicht generiert)
+  2026-08-26  4 Mi        Kraft    Strength Training        0     0   45  full_light       (Phase 2/LLM — nicht generiert)
+  2026-08-30  4 So        Longrun  Long Run               4.4    31   31  —                (Phase 2/LLM — nicht generiert)
+  2026-08-31  5 Mo        Easy     Easy Run               4.9     9   32  —                (Phase 2/LLM — nicht generiert)
+  2026-09-01  5 Di        Quality  Tempo Session          3.3     2   18  —                (Phase 2/LLM — nicht generiert)
+  2026-09-02  5 Mi        Kraft    Strength Training        0     0   45  lower_moderate   (Phase 2/LLM — nicht generiert)
+  2026-09-06  5 So        Longrun  Long Run               5.8    40   41  —                (Phase 2/LLM — nicht generiert)
+  2026-09-07  6 Mo        Easy     Easy Run               4.9     9   32  —                (Phase 2/LLM — nicht generiert)
+  2026-09-08  6 Di        Quality  Tempo Session          3.2     2   18  —                (Phase 2/LLM — nicht generiert)
+  2026-09-09  6 Mi        Kraft    Strength Training        0     0   45  lower_moderate   (Phase 2/LLM — nicht generiert)
+  2026-09-13  6 So        Longrun  Long Run               5.8    40   41  —                (Phase 2/LLM — nicht generiert)
+  2026-09-14  7 Mo        Easy     Easy Run               4.9    10   32  —                (Phase 2/LLM — nicht generiert)
+  2026-09-15  7 Di        Quality  Tempo Session          3.2     2   18  —                (Phase 2/LLM — nicht generiert)
+  2026-09-16  7 Mi        Kraft    Strength Training        0     0   45  lower_moderate   (Phase 2/LLM — nicht generiert)
+  2026-09-20  7 So        Longrun  Long Run               5.8    40   41  —                (Phase 2/LLM — nicht generiert)
+  2026-09-21  8 Mo        Easy     Easy Run               3.5     5   23  —                (Phase 2/LLM — nicht generiert)
+  2026-09-22  8 Di        Easy     Easy Run               3.6     4   23  —                (Phase 2/LLM — nicht generiert)
+  2026-09-23  8 Mi        Kraft    Strength Training        0     0   45  full_light       (Phase 2/LLM — nicht generiert)
+  2026-09-27  8 So        Longrun  Long Run               4.5    31   32  —                (Phase 2/LLM — nicht generiert)
+  2026-09-28  9 Mo        Easy     Easy Run               4.8     9   31  —                (Phase 2/LLM — nicht generiert)
+  2026-09-29  9 Di        Quality  Tempo Session          3.1     2   17  —                (Phase 2/LLM — nicht generiert)
+  2026-09-30  9 Mi        Kraft    Strength Training        0     0   45  lower_moderate   (Phase 2/LLM — nicht generiert)
+  2026-10-04  9 So        Longrun  Long Run               5.8    41   41  —                (Phase 2/LLM — nicht generiert)
+  2026-10-05 10 Mo        Easy     Easy Run               4.7    10   31  —                (Phase 2/LLM — nicht generiert)
+  2026-10-06 10 Di        Quality  Tempo Session          3.0     2   16  —                (Phase 2/LLM — nicht generiert)
+  2026-10-07 10 Mi        Kraft    Strength Training        0     0   45  lower_moderate   (Phase 2/LLM — nicht generiert)
+  2026-10-11 10 So        Longrun  Long Run               5.7    41   40  —                (Phase 2/LLM — nicht generiert)
+  2026-10-12 11 Mo        Easy     Easy Run               3.0    17   20  —                (Phase 2/LLM — nicht generiert)
+  2026-10-13 11 Di        Quality  Tempo Session          2.4     3   13  —                (Phase 2/LLM — nicht generiert)
+  2026-10-14 11 Mi        Kraft    Strength Training        0     0   45  upper_light      (Phase 2/LLM — nicht generiert)
+  2026-10-15 11 Do        Easy     Easy Run               3.0    17   20  —                (Phase 2/LLM — nicht generiert)
+  2026-10-19 12 Mo        Easy     Easy Run               0.5     9    3  —                (Phase 2/LLM — nicht generiert)
+  2026-10-20 12 Di        Easy     Easy Run               0.5     9    3  —                (Phase 2/LLM — nicht generiert)
+  2026-10-21 12 Mi        Kraft    Strength Training        0     0   45  upper_light      (Phase 2/LLM — nicht generiert)
+  2026-10-25 12 So        Race     Race Day                10    50   70  —                (Phase 2/LLM — nicht generiert)
+
+--- Automatisierte Kriterien ---
+  Struktur    : PASS
+  Volumen     : FAIL
+      [FAIL] (plan-weit) | None | Ist: Woche 10 (PEAK): target_km=13.5 < erwartete Untergrenze 15.0 (min(avg_weekly_km=18, desired_peak_km=15.0)) | Erwartet: (siehe Regeltext) | Regel: validate_skeleton() Regelverstoß
+        Ursache: compute_weekly_progression() (data/generate_plan.py:149-196)
+      [WARNING] (plan-weit) | (Peak-Woche) | Ist: peak target_km=18 | Erwartet: ~24-30km | Regel: Peak-Wochenumfang im erwarteten Bereich
+        Ursache: compute_desired_peak_km() / compute_weekly_progression() (data/generate_plan.py:233-234, 149-196)
+  Longrun     : FAIL
+      [FAIL] (plan-weit) | None | Ist: Woche 9: Longrun-Anteil 42% > 40% des Wochenziels | Erwartet: (siehe Regeltext) | Regel: validate_skeleton() Regelverstoß
+        Ursache: compute_longrun_progression() / distribute_week_km() (data/generate_plan.py:279-362, 628-748)
+      [WARNING] Woche 1 | Long Run | Ist: 6.6km | Erwartet: ~10-12km | Regel: Peak-Longrun passt zu Renndistanz, Erfahrung und Terrain
+        Ursache: compute_desired_peak_longrun_km() / compute_longrun_progression() (data/generate_plan.py:265-362) — Formel ist NICHT terrainabhängig
+      [WARNING] Woche 2 | Long Run | Ist: 5.6km | Erwartet: >= Vorwoche (6.6km, Woche 1) | Regel: Longrun-Progression ist sicher und nachvollziehbar (monoton in Belastungswochen)
+        Ursache: compute_longrun_progression() (data/generate_plan.py:279-362)
+  HM/Terrain  : PASS
+  Kraft/Cross : PASS
+  Taper       : PASS
+
+####################################################################################################
+SZENARIO 2 — HALBMARATHON STRASSE / INTERMEDIÄR (HM Intermediate)
+####################################################################################################
+
+--- Normalisierte Eingaben (an build_full_skeleton übergeben) ---
+  start_date = '2026-07-20'
+  race_date = '2026-11-01'
+  race_distance_km = 21.1
+  race_elevation_m = 120
+  terrain = 'road'
+  days_per_week = 5
+  strength_sessions = 1
+  strength_days = [2]
+  quality_sessions = 1
+  long_run_day = 7
+  cross_training = True
+  cross_training_days = 1
+  cross_replaces_run = False
+  max_km = 50
+  avg_weekly_km = 32
+  avg_weekly_hm = 150
+  athlete_paces = {}
+  cross_training_types = ['Rennrad']  (informativ — NICHT von build_full_skeleton konsumiert, nur Phase-2/LLM-Prompt)
+
+--- Athlet-Kontext (informativ, teils nicht vom Generator konsumiert) ---
+  stabiler_laufumfang_km = 32
+  hoechste_woche_90d_km = 40
+  bestaetigte_longruns_km = [14, 15, 16]
+  avg_wochen_hm = 150
+  kontinuierliches_training = True
+  verletzung = False
+  plan_meta.ziel = 'ambitionierte Zeitverbesserung'  (informativ, kein Generator-Input)
+
+--- Skelett-Zusammenfassung ---
+  total_weeks=15  race_dow=7 (Sonntag)  desired_peak_km=31.7  peak_km_actual=31.650000000000002
+  desired_peak_hm=157.5  peak_hm_actual=157.5
+  validate_skeleton(): UNGÜLTIG (1 Validator-Fehler)
+
+--- Wochenübersicht ---
+  Wo Startdatum   Phase   base_km actual_km cross_min target_hm | sessions L/C/S/Q | LR-km LR-HM
+   1 2026-07-20 BASE      32.0      29.1        60       150 | 3/1/1/1      |  11.7   117   (actual_km_summe=29.1, actual_hm_summe=150)
+   2 2026-07-27 BASE      31.7      29.1        60       151 | 3/1/1/1      |  11.8   118   (actual_km_summe=29.1, actual_hm_summe=151)
+   3 2026-08-03 BASE      31.7      29.4        60       152 | 3/1/1/1      |  12.0   118   (actual_km_summe=29.4, actual_hm_summe=152)
+   4 2026-08-10 DELOAD    24.5      24.5        45       118 | 3/1/1/0      |   9.3    92   (actual_km_summe=24.5, actual_hm_summe=118)
+   5 2026-08-17 BUILD     31.1      29.3        60       152 | 3/1/1/1      |  12.0   119   (actual_km_summe=29.3, actual_hm_summe=152)
+   6 2026-08-24 BUILD     30.4      28.8        60       153 | 3/1/1/1      |  11.9   120   (actual_km_summe=28.8, actual_hm_summe=153)
+   7 2026-08-31 BUILD     29.8      28.6        60       154 | 3/1/1/1      |  11.9   120   (actual_km_summe=28.6, actual_hm_summe=154)
+   8 2026-09-07 DELOAD    24.5      24.5        45       119 | 3/1/1/0      |   9.2    93   (actual_km_summe=24.5, actual_hm_summe=119)
+   9 2026-09-14 BUILD     29.2      28.3        60       155 | 3/1/1/1      |  11.8   121   (actual_km_summe=28.3, actual_hm_summe=155)
+  10 2026-09-21 BUILD     28.5      27.9        60       156 | 3/1/1/1      |  11.7   122   (actual_km_summe=27.9, actual_hm_summe=156)
+  11 2026-09-28 BUILD     27.9      27.7        60       157 | 3/1/1/1      |  11.7   122   (actual_km_summe=27.7, actual_hm_summe=157)
+  12 2026-10-05 PEAK      27.3      27.3        60       158 | 3/1/1/1      |  12.7   123   (actual_km_summe=27.3, actual_hm_summe=158)
+  13 2026-10-12 TAPER     22.2      21.4        60       110 | 3/1/1/1      |   8.9    86   (actual_km_summe=21.4, actual_hm_summe=110)
+  14 2026-10-19 TAPER     22.2      17.4        60       110 | 3/1/1/1      |     0     0   (actual_km_summe=17.4, actual_hm_summe=110)
+  15 2026-10-26 RACE      11.1      11.1         0        55 | 3/0/1/0      |     0     0   (actual_km_summe=11.1, actual_hm_summe=55)
+
+--- Konflikte/Warnings (aus build_full_skeleton) ---
+    - Woche 5: target_km von 31.7 auf 31.1 reduziert — maximal 2 identische Belastungswochen in Folge erlaubt.
+    - Woche 6: target_km von 31.7 auf 30.4 reduziert — maximal 2 identische Belastungswochen in Folge erlaubt.
+    - Woche 7: target_km von 31.7 auf 29.8 reduziert — maximal 2 identische Belastungswochen in Folge erlaubt.
+    - Woche 9: target_km von 31.7 auf 29.2 reduziert — maximal 2 identische Belastungswochen in Folge erlaubt.
+    - Woche 10: target_km von 31.7 auf 28.5 reduziert — maximal 2 identische Belastungswochen in Folge erlaubt.
+    - Woche 11: target_km von 31.7 auf 27.9 reduziert — maximal 2 identische Belastungswochen in Folge erlaubt.
+    - Woche 12: target_km von 31.7 auf 27.3 reduziert — maximal 2 identische Belastungswochen in Folge erlaubt.
+    - Woche 12 (PEAK): renn-verankertes Longrun-Ziel 16.5km bei verfügbarer Vorbereitungszeit/Basis nicht sicher erreichbar, Peak-Longrun bleibt bei 12.7km (sichere +10%/Woche-Progression greift).
+    - Woche 3: target_km identisch zu Woche 2 (31.7 km) — Zielobergrenze (desired_peak_km=31.650000000000002) bereits vor der eigentlichen Peak-Woche erreicht, weiteres Wachstum durch absolute_plan_cap_km/race_distance_km-Formel begrenzt.
+    - Woche 1: Laufziel von 32km auf 29.1km reduziert (Easy-Run-/Taper-Obergrenzen) — finaler, tatsächlich gespeicherter Wert.
+    - Woche 2: Laufziel von 31.7km auf 29.1km reduziert (Easy-Run-/Taper-Obergrenzen) — finaler, tatsächlich gespeicherter Wert.
+    - Woche 3: Laufziel von 31.7km auf 29.4km reduziert (Easy-Run-/Taper-Obergrenzen) — finaler, tatsächlich gespeicherter Wert.
+    - Woche 5: Laufziel von 31.1km auf 29.3km reduziert (Easy-Run-/Taper-Obergrenzen) — finaler, tatsächlich gespeicherter Wert.
+    - Woche 6: Laufziel von 30.4km auf 28.8km reduziert (Easy-Run-/Taper-Obergrenzen) — finaler, tatsächlich gespeicherter Wert.
+    - Woche 7: Laufziel von 29.8km auf 28.6km reduziert (Easy-Run-/Taper-Obergrenzen) — finaler, tatsächlich gespeicherter Wert.
+    - Woche 9: Laufziel von 29.2km auf 28.3km reduziert (Easy-Run-/Taper-Obergrenzen) — finaler, tatsächlich gespeicherter Wert.
+    - Woche 10: Laufziel von 28.5km auf 27.9km reduziert (Easy-Run-/Taper-Obergrenzen) — finaler, tatsächlich gespeicherter Wert.
+    - Woche 11: Laufziel von 27.9km auf 27.7km reduziert (Easy-Run-/Taper-Obergrenzen) — finaler, tatsächlich gespeicherter Wert.
+    - Woche 13: kein geeigneter Lower-Body-Slot verfügbar, alle Gymtage als Upper Body.
+    - Woche 13: Laufziel von 22.2km auf 21.4km reduziert (Easy-Run-/Taper-Obergrenzen) — finaler, tatsächlich gespeicherter Wert.
+    - Woche 14: kein geeigneter Lower-Body-Slot verfügbar, alle Gymtage als Upper Body.
+    - Woche 14: Laufziel von 22.2km auf 17.4km reduziert (Easy-Run-/Taper-Obergrenzen) — finaler, tatsächlich gespeicherter Wert.
+
+--- Alle Sessions ---
+  Datum      Wo Wochentag  Rolle    Session               km    HM  Min  Strength-Fokus   notes_hint
+  2026-07-20  1 Mo        Cross    Cross Training           0     0   60  —                (Phase 2/LLM — nicht generiert)
+  2026-07-21  1 Di        Kraft    Strength Training        0     0   45  lower            (Phase 2/LLM — nicht generiert)
+  2026-07-22  1 Mi        Easy     Easy Run              10.2    28   66  —                (Phase 2/LLM — nicht generiert)
+  2026-07-23  1 Do        Quality  Tempo Session          7.2     5   40  —                (Phase 2/LLM — nicht generiert)
+  2026-07-26  1 So        Longrun  Long Run              11.7   117   82  —                (Phase 2/LLM — nicht generiert)
+  2026-07-27  2 Mo        Cross    Cross Training           0     0   60  —                (Phase 2/LLM — nicht generiert)
+  2026-07-28  2 Di        Kraft    Strength Training        0     0   45  lower            (Phase 2/LLM — nicht generiert)
+  2026-07-29  2 Mi        Easy     Easy Run              10.2    28   66  —                (Phase 2/LLM — nicht generiert)
+  2026-07-30  2 Do        Quality  Tempo Session          7.1     5   39  —                (Phase 2/LLM — nicht generiert)
+  2026-08-02  2 So        Longrun  Long Run              11.8   118   83  —                (Phase 2/LLM — nicht generiert)
+  2026-08-03  3 Mo        Cross    Cross Training           0     0   60  —                (Phase 2/LLM — nicht generiert)
+  2026-08-04  3 Di        Kraft    Strength Training        0     0   45  lower            (Phase 2/LLM — nicht generiert)
+  2026-08-05  3 Mi        Easy     Easy Run              10.3    29   67  —                (Phase 2/LLM — nicht generiert)
+  2026-08-06  3 Do        Quality  Tempo Session          7.1     5   39  —                (Phase 2/LLM — nicht generiert)
+  2026-08-09  3 So        Longrun  Long Run              12.0   118   84  —                (Phase 2/LLM — nicht generiert)
+  2026-08-10  4 Mo        Easy     Easy Run               7.6    13   49  —                (Phase 2/LLM — nicht generiert)
+  2026-08-11  4 Di        Kraft    Strength Training        0     0   45  full_light       (Phase 2/LLM — nicht generiert)
+  2026-08-12  4 Mi        Easy     Easy Run               7.6    13   49  —                (Phase 2/LLM — nicht generiert)
+  2026-08-13  4 Do        Cross    Cross Training           0     0   45  —                (Phase 2/LLM — nicht generiert)
+  2026-08-16  4 So        Longrun  Long Run               9.3    92   65  —                (Phase 2/LLM — nicht generiert)
+  2026-08-17  5 Mo        Cross    Cross Training           0     0   60  —                (Phase 2/LLM — nicht generiert)
+  2026-08-18  5 Di        Kraft    Strength Training        0     0   45  lower            (Phase 2/LLM — nicht generiert)
+  2026-08-19  5 Mi        Easy     Easy Run              10.3    28   67  —                (Phase 2/LLM — nicht generiert)
+  2026-08-20  5 Do        Quality  Tempo Session          7.0     5   38  —                (Phase 2/LLM — nicht generiert)
+  2026-08-23  5 So        Longrun  Long Run              12.0   119   84  —                (Phase 2/LLM — nicht generiert)
+  2026-08-24  6 Mo        Cross    Cross Training           0     0   60  —                (Phase 2/LLM — nicht generiert)
+  2026-08-25  6 Di        Kraft    Strength Training        0     0   45  lower            (Phase 2/LLM — nicht generiert)
+  2026-08-26  6 Mi        Easy     Easy Run              10.1    28   66  —                (Phase 2/LLM — nicht generiert)
+  2026-08-27  6 Do        Quality  Tempo Session          6.8     5   37  —                (Phase 2/LLM — nicht generiert)
+  2026-08-30  6 So        Longrun  Long Run              11.9   120   83  —                (Phase 2/LLM — nicht generiert)
+  2026-08-31  7 Mo        Cross    Cross Training           0     0   60  —                (Phase 2/LLM — nicht generiert)
+  2026-09-01  7 Di        Kraft    Strength Training        0     0   45  lower            (Phase 2/LLM — nicht generiert)
+  2026-09-02  7 Mi        Easy     Easy Run              10.0    29   65  —                (Phase 2/LLM — nicht generiert)
+  2026-09-03  7 Do        Quality  Tempo Session          6.7     5   37  —                (Phase 2/LLM — nicht generiert)
+  2026-09-06  7 So        Longrun  Long Run              11.9   120   83  —                (Phase 2/LLM — nicht generiert)
+  2026-09-07  8 Mo        Easy     Easy Run               7.7    13   50  —                (Phase 2/LLM — nicht generiert)
+  2026-09-08  8 Di        Kraft    Strength Training        0     0   45  full_light       (Phase 2/LLM — nicht generiert)
+  2026-09-09  8 Mi        Easy     Easy Run               7.6    13   49  —                (Phase 2/LLM — nicht generiert)
+  2026-09-10  8 Do        Cross    Cross Training           0     0   45  —                (Phase 2/LLM — nicht generiert)
+  2026-09-13  8 So        Longrun  Long Run               9.2    93   64  —                (Phase 2/LLM — nicht generiert)
+  2026-09-14  9 Mo        Cross    Cross Training           0     0   60  —                (Phase 2/LLM — nicht generiert)
+  2026-09-15  9 Di        Kraft    Strength Training        0     0   45  lower            (Phase 2/LLM — nicht generiert)
+  2026-09-16  9 Mi        Easy     Easy Run               9.9    29   64  —                (Phase 2/LLM — nicht generiert)
+  2026-09-17  9 Do        Quality  Tempo Session          6.6     5   36  —                (Phase 2/LLM — nicht generiert)
+  2026-09-20  9 So        Longrun  Long Run              11.8   121   83  —                (Phase 2/LLM — nicht generiert)
+  2026-09-21 10 Mo        Cross    Cross Training           0     0   60  —                (Phase 2/LLM — nicht generiert)
+  2026-09-22 10 Di        Kraft    Strength Training        0     0   45  lower            (Phase 2/LLM — nicht generiert)
+  2026-09-23 10 Mi        Easy     Easy Run               9.8    29   64  —                (Phase 2/LLM — nicht generiert)
+  2026-09-24 10 Do        Quality  Tempo Session          6.4     5   35  —                (Phase 2/LLM — nicht generiert)
+  2026-09-27 10 So        Longrun  Long Run              11.7   122   82  —                (Phase 2/LLM — nicht generiert)
+  2026-09-28 11 Mo        Cross    Cross Training           0     0   60  —                (Phase 2/LLM — nicht generiert)
+  2026-09-29 11 Di        Kraft    Strength Training        0     0   45  lower            (Phase 2/LLM — nicht generiert)
+  2026-09-30 11 Mi        Easy     Easy Run               9.7    30   63  —                (Phase 2/LLM — nicht generiert)
+  2026-10-01 11 Do        Quality  Tempo Session          6.3     5   35  —                (Phase 2/LLM — nicht generiert)
+  2026-10-04 11 So        Longrun  Long Run              11.7   122   82  —                (Phase 2/LLM — nicht generiert)
+  2026-10-05 12 Mo        Cross    Cross Training           0     0   60  —                (Phase 2/LLM — nicht generiert)
+  2026-10-06 12 Di        Kraft    Strength Training        0     0   45  lower            (Phase 2/LLM — nicht generiert)
+  2026-10-07 12 Mi        Easy     Easy Run               8.5    30   55  —                (Phase 2/LLM — nicht generiert)
+  2026-10-08 12 Do        Quality  Tempo Session          6.1     5   34  —                (Phase 2/LLM — nicht generiert)
+  2026-10-11 12 So        Longrun  Long Run              12.7   123   89  —                (Phase 2/LLM — nicht generiert)
+  2026-10-12 13 Mo        Easy     Easy Run               7.5    22   49  —                (Phase 2/LLM — nicht generiert)
+  2026-10-13 13 Di        Kraft    Strength Training        0     0   45  upper_light      (Phase 2/LLM — nicht generiert)
+  2026-10-14 13 Mi        Quality  Tempo Session          5.0     2   28  —                (Phase 2/LLM — nicht generiert)
+  2026-10-16 13 Fr        Cross    Cross Training           0     0   60  —                (Phase 2/LLM — nicht generiert)
+  2026-10-18 13 So        Longrun  Long Run               8.9    86   62  —                (Phase 2/LLM — nicht generiert)
+  2026-10-19 14 Mo        Cross    Cross Training           0     0   60  —                (Phase 2/LLM — nicht generiert)
+  2026-10-20 14 Di        Kraft    Strength Training        0     0   45  upper_light      (Phase 2/LLM — nicht generiert)
+  2026-10-21 14 Mi        Quality  Tempo Session          5.0     9   28  —                (Phase 2/LLM — nicht generiert)
+  2026-10-22 14 Do        Easy     Easy Run               6.2    51   40  —                (Phase 2/LLM — nicht generiert)
+  2026-10-23 14 Fr        Easy     Easy Run               6.2    50   40  —                (Phase 2/LLM — nicht generiert)
+  2026-10-26 15 Mo        Easy     Easy Run               3.7    18   24  —                (Phase 2/LLM — nicht generiert)
+  2026-10-27 15 Di        Kraft    Strength Training        0     0   45  upper_light      (Phase 2/LLM — nicht generiert)
+  2026-10-28 15 Mi        Easy     Easy Run               3.7    18   24  —                (Phase 2/LLM — nicht generiert)
+  2026-10-29 15 Do        Easy     Easy Run               3.7    19   24  —                (Phase 2/LLM — nicht generiert)
+  2026-11-01 15 So        Race     Race Day              21.1   120  149  —                (Phase 2/LLM — nicht generiert)
+
+--- Automatisierte Kriterien ---
+  Struktur    : PASS
+  Volumen     : FAIL
+      [FAIL] (plan-weit) | None | Ist: Woche 12 (PEAK): target_km=27.3 < erwartete Untergrenze 31.7 (min(avg_weekly_km=32, desired_peak_km=31.650000000000002)) | Erwartet: (siehe Regeltext) | Regel: validate_skeleton() Regelverstoß
+        Ursache: compute_weekly_progression() (data/generate_plan.py:149-196)
+      [WARNING] (plan-weit) | (Peak-Woche) | Ist: peak target_km=32 | Erwartet: ~40-50km | Regel: Peak-Wochenumfang im erwarteten Bereich
+        Ursache: compute_desired_peak_km() / compute_weekly_progression() (data/generate_plan.py:233-234, 149-196)
+  Longrun     : WARNING
+      [WARNING] Woche 12 | Long Run | Ist: 12.7km | Erwartet: ~18-22km | Regel: Peak-Longrun passt zu Renndistanz, Erfahrung und Terrain
+        Ursache: compute_desired_peak_longrun_km() / compute_longrun_progression() (data/generate_plan.py:265-362) — Formel ist NICHT terrainabhängig
+  HM/Terrain  : PASS
+  Kraft/Cross : PASS
+  Taper       : PASS
+
+####################################################################################################
+SZENARIO 3 — MARATHON STRASSE / FORTGESCHRITTEN (Marathon Advanced)
+####################################################################################################
+
+--- Normalisierte Eingaben (an build_full_skeleton übergeben) ---
+  start_date = '2026-06-29'
+  race_date = '2026-11-08'
+  race_distance_km = 42.195
+  race_elevation_m = 180
+  terrain = 'road'
+  days_per_week = 6
+  strength_sessions = 1
+  strength_days = [3]
+  quality_sessions = 2
+  long_run_day = 7
+  cross_training = False
+  cross_training_days = 0
+  max_km = 80
+  avg_weekly_km = 52
+  avg_weekly_hm = 250
+  athlete_paces = {}
+
+--- Athlet-Kontext (informativ, teils nicht vom Generator konsumiert) ---
+  stabiler_laufumfang_km = 52
+  hoechste_woche_90d_km = 65
+  bestaetigte_longruns_km = [24, 26, 28]
+  avg_wochen_hm = 250
+  mehrjaehrige_erfahrung = True
+  kuerzlich_hm_absolviert = True
+  verletzung = False
+  plan_meta.ziel = 'Zeitrennen'  (informativ, kein Generator-Input)
+
+--- Skelett-Zusammenfassung ---
+  total_weeks=19  race_dow=7 (Sonntag)  desired_peak_km=63.3  peak_km_actual=63.292500000000004
+  desired_peak_hm=262.5  peak_hm_actual=262.5
+  validate_skeleton(): GÜLTIG (0 Validator-Fehler)
+
+--- Wochenübersicht ---
+  Wo Startdatum   Phase   base_km actual_km cross_min target_hm | sessions L/C/S/Q | LR-km LR-HM
+   1 2026-06-29 BASE      52.0      52.0         0       250 | 5/0/1/2      |  19.0   195   (actual_km_summe=52.0, actual_hm_summe=250)
+   2 2026-07-06 BASE      52.9      52.9         0       251 | 5/0/1/2      |  19.6   196   (actual_km_summe=52.9, actual_hm_summe=251)
+   3 2026-07-13 BASE      53.7      53.7         0       252 | 5/0/1/2      |  20.1   197   (actual_km_summe=53.7, actual_hm_summe=252)
+   4 2026-07-20 DELOAD    41.6      41.6         0       195 | 5/0/1/0      |  15.6   152   (actual_km_summe=41.6, actual_hm_summe=195)
+   5 2026-07-27 BASE      54.6      54.6         0       253 | 5/0/1/2      |  20.7   197   (actual_km_summe=54.6, actual_hm_summe=253)
+   6 2026-08-03 BUILD     55.5      55.5         0       254 | 5/0/1/2      |  21.3   198   (actual_km_summe=55.5, actual_hm_summe=254)
+   7 2026-08-10 BUILD     56.4      56.4         0       255 | 5/0/1/2      |  21.9   199   (actual_km_summe=56.4, actual_hm_summe=255)
+   8 2026-08-17 DELOAD    43.7      43.7         0       198 | 5/0/1/0      |  17.0   154   (actual_km_summe=43.7, actual_hm_summe=198)
+   9 2026-08-24 BUILD     57.4      57.4         0       256 | 5/0/1/2      |  22.6   200   (actual_km_summe=57.4, actual_hm_summe=256)
+  10 2026-08-31 BUILD     58.3      58.3         0       257 | 5/0/1/2      |  23.2   201   (actual_km_summe=58.3, actual_hm_summe=257)
+  11 2026-09-07 BUILD     59.3      59.3         0       258 | 5/0/1/2      |  23.9   201   (actual_km_summe=59.3, actual_hm_summe=258)
+  12 2026-09-14 DELOAD    45.9      45.9         0       200 | 5/0/1/0      |  18.5   156   (actual_km_summe=45.9, actual_hm_summe=200)
+  13 2026-09-21 BUILD     60.3      60.3         0       259 | 5/0/1/2      |  24.6   202   (actual_km_summe=60.3, actual_hm_summe=259)
+  14 2026-09-28 BUILD     61.3      61.3         0       260 | 5/0/1/2      |  25.3   203   (actual_km_summe=61.3, actual_hm_summe=260)
+  15 2026-10-05 BUILD     62.3      62.3         0       261 | 5/0/1/2      |  26.0   204   (actual_km_summe=62.3, actual_hm_summe=261)
+  16 2026-10-12 PEAK      63.3      63.3         0       262 | 5/0/1/2      |  26.9   205   (actual_km_summe=63.3, actual_hm_summe=263)
+  17 2026-10-19 TAPER     44.3      44.3         0       184 | 5/0/1/1      |  18.8   143   (actual_km_summe=44.3, actual_hm_summe=184)
+  18 2026-10-26 TAPER     44.3      39.0         0       184 | 5/0/1/1      |     0     0   (actual_km_summe=39.0, actual_hm_summe=184)
+  19 2026-11-02 RACE      22.2      22.2         0        92 | 4/0/1/0      |     0     0   (actual_km_summe=22.2, actual_hm_summe=92)
+
+--- Konflikte/Warnings (aus build_full_skeleton) ---
+    - Woche 17: kein geeigneter Lower-Body-Slot verfügbar, alle Gymtage als Upper Body.
+    - Woche 18: kein geeigneter Lower-Body-Slot verfügbar, alle Gymtage als Upper Body.
+    - Woche 18 (letzte Taper-Woche): Easy Run von 8.6km auf 8.0km reduziert (Regel 16, Klarstellung 17: Prozentziel darf unterschritten werden).
+    - Woche 18 (letzte Taper-Woche): Easy Run von 8.6km auf 8.0km reduziert (Regel 16, Klarstellung 17: Prozentziel darf unterschritten werden).
+    - Woche 18 (letzte Taper-Woche): Easy Run von 8.6km auf 8.0km reduziert (Regel 16, Klarstellung 17: Prozentziel darf unterschritten werden).
+    - Woche 18 (letzte Taper-Woche): Easy Run von 8.5km auf 8.0km reduziert (Regel 16, Klarstellung 17: Prozentziel darf unterschritten werden).
+    - Woche 18 (letzte Taper-Woche): Fr+Sa von 16.0km auf ~13.0km reduziert (Regel 16: max. 12-14km zusammen).
+    - Woche 18: Laufziel von 44.3km auf 39.0km reduziert (Easy-Run-/Taper-Obergrenzen) — finaler, tatsächlich gespeicherter Wert.
+
+--- Alle Sessions ---
+  Datum      Wo Wochentag  Rolle    Session               km    HM  Min  Strength-Fokus   notes_hint
+  2026-06-29  1 Mo        Easy     Easy Run              10.7    24   70  —                (Phase 2/LLM — nicht generiert)
+  2026-06-30  1 Di        Quality  Tempo Session          5.8     4   32  —                (Phase 2/LLM — nicht generiert)
+  2026-07-01  1 Mi        Kraft    Strength Training        0     0   45  lower_moderate   (Phase 2/LLM — nicht generiert)
+  2026-07-02  1 Do        Easy     Easy Run              10.7    23   70  —                (Phase 2/LLM — nicht generiert)
+  2026-07-03  1 Fr        Quality  Interval Session       5.8     4   32  —                (Phase 2/LLM — nicht generiert)
+  2026-07-05  1 So        Longrun  Long Run              19.0   195  133  —                (Phase 2/LLM — nicht generiert)
+  2026-07-06  2 Mo        Easy     Easy Run              10.7    24   70  —                (Phase 2/LLM — nicht generiert)
+  2026-07-07  2 Di        Quality  Tempo Session          6.0     4   33  —                (Phase 2/LLM — nicht generiert)
+  2026-07-08  2 Mi        Kraft    Strength Training        0     0   45  lower_moderate   (Phase 2/LLM — nicht generiert)
+  2026-07-09  2 Do        Easy     Easy Run              10.6    23   69  —                (Phase 2/LLM — nicht generiert)
+  2026-07-10  2 Fr        Quality  Interval Session       6.0     4   33  —                (Phase 2/LLM — nicht generiert)
+  2026-07-12  2 So        Longrun  Long Run              19.6   196  137  —                (Phase 2/LLM — nicht generiert)
+  2026-07-13  3 Mo        Easy     Easy Run              10.8    24   70  —                (Phase 2/LLM — nicht generiert)
+  2026-07-14  3 Di        Quality  Tempo Session          6.0     4   33  —                (Phase 2/LLM — nicht generiert)
+  2026-07-15  3 Mi        Kraft    Strength Training        0     0   45  lower_moderate   (Phase 2/LLM — nicht generiert)
+  2026-07-16  3 Do        Easy     Easy Run              10.8    23   70  —                (Phase 2/LLM — nicht generiert)
+  2026-07-17  3 Fr        Quality  Interval Session       6.0     4   33  —                (Phase 2/LLM — nicht generiert)
+  2026-07-19  3 So        Longrun  Long Run              20.1   197  141  —                (Phase 2/LLM — nicht generiert)
+  2026-07-20  4 Mo        Easy     Easy Run               6.5    11   42  —                (Phase 2/LLM — nicht generiert)
+  2026-07-21  4 Di        Easy     Easy Run               6.5    11   42  —                (Phase 2/LLM — nicht generiert)
+  2026-07-22  4 Mi        Kraft    Strength Training        0     0   45  full_light       (Phase 2/LLM — nicht generiert)
+  2026-07-23  4 Do        Easy     Easy Run               6.5    11   42  —                (Phase 2/LLM — nicht generiert)
+  2026-07-24  4 Fr        Easy     Easy Run               6.5    10   42  —                (Phase 2/LLM — nicht generiert)
+  2026-07-26  4 So        Longrun  Long Run              15.6   152  109  —                (Phase 2/LLM — nicht generiert)
+  2026-07-27  5 Mo        Easy     Easy Run              10.8    24   70  —                (Phase 2/LLM — nicht generiert)
+  2026-07-28  5 Di        Quality  Tempo Session          6.2     4   34  —                (Phase 2/LLM — nicht generiert)
+  2026-07-29  5 Mi        Kraft    Strength Training        0     0   45  lower_moderate   (Phase 2/LLM — nicht generiert)
+  2026-07-30  5 Do        Easy     Easy Run              10.7    24   70  —                (Phase 2/LLM — nicht generiert)
+  2026-07-31  5 Fr        Quality  Interval Session       6.2     4   34  —                (Phase 2/LLM — nicht generiert)
+  2026-08-02  5 So        Longrun  Long Run              20.7   197  145  —                (Phase 2/LLM — nicht generiert)
+  2026-08-03  6 Mo        Easy     Easy Run              10.9    24   71  —                (Phase 2/LLM — nicht generiert)
+  2026-08-04  6 Di        Quality  Tempo Session          6.2     4   34  —                (Phase 2/LLM — nicht generiert)
+  2026-08-05  6 Mi        Kraft    Strength Training        0     0   45  lower_moderate   (Phase 2/LLM — nicht generiert)
+  2026-08-06  6 Do        Easy     Easy Run              10.9    24   71  —                (Phase 2/LLM — nicht generiert)
+  2026-08-07  6 Fr        Quality  Interval Session       6.2     4   34  —                (Phase 2/LLM — nicht generiert)
+  2026-08-09  6 So        Longrun  Long Run              21.3   198  149  —                (Phase 2/LLM — nicht generiert)
+  2026-08-10  7 Mo        Easy     Easy Run              10.9    24   71  —                (Phase 2/LLM — nicht generiert)
+  2026-08-11  7 Di        Quality  Tempo Session          6.3     4   35  —                (Phase 2/LLM — nicht generiert)
+  2026-08-12  7 Mi        Kraft    Strength Training        0     0   45  lower_moderate   (Phase 2/LLM — nicht generiert)
+  2026-08-13  7 Do        Easy     Easy Run              11.0    24   72  —                (Phase 2/LLM — nicht generiert)
+  2026-08-14  7 Fr        Quality  Interval Session       6.3     4   35  —                (Phase 2/LLM — nicht generiert)
+  2026-08-16  7 So        Longrun  Long Run              21.9   199  153  —                (Phase 2/LLM — nicht generiert)
+  2026-08-17  8 Mo        Easy     Easy Run               6.7    11   44  —                (Phase 2/LLM — nicht generiert)
+  2026-08-18  8 Di        Easy     Easy Run               6.7    11   44  —                (Phase 2/LLM — nicht generiert)
+  2026-08-19  8 Mi        Kraft    Strength Training        0     0   45  full_light       (Phase 2/LLM — nicht generiert)
+  2026-08-20  8 Do        Easy     Easy Run               6.7    11   44  —                (Phase 2/LLM — nicht generiert)
+  2026-08-21  8 Fr        Easy     Easy Run               6.6    11   43  —                (Phase 2/LLM — nicht generiert)
+  2026-08-23  8 So        Longrun  Long Run              17.0   154  119  —                (Phase 2/LLM — nicht generiert)
+  2026-08-24  9 Mo        Easy     Easy Run              10.9    24   71  —                (Phase 2/LLM — nicht generiert)
+  2026-08-25  9 Di        Quality  Tempo Session          6.5     4   36  —                (Phase 2/LLM — nicht generiert)
+  2026-08-26  9 Mi        Kraft    Strength Training        0     0   45  lower_moderate   (Phase 2/LLM — nicht generiert)
+  2026-08-27  9 Do        Easy     Easy Run              10.9    24   71  —                (Phase 2/LLM — nicht generiert)
+  2026-08-28  9 Fr        Quality  Interval Session       6.5     4   36  —                (Phase 2/LLM — nicht generiert)
+  2026-08-30  9 So        Longrun  Long Run              22.6   200  158  —                (Phase 2/LLM — nicht generiert)
+  2026-08-31 10 Mo        Easy     Easy Run              11.1    24   72  —                (Phase 2/LLM — nicht generiert)
+  2026-09-01 10 Di        Quality  Tempo Session          6.5     4   36  —                (Phase 2/LLM — nicht generiert)
+  2026-09-02 10 Mi        Kraft    Strength Training        0     0   45  lower_moderate   (Phase 2/LLM — nicht generiert)
+  2026-09-03 10 Do        Easy     Easy Run              11.0    24   72  —                (Phase 2/LLM — nicht generiert)
+  2026-09-04 10 Fr        Quality  Interval Session       6.5     4   36  —                (Phase 2/LLM — nicht generiert)
+  2026-09-06 10 So        Longrun  Long Run              23.2   201  162  —                (Phase 2/LLM — nicht generiert)
+  2026-09-07 11 Mo        Easy     Easy Run              11.0    25   72  —                (Phase 2/LLM — nicht generiert)
+  2026-09-08 11 Di        Quality  Tempo Session          6.7     4   37  —                (Phase 2/LLM — nicht generiert)
+  2026-09-09 11 Mi        Kraft    Strength Training        0     0   45  lower_moderate   (Phase 2/LLM — nicht generiert)
+  2026-09-10 11 Do        Easy     Easy Run              11.0    24   72  —                (Phase 2/LLM — nicht generiert)
+  2026-09-11 11 Fr        Quality  Interval Session       6.7     4   37  —                (Phase 2/LLM — nicht generiert)
+  2026-09-13 11 So        Longrun  Long Run              23.9   201  167  —                (Phase 2/LLM — nicht generiert)
+  2026-09-14 12 Mo        Easy     Easy Run               6.8    11   44  —                (Phase 2/LLM — nicht generiert)
+  2026-09-15 12 Di        Easy     Easy Run               6.8    11   44  —                (Phase 2/LLM — nicht generiert)
+  2026-09-16 12 Mi        Kraft    Strength Training        0     0   45  full_light       (Phase 2/LLM — nicht generiert)
+  2026-09-17 12 Do        Easy     Easy Run               6.8    11   44  —                (Phase 2/LLM — nicht generiert)
+  2026-09-18 12 Fr        Easy     Easy Run               7.0    11   46  —                (Phase 2/LLM — nicht generiert)
+  2026-09-20 12 So        Longrun  Long Run              18.5   156  130  —                (Phase 2/LLM — nicht generiert)
+  2026-09-21 13 Mo        Easy     Easy Run              11.1    25   72  —                (Phase 2/LLM — nicht generiert)
+  2026-09-22 13 Di        Quality  Tempo Session          6.8     4   37  —                (Phase 2/LLM — nicht generiert)
+  2026-09-23 13 Mi        Kraft    Strength Training        0     0   45  lower_moderate   (Phase 2/LLM — nicht generiert)
+  2026-09-24 13 Do        Easy     Easy Run              11.0    24   72  —                (Phase 2/LLM — nicht generiert)
+  2026-09-25 13 Fr        Quality  Interval Session       6.8     4   37  —                (Phase 2/LLM — nicht generiert)
+  2026-09-27 13 So        Longrun  Long Run              24.6   202  172  —                (Phase 2/LLM — nicht generiert)
+  2026-09-28 14 Mo        Easy     Easy Run              11.1    25   72  —                (Phase 2/LLM — nicht generiert)
+  2026-09-29 14 Di        Quality  Tempo Session          6.9     4   38  —                (Phase 2/LLM — nicht generiert)
+  2026-09-30 14 Mi        Kraft    Strength Training        0     0   45  lower_moderate   (Phase 2/LLM — nicht generiert)
+  2026-10-01 14 Do        Easy     Easy Run              11.1    24   72  —                (Phase 2/LLM — nicht generiert)
+  2026-10-02 14 Fr        Quality  Interval Session       6.9     4   38  —                (Phase 2/LLM — nicht generiert)
+  2026-10-04 14 So        Longrun  Long Run              25.3   203  177  —                (Phase 2/LLM — nicht generiert)
+  2026-10-05 15 Mo        Easy     Easy Run              11.2    25   73  —                (Phase 2/LLM — nicht generiert)
+  2026-10-06 15 Di        Quality  Tempo Session          7.0     4   38  —                (Phase 2/LLM — nicht generiert)
+  2026-10-07 15 Mi        Kraft    Strength Training        0     0   45  lower_moderate   (Phase 2/LLM — nicht generiert)
+  2026-10-08 15 Do        Easy     Easy Run              11.1    24   72  —                (Phase 2/LLM — nicht generiert)
+  2026-10-09 15 Fr        Quality  Interval Session       7.0     4   38  —                (Phase 2/LLM — nicht generiert)
+  2026-10-11 15 So        Longrun  Long Run              26.0   204  182  —                (Phase 2/LLM — nicht generiert)
+  2026-10-12 16 Mo        Easy     Easy Run              11.1    25   72  —                (Phase 2/LLM — nicht generiert)
+  2026-10-13 16 Di        Quality  Tempo Session          7.1     4   39  —                (Phase 2/LLM — nicht generiert)
+  2026-10-14 16 Mi        Kraft    Strength Training        0     0   45  lower_moderate   (Phase 2/LLM — nicht generiert)
+  2026-10-15 16 Do        Easy     Easy Run              11.1    25   72  —                (Phase 2/LLM — nicht generiert)
+  2026-10-16 16 Fr        Quality  Interval Session       7.1     4   39  —                (Phase 2/LLM — nicht generiert)
+  2026-10-18 16 So        Longrun  Long Run              26.9   205  188  —                (Phase 2/LLM — nicht generiert)
+  2026-10-19 17 Mo        Easy     Easy Run               5.2    13   34  —                (Phase 2/LLM — nicht generiert)
+  2026-10-20 17 Di        Easy     Easy Run               5.2    13   34  —                (Phase 2/LLM — nicht generiert)
+  2026-10-21 17 Mi        Kraft    Strength Training        0     0   45  upper_light      (Phase 2/LLM — nicht generiert)
+  2026-10-22 17 Do        Quality  Tempo Session         10.0     3   55  —                (Phase 2/LLM — nicht generiert)
+  2026-10-23 17 Fr        Easy     Easy Run               5.1    12   33  —                (Phase 2/LLM — nicht generiert)
+  2026-10-25 17 So        Longrun  Long Run              18.8   143  132  —                (Phase 2/LLM — nicht generiert)
+  2026-10-26 18 Mo        Easy     Easy Run               8.0    42   52  —                (Phase 2/LLM — nicht generiert)
+  2026-10-27 18 Di        Quality  Tempo Session         10.0    15   55  —                (Phase 2/LLM — nicht generiert)
+  2026-10-28 18 Mi        Kraft    Strength Training        0     0   45  upper_light      (Phase 2/LLM — nicht generiert)
+  2026-10-29 18 Do        Easy     Easy Run               8.0    42   52  —                (Phase 2/LLM — nicht generiert)
+  2026-10-30 18 Fr        Easy     Easy Run               6.5    42   42  —                (Phase 2/LLM — nicht generiert)
+  2026-10-31 18 Sa        Easy     Easy Run               6.5    43   42  —                (Phase 2/LLM — nicht generiert)
+  2026-11-02 19 Mo        Easy     Easy Run               5.5    23   36  —                (Phase 2/LLM — nicht generiert)
+  2026-11-03 19 Di        Easy     Easy Run               5.5    23   36  —                (Phase 2/LLM — nicht generiert)
+  2026-11-04 19 Mi        Kraft    Strength Training        0     0   45  upper_light      (Phase 2/LLM — nicht generiert)
+  2026-11-05 19 Do        Easy     Easy Run               5.5    23   36  —                (Phase 2/LLM — nicht generiert)
+  2026-11-06 19 Fr        Easy     Easy Run               5.7    23   37  —                (Phase 2/LLM — nicht generiert)
+  2026-11-08 19 So        Race     Race Day             42.195   180  297  —                (Phase 2/LLM — nicht generiert)
+
+--- Automatisierte Kriterien ---
+  Struktur    : PASS
+  Volumen     : PASS
+  Longrun     : WARNING
+      [WARNING] Woche 16 | Long Run | Ist: 26.9km | Erwartet: ~30-34km | Regel: Peak-Longrun passt zu Renndistanz, Erfahrung und Terrain
+        Ursache: compute_desired_peak_longrun_km() / compute_longrun_progression() (data/generate_plan.py:265-362) — Formel ist NICHT terrainabhängig
+  HM/Terrain  : PASS
+  Kraft/Cross : PASS
+  Taper       : PASS
+
+####################################################################################################
+SZENARIO 4 — 31 KM TRAIL / HYBRID-ATHLET (Trail 31K Hybrid)
+####################################################################################################
+
+--- Normalisierte Eingaben (an build_full_skeleton übergeben) ---
+  start_date = '2026-07-13'
+  race_date = '2026-10-26'
+  race_distance_km = 30.7
+  race_elevation_m = 1246
+  terrain = 'trail'
+  days_per_week = 6
+  strength_sessions = 2
+  strength_days = [2, 4]
+  quality_sessions = 1
+  long_run_day = 7
+  cross_training = True
+  cross_training_days = 1
+  cross_replaces_run = False
+  max_km = 55
+  avg_weekly_km = 36
+  avg_weekly_hm = 450
+  athlete_paces = {}
+  cross_training_types = ['Rennrad']  (informativ — NICHT von build_full_skeleton konsumiert, nur Phase-2/LLM-Prompt)
+
+--- Athlet-Kontext (informativ, teils nicht vom Generator konsumiert) ---
+  stabile_laufbasis_km = 36
+  hoechste_laufwoche_90d_km = 43
+  bestaetigte_longruns_km = [13, 14, 15]
+  avg_wochen_hm = 450
+  verletzung = False
+  cross_zusaetzlich = True
+  plan_meta.ziel = 'sicherer Finish mit guter Vorbereitung'  (informativ, kein Generator-Input)
+
+--- Skelett-Zusammenfassung ---
+  total_weeks=16  race_dow=1 (Montag)  desired_peak_km=46.0  peak_km_actual=46.05
+  desired_peak_hm=1308.3  peak_hm_actual=1061.1
+  validate_skeleton(): GÜLTIG (0 Validator-Fehler)
+
+--- Wochenübersicht ---
+  Wo Startdatum   Phase   base_km actual_km cross_min target_hm | sessions L/C/S/Q | LR-km LR-HM
+   1 2026-07-13 BASE      36.0      32.6        60       450 | 3/1/2/1      |  13.1   351   (actual_km_summe=32.6, actual_hm_summe=450)
+   2 2026-07-20 BASE      37.0      34.0        60       495 | 3/1/2/1      |  13.8   386   (actual_km_summe=34.0, actual_hm_summe=495)
+   3 2026-07-27 BASE      38.0      35.4        60       544 | 3/1/2/1      |  14.4   425   (actual_km_summe=35.4, actual_hm_summe=545)
+   4 2026-08-03 DELOAD    29.5      29.5        45       422 | 3/1/2/0      |  11.2   329   (actual_km_summe=29.5, actual_hm_summe=422)
+   5 2026-08-10 BUILD     39.1      36.6        60       599 | 3/1/2/1      |  15.0   467   (actual_km_summe=36.6, actual_hm_summe=599)
+   6 2026-08-17 BUILD     40.2      38.0        60       659 | 3/1/2/1      |  15.7   514   (actual_km_summe=38.0, actual_hm_summe=659)
+   7 2026-08-24 BUILD     41.3      39.6        60       725 | 3/1/2/1      |  16.4   565   (actual_km_summe=39.6, actual_hm_summe=725)
+   8 2026-08-31 DELOAD    32.0      32.0        45       562 | 3/1/2/0      |  12.7   438   (actual_km_summe=32.0, actual_hm_summe=562)
+   9 2026-09-07 BUILD     42.4      41.1        60       797 | 3/1/2/1      |  17.2   622   (actual_km_summe=41.1, actual_hm_summe=797)
+  10 2026-09-14 BUILD     43.6      42.6        60       877 | 3/1/2/1      |  17.9   684   (actual_km_summe=42.6, actual_hm_summe=877)
+  11 2026-09-21 BUILD     44.8      43.7        60       965 | 3/1/2/1      |  18.7   752   (actual_km_summe=43.7, actual_hm_summe=965)
+  12 2026-09-28 DELOAD    34.7      34.7        45       748 | 3/1/2/0      |  14.5   583   (actual_km_summe=34.7, actual_hm_summe=748)
+  13 2026-10-05 PEAK      46.0      45.8        60      1061 | 3/1/2/1      |  20.6   828   (actual_km_summe=45.8, actual_hm_summe=1061)
+  14 2026-10-12 TAPER     32.2      32.2        60       743 | 3/1/2/1      |  14.4   579   (actual_km_summe=32.2, actual_hm_summe=743)
+  15 2026-10-19 TAPER     32.2      20.2        60       743 | 3/1/2/1      |     0     0   (actual_km_summe=20.2, actual_hm_summe=743)
+  16 2026-10-26 RACE       0.0       0.0         0         0 | 0/0/0/0      |     0     0   (actual_km_summe=0, actual_hm_summe=0)
+
+--- Konflikte/Warnings (aus build_full_skeleton) ---
+    - Woche 13 (PEAK): renn-verankertes Longrun-Ziel 23.9km bei verfügbarer Vorbereitungszeit/Basis nicht sicher erreichbar, Peak-Longrun bleibt bei 20.6km (sichere +10%/Woche-Progression greift).
+    - Woche 1: Laufziel von 36km auf 32.6km reduziert (Easy-Run-/Taper-Obergrenzen) — finaler, tatsächlich gespeicherter Wert.
+    - Woche 2: Laufziel von 37.0km auf 34.0km reduziert (Easy-Run-/Taper-Obergrenzen) — finaler, tatsächlich gespeicherter Wert.
+    - Woche 3: Laufziel von 38.0km auf 35.4km reduziert (Easy-Run-/Taper-Obergrenzen) — finaler, tatsächlich gespeicherter Wert.
+    - Woche 5: Laufziel von 39.1km auf 36.6km reduziert (Easy-Run-/Taper-Obergrenzen) — finaler, tatsächlich gespeicherter Wert.
+    - Woche 6: Laufziel von 40.2km auf 38.0km reduziert (Easy-Run-/Taper-Obergrenzen) — finaler, tatsächlich gespeicherter Wert.
+    - Woche 7: Laufziel von 41.3km auf 39.6km reduziert (Easy-Run-/Taper-Obergrenzen) — finaler, tatsächlich gespeicherter Wert.
+    - Woche 9: Laufziel von 42.4km auf 41.1km reduziert (Easy-Run-/Taper-Obergrenzen) — finaler, tatsächlich gespeicherter Wert.
+    - Woche 10: Laufziel von 43.6km auf 42.6km reduziert (Easy-Run-/Taper-Obergrenzen) — finaler, tatsächlich gespeicherter Wert.
+    - Woche 11: Laufziel von 44.8km auf 43.7km reduziert (Easy-Run-/Taper-Obergrenzen) — finaler, tatsächlich gespeicherter Wert.
+    - Woche 13: Laufziel von 46.0km auf 45.8km reduziert (Easy-Run-/Taper-Obergrenzen) — finaler, tatsächlich gespeicherter Wert.
+    - Woche 14: kein geeigneter Lower-Body-Slot verfügbar, alle Gymtage als Upper Body.
+    - Woche 15: kein geeigneter Lower-Body-Slot verfügbar, alle Gymtage als Upper Body.
+    - Woche 15 (letzte Taper-Woche): Easy Run von 9.1km auf 8.0km reduziert (Regel 16, Klarstellung 17: Prozentziel darf unterschritten werden).
+    - Woche 15 (letzte Taper-Woche): Easy Run von 9.1km auf 8.0km reduziert (Regel 16, Klarstellung 17: Prozentziel darf unterschritten werden).
+    - Woche 15 (letzte Taper-Woche): Fr+Sa von 16.0km auf ~13.0km reduziert (Regel 16: max. 12-14km zusammen).
+    - Woche 15: Laufziel von 32.2km auf 20.2km reduziert (Easy-Run-/Taper-Obergrenzen) — finaler, tatsächlich gespeicherter Wert.
+
+--- Alle Sessions ---
+  Datum      Wo Wochentag  Rolle    Session               km    HM  Min  Strength-Fokus   notes_hint
+  2026-07-13  1 Mo        Cross    Cross Training           0     0   60  —                (Phase 2/LLM — nicht generiert)
+  2026-07-14  1 Di        Kraft    Strength Training        0     0   45  lower            (Phase 2/LLM — nicht generiert)
+  2026-07-15  1 Mi        Easy     Easy Run              11.4    45   74  —                (Phase 2/LLM — nicht generiert)
+  2026-07-16  1 Do        Kraft    Strength Training        0     0   45  upper            (Phase 2/LLM — nicht generiert)
+  2026-07-17  1 Fr        Quality  Hill Session           8.1    54   45  —                (Phase 2/LLM — nicht generiert)
+  2026-07-19  1 So        Longrun  Long Run              13.1   351   94  —                (Phase 2/LLM — nicht generiert)
+  2026-07-20  2 Mo        Cross    Cross Training           0     0   60  —                (Phase 2/LLM — nicht generiert)
+  2026-07-21  2 Di        Kraft    Strength Training        0     0   45  lower            (Phase 2/LLM — nicht generiert)
+  2026-07-22  2 Mi        Easy     Easy Run              11.9    49   78  —                (Phase 2/LLM — nicht generiert)
+  2026-07-23  2 Do        Kraft    Strength Training        0     0   45  upper            (Phase 2/LLM — nicht generiert)
+  2026-07-24  2 Fr        Quality  Hill Session           8.3    60   46  —                (Phase 2/LLM — nicht generiert)
+  2026-07-26  2 So        Longrun  Long Run              13.8   386   99  —                (Phase 2/LLM — nicht generiert)
+  2026-07-27  3 Mo        Cross    Cross Training           0     0   60  —                (Phase 2/LLM — nicht generiert)
+  2026-07-28  3 Di        Kraft    Strength Training        0     0   45  lower            (Phase 2/LLM — nicht generiert)
+  2026-07-29  3 Mi        Easy     Easy Run              12.4    54   81  —                (Phase 2/LLM — nicht generiert)
+  2026-07-30  3 Do        Kraft    Strength Training        0     0   45  upper            (Phase 2/LLM — nicht generiert)
+  2026-07-31  3 Fr        Quality  Hill Session           8.6    66   47  —                (Phase 2/LLM — nicht generiert)
+  2026-08-02  3 So        Longrun  Long Run              14.4   425  104  —                (Phase 2/LLM — nicht generiert)
+  2026-08-03  4 Mo        Cross    Cross Training           0     0   45  —                (Phase 2/LLM — nicht generiert)
+  2026-08-04  4 Di        Kraft    Strength Training        0     0   45  full_light       (Phase 2/LLM — nicht generiert)
+  2026-08-05  4 Mi        Easy     Easy Run               9.2    46   60  —                (Phase 2/LLM — nicht generiert)
+  2026-08-06  4 Do        Kraft    Strength Training        0     0   45  full_light       (Phase 2/LLM — nicht generiert)
+  2026-08-07  4 Fr        Easy     Easy Run               9.1    47   59  —                (Phase 2/LLM — nicht generiert)
+  2026-08-09  4 So        Longrun  Long Run              11.2   329   81  —                (Phase 2/LLM — nicht generiert)
+  2026-08-10  5 Mo        Cross    Cross Training           0     0   60  —                (Phase 2/LLM — nicht generiert)
+  2026-08-11  5 Di        Kraft    Strength Training        0     0   45  lower            (Phase 2/LLM — nicht generiert)
+  2026-08-12  5 Mi        Easy     Easy Run              12.8    59   84  —                (Phase 2/LLM — nicht generiert)
+  2026-08-13  5 Do        Kraft    Strength Training        0     0   45  upper            (Phase 2/LLM — nicht generiert)
+  2026-08-14  5 Fr        Quality  Hill Session           8.8    73   48  —                (Phase 2/LLM — nicht generiert)
+  2026-08-16  5 So        Longrun  Long Run              15.0   467  108  —                (Phase 2/LLM — nicht generiert)
+  2026-08-17  6 Mo        Cross    Cross Training           0     0   60  —                (Phase 2/LLM — nicht generiert)
+  2026-08-18  6 Di        Kraft    Strength Training        0     0   45  lower            (Phase 2/LLM — nicht generiert)
+  2026-08-19  6 Mi        Easy     Easy Run              13.3    65   87  —                (Phase 2/LLM — nicht generiert)
+  2026-08-20  6 Do        Kraft    Strength Training        0     0   45  upper            (Phase 2/LLM — nicht generiert)
+  2026-08-21  6 Fr        Quality  Hill Session           9.0    80   50  —                (Phase 2/LLM — nicht generiert)
+  2026-08-23  6 So        Longrun  Long Run              15.7   514  113  —                (Phase 2/LLM — nicht generiert)
+  2026-08-24  7 Mo        Cross    Cross Training           0     0   60  —                (Phase 2/LLM — nicht generiert)
+  2026-08-25  7 Di        Kraft    Strength Training        0     0   45  lower            (Phase 2/LLM — nicht generiert)
+  2026-08-26  7 Mi        Easy     Easy Run              13.9    72   91  —                (Phase 2/LLM — nicht generiert)
+  2026-08-27  7 Do        Kraft    Strength Training        0     0   45  upper            (Phase 2/LLM — nicht generiert)
+  2026-08-28  7 Fr        Quality  Hill Session           9.3    88   51  —                (Phase 2/LLM — nicht generiert)
+  2026-08-30  7 So        Longrun  Long Run              16.4   565  119  —                (Phase 2/LLM — nicht generiert)
+  2026-08-31  8 Mo        Cross    Cross Training           0     0   45  —                (Phase 2/LLM — nicht generiert)
+  2026-09-01  8 Di        Kraft    Strength Training        0     0   45  full_light       (Phase 2/LLM — nicht generiert)
+  2026-09-02  8 Mi        Easy     Easy Run               9.7    62   63  —                (Phase 2/LLM — nicht generiert)
+  2026-09-03  8 Do        Kraft    Strength Training        0     0   45  full_light       (Phase 2/LLM — nicht generiert)
+  2026-09-04  8 Fr        Easy     Easy Run               9.6    62   63  —                (Phase 2/LLM — nicht generiert)
+  2026-09-06  8 So        Longrun  Long Run              12.7   438   92  —                (Phase 2/LLM — nicht generiert)
+  2026-09-07  9 Mo        Cross    Cross Training           0     0   60  —                (Phase 2/LLM — nicht generiert)
+  2026-09-08  9 Di        Kraft    Strength Training        0     0   45  lower            (Phase 2/LLM — nicht generiert)
+  2026-09-09  9 Mi        Easy     Easy Run              14.4    79   94  —                (Phase 2/LLM — nicht generiert)
+  2026-09-10  9 Do        Kraft    Strength Training        0     0   45  upper            (Phase 2/LLM — nicht generiert)
+  2026-09-11  9 Fr        Quality  Hill Session           9.5    96   52  —                (Phase 2/LLM — nicht generiert)
+  2026-09-13  9 So        Longrun  Long Run              17.2   622  125  —                (Phase 2/LLM — nicht generiert)
+  2026-09-14 10 Mo        Cross    Cross Training           0     0   60  —                (Phase 2/LLM — nicht generiert)
+  2026-09-15 10 Di        Kraft    Strength Training        0     0   45  lower            (Phase 2/LLM — nicht generiert)
+  2026-09-16 10 Mi        Easy     Easy Run              14.9    87   97  —                (Phase 2/LLM — nicht generiert)
+  2026-09-17 10 Do        Kraft    Strength Training        0     0   45  upper            (Phase 2/LLM — nicht generiert)
+  2026-09-18 10 Fr        Quality  Hill Session           9.8   106   54  —                (Phase 2/LLM — nicht generiert)
+  2026-09-20 10 So        Longrun  Long Run              17.9   684  130  —                (Phase 2/LLM — nicht generiert)
+  2026-09-21 11 Mo        Cross    Cross Training           0     0   60  —                (Phase 2/LLM — nicht generiert)
+  2026-09-22 11 Di        Kraft    Strength Training        0     0   45  lower            (Phase 2/LLM — nicht generiert)
+  2026-09-23 11 Mi        Easy     Easy Run              14.9    96   98  —                (Phase 2/LLM — nicht generiert)
+  2026-09-24 11 Do        Kraft    Strength Training        0     0   45  upper            (Phase 2/LLM — nicht generiert)
+  2026-09-25 11 Fr        Quality  Hill Session          10.1   117   56  —                (Phase 2/LLM — nicht generiert)
+  2026-09-27 11 So        Longrun  Long Run              18.7   752  136  —                (Phase 2/LLM — nicht generiert)
+  2026-09-28 12 Mo        Cross    Cross Training           0     0   45  —                (Phase 2/LLM — nicht generiert)
+  2026-09-29 12 Di        Kraft    Strength Training        0     0   45  full_light       (Phase 2/LLM — nicht generiert)
+  2026-09-30 12 Mi        Easy     Easy Run              10.1    82   66  —                (Phase 2/LLM — nicht generiert)
+  2026-10-01 12 Do        Kraft    Strength Training        0     0   45  full_light       (Phase 2/LLM — nicht generiert)
+  2026-10-02 12 Fr        Easy     Easy Run              10.1    83   66  —                (Phase 2/LLM — nicht generiert)
+  2026-10-04 12 So        Longrun  Long Run              14.5   583  106  —                (Phase 2/LLM — nicht generiert)
+  2026-10-05 13 Mo        Cross    Cross Training           0     0   60  —                (Phase 2/LLM — nicht generiert)
+  2026-10-06 13 Di        Kraft    Strength Training        0     0   45  lower            (Phase 2/LLM — nicht generiert)
+  2026-10-07 13 Mi        Easy     Easy Run              14.9   105   98  —                (Phase 2/LLM — nicht generiert)
+  2026-10-08 13 Do        Kraft    Strength Training        0     0   45  upper            (Phase 2/LLM — nicht generiert)
+  2026-10-09 13 Fr        Quality  Hill Session          10.3   128   57  —                (Phase 2/LLM — nicht generiert)
+  2026-10-11 13 So        Longrun  Long Run              20.6   828  150  —                (Phase 2/LLM — nicht generiert)
+  2026-10-12 14 Mo        Cross    Cross Training           0     0   60  —                (Phase 2/LLM — nicht generiert)
+  2026-10-13 14 Di        Kraft    Strength Training        0     0   45  upper_light      (Phase 2/LLM — nicht generiert)
+  2026-10-14 14 Mi        Quality  Tempo Session          7.2    41   40  —                (Phase 2/LLM — nicht generiert)
+  2026-10-15 14 Do        Kraft    Strength Training        0     0   45  upper_light      (Phase 2/LLM — nicht generiert)
+  2026-10-16 14 Fr        Easy     Easy Run              10.6   123   70  —                (Phase 2/LLM — nicht generiert)
+  2026-10-18 14 So        Longrun  Long Run              14.4   579  105  —                (Phase 2/LLM — nicht generiert)
+  2026-10-19 15 Mo        Cross    Cross Training           0     0   60  —                (Phase 2/LLM — nicht generiert)
+  2026-10-20 15 Di        Kraft    Strength Training        0     0   45  upper_light      (Phase 2/LLM — nicht generiert)
+  2026-10-21 15 Mi        Quality  Tempo Session          7.2   186   40  —                (Phase 2/LLM — nicht generiert)
+  2026-10-22 15 Do        Kraft    Strength Training        0     0   45  upper_light      (Phase 2/LLM — nicht generiert)
+  2026-10-23 15 Fr        Easy     Easy Run               6.5   278   44  —                (Phase 2/LLM — nicht generiert)
+  2026-10-24 15 Sa        Easy     Easy Run               6.5   279   44  —                (Phase 2/LLM — nicht generiert)
+  2026-10-26 16 Mo        Race     Race Day              30.7  1246  227  —                (Phase 2/LLM — nicht generiert)
+
+--- Automatisierte Kriterien ---
+  Struktur    : PASS
+  Volumen     : PASS
+  Longrun     : WARNING
+      [WARNING] Woche 13 | Long Run | Ist: 20.6km | Erwartet: ~22-25km | Regel: Peak-Longrun passt zu Renndistanz, Erfahrung und Terrain
+        Ursache: compute_desired_peak_longrun_km() / compute_longrun_progression() (data/generate_plan.py:265-362) — Formel ist NICHT terrainabhängig
+  HM/Terrain  : WARNING
+      [WARNING] Woche 13 | Long Run | Ist: 828Hm | Erwartet: ~850-1120Hm | Regel: Peak-Longrun-HM passt zum Rennen
+        Ursache: compute_longrun_hm() (data/generate_plan.py:365-369)
+  Kraft/Cross : PASS
+  Taper       : PASS
+
+####################################################################################################
+SZENARIO 5 — BERGTRAIL 45 KM / ERFAHRENER TRAILRUNNER (Mountain Trail 45K)
+####################################################################################################
+
+--- Normalisierte Eingaben (an build_full_skeleton übergeben) ---
+  start_date = '2026-06-15'
+  race_date = '2026-10-17'
+  race_distance_km = 45
+  race_elevation_m = 2600
+  terrain = 'mountain_trail'
+  days_per_week = 6
+  strength_sessions = 1
+  strength_days = [2]
+  quality_sessions = 1
+  long_run_day = 7
+  cross_training = True
+  cross_training_days = 1
+  cross_replaces_run = True
+  max_km = 70
+  avg_weekly_km = 48
+  avg_weekly_hm = 1400
+  athlete_paces = {}
+  cross_training_types = ['Rennrad']  (informativ — NICHT von build_full_skeleton konsumiert, nur Phase-2/LLM-Prompt)
+
+--- Athlet-Kontext (informativ, teils nicht vom Generator konsumiert) ---
+  stabile_laufbasis_km = 48
+  hoechste_woche_90d_km = 62
+  bestaetigte_longruns = [(22, 900), (25, 1200), (28, 1450)]
+  avg_wochen_hm = 1400
+  kuerzlich_30km_trail = True
+  verletzung = False
+  plan_meta.ziel = 'Finish-orientiert'  (informativ, kein Generator-Input)
+
+--- Skelett-Zusammenfassung ---
+  total_weeks=18  race_dow=6 (Samstag)  desired_peak_km=62.4  peak_km_actual=62.39999999999996
+  desired_peak_hm=2730.0  peak_hm_actual=2730.0
+  validate_skeleton(): GÜLTIG (0 Validator-Fehler)
+
+--- Wochenübersicht ---
+  Wo Startdatum   Phase   base_km actual_km cross_min target_hm | sessions L/C/S/Q | LR-km LR-HM
+   1 2026-06-15 BASE      48.0      40.8        60      1400 | 4/1/1/1      |  17.5  1092   (actual_km_summe=40.8, actual_hm_summe=1400)
+   2 2026-06-22 BASE      49.2      41.8        60      1488 | 4/1/1/1      |  18.2  1160   (actual_km_summe=41.8, actual_hm_summe=1488)
+   3 2026-06-29 BASE      50.3      42.8        60      1581 | 4/1/1/1      |  18.9  1233   (actual_km_summe=42.8, actual_hm_summe=1581)
+   4 2026-07-06 DELOAD    39.0      33.1        45      1225 | 4/1/1/0      |  14.6   956   (actual_km_summe=33.1, actual_hm_summe=1225)
+   5 2026-07-13 BASE      51.6      43.9        60      1680 | 4/1/1/1      |  19.7  1310   (actual_km_summe=43.9, actual_hm_summe=1680)
+   6 2026-07-20 BUILD     52.8      44.9        60      1785 | 4/1/1/1      |  20.4  1392   (actual_km_summe=44.9, actual_hm_summe=1785)
+   7 2026-07-27 BUILD     54.1      46.1        60      1896 | 4/1/1/1      |  21.2  1479   (actual_km_summe=46.1, actual_hm_summe=1896)
+   8 2026-08-03 DELOAD    41.9      35.6        45      1470 | 4/1/1/0      |  16.4  1146   (actual_km_summe=35.6, actual_hm_summe=1470)
+   9 2026-08-10 BUILD     55.4      47.4        60      2015 | 4/1/1/1      |  22.0  1572   (actual_km_summe=47.4, actual_hm_summe=2015)
+  10 2026-08-17 BUILD     56.7      48.7        60      2141 | 4/1/1/1      |  22.8  1670   (actual_km_summe=48.7, actual_hm_summe=2141)
+  11 2026-08-24 BUILD     58.1      50.1        60      2275 | 4/1/1/1      |  23.7  1775   (actual_km_summe=50.1, actual_hm_summe=2275)
+  12 2026-08-31 DELOAD    45.0      38.2        45      1764 | 4/1/1/0      |  18.4  1376   (actual_km_summe=38.2, actual_hm_summe=1763)
+  13 2026-09-07 BUILD     59.5      51.5        60      2418 | 4/1/1/1      |  24.6  1886   (actual_km_summe=51.5, actual_hm_summe=2418)
+  14 2026-09-14 BUILD     60.9      52.9        60      2569 | 4/1/1/1      |  25.5  2004   (actual_km_summe=52.9, actual_hm_summe=2569)
+  15 2026-09-21 PEAK      62.4      54.4        60      2730 | 4/1/1/1      |  26.5  2129   (actual_km_summe=54.4, actual_hm_summe=2730)
+  16 2026-09-28 TAPER     43.7      37.1        60      1911 | 4/1/1/1      |  18.5  1491   (actual_km_summe=37.1, actual_hm_summe=1911)
+  17 2026-10-05 TAPER     43.7      29.3        60      1911 | 4/1/1/1      |     0     0   (actual_km_summe=29.3, actual_hm_summe=1911)
+  18 2026-10-12 RACE      18.2      18.2         0       796 | 4/0/1/0      |     0     0   (actual_km_summe=18.2, actual_hm_summe=796)
+
+--- Konflikte/Warnings (aus build_full_skeleton) ---
+    - Woche 16: kein geeigneter Lower-Body-Slot verfügbar, alle Gymtage als Upper Body.
+    - Woche 17: kein geeigneter Lower-Body-Slot verfügbar, alle Gymtage als Upper Body.
+    - Woche 17 (letzte Taper-Woche): Easy Run von 9.6km auf 8.0km reduziert (Regel 16, Klarstellung 17: Prozentziel darf unterschritten werden).
+    - Woche 17 (letzte Taper-Woche): Easy Run von 9.6km auf 8.0km reduziert (Regel 16, Klarstellung 17: Prozentziel darf unterschritten werden).
+    - Woche 17 (letzte Taper-Woche): Easy Run von 9.6km auf 8.0km reduziert (Regel 16, Klarstellung 17: Prozentziel darf unterschritten werden).
+    - Woche 17 (letzte Taper-Woche): Fr+Sa von 16.0km auf ~13.0km reduziert (Regel 16: max. 12-14km zusammen).
+    - Woche 17: Laufziel von 37.1km auf 29.3km reduziert (Easy-Run-/Taper-Obergrenzen) — finaler, tatsächlich gespeicherter Wert.
+
+--- Alle Sessions ---
+  Datum      Wo Wochentag  Rolle    Session               km    HM  Min  Strength-Fokus   notes_hint
+  2026-06-15  1 Mo        Cross    Cross Training           0     0   60  —                (Phase 2/LLM — nicht generiert)
+  2026-06-16  1 Di        Kraft    Strength Training        0     0   45  lower            (Phase 2/LLM — nicht generiert)
+  2026-06-17  1 Mi        Easy     Easy Run               7.0   131   46  —                (Phase 2/LLM — nicht generiert)
+  2026-06-18  1 Do        Quality  Tempo Session          9.2    46   51  —                (Phase 2/LLM — nicht generiert)
+  2026-06-19  1 Fr        Easy     Easy Run               7.1   131   46  —                (Phase 2/LLM — nicht generiert)
+  2026-06-21  1 So        Longrun  Long Run              17.5  1092  122  —                (Phase 2/LLM — nicht generiert)
+  2026-06-22  2 Mo        Cross    Cross Training           0     0   60  —                (Phase 2/LLM — nicht generiert)
+  2026-06-23  2 Di        Kraft    Strength Training        0     0   45  lower            (Phase 2/LLM — nicht generiert)
+  2026-06-24  2 Mi        Easy     Easy Run               7.1   139   46  —                (Phase 2/LLM — nicht generiert)
+  2026-06-25  2 Do        Quality  Tempo Session          9.4    49   52  —                (Phase 2/LLM — nicht generiert)
+  2026-06-26  2 Fr        Easy     Easy Run               7.1   140   46  —                (Phase 2/LLM — nicht generiert)
+  2026-06-28  2 So        Longrun  Long Run              18.2  1160  127  —                (Phase 2/LLM — nicht generiert)
+  2026-06-29  3 Mo        Cross    Cross Training           0     0   60  —                (Phase 2/LLM — nicht generiert)
+  2026-06-30  3 Di        Kraft    Strength Training        0     0   45  lower            (Phase 2/LLM — nicht generiert)
+  2026-07-01  3 Mi        Easy     Easy Run               7.2   148   47  —                (Phase 2/LLM — nicht generiert)
+  2026-07-02  3 Do        Quality  Tempo Session          9.6    52   53  —                (Phase 2/LLM — nicht generiert)
+  2026-07-03  3 Fr        Easy     Easy Run               7.1   148   46  —                (Phase 2/LLM — nicht generiert)
+  2026-07-05  3 So        Longrun  Long Run              18.9  1233  132  —                (Phase 2/LLM — nicht generiert)
+  2026-07-06  4 Mo        Easy     Easy Run               6.2    90   40  —                (Phase 2/LLM — nicht generiert)
+  2026-07-07  4 Di        Kraft    Strength Training        0     0   45  full_light       (Phase 2/LLM — nicht generiert)
+  2026-07-08  4 Mi        Easy     Easy Run               6.2    90   40  —                (Phase 2/LLM — nicht generiert)
+  2026-07-09  4 Do        Cross    Cross Training           0     0   45  —                (Phase 2/LLM — nicht generiert)
+  2026-07-10  4 Fr        Easy     Easy Run               6.1    89   40  —                (Phase 2/LLM — nicht generiert)
+  2026-07-12  4 So        Longrun  Long Run              14.6   956  102  —                (Phase 2/LLM — nicht generiert)
+  2026-07-13  5 Mo        Cross    Cross Training           0     0   60  —                (Phase 2/LLM — nicht generiert)
+  2026-07-14  5 Di        Kraft    Strength Training        0     0   45  lower            (Phase 2/LLM — nicht generiert)
+  2026-07-15  5 Mi        Easy     Easy Run               7.2   157   47  —                (Phase 2/LLM — nicht generiert)
+  2026-07-16  5 Do        Quality  Tempo Session          9.9    55   54  —                (Phase 2/LLM — nicht generiert)
+  2026-07-17  5 Fr        Easy     Easy Run               7.1   158   46  —                (Phase 2/LLM — nicht generiert)
+  2026-07-19  5 So        Longrun  Long Run              19.7  1310  138  —                (Phase 2/LLM — nicht generiert)
+  2026-07-20  6 Mo        Cross    Cross Training           0     0   60  —                (Phase 2/LLM — nicht generiert)
+  2026-07-21  6 Di        Kraft    Strength Training        0     0   45  lower            (Phase 2/LLM — nicht generiert)
+  2026-07-22  6 Mi        Easy     Easy Run               7.2   167   47  —                (Phase 2/LLM — nicht generiert)
+  2026-07-23  6 Do        Quality  Tempo Session         10.1    59   56  —                (Phase 2/LLM — nicht generiert)
+  2026-07-24  6 Fr        Easy     Easy Run               7.2   167   47  —                (Phase 2/LLM — nicht generiert)
+  2026-07-26  6 So        Longrun  Long Run              20.4  1392  143  —                (Phase 2/LLM — nicht generiert)
+  2026-07-27  7 Mo        Cross    Cross Training           0     0   60  —                (Phase 2/LLM — nicht generiert)
+  2026-07-28  7 Di        Kraft    Strength Training        0     0   45  lower            (Phase 2/LLM — nicht generiert)
+  2026-07-29  7 Mi        Easy     Easy Run               7.2   177   47  —                (Phase 2/LLM — nicht generiert)
+  2026-07-30  7 Do        Quality  Tempo Session         10.4    63   57  —                (Phase 2/LLM — nicht generiert)
+  2026-07-31  7 Fr        Easy     Easy Run               7.3   177   47  —                (Phase 2/LLM — nicht generiert)
+  2026-08-02  7 So        Longrun  Long Run              21.2  1479  148  —                (Phase 2/LLM — nicht generiert)
+  2026-08-03  8 Mo        Easy     Easy Run               6.4   108   42  —                (Phase 2/LLM — nicht generiert)
+  2026-08-04  8 Di        Kraft    Strength Training        0     0   45  full_light       (Phase 2/LLM — nicht generiert)
+  2026-08-05  8 Mi        Easy     Easy Run               6.4   108   42  —                (Phase 2/LLM — nicht generiert)
+  2026-08-06  8 Do        Cross    Cross Training           0     0   45  —                (Phase 2/LLM — nicht generiert)
+  2026-08-07  8 Fr        Easy     Easy Run               6.4   108   42  —                (Phase 2/LLM — nicht generiert)
+  2026-08-09  8 So        Longrun  Long Run              16.4  1146  115  —                (Phase 2/LLM — nicht generiert)
+  2026-08-10  9 Mo        Cross    Cross Training           0     0   60  —                (Phase 2/LLM — nicht generiert)
+  2026-08-11  9 Di        Kraft    Strength Training        0     0   45  lower            (Phase 2/LLM — nicht generiert)
+  2026-08-12  9 Mi        Easy     Easy Run               7.3   189   47  —                (Phase 2/LLM — nicht generiert)
+  2026-08-13  9 Do        Quality  Tempo Session         10.7    66   59  —                (Phase 2/LLM — nicht generiert)
+  2026-08-14  9 Fr        Easy     Easy Run               7.4   188   48  —                (Phase 2/LLM — nicht generiert)
+  2026-08-16  9 So        Longrun  Long Run              22.0  1572  154  —                (Phase 2/LLM — nicht generiert)
+  2026-08-17 10 Mo        Cross    Cross Training           0     0   60  —                (Phase 2/LLM — nicht generiert)
+  2026-08-18 10 Di        Kraft    Strength Training        0     0   45  lower            (Phase 2/LLM — nicht generiert)
+  2026-08-19 10 Mi        Easy     Easy Run               7.5   200   49  —                (Phase 2/LLM — nicht generiert)
+  2026-08-20 10 Do        Quality  Tempo Session         11.0    71   60  —                (Phase 2/LLM — nicht generiert)
+  2026-08-21 10 Fr        Easy     Easy Run               7.4   200   48  —                (Phase 2/LLM — nicht generiert)
+  2026-08-23 10 So        Longrun  Long Run              22.8  1670  160  —                (Phase 2/LLM — nicht generiert)
+  2026-08-24 11 Mo        Cross    Cross Training           0     0   60  —                (Phase 2/LLM — nicht generiert)
+  2026-08-25 11 Di        Kraft    Strength Training        0     0   45  lower            (Phase 2/LLM — nicht generiert)
+  2026-08-26 11 Mi        Easy     Easy Run               7.5   213   49  —                (Phase 2/LLM — nicht generiert)
+  2026-08-27 11 Do        Quality  Tempo Session         11.3    75   62  —                (Phase 2/LLM — nicht generiert)
+  2026-08-28 11 Fr        Easy     Easy Run               7.6   212   49  —                (Phase 2/LLM — nicht generiert)
+  2026-08-30 11 So        Longrun  Long Run              23.7  1775  166  —                (Phase 2/LLM — nicht generiert)
+  2026-08-31 12 Mo        Easy     Easy Run               6.6   129   43  —                (Phase 2/LLM — nicht generiert)
+  2026-09-01 12 Di        Kraft    Strength Training        0     0   45  full_light       (Phase 2/LLM — nicht generiert)
+  2026-09-02 12 Mi        Easy     Easy Run               6.6   129   43  —                (Phase 2/LLM — nicht generiert)
+  2026-09-03 12 Do        Cross    Cross Training           0     0   45  —                (Phase 2/LLM — nicht generiert)
+  2026-09-04 12 Fr        Easy     Easy Run               6.6   129   43  —                (Phase 2/LLM — nicht generiert)
+  2026-09-06 12 So        Longrun  Long Run              18.4  1376  129  —                (Phase 2/LLM — nicht generiert)
+  2026-09-07 13 Mo        Cross    Cross Training           0     0   60  —                (Phase 2/LLM — nicht generiert)
+  2026-09-08 13 Di        Kraft    Strength Training        0     0   45  lower            (Phase 2/LLM — nicht generiert)
+  2026-09-09 13 Mi        Easy     Easy Run               7.7   226   50  —                (Phase 2/LLM — nicht generiert)
+  2026-09-10 13 Do        Quality  Tempo Session         11.6    80   64  —                (Phase 2/LLM — nicht generiert)
+  2026-09-11 13 Fr        Easy     Easy Run               7.6   226   49  —                (Phase 2/LLM — nicht generiert)
+  2026-09-13 13 So        Longrun  Long Run              24.6  1886  172  —                (Phase 2/LLM — nicht generiert)
+  2026-09-14 14 Mo        Cross    Cross Training           0     0   60  —                (Phase 2/LLM — nicht generiert)
+  2026-09-15 14 Di        Kraft    Strength Training        0     0   45  lower            (Phase 2/LLM — nicht generiert)
+  2026-09-16 14 Mi        Easy     Easy Run               7.8   240   51  —                (Phase 2/LLM — nicht generiert)
+  2026-09-17 14 Do        Quality  Tempo Session         11.9    85   65  —                (Phase 2/LLM — nicht generiert)
+  2026-09-18 14 Fr        Easy     Easy Run               7.7   240   50  —                (Phase 2/LLM — nicht generiert)
+  2026-09-20 14 So        Longrun  Long Run              25.5  2004  178  —                (Phase 2/LLM — nicht generiert)
+  2026-09-21 15 Mo        Cross    Cross Training           0     0   60  —                (Phase 2/LLM — nicht generiert)
+  2026-09-22 15 Di        Kraft    Strength Training        0     0   45  lower            (Phase 2/LLM — nicht generiert)
+  2026-09-23 15 Mi        Easy     Easy Run               7.8   256   51  —                (Phase 2/LLM — nicht generiert)
+  2026-09-24 15 Do        Quality  Tempo Session         12.2    90   67  —                (Phase 2/LLM — nicht generiert)
+  2026-09-25 15 Fr        Easy     Easy Run               7.9   255   51  —                (Phase 2/LLM — nicht generiert)
+  2026-09-27 15 So        Longrun  Long Run              26.5  2129  186  —                (Phase 2/LLM — nicht generiert)
+  2026-09-28 16 Mo        Easy     Easy Run               5.2   193   34  —                (Phase 2/LLM — nicht generiert)
+  2026-09-29 16 Di        Kraft    Strength Training        0     0   45  upper_light      (Phase 2/LLM — nicht generiert)
+  2026-09-30 16 Mi        Quality  Tempo Session          8.3    34   46  —                (Phase 2/LLM — nicht generiert)
+  2026-10-01 16 Do        Easy     Easy Run               5.1   193   33  —                (Phase 2/LLM — nicht generiert)
+  2026-10-02 16 Fr        Cross    Cross Training           0     0   60  —                (Phase 2/LLM — nicht generiert)
+  2026-10-04 16 So        Longrun  Long Run              18.5  1491  130  —                (Phase 2/LLM — nicht generiert)
+  2026-10-05 17 Mo        Cross    Cross Training           0     0   60  —                (Phase 2/LLM — nicht generiert)
+  2026-10-06 17 Di        Kraft    Strength Training        0     0   45  upper_light      (Phase 2/LLM — nicht generiert)
+  2026-10-07 17 Mi        Quality  Tempo Session          8.3   153   46  —                (Phase 2/LLM — nicht generiert)
+  2026-10-08 17 Do        Easy     Easy Run               8.0   586   52  —                (Phase 2/LLM — nicht generiert)
+  2026-10-09 17 Fr        Easy     Easy Run               6.5   586   42  —                (Phase 2/LLM — nicht generiert)
+  2026-10-10 17 Sa        Easy     Easy Run               6.5   586   42  —                (Phase 2/LLM — nicht generiert)
+  2026-10-12 18 Mo        Easy     Easy Run               4.5   199   29  —                (Phase 2/LLM — nicht generiert)
+  2026-10-13 18 Di        Kraft    Strength Training        0     0   45  upper_light      (Phase 2/LLM — nicht generiert)
+  2026-10-14 18 Mi        Easy     Easy Run               4.5   199   29  —                (Phase 2/LLM — nicht generiert)
+  2026-10-15 18 Do        Easy     Easy Run               4.5   199   29  —                (Phase 2/LLM — nicht generiert)
+  2026-10-16 18 Fr        Easy     Easy Run               4.7   199   31  —                (Phase 2/LLM — nicht generiert)
+  2026-10-17 18 Sa        Race     Race Day                45  2600  341  —                (Phase 2/LLM — nicht generiert)
+
+--- Automatisierte Kriterien ---
+  Struktur    : PASS
+  Volumen     : PASS
+  Longrun     : WARNING
+      [WARNING] Woche 15 | Long Run | Ist: 26.5km | Erwartet: ~28-35km | Regel: Peak-Longrun passt zu Renndistanz, Erfahrung und Terrain
+        Ursache: compute_desired_peak_longrun_km() / compute_longrun_progression() (data/generate_plan.py:265-362) — Formel ist NICHT terrainabhängig
+  HM/Terrain  : FAIL
+      [FAIL] Woche 1 | Tempo Session | Ist: terrain='mountain_trail' -> Tempo Session | Erwartet: terrain='mountain_trail' sollte wie 'trail' behandelt werden -> Hill Session | Regel: terrain-Wert 'mountain_trail' ist nicht im Code-Enum ('trail','mixed') enthalten
+        Ursache: pick_quality_type() prüft `terrain in ('trail', 'mixed')` wörtlich — 'mountain_trail' fällt durch (data/generate_plan.py:441)
+      [FAIL] Woche 2 | Tempo Session | Ist: terrain='mountain_trail' -> Tempo Session | Erwartet: terrain='mountain_trail' sollte wie 'trail' behandelt werden -> Hill Session | Regel: terrain-Wert 'mountain_trail' ist nicht im Code-Enum ('trail','mixed') enthalten
+        Ursache: pick_quality_type() prüft `terrain in ('trail', 'mixed')` wörtlich — 'mountain_trail' fällt durch (data/generate_plan.py:441)
+      [FAIL] Woche 3 | Tempo Session | Ist: terrain='mountain_trail' -> Tempo Session | Erwartet: terrain='mountain_trail' sollte wie 'trail' behandelt werden -> Hill Session | Regel: terrain-Wert 'mountain_trail' ist nicht im Code-Enum ('trail','mixed') enthalten
+        Ursache: pick_quality_type() prüft `terrain in ('trail', 'mixed')` wörtlich — 'mountain_trail' fällt durch (data/generate_plan.py:441)
+      [FAIL] Woche 5 | Tempo Session | Ist: terrain='mountain_trail' -> Tempo Session | Erwartet: terrain='mountain_trail' sollte wie 'trail' behandelt werden -> Hill Session | Regel: terrain-Wert 'mountain_trail' ist nicht im Code-Enum ('trail','mixed') enthalten
+        Ursache: pick_quality_type() prüft `terrain in ('trail', 'mixed')` wörtlich — 'mountain_trail' fällt durch (data/generate_plan.py:441)
+      [FAIL] Woche 6 | Tempo Session | Ist: terrain='mountain_trail' -> Tempo Session | Erwartet: terrain='mountain_trail' sollte wie 'trail' behandelt werden -> Hill Session | Regel: terrain-Wert 'mountain_trail' ist nicht im Code-Enum ('trail','mixed') enthalten
+        Ursache: pick_quality_type() prüft `terrain in ('trail', 'mixed')` wörtlich — 'mountain_trail' fällt durch (data/generate_plan.py:441)
+      [FAIL] Woche 7 | Tempo Session | Ist: terrain='mountain_trail' -> Tempo Session | Erwartet: terrain='mountain_trail' sollte wie 'trail' behandelt werden -> Hill Session | Regel: terrain-Wert 'mountain_trail' ist nicht im Code-Enum ('trail','mixed') enthalten
+        Ursache: pick_quality_type() prüft `terrain in ('trail', 'mixed')` wörtlich — 'mountain_trail' fällt durch (data/generate_plan.py:441)
+      [FAIL] Woche 9 | Tempo Session | Ist: terrain='mountain_trail' -> Tempo Session | Erwartet: terrain='mountain_trail' sollte wie 'trail' behandelt werden -> Hill Session | Regel: terrain-Wert 'mountain_trail' ist nicht im Code-Enum ('trail','mixed') enthalten
+        Ursache: pick_quality_type() prüft `terrain in ('trail', 'mixed')` wörtlich — 'mountain_trail' fällt durch (data/generate_plan.py:441)
+      [FAIL] Woche 10 | Tempo Session | Ist: terrain='mountain_trail' -> Tempo Session | Erwartet: terrain='mountain_trail' sollte wie 'trail' behandelt werden -> Hill Session | Regel: terrain-Wert 'mountain_trail' ist nicht im Code-Enum ('trail','mixed') enthalten
+        Ursache: pick_quality_type() prüft `terrain in ('trail', 'mixed')` wörtlich — 'mountain_trail' fällt durch (data/generate_plan.py:441)
+      [FAIL] Woche 11 | Tempo Session | Ist: terrain='mountain_trail' -> Tempo Session | Erwartet: terrain='mountain_trail' sollte wie 'trail' behandelt werden -> Hill Session | Regel: terrain-Wert 'mountain_trail' ist nicht im Code-Enum ('trail','mixed') enthalten
+        Ursache: pick_quality_type() prüft `terrain in ('trail', 'mixed')` wörtlich — 'mountain_trail' fällt durch (data/generate_plan.py:441)
+      [FAIL] Woche 13 | Tempo Session | Ist: terrain='mountain_trail' -> Tempo Session | Erwartet: terrain='mountain_trail' sollte wie 'trail' behandelt werden -> Hill Session | Regel: terrain-Wert 'mountain_trail' ist nicht im Code-Enum ('trail','mixed') enthalten
+        Ursache: pick_quality_type() prüft `terrain in ('trail', 'mixed')` wörtlich — 'mountain_trail' fällt durch (data/generate_plan.py:441)
+      [FAIL] Woche 14 | Tempo Session | Ist: terrain='mountain_trail' -> Tempo Session | Erwartet: terrain='mountain_trail' sollte wie 'trail' behandelt werden -> Hill Session | Regel: terrain-Wert 'mountain_trail' ist nicht im Code-Enum ('trail','mixed') enthalten
+        Ursache: pick_quality_type() prüft `terrain in ('trail', 'mixed')` wörtlich — 'mountain_trail' fällt durch (data/generate_plan.py:441)
+      [FAIL] Woche 15 | Tempo Session | Ist: terrain='mountain_trail' -> Tempo Session | Erwartet: terrain='mountain_trail' sollte wie 'trail' behandelt werden -> Hill Session | Regel: terrain-Wert 'mountain_trail' ist nicht im Code-Enum ('trail','mixed') enthalten
+        Ursache: pick_quality_type() prüft `terrain in ('trail', 'mixed')` wörtlich — 'mountain_trail' fällt durch (data/generate_plan.py:441)
+  Kraft/Cross : PASS
+  Taper       : WARNING
+      [WARNING] Woche 18 | Easy Run | Ist: 4.7km am Tag vor Race Day | Erwartet: <= 3km oder Rest | Regel: Tag vor dem Rennen ist Rest oder maximal sehr kurzer Shakeout
+        Ursache: build_week_skeleton() Rennwoche-Layout (data/generate_plan.py:499-526)
+
+
+====================================================================================================
+VERGLEICHSTABELLE 1 — Bewertung pro Kategorie
+====================================================================================================
+| Szenario                     | Struktur    | Volumen     | Longrun     | HM/Terrain  | Kraft/Cross | Taper       | Gesamt  |
+|----------------------------------------------------------------------------------------------------------------------------|
+| 1. 10K Beginner              | PASS        | FAIL        | FAIL        | PASS        | PASS        | PASS        | FAIL    |
+| 2. HM Intermediate           | PASS        | FAIL        | WARNING     | PASS        | PASS        | PASS        | FAIL    |
+| 3. Marathon Advanced         | PASS        | PASS        | WARNING     | PASS        | PASS        | PASS        | WARNING |
+| 4. Trail 31K Hybrid          | PASS        | PASS        | WARNING     | WARNING     | PASS        | PASS        | WARNING |
+| 5. Mountain Trail 45K        | PASS        | PASS        | WARNING     | FAIL        | PASS        | WARNING     | FAIL    |
+
+====================================================================================================
+VERGLEICHSTABELLE 2 — Kennzahlen
+====================================================================================================
+| Szenario               | Wochen | Start-km | Peak-km | Start-LR | Peak-LR | Peak-LR-HM | Cross-min(Peak)  | Race korrekt |
+|--------------------------------------------------------------------------------------------------------------------------|
+| 1. 10K Beginner        |     12 |     18.0 |    18.0 |      6.6 |     6.6 |         39 |                0 | True         |
+| 2. HM Intermediate     |     15 |     32.0 |    32.0 |     11.7 |    12.7 |        123 |               60 | True         |
+| 3. Marathon Advanced   |     19 |     52.0 |    63.3 |     19.0 |    26.9 |        205 |                0 | True         |
+| 4. Trail 31K Hybrid    |     16 |     36.0 |    46.0 |     13.1 |    20.6 |        828 |               60 | True         |
+| 5. Mountain Trail 45K  |     18 |     48.0 |    62.4 |     17.5 |    26.5 |       2129 |               60 | True         |
+
+====================================================================================================
+ALLE FAILS UND WARNINGS (gesammelt)
+====================================================================================================
+
+Szenario 1 (10K Beginner):
+  [FAIL] Longrun      (plan-weit)  None
+      Ist:       Woche 9: Longrun-Anteil 42% > 40% des Wochenziels
+      Erwartet:  (siehe Regeltext)
+      Regel:     validate_skeleton() Regelverstoß
+      Ursache:   compute_longrun_progression() / distribute_week_km() (data/generate_plan.py:279-362, 628-748)
+  [FAIL] Volumen      (plan-weit)  None
+      Ist:       Woche 10 (PEAK): target_km=13.5 < erwartete Untergrenze 15.0 (min(avg_weekly_km=18, desired_peak_km=15.0))
+      Erwartet:  (siehe Regeltext)
+      Regel:     validate_skeleton() Regelverstoß
+      Ursache:   compute_weekly_progression() (data/generate_plan.py:149-196)
+  [WARNING] Volumen      (plan-weit)  (Peak-Woche)
+      Ist:       peak target_km=18
+      Erwartet:  ~24-30km
+      Regel:     Peak-Wochenumfang im erwarteten Bereich
+      Ursache:   compute_desired_peak_km() / compute_weekly_progression() (data/generate_plan.py:233-234, 149-196)
+  [WARNING] Longrun      Woche 1      Long Run
+      Ist:       6.6km
+      Erwartet:  ~10-12km
+      Regel:     Peak-Longrun passt zu Renndistanz, Erfahrung und Terrain
+      Ursache:   compute_desired_peak_longrun_km() / compute_longrun_progression() (data/generate_plan.py:265-362) — Formel ist NICHT terrainabhängig
+  [WARNING] Longrun      Woche 2      Long Run
+      Ist:       5.6km
+      Erwartet:  >= Vorwoche (6.6km, Woche 1)
+      Regel:     Longrun-Progression ist sicher und nachvollziehbar (monoton in Belastungswochen)
+      Ursache:   compute_longrun_progression() (data/generate_plan.py:279-362)
+
+Szenario 2 (HM Intermediate):
+  [FAIL] Volumen      (plan-weit)  None
+      Ist:       Woche 12 (PEAK): target_km=27.3 < erwartete Untergrenze 31.7 (min(avg_weekly_km=32, desired_peak_km=31.650000000000002))
+      Erwartet:  (siehe Regeltext)
+      Regel:     validate_skeleton() Regelverstoß
+      Ursache:   compute_weekly_progression() (data/generate_plan.py:149-196)
+  [WARNING] Volumen      (plan-weit)  (Peak-Woche)
+      Ist:       peak target_km=32
+      Erwartet:  ~40-50km
+      Regel:     Peak-Wochenumfang im erwarteten Bereich
+      Ursache:   compute_desired_peak_km() / compute_weekly_progression() (data/generate_plan.py:233-234, 149-196)
+  [WARNING] Longrun      Woche 12     Long Run
+      Ist:       12.7km
+      Erwartet:  ~18-22km
+      Regel:     Peak-Longrun passt zu Renndistanz, Erfahrung und Terrain
+      Ursache:   compute_desired_peak_longrun_km() / compute_longrun_progression() (data/generate_plan.py:265-362) — Formel ist NICHT terrainabhängig
+
+Szenario 3 (Marathon Advanced):
+  [WARNING] Longrun      Woche 16     Long Run
+      Ist:       26.9km
+      Erwartet:  ~30-34km
+      Regel:     Peak-Longrun passt zu Renndistanz, Erfahrung und Terrain
+      Ursache:   compute_desired_peak_longrun_km() / compute_longrun_progression() (data/generate_plan.py:265-362) — Formel ist NICHT terrainabhängig
+
+Szenario 4 (Trail 31K Hybrid):
+  [WARNING] Longrun      Woche 13     Long Run
+      Ist:       20.6km
+      Erwartet:  ~22-25km
+      Regel:     Peak-Longrun passt zu Renndistanz, Erfahrung und Terrain
+      Ursache:   compute_desired_peak_longrun_km() / compute_longrun_progression() (data/generate_plan.py:265-362) — Formel ist NICHT terrainabhängig
+  [WARNING] HM/Terrain   Woche 13     Long Run
+      Ist:       828Hm
+      Erwartet:  ~850-1120Hm
+      Regel:     Peak-Longrun-HM passt zum Rennen
+      Ursache:   compute_longrun_hm() (data/generate_plan.py:365-369)
+
+Szenario 5 (Mountain Trail 45K):
+  [WARNING] Taper        Woche 18     Easy Run
+      Ist:       4.7km am Tag vor Race Day
+      Erwartet:  <= 3km oder Rest
+      Regel:     Tag vor dem Rennen ist Rest oder maximal sehr kurzer Shakeout
+      Ursache:   build_week_skeleton() Rennwoche-Layout (data/generate_plan.py:499-526)
+  [WARNING] Longrun      Woche 15     Long Run
+      Ist:       26.5km
+      Erwartet:  ~28-35km
+      Regel:     Peak-Longrun passt zu Renndistanz, Erfahrung und Terrain
+      Ursache:   compute_desired_peak_longrun_km() / compute_longrun_progression() (data/generate_plan.py:265-362) — Formel ist NICHT terrainabhängig
+  [FAIL] HM/Terrain   Woche 1      Tempo Session
+      Ist:       terrain='mountain_trail' -> Tempo Session
+      Erwartet:  terrain='mountain_trail' sollte wie 'trail' behandelt werden -> Hill Session
+      Regel:     terrain-Wert 'mountain_trail' ist nicht im Code-Enum ('trail','mixed') enthalten
+      Ursache:   pick_quality_type() prüft `terrain in ('trail', 'mixed')` wörtlich — 'mountain_trail' fällt durch (data/generate_plan.py:441)
+  [FAIL] HM/Terrain   Woche 2      Tempo Session
+      Ist:       terrain='mountain_trail' -> Tempo Session
+      Erwartet:  terrain='mountain_trail' sollte wie 'trail' behandelt werden -> Hill Session
+      Regel:     terrain-Wert 'mountain_trail' ist nicht im Code-Enum ('trail','mixed') enthalten
+      Ursache:   pick_quality_type() prüft `terrain in ('trail', 'mixed')` wörtlich — 'mountain_trail' fällt durch (data/generate_plan.py:441)
+  [FAIL] HM/Terrain   Woche 3      Tempo Session
+      Ist:       terrain='mountain_trail' -> Tempo Session
+      Erwartet:  terrain='mountain_trail' sollte wie 'trail' behandelt werden -> Hill Session
+      Regel:     terrain-Wert 'mountain_trail' ist nicht im Code-Enum ('trail','mixed') enthalten
+      Ursache:   pick_quality_type() prüft `terrain in ('trail', 'mixed')` wörtlich — 'mountain_trail' fällt durch (data/generate_plan.py:441)
+  [FAIL] HM/Terrain   Woche 5      Tempo Session
+      Ist:       terrain='mountain_trail' -> Tempo Session
+      Erwartet:  terrain='mountain_trail' sollte wie 'trail' behandelt werden -> Hill Session
+      Regel:     terrain-Wert 'mountain_trail' ist nicht im Code-Enum ('trail','mixed') enthalten
+      Ursache:   pick_quality_type() prüft `terrain in ('trail', 'mixed')` wörtlich — 'mountain_trail' fällt durch (data/generate_plan.py:441)
+  [FAIL] HM/Terrain   Woche 6      Tempo Session
+      Ist:       terrain='mountain_trail' -> Tempo Session
+      Erwartet:  terrain='mountain_trail' sollte wie 'trail' behandelt werden -> Hill Session
+      Regel:     terrain-Wert 'mountain_trail' ist nicht im Code-Enum ('trail','mixed') enthalten
+      Ursache:   pick_quality_type() prüft `terrain in ('trail', 'mixed')` wörtlich — 'mountain_trail' fällt durch (data/generate_plan.py:441)
+  [FAIL] HM/Terrain   Woche 7      Tempo Session
+      Ist:       terrain='mountain_trail' -> Tempo Session
+      Erwartet:  terrain='mountain_trail' sollte wie 'trail' behandelt werden -> Hill Session
+      Regel:     terrain-Wert 'mountain_trail' ist nicht im Code-Enum ('trail','mixed') enthalten
+      Ursache:   pick_quality_type() prüft `terrain in ('trail', 'mixed')` wörtlich — 'mountain_trail' fällt durch (data/generate_plan.py:441)
+  [FAIL] HM/Terrain   Woche 9      Tempo Session
+      Ist:       terrain='mountain_trail' -> Tempo Session
+      Erwartet:  terrain='mountain_trail' sollte wie 'trail' behandelt werden -> Hill Session
+      Regel:     terrain-Wert 'mountain_trail' ist nicht im Code-Enum ('trail','mixed') enthalten
+      Ursache:   pick_quality_type() prüft `terrain in ('trail', 'mixed')` wörtlich — 'mountain_trail' fällt durch (data/generate_plan.py:441)
+  [FAIL] HM/Terrain   Woche 10     Tempo Session
+      Ist:       terrain='mountain_trail' -> Tempo Session
+      Erwartet:  terrain='mountain_trail' sollte wie 'trail' behandelt werden -> Hill Session
+      Regel:     terrain-Wert 'mountain_trail' ist nicht im Code-Enum ('trail','mixed') enthalten
+      Ursache:   pick_quality_type() prüft `terrain in ('trail', 'mixed')` wörtlich — 'mountain_trail' fällt durch (data/generate_plan.py:441)
+  [FAIL] HM/Terrain   Woche 11     Tempo Session
+      Ist:       terrain='mountain_trail' -> Tempo Session
+      Erwartet:  terrain='mountain_trail' sollte wie 'trail' behandelt werden -> Hill Session
+      Regel:     terrain-Wert 'mountain_trail' ist nicht im Code-Enum ('trail','mixed') enthalten
+      Ursache:   pick_quality_type() prüft `terrain in ('trail', 'mixed')` wörtlich — 'mountain_trail' fällt durch (data/generate_plan.py:441)
+  [FAIL] HM/Terrain   Woche 13     Tempo Session
+      Ist:       terrain='mountain_trail' -> Tempo Session
+      Erwartet:  terrain='mountain_trail' sollte wie 'trail' behandelt werden -> Hill Session
+      Regel:     terrain-Wert 'mountain_trail' ist nicht im Code-Enum ('trail','mixed') enthalten
+      Ursache:   pick_quality_type() prüft `terrain in ('trail', 'mixed')` wörtlich — 'mountain_trail' fällt durch (data/generate_plan.py:441)
+  [FAIL] HM/Terrain   Woche 14     Tempo Session
+      Ist:       terrain='mountain_trail' -> Tempo Session
+      Erwartet:  terrain='mountain_trail' sollte wie 'trail' behandelt werden -> Hill Session
+      Regel:     terrain-Wert 'mountain_trail' ist nicht im Code-Enum ('trail','mixed') enthalten
+      Ursache:   pick_quality_type() prüft `terrain in ('trail', 'mixed')` wörtlich — 'mountain_trail' fällt durch (data/generate_plan.py:441)
+  [FAIL] HM/Terrain   Woche 15     Tempo Session
+      Ist:       terrain='mountain_trail' -> Tempo Session
+      Erwartet:  terrain='mountain_trail' sollte wie 'trail' behandelt werden -> Hill Session
+      Regel:     terrain-Wert 'mountain_trail' ist nicht im Code-Enum ('trail','mixed') enthalten
+      Ursache:   pick_quality_type() prüft `terrain in ('trail', 'mixed')` wörtlich — 'mountain_trail' fällt durch (data/generate_plan.py:441)
+
+====================================================================================================
+INTERFACE-ANALYSE — von der Aufgabenstellung genannte Athlet-Fakten, die build_full_skeleton()
+NICHT konsumiert (informativ, kein Fehler — zeigt Deckungslücken der Schnittstelle)
+====================================================================================================
+  - hoechste_woche_90d_km / hoechste_laufwoche_90d_km / hoechste_woche_90d_km (max_weekly_km_actual)
+  - laengster_relevanter_lauf_90d_km
+  - bestaetigte_longruns_km / bestaetigte_longruns (Longrun-Historie)
+  - kontinuierliches_training / mehrjaehrige_erfahrung / kuerzlich_* (Trainingskontext)
+  - verletzung (kein Injury-Feld in build_full_skeleton)
+  - plan_meta.ziel (Zielintention, z.B. "Zeitrennen" vs. "Finish")
+  - cross_training_types (nur Phase 2 / LLM-Prompt, siehe enrich_week_with_llm)
+
+====================================================================================================
+ANALYSE
+====================================================================================================
+
+1. Fehler, die in mehreren Szenarien auftreten:
+   - "validate_skeleton() Regelverstoß" — Szenarien [1, 2]
+   - "Peak-Wochenumfang im erwarteten Bereich" — Szenarien [1, 2]
+   - "Peak-Longrun passt zu Renndistanz, Erfahrung und Terrain" — Szenarien [1, 2, 3, 4, 5]
+
+2. Terrain-spezifische Fehler:
+   - Szenario 5 (terrain='mountain_trail'): pick_quality_type() und weitere terrain-Checks prüfen
+     wörtlich `terrain in ('trail', 'mixed')` — 'mountain_trail' erfüllt das NICHT und fällt auf die
+     Road-Logik zurück (Tempo/Interval statt Hill Session, TERRAIN_HM_PER_KM_ESTIMATE-Fallback auf
+     'road'=3 Hm/km, kein Elevation-Zuschlag in compute_duration_min()).
+
+3. Distanz-spezifische Fehler:
+   - compute_desired_peak_longrun_km() (data/generate_plan.py:265-276) ist nur für race_distance_km
+     20-42km definiert (Szenarien 2/4 grenzwertig, Szenario 3/5 ausserhalb -> Rückfall auf feste
+     42.5%-Quote ohne Renn-Anker, siehe compute_longrun_progression() PEAK_FRACTION-Fallback).
+   - Szenario 1 (10km): sehr kurze Renndistanz, race_distance_km*0.80-Deckel in
+     compute_longrun_progression() (ceiling=race_distance_km*0.82) limitiert den Longrun strukturell
+     stark — bei 10km max. ~8.2km, unabhängig vom Longrun-Fraction-Verlauf.
+
+4. Regeln, die zu starr wirken:
+   - Longrun-Ceiling `race_distance_km * 0.82` (compute_longrun_progression, Zeile 330) gilt
+     unterschiedslos für 10km-Einsteiger und 45km-Bergtrail — für sehr kurze Rennen zu eng, für
+     sehr lange Trail-Rennen ignoriert es Zeitdauer-Aspekte des Longruns völlig (keine Berücksichtigung
+     von Gehzeit/Powerhiking bei 2600Hm).
+   - `terrain in ('trail', 'mixed')`-Stringvergleich (mehrfach: pick_quality_type, compute_duration_min,
+     distribute_week_hm, TERRAIN_HM_PER_KM_ESTIMATE) — kein Enum/Whitelist-Fallback, jeder neue
+     Terrain-Wert (z.B. 'mountain_trail') fällt lautlos auf Road-Verhalten zurück.
+   - max_weekly_km_actual wird von fetch_athlete_context() berechnet, aber in build_full_skeleton()
+     NIRGENDS gelesen (grep bestätigt) — die 'höchste Woche letzte 90 Tage' hat aktuell keinerlei
+     Einfluss auf desired_peak_km/max_km trotz expliziter Erhebung.
+
+5. Ergebnisse, die trainingspraktisch unplausibel wirken, obwohl validate_skeleton() PASS meldet:
+   - Szenario 5 (Mountain Trail 45K): validate_skeleton()=GÜLTIG, aber "terrain-Wert 'mountain_trail' ist nicht im Code-Enum ('trail','mixed') enthalten" verletzt (Ist: terrain='mountain_trail' -> Tempo Session).
+   - Szenario 5 (Mountain Trail 45K): validate_skeleton()=GÜLTIG, aber "terrain-Wert 'mountain_trail' ist nicht im Code-Enum ('trail','mixed') enthalten" verletzt (Ist: terrain='mountain_trail' -> Tempo Session).
+   - Szenario 2/3 (Strasse): 'bestätigte Longruns' (14-16km bzw. 24-28km) fliessen NICHT in den
+     Start-Longrun ein — der Validator prüft nur den 90-110%-Korridor von avg_weekly_km in Woche 1,
+     nicht die Longrun-Historie selbst. Ein technisch PASS-Plan kann den Longrun trotzdem faktisch
+     unter der bereits bewiesenen Fähigkeit des Athleten starten lassen.
+
+6. Drei Codebereiche, die als Nächstes priorisiert werden sollten:
+   1. terrain-String-Matching konsolidieren (aktuell `terrain in ('trail','mixed')` an 4+ Stellen
+      dupliziert, kein zentrales Terrain-Enum) — verhindert stille Fallbacks wie bei 'mountain_trail'.
+   2. Longrun-Historie als echten Input aufnehmen (z.B. `confirmed_longrun_km` in inputs) statt
+      Start-Longrun ausschliesslich aus avg_weekly_km*36.5% abzuleiten — betrifft Szenario 2/3/5 direkt.
+   3. max_weekly_km_actual tatsächlich verwenden (aktuell totes Datenfeld) oder aus dem Interface
+      entfernen, um keine falsche Erwartung zu wecken, dass die höchste 90-Tage-Woche einfliesst.
