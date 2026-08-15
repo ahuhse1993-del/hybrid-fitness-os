@@ -85,10 +85,13 @@ def import_all_activities():
 
             try:
                 cur.execute("""
-                    INSERT INTO trainings 
-                        (date, type, duration_minutes, distance_km, 
-                         heart_rate_avg, notes, garmin_id)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    INSERT INTO trainings
+                        (date, type, duration_minutes, distance_km,
+                         heart_rate_avg, notes, garmin_id,
+                         elevation_gain_m, elevation_loss_m, max_hr,
+                         avg_cadence, training_load,
+                         aerobic_effect, anaerobic_effect, vo2max_estimate, avg_power)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """, (
                     date_str,
                     activity_type,
@@ -97,6 +100,15 @@ def import_all_activities():
                     int(avg_hr) if avg_hr else None,
                     notes,
                     garmin_id,
+                    round(a.get("elevationGain"), 1) if a.get("elevationGain") else None,
+                    round(a.get("elevationLoss"), 1) if a.get("elevationLoss") else None,
+                    int(a.get("maxHR")) if a.get("maxHR") else None,
+                    int(a.get("averageRunCadence")) if a.get("averageRunCadence") else None,
+                    a.get("activityTrainingLoad"),
+                    a.get("aerobicTrainingEffect"),
+                    a.get("anaerobicTrainingEffect"),
+                    a.get("vO2MaxValue"),
+                    int(a.get("avgPower")) if a.get("avgPower") else None,
                 ))
                 total_imported += 1
                 print(f"  ✅ {date_str} | {activity_type} | {name}")

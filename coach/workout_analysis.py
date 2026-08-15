@@ -12,6 +12,60 @@ import anthropic
 from knowledge.loader import load_workout_analysis_knowledge
 
 
+def compute_trail_segments(splits: list) -> str:
+    UPHILL_THRESHOLD = 30
+    DOWNHILL_THRESHOLD = -30
+    if not splits:
+        return ""
+    classified = []
+    for s in splits:
+        elev = float(s[4]) if s[4] else 0.0
+        dist = float(s[1]) if s[1] else 1.0
+        gradient = elev / dist if dist > 0 else 0
+        terrain = "uphill" if gradient > UPHILL_THRESHOLD else ("downhill" if gradient < DOWNHILL_THRESHOLD else "flat")
+        classified.append({"km": s[0], "distance_km": dist, "pace_s": s[2], "hr": s[3] or 0, "elevation_m": elev, "terrain": terrain})
+    segments = []
+    current = None
+    for point in classified:
+        if current is None or point["terrain"] != current["terrain"]:
+            if current:
+                segments.append(current)
+            current = {"terrain": point["terrain"], "start_km": point["km"] - 1, "end_km": point["km"], "km_count": 1, "total_elevation_m": point["elevation_m"], "total_distance_km": point["distance_km"], "pace_seconds": [point["pace_s"]] if point["pace_s"] else [], "hr_values": [point["hr"]] if point["hr"] else []}
+        else:
+            current["end_km"] = point["km"]
+            current["km_count"] += 1
+            current["total_elevation_m"] += point["elevation_m"]
+            current["total_distance_km"] += point["distance_km"]
+            if point["pace_s"]: current["pace_seconds"].append(point["pace_s"])
+            if point["hr"]: current["hr_values"].append(point["hr"])
+    if current:
+        segments.append(current)
+    merged = []
+    for seg in segments:
+        if merged and seg["km_count"] == 1:
+            prev = merged[-1]
+            prev["end_km"] = seg["end_km"]
+            prev["km_count"] += seg["km_count"]
+            prev["total_elevation_m"] += seg["total_elevation_m"]
+            prev["total_distance_km"] += seg["total_distance_km"]
+            prev["pace_seconds"].extend(seg["pace_seconds"])
+            prev["hr_values"].extend(seg["hr_values"])
+        else:
+            merged.append(seg)
+    LABELS = {"uphill": "↑ Aufstieg", "downhill": "↓ Abstieg", "flat": "→ Flach"}
+    lines = ["## Trail-Segmente (Geländephasen)"]
+    for i, seg in enumerate(merged, 1):
+        elev = seg["total_elevation_m"]
+        elev_str = f"+{elev:.0f}m" if elev > 0 else f"{elev:.0f}m"
+        avg_pace_s = int(sum(seg["pace_seconds"]) / len(seg["pace_seconds"])) if seg["pace_seconds"] else None
+        pace_str = f"{avg_pace_s//60}:{str(avg_pace_s%60).zfill(2)}/km" if avg_pace_s else "—"
+        avg_hr = int(sum(seg["hr_values"]) / len(seg["hr_values"])) if seg["hr_values"] else None
+        hr_str = f"{avg_hr} bpm" if avg_hr else "—"
+        gradient_pct = abs(elev / (seg["total_distance_km"] * 1000) * 100) if seg["total_distance_km"] > 0 else 0
+        lines.append(f"  {i}. {LABELS[seg['terrain']]} | km {seg['start_km']}–{seg['end_km']} ({seg['total_distance_km']:.1f} km) | {elev_str} | ~{gradient_pct:.0f}% | ⌀ {pace_str} | ⌀ HF {hr_str}")
+    return "\n".join(lines)
+
+
 def generate_workout_analysis(training_id: int) -> dict:
     import psycopg2
     database_url = os.getenv("RAILWAY_DATABASE_URL") or os.getenv("DATABASE_URL")
@@ -80,6 +134,7 @@ def generate_workout_analysis(training_id: int) -> dict:
         )
 
     splits_text = "\n".join(splits_lines)
+    trail_segments_text = compute_trail_segments(splits)
 
     # ── Elevation summary ──
     elevation_summary = f"Total ascent: +{total_elevation_up:.0f}m | Total descent: -{total_elevation_down:.0f}m"
@@ -146,6 +201,8 @@ Average HR: {avg_hr} bpm
 
 Note: Elevation shows meters gained (+) or lost (-) per kilometer.
 Use this to explain pace variations — a slow km on a steep climb is expected and correct.
+
+{trail_segments_text}
 
 ## Recent Training Context
 {recent_text if recent_text else "No recent training data."}

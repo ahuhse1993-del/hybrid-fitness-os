@@ -22,6 +22,7 @@ try:
     from mcp.server import MCPServer as FastMCP  # mcp 2.0+
 except ImportError:
     from mcp.server import FastMCP  # type: ignore[assignment]  # mcp 1.x
+from mcp.server.transport_security import TransportSecuritySettings
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
@@ -138,17 +139,17 @@ def get_recent_activities(days: int = 28) -> list[dict]:
 def get_training_summary(weeks: int = 4) -> dict:
     """
     Return weekly training volume for the last N weeks (default 4).
-    Shows total km, duration, elevation gain, and average heart rate per week.
+    Shows session count, total km, total duration, and average heart rate
+    per week.
     """
     rows = _fetchall(
         """
         SELECT
-            date_trunc('week', date)::date           AS week_start,
+            date_trunc('week', date)::date          AS week_start,
             COUNT(*)                                 AS sessions,
             ROUND(SUM(distance_km)::numeric, 2)     AS total_km,
-            SUM(duration_secs)                      AS total_secs,
-            ROUND(AVG(avg_hr)::numeric, 1)           AS avg_hr,
-            SUM(elevation_gain_m)                   AS total_elevation_m
+            SUM(duration_minutes)                   AS total_duration_min,
+            ROUND(AVG(heart_rate_avg)::numeric, 1)   AS avg_hr
         FROM trainings
         WHERE date >= CURRENT_DATE - (INTERVAL '1 week' * %s)
         GROUP BY week_start
@@ -206,9 +207,10 @@ def get_races_and_goals() -> dict:
         LIMIT 5
         """
     )
+    # athlete_profile has no goal/current_fitness_level/weekly_volume_km columns —
+    # long_term_goals is the only goal-related field that actually exists.
     profile = _fetchone(
-        "SELECT goal, current_fitness_level, weekly_volume_km "
-        "FROM athlete_profile ORDER BY id DESC LIMIT 1"
+        "SELECT long_term_goals FROM athlete_profile ORDER BY id DESC LIMIT 1"
     )
     return {"plans": plans, "profile_goals": profile}
 
@@ -410,7 +412,10 @@ def move_garmin_workout(
     client = garmin_client()
     if old_schedule_id is not None:
         try:
-            client.delete_workout_schedule(old_schedule_id)
+            # garminconnect 0.3.6 has no delete_workout_schedule() method —
+            # the actual API is unschedule_workout(scheduled_workout_id).
+            # Confirmed live against the real Garmin API on 2026-08-14.
+            client.unschedule_workout(old_schedule_id)
             logger.info("Deleted old Garmin schedule_id=%s", old_schedule_id)
         except Exception as exc:
             logger.warning(
@@ -440,17 +445,245 @@ def delete_garmin_workout(garmin_workout_id: int) -> dict:
     return {"deleted": True, "garmin_workout_id": garmin_workout_id}
 
 
+@mcp.tool()
+def get_activity_analysis_data(
+    activity_id: int | None = None,
+    garmin_id: str | None = None,
+    stream_resolution_s: int = 30,
+) -> dict:
+    """
+    Vollständige Analyse-Daten für einen abgeschlossenen Lauf.
+    Zuerst get_recent_activities() aufrufen um die activity_id zu erhalten.
+
+    Gibt zurück:
+    - summary:          23+ Felder Gesamtübersicht
+    - splits:           km-weise Aufschlüsselung mit Pace, HF, Elevation
+    - hr_zones:         Zeitverteilung in HR-Zonen (Minuten + Prozent)
+    - trail_segments:   Aggregierte Aufstiegs-/Abstiegs-/Flachphasen
+    - stream:           Downgesampelter HR-Stream (aus hr_tracks, ~30s Auflösung)
+    """
+    # ── Aktivität laden ──
+    if activity_id:
+        training = _fetchone(
+            "SELECT id, date, type, notes, distance_km, duration_minutes, "
+            "heart_rate_avg, garmin_id, elevation_gain_m, elevation_loss_m, "
+            "max_hr, avg_cadence, training_load, aerobic_effect, anaerobic_effect, "
+            "vo2max_estimate, avg_power "
+            "FROM trainings WHERE id = %s",
+            (activity_id,)
+        )
+    elif garmin_id:
+        training = _fetchone(
+            "SELECT id, date, type, notes, distance_km, duration_minutes, "
+            "heart_rate_avg, garmin_id, elevation_gain_m, elevation_loss_m, "
+            "max_hr, avg_cadence, training_load, aerobic_effect, anaerobic_effect, "
+            "vo2max_estimate, avg_power "
+            "FROM trainings WHERE garmin_id = %s",
+            (str(garmin_id),)
+        )
+    else:
+        return {"error": "activity_id oder garmin_id erforderlich"}
+
+    if not training:
+        return {"error": "Aktivität nicht gefunden"}
+
+    tid = training["id"]
+
+    # ── Splits ──
+    splits_raw = _fetchall(
+        "SELECT split_number, distance_km, pace_seconds, heart_rate_avg, elevation_gain "
+        "FROM splits WHERE training_id = %s ORDER BY split_number",
+        (tid,)
+    )
+
+    splits_out = []
+    total_up = 0.0
+    total_down = 0.0
+    for s in splits_raw:
+        elev = float(s["elevation_gain"]) if s["elevation_gain"] else 0.0
+        if elev > 0:
+            total_up += elev
+        else:
+            total_down += abs(elev)
+        pace_s = s["pace_seconds"]
+        splits_out.append({
+            "km": s["split_number"],
+            "distance_km": float(s["distance_km"]) if s["distance_km"] else None,
+            "pace_per_km": f"{pace_s//60}:{str(pace_s%60).zfill(2)}" if pace_s else None,
+            "hr_avg": s["heart_rate_avg"],
+            "elevation_m": round(elev, 1),
+        })
+
+    # ── Trail-Segmente (aus Splits berechnet) ──
+    UPHILL_T, DOWNHILL_T = 30, -30
+    classified = []
+    for s in splits_raw:
+        elev = float(s["elevation_gain"]) if s["elevation_gain"] else 0.0
+        dist = float(s["distance_km"]) if s["distance_km"] else 1.0
+        gradient = elev / dist if dist > 0 else 0
+        terrain = "uphill" if gradient > UPHILL_T else ("downhill" if gradient < DOWNHILL_T else "flat")
+        classified.append({"km": s["split_number"], "distance_km": dist, "pace_s": s["pace_seconds"],
+                           "hr": s["heart_rate_avg"] or 0, "elevation_m": elev, "terrain": terrain})
+
+    segments, current = [], None
+    for point in classified:
+        if current is None or point["terrain"] != current["terrain"]:
+            if current: segments.append(current)
+            current = {"terrain": point["terrain"], "start_km": point["km"] - 1, "end_km": point["km"],
+                      "total_elevation_m": point["elevation_m"], "total_distance_km": point["distance_km"],
+                      "pace_seconds": [point["pace_s"]] if point["pace_s"] else [],
+                      "hr_values": [point["hr"]] if point["hr"] else []}
+        else:
+            current["end_km"] = point["km"]
+            current["total_elevation_m"] += point["elevation_m"]
+            current["total_distance_km"] += point["distance_km"]
+            if point["pace_s"]: current["pace_seconds"].append(point["pace_s"])
+            if point["hr"]: current["hr_values"].append(point["hr"])
+    if current: segments.append(current)
+
+    trail_segments = []
+    for seg in segments:
+        avg_pace_s = int(sum(seg["pace_seconds"]) / len(seg["pace_seconds"])) if seg["pace_seconds"] else None
+        avg_hr = int(sum(seg["hr_values"]) / len(seg["hr_values"])) if seg["hr_values"] else None
+        gradient_pct = round(abs(seg["total_elevation_m"]) / (seg["total_distance_km"] * 1000) * 100, 1) if seg["total_distance_km"] > 0 else 0
+        trail_segments.append({
+            "type": seg["terrain"],
+            "start_km": seg["start_km"],
+            "end_km": seg["end_km"],
+            "distance_km": round(seg["total_distance_km"], 2),
+            "elevation_m": round(seg["total_elevation_m"], 1),
+            "gradient_pct": gradient_pct,
+            "avg_pace_per_km": f"{avg_pace_s//60}:{str(avg_pace_s%60).zfill(2)}" if avg_pace_s else None,
+            "avg_hr": avg_hr,
+        })
+
+    # ── HR-Zonen (aus athlete_profile + hr_tracks) ──
+    zones_out = []
+    profile = _fetchone(
+        "SELECT hr_z1_max, hr_z2_max, hr_z3_max, hr_z4_max, hr_z5_max "
+        "FROM athlete_profile ORDER BY id DESC LIMIT 1"
+    )
+    if profile and any(profile.values()):
+        hr_points = _fetchall(
+            "SELECT heart_rate FROM hr_tracks WHERE training_id = %s AND heart_rate IS NOT NULL",
+            (tid,)
+        )
+        if hr_points:
+            zone_bounds = [
+                (1, "Regeneration", 0, profile["hr_z1_max"] or 130),
+                (2, "Basis",        (profile["hr_z1_max"] or 130) + 1, profile["hr_z2_max"] or 148),
+                (3, "Tempo",        (profile["hr_z2_max"] or 148) + 1, profile["hr_z3_max"] or 162),
+                (4, "Schwelle",     (profile["hr_z3_max"] or 162) + 1, profile["hr_z4_max"] or 174),
+                (5, "VO2max",       (profile["hr_z4_max"] or 174) + 1, 999),
+            ]
+            total_pts = len(hr_points)
+            for z_num, z_label, z_min, z_max in zone_bounds:
+                count = sum(1 for p in hr_points if z_min <= (p["heart_rate"] or 0) <= z_max)
+                time_min = round(count / 60, 1)
+                zones_out.append({
+                    "zone": z_num,
+                    "label": z_label,
+                    "min_hr": z_min,
+                    "max_hr": z_max if z_max < 999 else None,
+                    "time_min": time_min,
+                    "pct": round(count / total_pts * 100) if total_pts > 0 else 0,
+                })
+
+    # ── Stream (downgesampelt aus hr_tracks) ──
+    stream_data = _fetchall(
+        f"SELECT point_index, timestamp_ms, heart_rate FROM hr_tracks "
+        f"WHERE training_id = %s AND MOD(point_index, %s) = 0 "
+        f"ORDER BY point_index",
+        (tid, stream_resolution_s)
+    )
+
+    # ── Summary ──
+    dist = training["distance_km"]
+    dur = training["duration_minutes"]
+    avg_pace_s = int(dur * 60 / float(dist)) if dist and dur and float(dist) > 0 else None
+
+    summary = {
+        "training_id": tid,
+        "garmin_id": training["garmin_id"],
+        "date": str(training["date"]) if training["date"] else None,
+        "type": training["type"],
+        "activity_name": training["notes"],
+        "distance_km": float(dist) if dist else None,
+        "duration_min": dur,
+        "avg_pace_per_km": f"{avg_pace_s//60}:{str(avg_pace_s%60).zfill(2)}" if avg_pace_s else None,
+        "avg_hr": training["heart_rate_avg"],
+        "max_hr": training["max_hr"],
+        "elevation_gain_m": training["elevation_gain_m"] or round(total_up, 1),
+        "elevation_loss_m": training["elevation_loss_m"] or round(total_down, 1),
+        "avg_cadence": training["avg_cadence"],
+        "training_load": training["training_load"],
+        "aerobic_effect": training["aerobic_effect"],
+        "anaerobic_effect": training["anaerobic_effect"],
+        "vo2max_estimate": training["vo2max_estimate"],
+        "avg_power": training["avg_power"],
+        "splits_count": len(splits_out),
+        "trail_segments_count": len(trail_segments),
+        "hr_zones_available": len(zones_out) > 0,
+        "stream_points": len(stream_data),
+    }
+
+    return {
+        "summary": summary,
+        "splits": splits_out,
+        "trail_segments": trail_segments,
+        "hr_zones": zones_out if zones_out else None,
+        "stream": {
+            "resolution_s": stream_resolution_s,
+            "fields": ["point_index", "timestamp_ms", "heart_rate"],
+            "data": [[p["point_index"], p["timestamp_ms"], p["heart_rate"]] for p in stream_data],
+        } if stream_data else None,
+    }
+
+
 # ── ASGI app factory ───────────────────────────────────────────────────────────
 
 def create_mcp_asgi_app() -> ASGIApp:
     """
-    Return the MCPServer ASGI app wrapped in BearerAuthMiddleware.
+    Return the MCPServer ASGI app — UNAUTHENTICATED.
+
+    KNOWN, TEMPORARY SECURITY TRADE-OFF (2026-08-14, per Alexander):
+    BearerAuthMiddleware is defined above but intentionally NOT applied here.
+    ChatGPT's custom-connector setup rejected our Bearer-token auth ("Fehler
+    beim Erstellen des Konnektors"), so auth was removed to unblock the
+    ChatGPT connector. This means /mcp is reachable by ANYONE who has the
+    URL, with no authentication at all — including create_garmin_workout /
+    move_garmin_workout / delete_garmin_workout (real writes/deletes on
+    Garmin Connect) and every read tool (full training + health history).
+    "URL not publicly advertised" is NOT a real control — Railway subdomains
+    are enumerable and the URL now lives in the ChatGPT connector config.
+    Durable fix: implement proper OAuth (the mcp SDK already exposes
+    AuthSettings/token_verifier/auth_server_provider for this — see
+    MCPServer.__init__), which ChatGPT connectors do support, instead of
+    leaving this endpoint open indefinitely.
 
     The inner app handles POST /mcp (Streamable HTTP transport).
-    BearerAuthMiddleware is applied directly — no Starlette Mount wrapper —
-    so the full path (/mcp) reaches the inner app unchanged.
 
-    Requires: mcp>=1.0, MCP_API_KEY env var set.
+    transport_security: streamable_http_app() auto-enables DNS-rebinding
+    protection with allowed_hosts=["127.0.0.1:*", ...] whenever no `host=`
+    is passed (its internal default is host="127.0.0.1"). That rejects any
+    real deployment host with "Invalid Host header". We pass an explicit
+    TransportSecuritySettings instead — protection stays ON, but the actual
+    public host (env var, falls back to the known Railway host) is allowed
+    too. Never disable enable_dns_rebinding_protection outright — that would
+    remove the protection entirely rather than fixing the allow-list.
+
+    Requires: mcp>=1.0. MCP_API_KEY is no longer read here (BearerAuthMiddleware
+    is not applied) — see the security trade-off note above.
     """
-    inner = mcp.streamable_http_app()
-    return BearerAuthMiddleware(inner)
+    public_host = os.getenv("MCP_PUBLIC_HOST", "web-production-297f2.up.railway.app")
+    transport_security = TransportSecuritySettings(
+        enable_dns_rebinding_protection=True,
+        allowed_hosts=[public_host, "127.0.0.1:*", "localhost:*", "[::1]:*"],
+        allowed_origins=[
+            f"https://{public_host}",
+            "http://127.0.0.1:*",
+            "http://localhost:*",
+            "http://[::1]:*",
+        ],
+    )
+    return mcp.streamable_http_app(transport_security=transport_security)
