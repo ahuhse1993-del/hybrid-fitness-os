@@ -10,8 +10,10 @@ Start command:
   uvicorn coach.main:app --host 0.0.0.0 --port $PORT
 """
 
+import glob
 import json
 import logging
+import os
 
 from starlette.middleware.wsgi import WSGIMiddleware
 from starlette.types import ASGIApp, Receive, Scope, Send
@@ -20,6 +22,38 @@ from coach.api import app as flask_app
 from coach.mcp_server import create_mcp_asgi_app
 
 logger = logging.getLogger(__name__)
+
+
+def _run_migrations() -> None:
+    """
+    Wendet alle SQL-Dateien in database/migrations/ automatisch an.
+    Läuft einmal beim App-Start auf Railway.
+    IF NOT EXISTS / ON CONFLICT schützt vor Doppelläufen.
+    """
+    try:
+        from database.connection import get_connection
+        conn = get_connection()
+        migrations_dir = os.path.join(os.path.dirname(__file__), "..", "database", "migrations")
+        sql_files = sorted(glob.glob(os.path.join(migrations_dir, "*.sql")))
+        for path in sql_files:
+            filename = os.path.basename(path)
+            try:
+                with open(path) as f:
+                    sql = f.read()
+                with conn.cursor() as cur:
+                    cur.execute(sql)
+                conn.commit()
+                logger.info("Migration OK: %s", filename)
+            except Exception as exc:
+                conn.rollback()
+                logger.warning("Migration übersprungen (%s): %s", filename, type(exc).__name__)
+        conn.close()
+    except Exception as exc:
+        logger.error("Migration-Fehler beim Start: %s", exc)
+
+
+# Migrations beim App-Start ausführen
+_run_migrations()
 
 _flask_asgi: ASGIApp = WSGIMiddleware(flask_app)
 _mcp_asgi: ASGIApp = create_mcp_asgi_app()
