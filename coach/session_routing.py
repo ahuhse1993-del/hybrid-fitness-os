@@ -140,6 +140,54 @@ def resolve_sync_target(session_type: str, requested_sync_target: str | None = N
     return computed
 
 
+def validate_no_target_policy(steps: list[dict], session_type: str = "") -> list[str]:
+    """
+    Prüft ob steps die No-Target-Policy einhalten.
+    Gibt eine Liste von Warnungen zurück (leer = alles OK).
+    Wirft keinen Fehler — nur Logging-Warnungen für Debug.
+
+    Prüft rekursiv (auch inner steps in repeat-Blocks) und warnt wenn:
+    - ein warmup/cooldown/recovery-Step ein nicht-no_target hat
+    - ein Session-Typ aus NO_TARGET_SESSION_TYPES ein Target hat
+
+    Reiner Vorab-Check auf den rohen step_def-Dicts (wie an
+    coach.garmin_push.build_workout_payload() übergeben) — kein Ersatz für
+    die tatsächliche Durchsetzung dort (build_workout_payload erzwingt die
+    Policy hart, diese Funktion dient nur der Sichtbarkeit/dem Debugging
+    davor). Import von garmin_push lokal, damit session_routing.py beim
+    Import fuer reine Klassifizierung (z.B. in Tests) nicht zwingend die
+    garminconnect-Abhaengigkeit mitzieht.
+    """
+    from coach.garmin_push import NO_TARGET_SESSION_TYPES, NO_TARGET_STEP_TYPES
+
+    warnings: list[str] = []
+    session_forces_no_target = session_type in NO_TARGET_SESSION_TYPES
+
+    def _has_real_target(step: dict) -> bool:
+        target = step.get("target")
+        return isinstance(target, dict) and target.get("type") not in (None, "no_target")
+
+    def _check(step: dict, path: str) -> None:
+        step_type = step.get("type")
+        if step_type in NO_TARGET_STEP_TYPES and _has_real_target(step):
+            warnings.append(
+                f"{path}: step_type={step_type!r} darf nie ein Target haben, "
+                f"hat aber {step.get('target')!r}."
+            )
+        if session_forces_no_target and _has_real_target(step):
+            warnings.append(
+                f"{path}: session_type={session_type!r} erzwingt no_target fuer alle Steps, "
+                f"Step hat aber {step.get('target')!r}."
+            )
+        if step_type == "repeat":
+            for i, inner in enumerate(step.get("steps") or [], start=1):
+                _check(inner, f"{path}.repeat[{i}]")
+
+    for i, s in enumerate(steps or [], start=1):
+        _check(s, f"step[{i}]")
+    return warnings
+
+
 def split_training_block(sessions: list[dict]) -> dict:
     """
     Teilt einen Trainingsblock (Liste von Session-Dicts mit mindestens

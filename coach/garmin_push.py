@@ -43,6 +43,26 @@ _TIME_END_CONDITION: dict[str, Any] = {
     "displayOrder": 2,
     "displayable": True,
 }
+
+# ── No-Target-Policy (2026-08-15) ──────────────────────────────────────────
+# Garmin loest bei einem gesetzten HF-/Pace-/Power-Target auf der Uhr einen
+# Zonen-Alert aus. Bei lockeren Einheiten (Warmup/Cooldown/Recovery, oder
+# ganzen Session-Typen wie Easy Run) ist das unerwuenscht — der Athlet soll
+# nach Gefuehl laufen, nicht durch Vibrationsalarme aus dem Flow gerissen
+# werden. Default ist daher IMMER no_target; ein echtes Target ist nur die
+# bewusste Ausnahme (enforce_garmin_target=True auf einem interval-Step),
+# nie der Normalfall.
+
+# Step-Typen, die NIE ein Garmin-Target erhalten dürfen
+NO_TARGET_STEP_TYPES: frozenset[str] = frozenset({
+    "warmup", "cooldown", "recovery", "rest", "transition",
+})
+
+# Session-Typen, bei denen ALLE Steps automatisch no_target bekommen
+NO_TARGET_SESSION_TYPES: frozenset[str] = frozenset({
+    "Easy Run", "Recovery Run", "Long Run", "Trail Run",
+    "Cross Training", "Hiking", "Cycling",  # lockere Einheiten
+})
 # Sport-Type-Dicts exakt aus garminconnect.workout.SportType (installiertes Paket,
 # /workout-service/workout/types) übernommen.
 #
@@ -102,7 +122,9 @@ def _build_target(target_def: dict[str, Any] | None) -> dict[str, Any]:
         f"Unsupported target type: {target_def['type']!r}. Supported: hr_zone, no_target"
     )
 
-def _build_executable_step(step_def: dict[str, Any], step_order: int) -> ExecutableStep:
+def _build_executable_step(
+    step_def: dict[str, Any], step_order: int, force_no_target: bool = False,
+) -> ExecutableStep:
     step_type_key = step_def.get("type")
     if step_type_key not in _STEP_TYPE_MAP:
         raise GarminWorkoutValidationError(
@@ -116,7 +138,20 @@ def _build_executable_step(step_def: dict[str, Any], step_order: int) -> Executa
         raise GarminWorkoutValidationError(
             f"Step '{step_type_key}' requires duration_secs > 0, got {step_def.get('duration_secs')!r}"
         )
-    target_kwargs = _build_target(step_def.get("target"))
+
+    # No-Target-Policy: no_target ist der Default. Ein echtes Target wird nur
+    # gebaut, wenn explizit enforce_garmin_target=True auf einem interval-Step
+    # gesetzt ist — und selbst das wird von force_no_target/NO_TARGET_STEP_TYPES
+    # ueberstimmt (Warmup/Cooldown/Recovery/lockere Session-Typen gewinnen immer).
+    # intensity_description (z.B. "Z2", "RPE 3-4") fliesst absichtlich NICHT in
+    # das Garmin-Target ein — nur als Freitext in notes, nie als Zonen-Alert.
+    if force_no_target or step_type_key in NO_TARGET_STEP_TYPES:
+        target_kwargs: dict[str, Any] = {"targetType": _NO_TARGET}
+    elif step_def.get("enforce_garmin_target") is True and step_type_key == "interval":
+        target_kwargs = _build_target(step_def.get("target"))
+    else:
+        target_kwargs = {"targetType": _NO_TARGET}
+
     return ExecutableStep(
         stepOrder=step_order,
         stepType=_STEP_TYPE_MAP[step_type_key],
@@ -125,9 +160,10 @@ def _build_executable_step(step_def: dict[str, Any], step_order: int) -> Executa
         **target_kwargs,
     )
 
-def _build_steps(steps_def: list[dict[str, Any]]) -> list:
+def _build_steps(steps_def: list[dict[str, Any]], session_type: str = "") -> list:
     if not steps_def:
         raise GarminWorkoutValidationError("Steps list must not be empty")
+    session_force_no_target = session_type in NO_TARGET_SESSION_TYPES
     result = []
     for i, step_def in enumerate(steps_def, start=1):
         step_type = step_def.get("type")
@@ -143,10 +179,16 @@ def _build_steps(steps_def: list[dict[str, Any]]) -> list:
             inner_defs = step_def.get("steps")
             if not inner_defs:
                 raise GarminWorkoutValidationError("'repeat' block must contain at least one inner step")
-            inner_steps = [_build_executable_step(s, order) for order, s in enumerate(inner_defs, start=1)]
+            inner_steps = []
+            for order, s in enumerate(inner_defs, start=1):
+                # Recovery/Rest-Inner-Steps bekommen IMMER no_target, unabhaengig
+                # vom Session-Typ — ein Trabpause-Step erbt nie das Target der
+                # aktiven Intervalle daneben (siehe Docstring build_workout_payload).
+                inner_force = True if s.get("type") in ("recovery", "rest") else session_force_no_target
+                inner_steps.append(_build_executable_step(s, order, force_no_target=inner_force))
             result.append(create_repeat_group(iterations=iterations, workout_steps=inner_steps, step_order=i))
         else:
-            result.append(_build_executable_step(step_def, i))
+            result.append(_build_executable_step(step_def, i, force_no_target=session_force_no_target))
     return result
 
 _WORKOUT_CLASS_BY_SPORT: dict[str, type] = {
@@ -185,7 +227,8 @@ def build_workout_payload(workout_def: dict[str, Any], sport: str = "running") -
     steps_def = workout_def.get("steps")
     if not steps_def:
         raise GarminWorkoutValidationError("workout_def requires at least one step")
-    steps = _build_steps(steps_def)
+    session_type = workout_def.get("session_type", "")
+    steps = _build_steps(steps_def, session_type=session_type)
     sport_type_dict = _SPORT_TYPES[sport]
     segment = WorkoutSegment(segmentOrder=1, sportType=sport_type_dict, workoutSteps=steps)
     workout_cls = _WORKOUT_CLASS_BY_SPORT[sport]
