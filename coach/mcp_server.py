@@ -36,6 +36,7 @@ from coach.garmin_push import (
     schedule_workout,
 )
 from coach.session_routing import classify_for_push, resolve_sync_target, split_training_block
+from coach.sync_utils import compute_content_hash
 from database.connection import get_connection
 
 logger = logging.getLogger(__name__)
@@ -924,6 +925,16 @@ def upsert_planned_workout(
             active = cur.fetchone()
             plan_id = active[0] if active else None
 
+            # Vor dem Schreiben: bestehenden garmin_workout_id/session_zone
+            # merken, um danach zu erkennen ob eine bereits gepushte Session
+            # inhaltlich geaendert wurde (-> dirty markieren, Schritt 6).
+            cur.execute(
+                "SELECT garmin_workout_id, session_zone FROM training_plan WHERE external_id = %s",
+                (external_id,),
+            )
+            prior = cur.fetchone()
+            existing_garmin_id, existing_session_zone = prior if prior else (None, None)
+
             columns = [
                 "external_id", "week_date", "day_of_week", "session_type", "sport",
                 "name", "distance_km", "duration_min", "notes", "workout_steps",
@@ -952,6 +963,26 @@ def upsert_planned_workout(
                 values,
             )
             row_id, inserted = cur.fetchone()
+
+            # Schritt 6 — Dirty-Marking: wenn diese Session schon einen
+            # garmin_workout_id hatte (also bereits gepusht war) UND sich der
+            # Inhalt gegenueber dem gespeicherten content_hash geaendert hat,
+            # sync_status='dirty' setzen, damit der naechste Batch-Push sie
+            # erneut aufnimmt (sessions_to_push() filtert genau darauf).
+            if existing_garmin_id:
+                new_hash = compute_content_hash({
+                    "date": date, "session_type": session_type,
+                    "distance_km": distance_km, "duration_min": duration_min,
+                    "notes": notes, "workout_steps": structure,
+                    "session_zone": existing_session_zone,
+                })
+                cur.execute("SELECT content_hash FROM training_plan WHERE id = %s", (row_id,))
+                old_hash = cur.fetchone()[0]
+                if new_hash != old_hash:
+                    cur.execute(
+                        "UPDATE training_plan SET sync_status='dirty', content_hash=%s WHERE id=%s",
+                        (new_hash, row_id),
+                    )
         conn.commit()
         logger.info(
             "upsert_planned_workout committed: id=%s external_id=%s sync_target=%s created=%s",
@@ -1072,6 +1103,23 @@ def upsert_training_block(plan: dict, confirm_race_date_change: bool = False) ->
                             f"aber ohne bestaetigte Hevy-Routine (nichts erfunden)."
                         )
 
+                # sport: expliziter sport_hint hat Vorrang, sonst der aus session_type
+                # berechnete garmin_sport (None fuer hevy/cairn_only) — damit die
+                # Garmin-Batch-Engine (coach/garmin_batch.py) running/cycling immer
+                # korrekt unterscheiden kann, ohne dass jeder Aufrufer sport explizit
+                # mitgeben muss.
+                resolved_sport = s.get("sport_hint") or routing["garmin_sport"]
+
+                # Vor dem Schreiben: bestehenden garmin_workout_id/content_hash
+                # merken, um danach zu erkennen ob eine bereits gepushte Session
+                # inhaltlich geaendert wurde (-> dirty markieren, Schritt 6).
+                cur.execute(
+                    "SELECT garmin_workout_id, content_hash FROM training_plan WHERE external_id = %s",
+                    (s["external_id"],),
+                )
+                prior = cur.fetchone()
+                existing_garmin_id, old_hash = prior if prior else (None, None)
+
                 # status wird bei INSERT gesetzt, aber bei ON CONFLICT bewusst NICHT
                 # überschrieben — ein erneutes upsert_training_block darf einen bereits
                 # von sync_hevy_completions auf 'completed' gesetzten Status nicht
@@ -1080,29 +1128,49 @@ def upsert_training_block(plan: dict, confirm_race_date_change: bool = False) ->
                     """INSERT INTO training_plan
                            (external_id, week_date, day_of_week, session_type, session_zone,
                             distance_km, duration_min, notes, plan_id,
-                            status, source, garmin_push_required, hevy_routine_key)
-                       VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                            status, source, garmin_push_required, hevy_routine_key,
+                            sport, sync_target, name, target)
+                       VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                        ON CONFLICT (external_id) DO UPDATE SET
                            week_date=EXCLUDED.week_date, day_of_week=EXCLUDED.day_of_week,
                            session_type=EXCLUDED.session_type, session_zone=EXCLUDED.session_zone,
                            distance_km=EXCLUDED.distance_km, duration_min=EXCLUDED.duration_min,
                            notes=EXCLUDED.notes, plan_id=EXCLUDED.plan_id,
                            source=EXCLUDED.source, garmin_push_required=EXCLUDED.garmin_push_required,
-                           hevy_routine_key=EXCLUDED.hevy_routine_key, updated_at=now()
-                       RETURNING (xmax = 0) AS inserted""",
+                           hevy_routine_key=EXCLUDED.hevy_routine_key,
+                           sport=EXCLUDED.sport, sync_target=EXCLUDED.sync_target,
+                           name=EXCLUDED.name, target=EXCLUDED.target, updated_at=now()
+                       RETURNING id, (xmax = 0) AS inserted""",
                     (
                         s["external_id"], week_date, day_of_week, s["session_type"],
                         s.get("session_zone"), s.get("distance_km"), s.get("duration_min"),
                         s.get("notes"), plan_id,
                         s.get("status", "planned"), routing["source"],
                         routing["garmin_push_required"], hevy_routine_key,
+                        resolved_sport, routing["sync_target"], s.get("name"),
+                        json.dumps(s["target"]) if s.get("target") is not None else None,
                     ),
                 )
-                inserted = cur.fetchone()[0]
+                row_id, inserted = cur.fetchone()
                 if inserted:
                     created += 1
                 else:
                     updated += 1
+
+                # Schritt 6 — Dirty-Marking (siehe upsert_planned_workout fuer
+                # dieselbe Logik): bereits gepushte Session inhaltlich geaendert?
+                if existing_garmin_id:
+                    new_hash = compute_content_hash({
+                        "date": s["date"], "session_type": s["session_type"],
+                        "distance_km": s.get("distance_km"), "duration_min": s.get("duration_min"),
+                        "notes": s.get("notes"), "workout_steps": None,
+                        "session_zone": s.get("session_zone"),
+                    })
+                    if new_hash != old_hash:
+                        cur.execute(
+                            "UPDATE training_plan SET sync_status='dirty', content_hash=%s WHERE id=%s",
+                            (new_hash, row_id),
+                        )
 
         conn.commit()
         logger.info(
@@ -1364,6 +1432,27 @@ def reconcile_training_block(start_date: str, end_date: str) -> dict:
         "sessions": results,
         "orphan_garmin_entries": orphan_garmin_entries,
     }
+
+
+@mcp.tool()
+def push_sessions_to_garmin(session_ids: list[int]) -> dict:
+    """
+    Pusht eine Liste von CAIRN-Sessions gesammelt zu Garmin.
+    Ein Login — mehrere Uploads — isolierte Fehlerbehandlung.
+
+    Nutzen:
+    - Nach Planänderungen: [session_id] der geänderten Session
+    - Nach Wochenumstrukturierung: alle IDs der betroffenen Woche
+    - Nachholpush: IDs aller fehlgeschlagenen Sessions
+
+    Gibt zurück: created / updated / moved / unchanged / failed pro Session.
+    Strength, Core, Mobility werden vor dem ersten Garmin-Kontakt hart abgelehnt.
+    """
+    try:
+        from coach.garmin_batch import run_batch
+        return run_batch(session_ids=session_ids)
+    except Exception as exc:
+        return {"error": str(exc), "type": type(exc).__name__}
 
 
 # ── ASGI app factory ───────────────────────────────────────────────────────────

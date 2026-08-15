@@ -30,13 +30,19 @@ STRENGTH_TYPES = frozenset({"Strength Training", "Krafttraining"})
 
 # Nie an Garmin senden, unabhaengig von sport_hint.
 NEVER_GARMIN_TYPES = STRENGTH_TYPES | frozenset({"Mobility", "Core", "Rest Day"})
+# Alias fuer coach/garmin_batch.py — gleiche Menge, stabiler oeffentlicher Name.
+GARMIN_BLOCKED_TYPES = NEVER_GARMIN_TYPES
 
 # Laufbezogene Typen, wie in generate_plan.py (QUALITY_TYPES, ENDURANCE_RUN_TYPES)
-# und training_plan.session_type in der Praxis verwendet.
+# und training_plan.session_type in der Praxis verwendet. "Race Day" kommt aus
+# generate_plan.py, "Race" wurde in einem real importierten Trainingsblock
+# beobachtet (session_type='Race' fuer den 2026-09-26-Renntag selbst) — beide
+# Schreibweisen muessen als Garmin-Push-faehig gelten, sonst faellt der
+# eigentliche Renntag auf cairn_only und wird nie automatisch gepusht.
 GARMIN_RUNNING_TYPES = frozenset({
     "Easy Run", "Trail Run", "Recovery Run", "Long Run",
     "Tempo Session", "Interval Session", "Sprint Session", "Hill Session",
-    "Race Day",
+    "Race Day", "Race",
 })
 
 # 'Cross Training' selbst ist NICHT automatisch Rad — siehe Docstring oben.
