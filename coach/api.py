@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, request, send_file
+from flask import Flask, jsonify, request, send_file, send_from_directory
 from flask_cors import CORS
 import os, psycopg2, json, time, traceback
 from datetime import date, timedelta, datetime
@@ -1531,6 +1531,430 @@ def cron_health_sync():
 
     except Exception as e:
         return jsonify({"status": "error", "message": str(e), "trace": traceback.format_exc()}), 500
+
+# ─── FRONTEND V5 ROUTES ───────────────────────────────────────────────────────
+
+@app.route('/app')
+def cairn_app_v5():
+    return send_file(os.path.join(os.path.dirname(__file__), '..', 'files', 'cairn_app_v5.html'))
+
+@app.route('/static/assets/cairn/<path:filename>')
+def cairn_assets(filename):
+    """Serve CAIRN session illustration assets (SVG/PNG)."""
+    asset_dir = os.path.join(os.path.dirname(__file__), '..', 'static', 'assets', 'cairn')
+    return send_from_directory(asset_dir, filename)
+
+
+# ─── FRONTEND API: Woche ──────────────────────────────────────────────────────
+
+@app.route('/api/frontend/week')
+def frontend_week():
+    """
+    Aggregierte Wochenansicht: heute + aktuelle Woche + nächste Woche.
+    Gibt für jeden Tag eine Session-Karte zurück (auch Rest Days).
+    Status: planned | pushed | completed | changed | pending | error
+    """
+    try:
+        today = get_today()
+        # Montag dieser Woche bis Sonntag nächster Woche
+        monday_this = today - timedelta(days=today.weekday())
+        sunday_next = monday_this + timedelta(days=13)
+
+        conn = get_db()
+        cur = conn.cursor()
+
+        # Training plan für beide Wochen
+        cur.execute("""
+            SELECT id,
+                   (week_date + (day_of_week - 1) * INTERVAL '1 day')::date AS session_date,
+                   session_type, session_zone, distance_km, duration_min,
+                   notes, phase, garmin_workout_id, workout_steps
+            FROM training_plan
+            WHERE week_date >= %s AND week_date <= %s
+            ORDER BY week_date, day_of_week
+        """, (monday_this, monday_this + timedelta(weeks=1)))
+        plan_rows = cur.fetchall()
+
+        # Absolvierte Trainings in diesem Zeitraum
+        cur.execute("""
+            SELECT date, type, distance_km, duration_minutes, heart_rate_avg, id
+            FROM trainings
+            WHERE date >= %s AND date <= %s
+            ORDER BY date
+        """, (monday_this, sunday_next))
+        actual_rows = cur.fetchall()
+
+        # Garmin Push-Status aus garmin_mcp_log (letzte 14 Tage)
+        cur.execute("""
+            SELECT workout_name, scheduled_date, garmin_workout_id, garmin_schedule_id,
+                   status, action, updated_at
+            FROM garmin_mcp_log
+            WHERE scheduled_date >= %s AND scheduled_date <= %s
+            ORDER BY updated_at DESC
+        """, (monday_this, sunday_next))
+        garmin_rows = cur.fetchall()
+        conn.close()
+
+        # Index: absolvierte Trainings nach Datum
+        actual_by_date = {}
+        for r in actual_rows:
+            d = str(r[0])
+            if d not in actual_by_date:
+                actual_by_date[d] = []
+            actual_by_date[d].append({
+                "type": r[1],
+                "distance_km": float(r[2]) if r[2] else 0,
+                "duration_min": r[3],
+                "avg_hr": r[4],
+                "training_id": r[5],
+            })
+
+        # Index: Garmin-Status nach Datum
+        garmin_by_date = {}
+        for r in garmin_rows:
+            d = str(r[1]) if r[1] else None
+            if d and d not in garmin_by_date:
+                garmin_by_date[d] = {
+                    "garmin_workout_id": r[2],
+                    "garmin_schedule_id": r[3],
+                    "status": r[4],
+                    "action": r[5],
+                }
+
+        # Session-Karten bauen
+        DAY_DE = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag']
+        MONTH_DE = ['', 'Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez']
+
+        sessions = []
+        for r in plan_rows:
+            session_date = r[1]
+            d_str = str(session_date)
+            session_type = r[2] or 'Rest Day'
+            garmin_info = garmin_by_date.get(d_str, {})
+            actual = actual_by_date.get(d_str, [{}])[0]
+
+            # Status ableiten
+            if actual.get("training_id"):
+                status = "completed"
+            elif garmin_info.get("status") == "failed":
+                status = "error"
+            elif garmin_info.get("status") == "pending":
+                status = "pending"
+            elif garmin_info.get("garmin_workout_id") or r[8]:  # garmin_workout_id in training_plan
+                status = "pushed"
+            else:
+                status = "planned"
+
+            # Workout-Steps für Strukturprofil
+            steps = []
+            if r[9]:  # workout_steps JSONB
+                try:
+                    steps = r[9] if isinstance(r[9], list) else json.loads(r[9])
+                except Exception:
+                    steps = []
+
+            sessions.append({
+                "id": r[0],
+                "date": d_str,
+                "day_label": DAY_DE[session_date.weekday()],
+                "day_number": session_date.day,
+                "month_label": MONTH_DE[session_date.month],
+                "is_today": session_date == today,
+                "is_past": session_date < today,
+                "session_type": session_type,
+                "session_zone": r[3] or "",
+                "km": float(r[4]) if r[4] else None,
+                "duration_min": r[5],
+                "notes": r[6] or "",
+                "phase": r[7] or "base",
+                "status": status,
+                "garmin_workout_id": garmin_info.get("garmin_workout_id") or r[8],
+                "garmin_schedule_id": garmin_info.get("garmin_schedule_id"),
+                "steps": steps,
+                # Für absolvierte Sessions
+                "actual_km": actual.get("distance_km"),
+                "actual_min": actual.get("duration_min"),
+                "actual_hr": actual.get("avg_hr"),
+            })
+
+        return jsonify({
+            "status": "ok",
+            "today": str(today),
+            "range": {"start": str(monday_this), "end": str(sunday_next)},
+            "sessions": sessions,
+        })
+
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e), "trace": traceback.format_exc()}), 500
+
+
+# ─── FRONTEND API: Plan ───────────────────────────────────────────────────────
+
+@app.route('/api/frontend/plan')
+def frontend_plan():
+    """
+    Planansicht: Rennen, aktuelle Phase, Belastungskurve, Milestones.
+    Belastungskurve = Anzahl Non-Rest Sessions pro Woche aus training_plan.
+    """
+    try:
+        today = get_today()
+        conn = get_db()
+        cur = conn.cursor()
+
+        # Aktiver Plan
+        cur.execute("""
+            SELECT id, name, goal_type, race_name, race_date, race_distance_km,
+                   total_weeks, current_week, status
+            FROM plans WHERE status = 'active' ORDER BY created_at DESC LIMIT 1
+        """)
+        plan_row = cur.fetchone()
+
+        if not plan_row:
+            conn.close()
+            return jsonify({"status": "ok", "has_plan": False})
+
+        plan_id = plan_row[0]
+        race_date = plan_row[4]
+        total_weeks = plan_row[6] or 16
+        current_week = plan_row[7] or 1
+
+        countdown_days = (race_date - today).days if race_date else None
+
+        # Belastungskurve: Sessions pro Woche (Non-Rest), gruppiert nach Wochenmondat
+        cur.execute("""
+            SELECT week_date,
+                   COUNT(*) FILTER (WHERE session_type != 'Rest Day') AS sessions,
+                   ROUND(COALESCE(SUM(distance_km), 0)::numeric, 1)  AS total_km,
+                   MAX(phase) AS phase
+            FROM training_plan
+            WHERE plan_id = %s OR plan_id IS NULL
+            GROUP BY week_date
+            ORDER BY week_date
+        """, (plan_id,))
+        week_rows = cur.fetchall()
+
+        # Wochenstruktur für Kurve
+        weeks = []
+        for i, r in enumerate(week_rows):
+            weeks.append({
+                "week_date": str(r[0]),
+                "week_number": i + 1,
+                "sessions": int(r[1]) if r[1] else 0,
+                "total_km": float(r[2]) if r[2] else 0,
+                "phase": r[3] or "base",
+                "is_deload": False,  # Deloads: Wochen mit weniger Sessions als Nachbarwoche (heuristisch)
+                "is_current": False,
+            })
+
+        # Deloads und aktuelle Woche markieren
+        monday_today = today - timedelta(days=today.weekday())
+        for i, w in enumerate(weeks):
+            if w["week_date"] == str(monday_today):
+                w["is_current"] = True
+            # Einfache Deload-Heuristik: < 70% der Vorwoche
+            if i >= 1 and weeks[i - 1]["total_km"] > 0:
+                ratio = w["total_km"] / weeks[i - 1]["total_km"]
+                if ratio < 0.75 and w["total_km"] > 0:
+                    w["is_deload"] = True
+
+        # Milestones
+        cur.execute("""
+            SELECT id, step_number, title, criterion, target_date,
+                   status, evidence, notes, achieved_at
+            FROM milestones
+            WHERE plan_id = %s
+            ORDER BY step_number
+        """, (plan_id,))
+        milestone_rows = cur.fetchall()
+
+        milestones = []
+        next_set = False
+        for r in milestone_rows:
+            ms_status = r[5]
+            is_next = False
+            if ms_status == 'open' and not next_set:
+                is_next = True
+                next_set = True
+            milestones.append({
+                "id": r[0],
+                "step_number": r[1],
+                "title": r[2],
+                "criterion": r[3] or "",
+                "target_date": str(r[4]) if r[4] else None,
+                "status": ms_status,
+                "is_next": is_next,
+                "evidence": r[6] or "",
+                "notes": r[7] or "",
+                "achieved_at": str(r[8]) if r[8] else None,
+            })
+
+        conn.close()
+
+        return jsonify({
+            "status": "ok",
+            "has_plan": True,
+            "race": {
+                "name": plan_row[3],
+                "date": str(race_date) if race_date else None,
+                "distance_km": plan_row[5],
+                "countdown_days": countdown_days,
+            },
+            "block": {
+                "current_week": current_week,
+                "total_weeks": total_weeks,
+                "phase": weeks[current_week - 1]["phase"] if weeks and current_week <= len(weeks) else "base",
+            },
+            "weeks": weeks,
+            "milestones": milestones,
+        })
+
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e), "trace": traceback.format_exc()}), 500
+
+
+# ─── FRONTEND API: Sync ───────────────────────────────────────────────────────
+
+@app.route('/api/frontend/sync')
+def frontend_sync():
+    """
+    Sync-Status: Verbindungen, letzte Aktivitäten, letzte Änderungen.
+    Keine Rohlogs, keine MCP-Funktionsnamen, keine SQL-Fehler im Response.
+    """
+    try:
+        today = get_today()
+        conn = get_db()
+        cur = conn.cursor()
+
+        # DB-Status: letzter daily_log Eintrag
+        cur.execute("SELECT MAX(date) FROM daily_logs")
+        last_health_date = cur.fetchone()[0]
+
+        # Letzte Aktivität
+        cur.execute("SELECT MAX(date) FROM trainings")
+        last_activity_date = cur.fetchone()[0]
+
+        # Garmin-Session: letzter erfolgreicher Push
+        cur.execute("""
+            SELECT updated_at FROM garmin_mcp_log
+            WHERE status = 'success' ORDER BY updated_at DESC LIMIT 1
+        """)
+        row = cur.fetchone()
+        last_garmin_push = row[0].isoformat() if row else None
+
+        garmin_connected = last_garmin_push is not None
+
+        # Letzte 3 Aktivitäten
+        cur.execute("""
+            SELECT date, type, notes, distance_km, duration_minutes
+            FROM trainings
+            ORDER BY date DESC LIMIT 3
+        """)
+        activity_rows = cur.fetchall()
+
+        MONTH_DE = ['', 'Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez']
+        DAY_DE_SHORT = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So']
+
+        activities = []
+        for r in activity_rows:
+            act_date = r[0]
+            if act_date == today:
+                date_label = "Heute"
+            elif act_date == today - timedelta(days=1):
+                date_label = "Gestern"
+            else:
+                date_label = f"{DAY_DE_SHORT[act_date.weekday()]} {act_date.day}. {MONTH_DE[act_date.month]}"
+            activities.append({
+                "date": str(act_date),
+                "date_label": date_label,
+                "session_type": r[1],
+                "title": (r[2] or r[1]).split(" | ")[0],
+                "km": float(r[3]) if r[3] else None,
+                "duration_min": r[4],
+            })
+
+        # Letzte Änderungen aus garmin_mcp_log (lesbare Zusammenfassung)
+        cur.execute("""
+            SELECT workout_name, scheduled_date, action, status,
+                   garmin_workout_id, created_at, last_error
+            FROM garmin_mcp_log
+            ORDER BY created_at DESC LIMIT 10
+        """)
+        change_rows = cur.fetchall()
+
+        ACTION_LABEL = {
+            "push": "Workout erstellt",
+            "move": "Workout verschoben",
+            "delete": "Workout gelöscht",
+            "preview": "Workout vorschau",
+        }
+        STATUS_LABEL = {
+            "success": "synchronisiert",
+            "pending": "ausstehend",
+            "failed": "Fehler",
+        }
+
+        changes = []
+        for r in change_rows:
+            workout_name = r[0] or "Workout"
+            sched_date = r[1]
+            action = r[2]
+            status = r[3]
+            created_at = r[5]
+
+            # Datum relativ
+            if created_at:
+                delta = today - created_at.date()
+                if delta.days == 0:
+                    when = f"Heute · {created_at.strftime('%H:%M')}"
+                elif delta.days == 1:
+                    when = f"Gestern · {created_at.strftime('%H:%M')}"
+                else:
+                    when = created_at.strftime(f"{delta.days} Tage")
+            else:
+                when = "—"
+
+            description = ACTION_LABEL.get(action, action)
+            if sched_date:
+                day_name = DAY_DE_SHORT[sched_date.weekday()]
+                description += f" · {day_name} {sched_date.day}. {MONTH_DE[sched_date.month]}"
+
+            changes.append({
+                "when": when,
+                "created_at": created_at.isoformat() if created_at else None,
+                "workout_name": workout_name,
+                "description": description,
+                "status": status,
+                "status_label": STATUS_LABEL.get(status, status),
+                "has_error": status == "failed",
+                # Fehlertext bleibt generisch – keine technischen Details
+                "error_hint": "Push fehlgeschlagen – bitte im Chat nachfragen." if status == "failed" else None,
+            })
+
+        conn.close()
+
+        return jsonify({
+            "status": "ok",
+            "connections": {
+                "mcp": {"status": "live", "label": "LIVE"},
+                "garmin": {
+                    "status": "connected" if garmin_connected else "unknown",
+                    "label": "VERBUNDEN" if garmin_connected else "UNBEKANNT",
+                    "last_push": last_garmin_push,
+                },
+                "database": {
+                    "status": "current" if last_health_date == today else "stale",
+                    "label": "AKTUELL" if last_health_date == today else "VERALTET",
+                },
+                "last_health_sync": str(last_health_date) if last_health_date else None,
+                "last_activity_sync": str(last_activity_date) if last_activity_date else None,
+            },
+            "activities": activities,
+            "changes": changes,
+        })
+
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e), "trace": traceback.format_exc()}), 500
+
 
 if __name__ == '__main__':
     port = int(os.getenv("PORT", 5002))

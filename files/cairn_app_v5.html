@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <title>CAIRN</title>
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --bg:#f0eeea;
+      --card-bg:#ffffff;
+      --text:#1a1a1a;
+      --sub:#666;
+      --mute:#9b9b9b;
+      --tab-bg:#111111;
+      --tab-h:64px;
+      --hdr-h:56px;
+      --blue:#3a7bd5;
+      --green:#4a9a59;
+      --rose:#c4547a;
+      --purple:#7a5ab8;
+      --amber:#d9984a;
+      --c-easy:#e8f4e6;
+      --c-recovery:#e6eff4;
+      --c-long:#f4f0ec;
+      --c-trail:#ece8f4;
+      --c-hill:#f4ece8;
+      --c-interval:#e8eef4;
+      --c-tempo:#f4f0e6;
+      --c-sprint:#f4e8ec;
+      --c-time:#e6f4f0;
+      --c-strength:#f0eeec;
+      --c-cross:#e8f4ea;
+      --c-mobility:#f4e8f4;
+      --c-rest:#ebebeb;
+      --c-race:#f4e6f0;
+    }
+    html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Helvetica Neue",Arial,sans-serif;background:var(--bg);color:var(--text);overscroll-behavior:none;-webkit-font-smoothing:antialiased}
+    #app{display:flex;flex-direction:column;height:100%;max-width:430px;margin:0 auto;position:relative}
+
+    /* ── Header ── */
+    .hdr{height:var(--hdr-h);padding:0 20px;display:flex;align-items:center;justify-content:space-between;background:var(--bg);flex-shrink:0;border-bottom:1px solid rgba(0,0,0,.06)}
+    .hdr-logo{font-size:23px;font-weight:900;letter-spacing:-1px;color:var(--text);font-style:italic;user-select:none}
+    .live-badge{display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:700;letter-spacing:.8px;color:var(--sub);text-transform:uppercase}
+    .live-badge::before{content:'';display:block;width:7px;height:7px;border-radius:50%;background:#4caf50;box-shadow:0 0 6px #4caf5080;animation:pulse 2s infinite}
+    @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+    /* ── Panels ── */
+    .panels{flex:1;overflow:hidden;position:relative}
+    .panel{position:absolute;inset:0;overflow-y:auto;-webkit-overflow-scrolling:touch;display:none;padding:16px 16px calc(var(--tab-h) + env(safe-area-inset-bottom) + 12px)}
+    .panel.on{display:block}
+
+    /* ── Tab bar ── */
+    .tabbar{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:430px;height:calc(var(--tab-h) + env(safe-area-inset-bottom));padding-bottom:env(safe-area-inset-bottom);background:var(--tab-bg);display:flex;z-index:100}
+    .tabbtn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;border:none;background:none;color:#555;cursor:pointer;font-family:inherit;padding:8px 0;transition:color .15s;-webkit-tap-highlight-color:transparent}
+    .tabbtn.on{color:#fff}
+    .tabbtn svg{display:block}
+    .tabbtn span{font-size:10px;font-weight:600;letter-spacing:.5px;text-transform:uppercase}
+
+    /* ── Section label ── */
+    .sec-label{font-size:10px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:var(--mute);margin-bottom:10px}
+    .week-divider{font-size:10px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:var(--sub);margin:20px 0 10px}
+    .week-divider:first-child{margin-top:0}
+
+    /* ── Session card ── */
+    .scard{border-radius:16px;padding:16px;margin-bottom:10px;position:relative;overflow:hidden;min-height:92px}
+    .scard.is-today{box-shadow:0 3px 18px rgba(0,0,0,.13)}
+    .scard.is-past{opacity:.68}
+    .scard[data-t="Easy Run"]{background:var(--c-easy)}
+    .scard[data-t="Recovery Run"]{background:var(--c-recovery)}
+    .scard[data-t="Long Run"],.scard[data-t="Long Trail Run"]{background:var(--c-long)}
+    .scard[data-t="Trail Run"]{background:var(--c-trail)}
+    .scard[data-t="Hill Session"]{background:var(--c-hill)}
+    .scard[data-t="Interval Session"],.scard[data-t="Interval Run"]{background:var(--c-interval)}
+    .scard[data-t="Tempo Session"],.scard[data-t="Tempo Run"]{background:var(--c-tempo)}
+    .scard[data-t="Sprint Session"]{background:var(--c-sprint)}
+    .scard[data-t="Time Trial"],.scard[data-t="Time Trail"]{background:var(--c-time)}
+    .scard[data-t="Strength Training"],.scard[data-t^="Upper"],.scard[data-t^="Lower"],.scard[data-t^="Full Body"]{background:var(--c-strength)}
+    .scard[data-t="Cross Training"]{background:var(--c-cross)}
+    .scard[data-t="Mobility"]{background:var(--c-mobility)}
+    .scard[data-t="Rest Day"],.scard[data-t="Rest"]{background:var(--c-rest)}
+    .scard[data-t="Race Day"]{background:var(--c-race)}
+    .scard.is-today{background:#f5f0df!important}
+
+    .ci{display:flex;gap:12px;align-items:flex-start}
+    .cdate{display:flex;flex-direction:column;align-items:center;min-width:40px;flex-shrink:0}
+    .cnum{font-size:34px;font-weight:900;line-height:1;letter-spacing:-1.5px}
+    .cday{font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--sub);margin-top:2px}
+    .cbody{flex:1;min-width:0}
+    .ctype{font-size:15px;font-weight:700;margin-bottom:5px;padding-right:52px;line-height:1.2}
+    .cmeta{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:12px;color:var(--sub);font-weight:500}
+    .cmeta-dot{color:var(--mute)}
+    .cnotes{font-size:11px;color:var(--sub);margin-top:5px;line-height:1.4;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+    .cactual{font-size:11px;font-weight:700;color:#3a8a49;margin-top:4px}
+    .cbadge-row{margin-top:6px}
+
+    /* Status badge */
+    .sbadge{display:inline-block;padding:2px 7px;border-radius:4px;font-size:9px;font-weight:800;letter-spacing:.8px;text-transform:uppercase}
+    .sbadge.planned{background:rgba(0,0,0,.08);color:var(--sub)}
+    .sbadge.pushed{background:rgba(58,123,213,.15);color:#2a6bc5}
+    .sbadge.completed{background:rgba(74,154,89,.15);color:#3a8a49}
+    .sbadge.error{background:rgba(220,80,80,.15);color:#c44}
+    .sbadge.pending{background:rgba(217,152,74,.18);color:#b8700c}
+    .sbadge.changed{background:rgba(200,110,50,.15);color:#a85020}
+
+    /* Asset image */
+    .casset{position:absolute;right:-2%;bottom:-6%;width:min(44%,136px);opacity:.82;pointer-events:none;user-select:none}
+
+    /* Structure bars */
+    .struct{display:flex;gap:2px;height:7px;border-radius:4px;overflow:hidden;margin-top:9px}
+    .sb{height:100%;border-radius:2px}
+    .sb-wu{background:#a0c8a0}
+    .sb-iv{background:#4878c0}
+    .sb-rc{background:#88acc8}
+    .sb-cd{background:#9ab89a}
+    .sb-rs{background:#c0c0c0}
+    .sb-xx{background:#a090c0}
+
+    /* ── White card ── */
+    .card{background:var(--card-bg);border-radius:16px;padding:18px;margin-bottom:12px;box-shadow:0 1px 6px rgba(0,0,0,.06)}
+
+    /* Race card */
+    .race-card{background:#160e38;color:#fff}
+    .race-card .sec-label{color:rgba(255,255,255,.35)}
+    .race-name{font-size:21px;font-weight:900;letter-spacing:-.5px;margin-bottom:6px;line-height:1.2}
+    .race-meta{display:flex;flex-wrap:wrap;gap:10px;font-size:13px;color:rgba(255,255,255,.65);font-weight:500}
+    .race-cd{margin-top:14px;display:inline-block;background:rgba(255,255,255,.12);border-radius:8px;padding:5px 12px;font-size:12px;font-weight:700;color:rgba(255,255,255,.8);letter-spacing:.3px}
+
+    /* Load curve */
+    .blk-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+    .blk-phase{font-size:18px;font-weight:900;letter-spacing:-.3px}
+    .blk-pill{background:var(--text);color:#fff;border-radius:20px;padding:4px 11px;font-size:11px;font-weight:700;letter-spacing:.4px}
+    .curve-svg{width:100%;height:96px;display:block}
+    .phase-strip{display:flex;margin-top:4px;border-radius:3px;overflow:hidden;height:4px}
+    .ps-seg{height:100%}
+
+    /* Milestones */
+    .ms-timeline{position:relative;padding:4px 0 8px}
+    .ms-vline{position:absolute;left:50%;top:0;bottom:0;width:2px;background:rgba(0,0,0,.08);transform:translateX(-50%)}
+    .ms-item{display:flex;align-items:flex-start;margin-bottom:22px;position:relative}
+    .ms-item:nth-child(even){flex-direction:row-reverse}
+    .ms-side{flex:1;padding:0 10px}
+    .ms-item:nth-child(odd) .ms-side:first-child{text-align:right}
+    .ms-item:nth-child(even) .ms-side:first-child{text-align:left}
+    .ms-dot-col{flex-shrink:0;display:flex;align-items:flex-start;padding-top:2px;z-index:1}
+    .ms-dot{width:18px;height:18px;border-radius:50%;border:2.5px solid var(--bg);box-shadow:0 0 0 2px rgba(0,0,0,.14);background:var(--mute)}
+    .ms-dot.achieved{background:var(--green);box-shadow:0 0 0 2px var(--green)}
+    .ms-dot.next{background:var(--purple);box-shadow:0 0 0 2.5px var(--purple),0 0 10px rgba(122,90,184,.45)}
+    .ms-title{font-size:13px;font-weight:700;line-height:1.3}
+    .ms-crit{font-size:11px;color:var(--sub);margin-top:2px;line-height:1.3}
+    .ms-status{font-size:9px;font-weight:800;letter-spacing:.7px;text-transform:uppercase;margin-top:3px}
+    .ms-status.achieved{color:var(--green)}
+    .ms-status.next{color:var(--purple)}
+    .ms-status.open{color:var(--mute)}
+    .ms-raceday{text-align:center;padding:8px 0 4px}
+    .ms-raceday-dot{width:22px;height:22px;border-radius:50%;background:var(--rose);border:2.5px solid var(--bg);box-shadow:0 0 0 2.5px var(--rose),0 0 12px rgba(196,84,122,.4);margin:0 auto 7px}
+    .ms-raceday-label{font-size:12px;font-weight:900;letter-spacing:1px;color:var(--rose);text-transform:uppercase}
+    .ms-raceday-name{font-size:12px;color:var(--sub);margin-top:3px}
+
+    /* ── Sync/Verlauf ── */
+    .conn-row{display:flex;align-items:center;padding:11px 0;border-bottom:1px solid rgba(0,0,0,.05)}
+    .conn-row:last-child{border-bottom:none}
+    .cdot{width:9px;height:9px;border-radius:50%;flex-shrink:0;margin-right:11px}
+    .cdot.live,.cdot.connected,.cdot.current{background:#4caf50;box-shadow:0 0 5px #4caf5055}
+    .cdot.stale{background:#ff9800}
+    .cdot.unknown{background:#c0c0c0}
+    .cname{flex:1;font-size:13px;font-weight:600}
+    .cstat{font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase}
+    .cstat.live,.cstat.connected,.cstat.current{color:#3a9a49}
+    .cstat.stale{color:#b87020}
+    .cstat.unknown{color:var(--mute)}
+
+    .act-row{display:flex;align-items:center;padding:10px 0;border-bottom:1px solid rgba(0,0,0,.05);gap:10px}
+    .act-row:last-child{border-bottom:none}
+    .act-ico{width:36px;height:36px;border-radius:10px;background:var(--bg);display:flex;align-items:center;justify-content:center;flex-shrink:0;overflow:hidden}
+    .act-ico img{width:26px;height:26px;object-fit:contain}
+    .act-info{flex:1;min-width:0}
+    .act-title{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .act-date{font-size:11px;color:var(--sub);margin-top:1px}
+    .act-stats{font-size:12px;font-weight:600;color:var(--sub);text-align:right;white-space:nowrap}
+
+    .chg-row{display:flex;gap:10px;padding:10px 0;border-bottom:1px solid rgba(0,0,0,.05);align-items:flex-start}
+    .chg-row:last-child{border-bottom:none}
+    .chg-dot{width:8px;height:8px;border-radius:50%;background:var(--mute);flex-shrink:0;margin-top:4px}
+    .chg-dot.success{background:#4caf50}
+    .chg-dot.failed{background:#e05454}
+    .chg-dot.pending{background:#ff9800}
+    .chg-body{flex:1;min-width:0}
+    .chg-name{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .chg-desc{font-size:11px;color:var(--sub);margin-top:2px}
+    .chg-when{font-size:11px;color:var(--mute);white-space:nowrap}
+
+    /* ── States ── */
+    .loading-wrap{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:48px 20px;gap:12px}
+    .spinner{width:24px;height:24px;border:3px solid rgba(0,0,0,.1);border-top-color:var(--text);border-radius:50%;animation:spin .7s linear infinite}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .loading-txt{font-size:13px;color:var(--mute)}
+    .err-box{padding:18px;background:#fee8e8;border-radius:12px;font-size:13px;color:#b44;text-align:center;line-height:1.5}
+    .empty{text-align:center;padding:28px 16px;color:var(--mute);font-size:14px}
+  </style>
+</head>
+<body>
+<div id="app">
+
+  <header class="hdr">
+    <div class="hdr-logo">Cairn</div>
+    <div class="live-badge">Live</div>
+  </header>
+
+  <div class="panels">
+    <div class="panel on" id="p-woche">
+      <div id="woche-out"><div class="loading-wrap"><div class="spinner"></div><div class="loading-txt">Lade Trainingsplan…</div></div></div>
+    </div>
+    <div class="panel" id="p-plan">
+      <div id="plan-out"><div class="loading-wrap"><div class="spinner"></div><div class="loading-txt">Lade Plan…</div></div></div>
+    </div>
+    <div class="panel" id="p-verlauf">
+      <div id="verlauf-out"><div class="loading-wrap"><div class="spinner"></div><div class="loading-txt">Lade Verlauf…</div></div></div>
+    </div>
+  </div>
+
+  <nav class="tabbar">
+    <button class="tabbtn on" data-tab="woche">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+      </svg>
+      <span>Woche</span>
+    </button>
+    <button class="tabbtn" data-tab="plan">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/>
+        <circle cx="3" cy="6" r="1" fill="currentColor"/><circle cx="3" cy="12" r="1" fill="currentColor"/><circle cx="3" cy="18" r="1" fill="currentColor"/>
+      </svg>
+      <span>Plan</span>
+    </button>
+    <button class="tabbtn" data-tab="verlauf">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>
+      </svg>
+      <span>Verlauf</span>
+    </button>
+  </nav>
+</div>
+
+<script>
+// ─── Assets ─────────────────────────────────────────────────────────────────
+const ASSET_MAP = {
+  "Easy Run":"easy_run","Recovery Run":"recovery_run","Long Run":"long_run",
+  "Long Trail Run":"long_run","Trail Run":"trail_run","Hill Session":"hill_session",
+  "Interval Session":"interval_session","Interval Run":"interval_session",
+  "Tempo Session":"tempo_session","Tempo Run":"tempo_session",
+  "Sprint Session":"sprint_session","Time Trial":"time_trial","Time Trail":"time_trial",
+  "Strength Training":"strength_training","Upper Body CAIRN":"strength_training",
+  "Lower Body + Arms CAIRN":"strength_training","Full Body Light CAIRN":"strength_training",
+  "Cross Training":"cross_training","Mobility":"mobility",
+  "Rest Day":"rest_day","Rest":"rest_day","Race Day":"race_day"
+};
+const STRUCTURED = new Set(["Hill Session","Interval Session","Interval Run","Tempo Session","Tempo Run","Sprint Session","Time Trial","Time Trail"]);
+const assetUrl = (t, fmt="svg") => `/static/assets/cairn/${fmt}/${ASSET_MAP[t]||"cairn"}.${fmt}`;
+const isStructured = t => STRUCTURED.has(t);
+
+// ─── Labels ─────────────────────────────────────────────────────────────────
+const STATUS_LBL = {planned:"Geplant",pushed:"Auf Garmin",completed:"Absolviert",error:"Fehler",pending:"Ausstehend",changed:"Geändert"};
+const PHASE_LBL  = {base:"Basis-Phase",build:"Aufbau-Phase",peak:"Peak-Phase",taper:"Tapering",race:"Rennen"};
+const PHASE_CLR  = {base:"#6b93a8",build:"#8a7fbb",peak:"#c47d5a",taper:"#7aaa88",race:"#c45a7a"};
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+const esc = s => s ? String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;") : "";
+const fmtKm  = km  => !km && km!==0 ? null : (km<10 ? km.toFixed(1)+" km" : Math.round(km)+" km");
+const fmtMin = min => {if(!min)return null; const h=Math.floor(min/60),m=min%60; return h?`${h}:${String(m).padStart(2,"0")} h`:`${m} min`};
+const fmtDate = s => {if(!s)return""; const d=new Date(s+"T00:00:00"); return d.toLocaleDateString("de-CH",{day:"numeric",month:"long",year:"numeric"})};
+const monOf = s => {const d=new Date(s+"T00:00:00"),diff=(d.getDay()+6)%7;d.setDate(d.getDate()-diff);return d.toISOString().slice(0,10)};
+
+// ─── Tab switching ────────────────────────────────────────────────────────────
+let activeTab = "woche";
+const loaded = {woche:false,plan:false,verlauf:false};
+document.querySelectorAll(".tabbtn").forEach(b=>{
+  b.addEventListener("click",()=>switchTab(b.dataset.tab));
+});
+function switchTab(tab){
+  activeTab=tab;
+  document.querySelectorAll(".tabbtn").forEach(b=>b.classList.toggle("on",b.dataset.tab===tab));
+  document.querySelectorAll(".panel").forEach(p=>p.classList.toggle("on",p.id===`p-${tab}`));
+  if(!loaded[tab]){
+    loaded[tab]=true;
+    if(tab==="woche")   fetchWoche();
+    if(tab==="plan")    fetchPlan();
+    if(tab==="verlauf") fetchVerlauf();
+  }
+}
+
+// ─── Structure profile ────────────────────────────────────────────────────────
+function renderStruct(steps){
+  if(!steps||!steps.length) return "";
+  const flat=[];
+  (function flatten(arr){
+    (arr||[]).forEach(s=>{
+      if(s.type==="repeat"&&s.steps){for(let i=0;i<(s.iterations||1);i++)flatten(s.steps);}
+      else flat.push(s);
+    });
+  })(steps);
+  if(!flat.length) return "";
+  const tot=flat.reduce((a,s)=>a+(s.duration_secs||60),0)||1;
+  const bars=flat.map(s=>{
+    const pct=((s.duration_secs||60)/tot*100).toFixed(2);
+    const cls={warmup:"sb-wu",interval:"sb-iv",recovery:"sb-rc",cooldown:"sb-cd",rest:"sb-rs"}[s.type]||"sb-xx";
+    return `<div class="sb ${cls}" style="flex:${pct}"></div>`;
+  }).join("");
+  return `<div class="struct">${bars}</div>`;
+}
+
+// ─── WOCHE ────────────────────────────────────────────────────────────────────
+async function fetchWoche(){
+  try{
+    const r=await fetch("/api/frontend/week"); const d=await r.json();
+    if(d.status!=="ok") throw new Error(d.message||"Fehler");
+    renderWoche(d);
+  }catch(e){
+    document.getElementById("woche-out").innerHTML=`<div class="err-box">Wochenplan konnte nicht geladen werden.<br><small>${esc(e.message)}</small></div>`;
+  }
+}
+function renderWoche(d){
+  const sessions=d.sessions||[];
+  if(!sessions.length){document.getElementById("woche-out").innerHTML=`<div class="empty">Keine Sessions geplant.</div>`;return;}
+  let html="", lastMon=null;
+  sessions.forEach(s=>{
+    const mon=monOf(s.date);
+    if(mon!==lastMon){
+      const todayMon=monOf(d.today);
+      const lbl=mon===todayMon?"Diese Woche":mon>todayMon?"Nächste Woche":"Letzte Woche";
+      html+=`<div class="week-divider">${lbl}</div>`;
+      lastMon=mon;
+    }
+    html+=buildCard(s);
+  });
+  document.getElementById("woche-out").innerHTML=html;
+}
+function buildCard(s){
+  const todayCls=s.is_today?" is-today":"";
+  const pastCls =s.is_past?" is-past":"";
+  const t=s.session_type||"";
+  const meta=[fmtKm(s.km),fmtMin(s.duration_min),s.session_zone||null].filter(Boolean).join('<span class="cmeta-dot"> · </span>');
+  const badge=`<span class="sbadge ${s.status||"planned"}">${STATUS_LBL[s.status]||"Geplant"}</span>`;
+  const actual=(s.status==="completed"&&(s.actual_km||s.actual_min))
+    ?`<div class="cactual">✓ ${[fmtKm(s.actual_km),fmtMin(s.actual_min)].filter(Boolean).join(" · ")}</div>`:"";
+  const notes=s.notes?`<div class="cnotes">${esc(s.notes.slice(0,140))}</div>`:"";
+  const struct=(isStructured(t)&&s.steps&&s.steps.length)?renderStruct(s.steps):"";
+  const dayAbr=(s.day_label||"").slice(0,2).toUpperCase();
+  return `
+<div class="scard${todayCls}${pastCls}" data-t="${esc(t)}">
+  <img class="casset" src="${assetUrl(t)}" alt="" loading="lazy" onerror="this.style.display='none'">
+  <div class="ci">
+    <div class="cdate"><span class="cnum">${s.day_number||""}</span><span class="cday">${dayAbr}</span></div>
+    <div class="cbody">
+      <div class="ctype">${esc(t)}</div>
+      ${meta?`<div class="cmeta">${meta}</div>`:""}
+      ${notes}${actual}
+      <div class="cbadge-row">${badge}</div>
+      ${struct}
+    </div>
+  </div>
+</div>`;
+}
+
+// ─── PLAN ─────────────────────────────────────────────────────────────────────
+async function fetchPlan(){
+  try{
+    const r=await fetch("/api/frontend/plan"); const d=await r.json();
+    if(d.status!=="ok") throw new Error(d.message||"Fehler");
+    renderPlan(d);
+  }catch(e){
+    document.getElementById("plan-out").innerHTML=`<div class="err-box">Plan konnte nicht geladen werden.<br><small>${esc(e.message)}</small></div>`;
+  }
+}
+function renderPlan(d){
+  if(!d.has_plan){document.getElementById("plan-out").innerHTML=`<div class="empty">Kein aktiver Plan gefunden.</div>`;return;}
+  const {race,block,weeks,milestones}=d;
+  let html="";
+  html+=raceCard(race);
+  html+=loadCurve(weeks,block);
+  html+=milestoneCard(milestones,race);
+  document.getElementById("plan-out").innerHTML=html;
+}
+function raceCard(r){
+  const cd=r.countdown_days;
+  const cdStr=cd==null?"":(cd===0?"Heute!":(cd===1?"Morgen!":`Noch ${cd} Tage`));
+  const meta=[r.distance_km?`${r.distance_km} km`:null,r.date?fmtDate(r.date):null].filter(Boolean);
+  return `<div class="card race-card">
+  <div class="sec-label">A-Rennen</div>
+  <div class="race-name">${esc(r.name||"Rennen")}</div>
+  ${meta.length?`<div class="race-meta">${meta.map(m=>`<span>${esc(m)}</span>`).join("")}</div>`:""}
+  ${cdStr?`<div class="race-cd">${cdStr}</div>`:""}
+</div>`;
+}
+function loadCurve(weeks,block){
+  if(!weeks||!weeks.length) return "";
+  const ph=block.phase||"build";
+  const phLabel=PHASE_LBL[ph]||ph;
+  const pill=`Woche ${block.current_week||"?"} / ${block.total_weeks||"?"}`;
+  const W=weeks.length, maxKm=Math.max(...weeks.map(w=>w.total_km),1);
+  const SW=280,SH=84,PL=4,PR=4,PT=6,PB=18;
+  const plotW=SW-PL-PR, plotH=SH-PT-PB;
+
+  const pts=weeks.map((w,i)=>[PL+(i/Math.max(W-1,1))*plotW, PT+(1-w.total_km/maxKm)*plotH]);
+  let pathD=`M${pts[0][0].toFixed(1)},${pts[0][1].toFixed(1)}`;
+  for(let i=1;i<pts.length;i++){
+    const [px,py]=pts[i-1],[cx,cy]=pts[i];
+    const cpx=(px+cx)/2;
+    pathD+=` C${cpx.toFixed(1)},${py.toFixed(1)} ${cpx.toFixed(1)},${cy.toFixed(1)} ${cx.toFixed(1)},${cy.toFixed(1)}`;
+  }
+  const lp=pts[pts.length-1],fp=pts[0];
+  const fill=pathD+` L${lp[0].toFixed(1)},${SH-PB} L${fp[0].toFixed(1)},${SH-PB} Z`;
+
+  const curIdx=weeks.findIndex(w=>w.is_current);
+  let marker="";
+  if(curIdx>=0){
+    const [mx,my]=pts[curIdx];
+    marker=`<line x1="${mx.toFixed(1)}" y1="${my.toFixed(1)}" x2="${mx.toFixed(1)}" y2="${SH-PB}" stroke="#7a5ab8" stroke-width="1.5" stroke-dasharray="3,2" opacity=".55"/>
+    <circle cx="${mx.toFixed(1)}" cy="${my.toFixed(1)}" r="4" fill="#7a5ab8" stroke="white" stroke-width="2"/>`;
+  }
+
+  // Deloads
+  const deloads=weeks.map((w,i)=>{
+    if(!w.is_deload)return"";
+    const[dx,dy]=pts[i];
+    return `<circle cx="${dx.toFixed(1)}" cy="${dy.toFixed(1)}" r="3.5" fill="none" stroke="#d9984a" stroke-width="1.5"/>`;
+  }).join("");
+
+  // Phase color strip
+  const phaseSegs=computePhaseSegs(weeks);
+  const stripH=phaseSegs.map(seg=>{
+    const x1=PL+(seg.si/Math.max(W-1,1))*plotW;
+    const x2=PL+(seg.ei/Math.max(W-1,1))*plotW;
+    return `<div class="ps-seg" style="flex:${(seg.ei-seg.si+1)};background:${PHASE_CLR[seg.ph]||"#aaa"}"></div>`;
+  }).join("");
+
+  return `<div class="card">
+  <div class="blk-hdr"><div class="blk-phase">${esc(phLabel)}</div><div class="blk-pill">${esc(pill)}</div></div>
+  <svg class="curve-svg" viewBox="0 0 ${SW} ${SH}" xmlns="http://www.w3.org/2000/svg">
+    <defs><linearGradient id="cg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#7a5ab8" stop-opacity=".22"/>
+      <stop offset="100%" stop-color="#7a5ab8" stop-opacity="0"/>
+    </linearGradient></defs>
+    <path d="${fill}" fill="url(#cg)"/>
+    <path d="${pathD}" fill="none" stroke="#7a5ab8" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    ${deloads}${marker}
+  </svg>
+  <div class="phase-strip">${stripH}</div>
+</div>`;
+}
+function computePhaseSegs(weeks){
+  const segs=[]; let cur=null;
+  weeks.forEach((w,i)=>{
+    const ph=w.phase||"base";
+    if(!cur||cur.ph!==ph){if(cur)segs.push(cur);cur={ph,si:i,ei:i};}
+    else cur.ei=i;
+  });
+  if(cur)segs.push(cur);
+  return segs;
+}
+function milestoneCard(ms,race){
+  if(!ms||!ms.length){
+    return `<div class="card"><div class="sec-label">Meilensteine</div><div class="empty" style="padding:16px 0">Noch keine Meilensteine definiert.</div></div>`;
+  }
+  let inner=`<div class="ms-timeline"><div class="ms-vline"></div>`;
+  ms.forEach((m,i)=>{
+    const dc=m.status==="achieved"?"achieved":m.is_next?"next":"";
+    const sl=m.status==="achieved"?"Geschafft":m.is_next?"Als Nächstes":"Offen";
+    const sc=m.status==="achieved"?"achieved":m.is_next?"next":"open";
+    const text=`<div class="ms-side">
+      <div class="ms-title">${esc(m.title)}</div>
+      ${m.criterion?`<div class="ms-crit">${esc(m.criterion)}</div>`:""}
+      <div class="ms-status ${sc}">${sl}</div>
+    </div>`;
+    const empty=`<div class="ms-side"></div>`;
+    inner+=`<div class="ms-item">
+      ${i%2===0?empty:text}
+      <div class="ms-dot-col"><div class="ms-dot ${dc}"></div></div>
+      ${i%2===0?text:empty}
+    </div>`;
+  });
+  if(race&&race.name){
+    inner+=`<div class="ms-raceday">
+      <div class="ms-raceday-dot"></div>
+      <div class="ms-raceday-label">Race Day</div>
+      <div class="ms-raceday-name">${esc(race.name)}</div>
+    </div>`;
+  }
+  inner+="</div>";
+  return `<div class="card"><div class="sec-label">Meilensteine</div>${inner}</div>`;
+}
+
+// ─── VERLAUF ──────────────────────────────────────────────────────────────────
+async function fetchVerlauf(){
+  try{
+    const r=await fetch("/api/frontend/sync"); const d=await r.json();
+    if(d.status!=="ok") throw new Error(d.message||"Fehler");
+    renderVerlauf(d);
+  }catch(e){
+    document.getElementById("verlauf-out").innerHTML=`<div class="err-box">Verlauf konnte nicht geladen werden.<br><small>${esc(e.message)}</small></div>`;
+  }
+}
+function renderVerlauf(d){
+  const{connections:c,activities,changes}=d;
+  let html="";
+
+  // Connections
+  const rows=[
+    {name:"CAIRN MCP",status:c.mcp?.status,label:c.mcp?.label},
+    {name:"Garmin",   status:c.garmin?.status,label:c.garmin?.label},
+    {name:"Datenbank",status:c.database?.status,label:c.database?.label},
+  ];
+  html+=`<div class="card"><div class="sec-label">Verbindungen</div>${
+    rows.map(r=>`<div class="conn-row">
+      <div class="cdot ${r.status||"unknown"}"></div>
+      <div class="cname">${esc(r.name)}</div>
+      <div class="cstat ${r.status||"unknown"}">${esc(r.label||r.status||"—")}</div>
+    </div>`).join("")
+  }</div>`;
+
+  // Activities
+  if(activities&&activities.length){
+    html+=`<div class="card"><div class="sec-label">Letzte Aktivitäten</div>${
+      activities.map(a=>`<div class="act-row">
+        <div class="act-ico"><img src="${assetUrl(a.session_type)}" alt="" loading="lazy" onerror="this.style.opacity=0"></div>
+        <div class="act-info">
+          <div class="act-title">${esc(a.title||a.session_type||"Training")}</div>
+          <div class="act-date">${esc(a.date_label||a.date)}</div>
+        </div>
+        <div class="act-stats">${[fmtKm(a.km),fmtMin(a.duration_min)].filter(Boolean).map(v=>`<div>${v}</div>`).join("")}</div>
+      </div>`).join("")
+    }</div>`;
+  }
+
+  // Changes
+  html+=`<div class="card"><div class="sec-label">Letzte Änderungen</div>${
+    changes&&changes.length
+    ? changes.map(ch=>`<div class="chg-row">
+        <div class="chg-dot ${ch.status||""}"></div>
+        <div class="chg-body">
+          <div class="chg-name">${esc(ch.workout_name||"Workout")}</div>
+          <div class="chg-desc">${esc(ch.description||ch.status_label||"")}</div>
+        </div>
+        <div class="chg-when">${esc(ch.when||"")}</div>
+      </div>`).join("")
+    :`<div class="empty" style="padding:12px 0">Noch keine Änderungen.</div>`
+  }</div>`;
+
+  document.getElementById("verlauf-out").innerHTML=html;
+}
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+loaded.woche=true;
+fetchWoche();
+</script>
+</body>
+</html>

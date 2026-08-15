@@ -22,7 +22,6 @@ try:
     from mcp.server import MCPServer as FastMCP  # mcp 2.0+
 except ImportError:
     from mcp.server import FastMCP  # type: ignore[assignment]  # mcp 1.x
-from mcp.server.transport_security import TransportSecuritySettings
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
@@ -119,16 +118,14 @@ def get_athlete_profile() -> dict:
 @mcp.tool()
 def get_recent_activities(days: int = 28) -> list[dict]:
     """
-    Return recent activities from the last N days (default 28).
-    Includes type, distance, duration, and average heart rate. The trainings
-    table has no elevation/pace/training-load columns — elevation, if known,
-    is embedded as free text in notes (e.g. "... | +320m"), not queryable
-    as a number.
+    Return recent Garmin activities from the last N days (default 28).
+    Includes distance, duration, heart rate.
     """
     return _fetchall(
         """
-        SELECT id, date, type, duration_minutes, distance_km,
-               heart_rate_avg, notes, garmin_id
+        SELECT id, date, type, notes,
+               distance_km, duration_minutes,
+               heart_rate_avg, garmin_id
         FROM trainings
         WHERE date >= CURRENT_DATE - (INTERVAL '1 day' * %s)
         ORDER BY date DESC
@@ -141,17 +138,17 @@ def get_recent_activities(days: int = 28) -> list[dict]:
 def get_training_summary(weeks: int = 4) -> dict:
     """
     Return weekly training volume for the last N weeks (default 4).
-    Shows session count, total km, total duration, and average heart rate
-    per week. No elevation column exists in trainings (see get_recent_activities).
+    Shows total km, duration, elevation gain, and average heart rate per week.
     """
     rows = _fetchall(
         """
         SELECT
-            date_trunc('week', date)::date          AS week_start,
+            date_trunc('week', date)::date           AS week_start,
             COUNT(*)                                 AS sessions,
             ROUND(SUM(distance_km)::numeric, 2)     AS total_km,
-            SUM(duration_minutes)                   AS total_duration_min,
-            ROUND(AVG(heart_rate_avg)::numeric, 1)   AS avg_hr
+            SUM(duration_secs)                      AS total_secs,
+            ROUND(AVG(avg_hr)::numeric, 1)           AS avg_hr,
+            SUM(elevation_gain_m)                   AS total_elevation_m
         FROM trainings
         WHERE date >= CURRENT_DATE - (INTERVAL '1 week' * %s)
         GROUP BY week_start
@@ -209,10 +206,9 @@ def get_races_and_goals() -> dict:
         LIMIT 5
         """
     )
-    # athlete_profile has no goal/current_fitness_level/weekly_volume_km columns —
-    # long_term_goals is the only goal-related field that actually exists.
     profile = _fetchone(
-        "SELECT long_term_goals FROM athlete_profile ORDER BY id DESC LIMIT 1"
+        "SELECT goal, current_fitness_level, weekly_volume_km "
+        "FROM athlete_profile ORDER BY id DESC LIMIT 1"
     )
     return {"plans": plans, "profile_goals": profile}
 
@@ -223,20 +219,16 @@ def get_planned_workouts(days: int = 14) -> list[dict]:
     Return planned training sessions for the next N days (default 14).
     Includes session type, distance, target zone, structure, and Garmin workout ID if already pushed.
     """
-    # training_plan has no direct date column — a session's calendar date is
-    # week_date (the Monday of that week) + day_of_week (1=Mon..7=Sun), and
-    # session_zone (not "zone") holds the target zone.
     return _fetchall(
         """
         SELECT id,
                (week_date + (day_of_week - 1) * INTERVAL '1 day')::date AS session_date,
-               session_type, distance_km, duration_min, notes,
-               session_zone AS zone, warmup_km, main_sets, main_pace,
-               elevation_gain_m, garmin_workout_id
+               session_type, session_zone, distance_km, duration_min,
+               notes, phase, garmin_workout_id, workout_steps, plan_week
         FROM training_plan
         WHERE (week_date + (day_of_week - 1) * INTERVAL '1 day')::date
               BETWEEN CURRENT_DATE AND CURRENT_DATE + (INTERVAL '1 day' * %s)
-        ORDER BY week_date ASC, day_of_week ASC
+        ORDER BY session_date ASC
         """,
         (days,),
     )
@@ -418,9 +410,7 @@ def move_garmin_workout(
     client = garmin_client()
     if old_schedule_id is not None:
         try:
-            # garminconnect 0.3.6 has no delete_workout_schedule() method —
-            # the actual API is unschedule_workout(scheduled_workout_id).
-            client.unschedule_workout(old_schedule_id)
+            client.delete_workout_schedule(old_schedule_id)
             logger.info("Deleted old Garmin schedule_id=%s", old_schedule_id)
         except Exception as exc:
             logger.warning(
@@ -454,46 +444,13 @@ def delete_garmin_workout(garmin_workout_id: int) -> dict:
 
 def create_mcp_asgi_app() -> ASGIApp:
     """
-    Return the MCPServer ASGI app — UNAUTHENTICATED.
-
-    KNOWN, TEMPORARY SECURITY TRADE-OFF (2026-08-14, per Alexander):
-    BearerAuthMiddleware is defined above but intentionally NOT applied here.
-    ChatGPT's custom-connector setup rejected our Bearer-token auth ("Fehler
-    beim Erstellen des Konnektors"), so auth was removed to unblock the
-    ChatGPT connector. This means /mcp is reachable by ANYONE who has the
-    URL, with no authentication at all — including create_garmin_workout /
-    move_garmin_workout / delete_garmin_workout (real writes/deletes on
-    Garmin Connect) and every read tool (full training + health history).
-    "URL not publicly advertised" is NOT a real control — Railway subdomains
-    are enumerable and the URL now lives in the ChatGPT connector config.
-    Durable fix: implement proper OAuth (the mcp SDK already exposes
-    AuthSettings/token_verifier/auth_server_provider for this — see
-    MCPServer.__init__), which ChatGPT connectors do support, instead of
-    leaving this endpoint open indefinitely.
+    Return the MCPServer ASGI app wrapped in BearerAuthMiddleware.
 
     The inner app handles POST /mcp (Streamable HTTP transport).
+    BearerAuthMiddleware is applied directly — no Starlette Mount wrapper —
+    so the full path (/mcp) reaches the inner app unchanged.
 
-    transport_security: streamable_http_app() auto-enables DNS-rebinding
-    protection with allowed_hosts=["127.0.0.1:*", ...] whenever no `host=`
-    is passed (its internal default is host="127.0.0.1"). That rejects any
-    real deployment host with "Invalid Host header". We pass an explicit
-    TransportSecuritySettings instead — protection stays ON, but the actual
-    public host (env var, falls back to the known Railway host) is allowed
-    too. Never disable enable_dns_rebinding_protection outright — that would
-    remove the protection entirely rather than fixing the allow-list.
-
-    Requires: mcp>=1.0. MCP_API_KEY is no longer read here (BearerAuthMiddleware
-    is not applied) — see the security trade-off note above.
+    Requires: mcp>=1.0, MCP_API_KEY env var set.
     """
-    public_host = os.getenv("MCP_PUBLIC_HOST", "web-production-297f2.up.railway.app")
-    transport_security = TransportSecuritySettings(
-        enable_dns_rebinding_protection=True,
-        allowed_hosts=[public_host, "127.0.0.1:*", "localhost:*", "[::1]:*"],
-        allowed_origins=[
-            f"https://{public_host}",
-            "http://127.0.0.1:*",
-            "http://localhost:*",
-            "http://[::1]:*",
-        ],
-    )
-    return mcp.streamable_http_app(transport_security=transport_security)
+    inner = mcp.streamable_http_app()
+    return BearerAuthMiddleware(inner)
