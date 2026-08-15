@@ -35,6 +35,7 @@ from coach.garmin_push import (
     push_workout,
     schedule_workout,
 )
+from coach.session_routing import classify_for_push, split_training_block
 from database.connection import get_connection
 
 logger = logging.getLogger(__name__)
@@ -301,8 +302,9 @@ def preview_garmin_workout(workout_def: dict, sport: str = "running") -> dict:
     Validate a workout definition and return a parsed preview — zero network calls.
     Always call this before create_garmin_workout to confirm structure.
 
-    sport: "running" | "cycling" | "strength". Strength has no dedicated Garmin
-    workout type — it is pushed via the generic upload_workout() endpoint.
+    sport: "running" | "cycling" only. Strength Training must NEVER be pushed to
+    Garmin (Hevy is the sole source for strength) — this is hard-rejected in
+    coach/garmin_push.py, both by sport value and by workout_def['session_type'].
 
     workout_def shape:
     {
@@ -372,9 +374,8 @@ def create_garmin_workout(
         date_str:     Target date in YYYY-MM-DD format.
         external_id:  Unique caller ID, e.g. "plan_session_42_2026-08-15".
                       Use the training_plan row ID + date for natural idempotency.
-        sport:        "running" | "cycling" | "strength". Strength uses Garmin's
-                      generic calendar-entry upload (no dedicated strength workout
-                      type exists in the API).
+        sport:        "running" | "cycling" only. Strength Training must never
+                      reach Garmin — Hevy is the sole source for strength training.
     Returns:
         garmin_workout_id, garmin_schedule_id, workout_name, scheduled_date
     """
@@ -829,14 +830,28 @@ def preview_training_block(plan: dict) -> dict:
         else:
             unchanged_count += 1
 
+        routing = classify_for_push(s.get("session_type", ""), s.get("sport_hint"))
         sessions_preview.append({
             "external_id": ext_id, "date": s.get("date"), "session_type": s.get("session_type"),
             "action": action, "existing_training_plan_id": existing["id"] if existing else None,
+            "target": routing["target"], "garmin_sport": routing["garmin_sport"],
         })
+
+        if routing["target"] == "hevy" and s.get("hevy_routine_key"):
+            match = _fetchone("SELECT 1 AS ok FROM cairn_routines WHERE title = %s", (s["hevy_routine_key"],))
+            if not match:
+                warnings.append(
+                    f"Session {ext_id!r}: hevy_routine_key {s['hevy_routine_key']!r} "
+                    f"nicht in cairn_routines gefunden."
+                )
+
+    routing_split = split_training_block(sessions)
+    routing_summary = {k: len(v) for k, v in routing_split.items()}
 
     return {
         "valid": len(conflicts) == 0,
         "summary": {"create": create_count, "update": update_count, "unchanged": unchanged_count, "total": len(sessions)},
+        "routing_summary": routing_summary,
         "race_date_change": race_date_change,
         "conflicts": conflicts,
         "warnings": warnings,
@@ -925,24 +940,53 @@ def upsert_training_block(plan: dict, confirm_race_date_change: bool = False) ->
                 plan_id = cur.fetchone()[0]
 
             created = updated = 0
+            routing_warnings: list[str] = []
+            routing_summary = {"garmin": 0, "hevy": 0, "none": 0}
             for s in sessions:
                 session_date = datetime.date.fromisoformat(s["date"])
                 week_date, day_of_week = _week_date_and_dow(session_date)
+
+                # Zentrale Klassifizierung — einzige Stelle, die ueber Garmin-
+                # Zustaendigkeit entscheidet. Kraft/Mobility/Core/Rest Day
+                # bekommen hier garmin_push_required=False und werden von
+                # KEINEM Code-Pfad automatisch an Garmin geschickt.
+                routing = classify_for_push(s["session_type"], s.get("sport_hint"))
+                routing_summary[routing["target"]] += 1
+
+                hevy_routine_key = s.get("hevy_routine_key") if routing["target"] == "hevy" else None
+                if hevy_routine_key:
+                    cur.execute("SELECT 1 FROM cairn_routines WHERE title = %s", (hevy_routine_key,))
+                    if not cur.fetchone():
+                        routing_warnings.append(
+                            f"Session {s['external_id']!r}: hevy_routine_key {hevy_routine_key!r} "
+                            f"nicht in cairn_routines gefunden — Referenz wird trotzdem gespeichert, "
+                            f"aber ohne bestaetigte Hevy-Routine (nichts erfunden)."
+                        )
+
+                # status wird bei INSERT gesetzt, aber bei ON CONFLICT bewusst NICHT
+                # überschrieben — ein erneutes upsert_training_block darf einen bereits
+                # von sync_hevy_completions auf 'completed' gesetzten Status nicht
+                # stillschweigend auf 'planned' zurücksetzen.
                 cur.execute(
                     """INSERT INTO training_plan
                            (external_id, week_date, day_of_week, session_type, session_zone,
-                            distance_km, duration_min, notes, plan_id)
-                       VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                            distance_km, duration_min, notes, plan_id,
+                            status, source, garmin_push_required, hevy_routine_key)
+                       VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                        ON CONFLICT (external_id) DO UPDATE SET
                            week_date=EXCLUDED.week_date, day_of_week=EXCLUDED.day_of_week,
                            session_type=EXCLUDED.session_type, session_zone=EXCLUDED.session_zone,
                            distance_km=EXCLUDED.distance_km, duration_min=EXCLUDED.duration_min,
-                           notes=EXCLUDED.notes, plan_id=EXCLUDED.plan_id, updated_at=now()
+                           notes=EXCLUDED.notes, plan_id=EXCLUDED.plan_id,
+                           source=EXCLUDED.source, garmin_push_required=EXCLUDED.garmin_push_required,
+                           hevy_routine_key=EXCLUDED.hevy_routine_key, updated_at=now()
                        RETURNING (xmax = 0) AS inserted""",
                     (
                         s["external_id"], week_date, day_of_week, s["session_type"],
                         s.get("session_zone"), s.get("distance_km"), s.get("duration_min"),
                         s.get("notes"), plan_id,
+                        s.get("status", "planned"), routing["source"],
+                        routing["garmin_push_required"], hevy_routine_key,
                     ),
                 )
                 inserted = cur.fetchone()[0]
@@ -953,12 +997,14 @@ def upsert_training_block(plan: dict, confirm_race_date_change: bool = False) ->
 
         conn.commit()
         logger.info(
-            "upsert_training_block committed: plan_id=%s created=%s updated=%s race_date_changed=%s",
-            plan_id, created, updated, race_date_changed,
+            "upsert_training_block committed: plan_id=%s created=%s updated=%s race_date_changed=%s routing=%s",
+            plan_id, created, updated, race_date_changed, routing_summary,
         )
         return {
             "plan_id": plan_id, "created": created, "updated": updated,
             "race_date_changed": race_date_changed,
+            "routing_summary": routing_summary,
+            "warnings": routing_warnings,
         }
     except Exception:
         conn.rollback()
@@ -1016,6 +1062,112 @@ def upsert_milestones(milestones: list) -> dict:
         conn.commit()
         logger.info("upsert_milestones committed: created=%s updated=%s", created, updated)
         return {"created": created, "updated": updated}
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+@mcp.tool()
+def sync_hevy_completions(days: int = 14) -> dict:
+    """
+    Match completed Hevy workouts (trainings.hevy_id IS NOT NULL) to planned
+    Strength Training sessions in training_plan, over the last N days.
+
+    Matching preference (per architecture doc):
+    1. Routine reference: training_plan.hevy_routine_key matches the Hevy
+       workout's title (trainings.notes, set by data/hevy_sync.py).
+    2. Fallback: same calendar date, session not yet matched.
+
+    Idempotent: only considers training_plan rows with status='planned' AND
+    matched_training_id IS NULL, and only trainings not already referenced by
+    another training_plan.matched_training_id — repeated calls never create
+    duplicate matches or double-link the same Hevy workout.
+
+    A failure matching one session does not abort the rest (isolated per-row
+    try/except) — this must never block Garmin sync, which is a separate tool.
+
+    Returns: {matched: int, unmatched_sessions: [...], warnings: [...]}
+    """
+    conn = get_connection()
+    try:
+        matched = 0
+        warnings: list[str] = []
+        unmatched: list[dict] = []
+
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT id, external_id, hevy_routine_key,
+                       (week_date + (day_of_week - 1) * INTERVAL '1 day')::date AS session_date
+                FROM training_plan
+                WHERE session_type IN ('Strength Training', 'Krafttraining')
+                  AND status = 'planned'
+                  AND matched_training_id IS NULL
+                  AND (week_date + (day_of_week - 1) * INTERVAL '1 day')::date
+                      >= CURRENT_DATE - (INTERVAL '1 day' * %s)
+                ORDER BY session_date
+                """,
+                (days,),
+            )
+            planned_sessions = cur.fetchall()
+
+            for tp_id, ext_id, routine_key, session_date in planned_sessions:
+                try:
+                    hevy_row = None
+                    if routine_key:
+                        cur.execute(
+                            """
+                            SELECT id FROM trainings
+                            WHERE hevy_id IS NOT NULL AND date = %s AND notes = %s
+                              AND id NOT IN (
+                                  SELECT matched_training_id FROM training_plan
+                                  WHERE matched_training_id IS NOT NULL
+                              )
+                            LIMIT 1
+                            """,
+                            (session_date, routine_key),
+                        )
+                        hevy_row = cur.fetchone()
+
+                    if not hevy_row:
+                        cur.execute(
+                            """
+                            SELECT id FROM trainings
+                            WHERE hevy_id IS NOT NULL AND date = %s
+                              AND id NOT IN (
+                                  SELECT matched_training_id FROM training_plan
+                                  WHERE matched_training_id IS NOT NULL
+                              )
+                            LIMIT 1
+                            """,
+                            (session_date,),
+                        )
+                        hevy_row = cur.fetchone()
+
+                    if hevy_row:
+                        cur.execute(
+                            "UPDATE training_plan SET status='completed', matched_training_id=%s WHERE id=%s",
+                            (hevy_row[0], tp_id),
+                        )
+                        matched += 1
+                        logger.info(
+                            "sync_hevy_completions matched: training_plan_id=%s -> training_id=%s",
+                            tp_id, hevy_row[0],
+                        )
+                    else:
+                        unmatched.append({
+                            "training_plan_id": tp_id, "external_id": ext_id,
+                            "date": str(session_date), "hevy_routine_key": routine_key,
+                        })
+                except Exception as exc:
+                    warnings.append(f"Session {ext_id!r} (id={tp_id}): Matching-Fehler — {type(exc).__name__}: {exc}")
+                    continue
+
+        conn.commit()
+        logger.info("sync_hevy_completions committed: matched=%s unmatched=%s", matched, len(unmatched))
+        return {"matched": matched, "unmatched_sessions": unmatched, "warnings": warnings}
     except Exception:
         conn.rollback()
         raise

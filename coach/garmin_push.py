@@ -8,7 +8,7 @@ import os
 from typing import Any
 from garminconnect import Garmin
 from garminconnect.workout import (
-    BaseWorkout, ConditionType, CyclingWorkout, ExecutableStep, RunningWorkout,
+    ConditionType, CyclingWorkout, ExecutableStep, RunningWorkout,
     StepType, TargetType, WorkoutSegment, create_repeat_group,
 )
 
@@ -44,15 +44,35 @@ _TIME_END_CONDITION: dict[str, Any] = {
     "displayable": True,
 }
 # Sport-Type-Dicts exakt aus garminconnect.workout.SportType (installiertes Paket,
-# /workout-service/workout/types) übernommen. FitnessEquipmentWorkout wurde bewusst
-# NICHT verwendet — sein Pydantic-Default ist sportTypeId=6 "cardio_training", nicht
-# Strength Training (sportTypeId=5) — der Klassenname ist irreführend.
+# /workout-service/workout/types) übernommen.
+#
+# ARCHITEKTURENTSCHEIDUNG (2026-08-15, per Alexander): Strength Training darf
+# NIEMALS an Garmin gesendet werden — Hevy ist die alleinige Quelle für
+# Krafttraining, CAIRN speichert geplante Krafteinheiten nur lokal. Eine
+# vorherige Session-Iteration hatte "strength" hier als drittes sport-Sport
+# ergänzt (BaseWorkout + generisches upload_workout()) — das wurde bewusst
+# wieder entfernt. Dieses Modul unterstützt jetzt ausschließlich running/cycling.
 _SPORT_TYPES: dict[str, dict[str, Any]] = {
     "running":  {"sportTypeId": 1, "sportTypeKey": "running", "displayOrder": 1},
     "cycling":  {"sportTypeId": 2, "sportTypeKey": "cycling", "displayOrder": 2},
-    "strength": {"sportTypeId": 5, "sportTypeKey": "strength_training", "displayOrder": 5},
 }
 _SPORT_TYPE_RUNNING = _SPORT_TYPES["running"]  # bestehender Name, für Rückwärtskompatibilität
+
+# Defense in depth: auch wenn 'sport' korrekt "running"/"cycling" ist, blockt
+# dieser Guard zusätzlich anhand eines mitgegebenen session_type-Felds — falls
+# ein Aufrufer versehentlich eine Kraft-Session mit sport="running" schickt.
+_NEVER_GARMIN_SESSION_TYPES = frozenset({
+    "Strength Training", "Krafttraining", "Mobility", "Core", "Rest Day",
+})
+
+
+def _reject_if_never_garmin_session(workout_def: dict[str, Any]) -> None:
+    session_type = workout_def.get("session_type")
+    if session_type in _NEVER_GARMIN_SESSION_TYPES:
+        raise GarminWorkoutValidationError(
+            f"session_type {session_type!r} darf niemals an Garmin gesendet werden "
+            f"(Strength/Mobility/Core/Rest Day sind Garmin-Push ausgeschlossen)."
+        )
 
 def garmin_client() -> Garmin:
     email = os.getenv("GARMIN_EMAIL")
@@ -132,25 +152,20 @@ def _build_steps(steps_def: list[dict[str, Any]]) -> list:
 _WORKOUT_CLASS_BY_SPORT: dict[str, type] = {
     "running": RunningWorkout,
     "cycling": CyclingWorkout,
-    # Kein dedizierter Strength-Typ in garminconnect.workout — BaseWorkout mit
-    # explizitem sportType-Override (siehe _SPORT_TYPES["strength"]) statt des
-    # irreführenden FitnessEquipmentWorkout-Defaults (cardio_training).
-    "strength": BaseWorkout,
 }
 
 _UPLOAD_METHOD_BY_SPORT: dict[str, str] = {
     "running": "upload_running_workout",
     "cycling": "upload_cycling_workout",
-    # Kein upload_strength_workout()/upload_fitness_equipment_workout() in
-    # garminconnect==0.3.6 — generischer Fallback laut Aufgabenstellung.
-    "strength": "upload_workout",
 }
 
-def build_workout_payload(workout_def: dict[str, Any], sport: str = "running") -> BaseWorkout:
+def build_workout_payload(workout_def: dict[str, Any], sport: str = "running") -> RunningWorkout | CyclingWorkout:
     if sport not in _SPORT_TYPES:
         raise GarminWorkoutValidationError(
-            f"Unsupported sport: {sport!r}. Supported: {sorted(_SPORT_TYPES)}"
+            f"Unsupported sport: {sport!r}. Supported: {sorted(_SPORT_TYPES)}. "
+            f"Strength training is intentionally not supported here — it must never reach Garmin."
         )
+    _reject_if_never_garmin_session(workout_def)
     name = str(workout_def.get("name", "")).strip()
     if not name:
         raise GarminWorkoutValidationError("workout_def requires a non-empty 'name'")
@@ -174,27 +189,19 @@ def build_workout_payload(workout_def: dict[str, Any], sport: str = "running") -
     sport_type_dict = _SPORT_TYPES[sport]
     segment = WorkoutSegment(segmentOrder=1, sportType=sport_type_dict, workoutSteps=steps)
     workout_cls = _WORKOUT_CLASS_BY_SPORT[sport]
-    kwargs: dict[str, Any] = dict(
+    return workout_cls(
         workoutName=name,
         estimatedDurationInSecs=int(duration),
         description=workout_def.get("description"),
         workoutSegments=[segment],
     )
-    if workout_cls is BaseWorkout:
-        kwargs["sportType"] = sport_type_dict
-    return workout_cls(**kwargs)
 
 def create_workout(workout_def: dict[str, Any], *, sport: str = "running", client: Garmin | None = None) -> dict[str, Any]:
     payload = build_workout_payload(workout_def, sport=sport)
     _client = client or garmin_client()
-    upload_method_name = _UPLOAD_METHOD_BY_SPORT.get(sport, "upload_workout")
-    upload_method = getattr(_client, upload_method_name)
+    upload_method = getattr(_client, _UPLOAD_METHOD_BY_SPORT[sport])
     try:
-        if upload_method_name == "upload_workout":
-            # Generischer Fallback erwartet workout_json (dict), kein Pydantic-Objekt.
-            result = upload_method(payload.to_dict())
-        else:
-            result = upload_method(payload)
+        result = upload_method(payload)
     except GarminPushError:
         raise
     except Exception as exc:
