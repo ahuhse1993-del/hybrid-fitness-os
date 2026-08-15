@@ -494,10 +494,35 @@ def move_garmin_workout(
     return schedule_workout(garmin_workout_id, new_date_str, client=client)
 
 
+def _clear_training_plan_sync_state(conn, garmin_workout_id: int) -> int:
+    """
+    Räumt training_plan nach einer erfolgreichen Garmin-Löschung auf.
+    training_plan hat keine garmin_schedule_id-Spalte (nur garmin_workout_id
+    VARCHAR(100) — Schedule-IDs leben ausschließlich in garmin_mcp_log), daher
+    nicht Teil dieses UPDATEs. garmin_workout_id wird als str verglichen,
+    passend zum tatsächlichen Spaltentyp.
+    """
+    with conn.cursor() as cur:
+        cur.execute(
+            """UPDATE training_plan
+               SET garmin_workout_id = NULL,
+                   sync_status = NULL,
+                   sync_error = NULL,
+                   content_hash = NULL,
+                   last_synced_at = NULL
+               WHERE garmin_workout_id = %s""",
+            (str(garmin_workout_id),),
+        )
+        return cur.rowcount
+
+
 @mcp.tool()
 def delete_garmin_workout(garmin_workout_id: int) -> dict:
     """
     Delete a workout from Garmin Connect (removes the workout definition and all schedule entries).
+    Also clears the matching training_plan row's sync state (garmin_workout_id,
+    sync_status, sync_error, content_hash, last_synced_at), so a later
+    push_sessions_to_garmin treats it as never-pushed rather than stale-synced.
 
     Args:
         garmin_workout_id: Garmin workout ID to delete (from create_garmin_workout or garmin_mcp_log).
@@ -510,7 +535,52 @@ def delete_garmin_workout(garmin_workout_id: int) -> dict:
         raise RuntimeError(
             f"Failed to delete Garmin workout {garmin_workout_id}: {type(exc).__name__}"
         ) from exc
-    return {"deleted": True, "garmin_workout_id": garmin_workout_id}
+
+    conn = get_connection()
+    try:
+        db_rows_cleared = _clear_training_plan_sync_state(conn, garmin_workout_id)
+        conn.commit()
+    finally:
+        conn.close()
+
+    return {"deleted": True, "garmin_workout_id": garmin_workout_id, "db_rows_cleared": db_rows_cleared}
+
+
+@mcp.tool()
+def bulk_delete_garmin_workouts(garmin_workout_ids: list[int]) -> dict:
+    """
+    Delete multiple Garmin workouts in one call — a single Garmin login for
+    the whole batch, isolated try/except per ID (one failure never blocks
+    the rest). Clears each deleted workout's training_plan sync state, same
+    as delete_garmin_workout.
+
+    Args:
+        garmin_workout_ids: Garmin workout IDs to delete.
+    Returns:
+        {deleted: [ids...], failed: [{garmin_workout_id, error}...], db_rows_cleared: int}
+    """
+    client = garmin_client()
+    conn = get_connection()
+    deleted: list[int] = []
+    failed: list[dict] = []
+    db_rows_cleared = 0
+
+    try:
+        for gw_id in garmin_workout_ids:
+            try:
+                client.delete_workout(gw_id)
+                logger.info("Deleted Garmin workout_id=%s", gw_id)
+                db_rows_cleared += _clear_training_plan_sync_state(conn, gw_id)
+                conn.commit()
+                deleted.append(gw_id)
+            except Exception as exc:
+                conn.rollback()
+                logger.error("Failed to delete Garmin workout_id=%s: %s", gw_id, exc)
+                failed.append({"garmin_workout_id": gw_id, "error": f"{type(exc).__name__}: {exc}"})
+    finally:
+        conn.close()
+
+    return {"deleted": deleted, "failed": failed, "db_rows_cleared": db_rows_cleared}
 
 
 @mcp.tool()
