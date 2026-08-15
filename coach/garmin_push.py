@@ -8,7 +8,7 @@ import os
 from typing import Any
 from garminconnect import Garmin
 from garminconnect.workout import (
-    ConditionType, ExecutableStep, RunningWorkout,
+    BaseWorkout, ConditionType, CyclingWorkout, ExecutableStep, RunningWorkout,
     StepType, TargetType, WorkoutSegment, create_repeat_group,
 )
 
@@ -43,9 +43,16 @@ _TIME_END_CONDITION: dict[str, Any] = {
     "displayOrder": 2,
     "displayable": True,
 }
-_SPORT_TYPE_RUNNING: dict[str, Any] = {
-    "sportTypeId": 1, "sportTypeKey": "running", "displayOrder": 1,
+# Sport-Type-Dicts exakt aus garminconnect.workout.SportType (installiertes Paket,
+# /workout-service/workout/types) übernommen. FitnessEquipmentWorkout wurde bewusst
+# NICHT verwendet — sein Pydantic-Default ist sportTypeId=6 "cardio_training", nicht
+# Strength Training (sportTypeId=5) — der Klassenname ist irreführend.
+_SPORT_TYPES: dict[str, dict[str, Any]] = {
+    "running":  {"sportTypeId": 1, "sportTypeKey": "running", "displayOrder": 1},
+    "cycling":  {"sportTypeId": 2, "sportTypeKey": "cycling", "displayOrder": 2},
+    "strength": {"sportTypeId": 5, "sportTypeKey": "strength_training", "displayOrder": 5},
 }
+_SPORT_TYPE_RUNNING = _SPORT_TYPES["running"]  # bestehender Name, für Rückwärtskompatibilität
 
 def garmin_client() -> Garmin:
     email = os.getenv("GARMIN_EMAIL")
@@ -122,10 +129,36 @@ def _build_steps(steps_def: list[dict[str, Any]]) -> list:
             result.append(_build_executable_step(step_def, i))
     return result
 
-def build_workout_payload(workout_def: dict[str, Any]) -> RunningWorkout:
+_WORKOUT_CLASS_BY_SPORT: dict[str, type] = {
+    "running": RunningWorkout,
+    "cycling": CyclingWorkout,
+    # Kein dedizierter Strength-Typ in garminconnect.workout — BaseWorkout mit
+    # explizitem sportType-Override (siehe _SPORT_TYPES["strength"]) statt des
+    # irreführenden FitnessEquipmentWorkout-Defaults (cardio_training).
+    "strength": BaseWorkout,
+}
+
+_UPLOAD_METHOD_BY_SPORT: dict[str, str] = {
+    "running": "upload_running_workout",
+    "cycling": "upload_cycling_workout",
+    # Kein upload_strength_workout()/upload_fitness_equipment_workout() in
+    # garminconnect==0.3.6 — generischer Fallback laut Aufgabenstellung.
+    "strength": "upload_workout",
+}
+
+def build_workout_payload(workout_def: dict[str, Any], sport: str = "running") -> BaseWorkout:
+    if sport not in _SPORT_TYPES:
+        raise GarminWorkoutValidationError(
+            f"Unsupported sport: {sport!r}. Supported: {sorted(_SPORT_TYPES)}"
+        )
     name = str(workout_def.get("name", "")).strip()
     if not name:
         raise GarminWorkoutValidationError("workout_def requires a non-empty 'name'")
+    if workout_def.get("optional"):
+        # Optionale Einheiten eindeutig markieren (Punkt 5) — sichtbar im
+        # Workout-Namen auf dem Geraet/in Garmin Connect, kein separates Feld
+        # im Garmin-Workout-Schema dafuer vorhanden.
+        name = f"(optional) {name}"
     duration = workout_def.get("estimated_duration_secs")
     try:
         duration = float(duration)
@@ -138,19 +171,30 @@ def build_workout_payload(workout_def: dict[str, Any]) -> RunningWorkout:
     if not steps_def:
         raise GarminWorkoutValidationError("workout_def requires at least one step")
     steps = _build_steps(steps_def)
-    segment = WorkoutSegment(segmentOrder=1, sportType=_SPORT_TYPE_RUNNING, workoutSteps=steps)
-    return RunningWorkout(
+    sport_type_dict = _SPORT_TYPES[sport]
+    segment = WorkoutSegment(segmentOrder=1, sportType=sport_type_dict, workoutSteps=steps)
+    workout_cls = _WORKOUT_CLASS_BY_SPORT[sport]
+    kwargs: dict[str, Any] = dict(
         workoutName=name,
         estimatedDurationInSecs=int(duration),
         description=workout_def.get("description"),
         workoutSegments=[segment],
     )
+    if workout_cls is BaseWorkout:
+        kwargs["sportType"] = sport_type_dict
+    return workout_cls(**kwargs)
 
-def create_workout(workout_def: dict[str, Any], *, client: Garmin | None = None) -> dict[str, Any]:
-    payload = build_workout_payload(workout_def)
+def create_workout(workout_def: dict[str, Any], *, sport: str = "running", client: Garmin | None = None) -> dict[str, Any]:
+    payload = build_workout_payload(workout_def, sport=sport)
     _client = client or garmin_client()
+    upload_method_name = _UPLOAD_METHOD_BY_SPORT.get(sport, "upload_workout")
+    upload_method = getattr(_client, upload_method_name)
     try:
-        result = _client.upload_running_workout(payload)
+        if upload_method_name == "upload_workout":
+            # Generischer Fallback erwartet workout_json (dict), kein Pydantic-Objekt.
+            result = upload_method(payload.to_dict())
+        else:
+            result = upload_method(payload)
     except GarminPushError:
         raise
     except Exception as exc:
@@ -158,7 +202,7 @@ def create_workout(workout_def: dict[str, Any], *, client: Garmin | None = None)
     workout_id = result.get("workoutId")
     if not workout_id:
         raise GarminWorkoutCreateError("Garmin response is missing 'workoutId'")
-    logger.info("Garmin workout created: id=%s name=%r", workout_id, workout_def.get("name"))
+    logger.info("Garmin workout created: id=%s name=%r sport=%s", workout_id, workout_def.get("name"), sport)
     return {"garmin_workout_id": int(workout_id), "workout_name": result.get("workoutName")}
 
 def schedule_workout(garmin_workout_id: int, date_str: str, *, client: Garmin | None = None) -> dict[str, Any]:
@@ -180,8 +224,8 @@ def schedule_workout(garmin_workout_id: int, date_str: str, *, client: Garmin | 
                 garmin_workout_id, schedule_id, date_str)
     return {"garmin_schedule_id": int(schedule_id), "scheduled_date": date_str}
 
-def push_workout(workout_def: dict[str, Any], date_str: str) -> dict[str, Any]:
+def push_workout(workout_def: dict[str, Any], date_str: str, *, sport: str = "running") -> dict[str, Any]:
     client = garmin_client()
-    created = create_workout(workout_def, client=client)
+    created = create_workout(workout_def, sport=sport, client=client)
     scheduled = schedule_workout(created["garmin_workout_id"], date_str, client=client)
     return {**created, **scheduled}

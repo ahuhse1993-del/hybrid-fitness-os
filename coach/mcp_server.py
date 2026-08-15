@@ -236,19 +236,80 @@ def get_planned_workouts(days: int = 14) -> list[dict]:
     )
 
 
+@mcp.tool()
+def list_garmin_workouts(start_date: str, end_date: str) -> list[dict]:
+    """
+    List existing Garmin calendar entries (workouts) in a date range, with their
+    Garmin workout_id and schedule_id. Read-only — makes real Garmin API calls
+    (client.get_scheduled_workouts per month) but writes nothing.
+
+    Use this before upsert_training_block / reconciliation to see what's
+    already on the Garmin calendar and avoid blind overwrites or duplicates.
+
+    Args:
+        start_date: YYYY-MM-DD
+        end_date:   YYYY-MM-DD (inclusive)
+    Returns:
+        [{date, title, workout_id, schedule_id, sport_type}]
+    """
+    start = datetime.date.fromisoformat(start_date)
+    end = datetime.date.fromisoformat(end_date)
+    if end < start:
+        return []
+
+    client = garmin_client()
+    months: set[tuple[int, int]] = set()
+    cursor = start.replace(day=1)
+    while cursor <= end:
+        months.add((cursor.year, cursor.month))
+        cursor = (cursor.replace(day=28) + datetime.timedelta(days=4)).replace(day=1)
+
+    seen_schedule_ids: set[int] = set()
+    entries: list[dict] = []
+    for year, month in sorted(months):
+        data = client.get_scheduled_workouts(year, month)
+        for item in data.get("calendarItems", []):
+            if item.get("itemType") != "workout":
+                continue
+            item_date_str = item.get("date")
+            if not item_date_str:
+                continue
+            item_date = datetime.date.fromisoformat(item_date_str)
+            if not (start <= item_date <= end):
+                continue
+            schedule_id = item.get("id")
+            if schedule_id in seen_schedule_ids:
+                continue
+            seen_schedule_ids.add(schedule_id)
+            sport = item.get("sportTypeKey") or (item.get("sportType") or {}).get("sportTypeKey")
+            entries.append({
+                "date": item_date_str,
+                "title": item.get("title"),
+                "workout_id": item.get("workoutId"),
+                "schedule_id": schedule_id,
+                "sport_type": sport,
+            })
+    entries.sort(key=lambda e: e["date"])
+    return entries
+
+
 # ── Garmin write tools ─────────────────────────────────────────────────────────
 
 @mcp.tool()
-def preview_garmin_workout(workout_def: dict) -> dict:
+def preview_garmin_workout(workout_def: dict, sport: str = "running") -> dict:
     """
     Validate a workout definition and return a parsed preview — zero network calls.
     Always call this before create_garmin_workout to confirm structure.
+
+    sport: "running" | "cycling" | "strength". Strength has no dedicated Garmin
+    workout type — it is pushed via the generic upload_workout() endpoint.
 
     workout_def shape:
     {
         "name": "CAIRN – 4x2min Z3",
         "estimated_duration_secs": 2160,
         "description": "optional",
+        "optional": false,
         "steps": [
             {"type": "warmup", "duration_secs": 600, "target": {"type": "hr_zone", "zone": 2}},
             {"type": "repeat", "iterations": 4, "steps": [
@@ -260,7 +321,7 @@ def preview_garmin_workout(workout_def: dict) -> dict:
     }
     """
     try:
-        payload = build_workout_payload(workout_def)
+        payload = build_workout_payload(workout_def, sport=sport)
         segment = payload.workoutSegments[0]
         steps_preview = []
         for i, step in enumerate(segment.workoutSteps):
@@ -284,6 +345,7 @@ def preview_garmin_workout(workout_def: dict) -> dict:
             steps_preview.append(entry)
         return {
             "valid": True,
+            "sport": sport,
             "workout_name": payload.workoutName,
             "estimated_duration_secs": payload.estimatedDurationInSecs,
             "description": payload.description,
@@ -299,9 +361,10 @@ def create_garmin_workout(
     workout_def: dict,
     date_str: str,
     external_id: str,
+    sport: str = "running",
 ) -> dict:
     """
-    Create and schedule a structured running workout on Garmin Connect.
+    Create and schedule a structured workout on Garmin Connect.
     Idempotent: a duplicate external_id returns the existing record without re-uploading.
 
     Args:
@@ -309,6 +372,9 @@ def create_garmin_workout(
         date_str:     Target date in YYYY-MM-DD format.
         external_id:  Unique caller ID, e.g. "plan_session_42_2026-08-15".
                       Use the training_plan row ID + date for natural idempotency.
+        sport:        "running" | "cycling" | "strength". Strength uses Garmin's
+                      generic calendar-entry upload (no dedicated strength workout
+                      type exists in the API).
     Returns:
         garmin_workout_id, garmin_schedule_id, workout_name, scheduled_date
     """
@@ -349,7 +415,7 @@ def create_garmin_workout(
             conn.commit()
 
         # Execute Garmin push (create + schedule)
-        result = push_workout(workout_def, date_str)
+        result = push_workout(workout_def, date_str, sport=sport)
 
         # Mark success
         with conn.cursor() as cur:
@@ -637,6 +703,405 @@ def get_activity_analysis_data(
             "fields": ["point_index", "timestamp_ms", "heart_rate"],
             "data": [[p["point_index"], p["timestamp_ms"], p["heart_rate"]] for p in stream_data],
         } if stream_data else None,
+    }
+
+
+# ── Training-Block-Verwaltung (Rennen + Sessions + Milestones) ─────────────────
+
+def _validate_session_fields(idx: int, s: dict) -> list[str]:
+    errors = []
+    if not s.get("external_id"):
+        errors.append(f"Session {idx}: external_id fehlt")
+    date_str = s.get("date")
+    if not date_str:
+        errors.append(f"Session {idx}: date fehlt")
+    else:
+        try:
+            datetime.date.fromisoformat(date_str)
+        except ValueError:
+            errors.append(f"Session {idx}: date {date_str!r} ist kein gueltiges YYYY-MM-DD")
+    if not s.get("session_type"):
+        errors.append(f"Session {idx}: session_type fehlt")
+    return errors
+
+
+def _week_date_and_dow(session_date: datetime.date) -> tuple[datetime.date, int]:
+    """training_plan speichert week_date (Montag der Woche) + day_of_week (1=Mo..7=So)."""
+    dow = session_date.isoweekday()
+    week_date = session_date - datetime.timedelta(days=dow - 1)
+    return week_date, dow
+
+
+@mcp.tool()
+def preview_training_block(plan: dict) -> dict:
+    """
+    Validate a full training block (race + sessions) — NO writes, read-only.
+    Always call this before upsert_training_block and show the result to the
+    athlete for confirmation, especially when race_date_change is non-null.
+
+    plan shape:
+    {
+      "race": {"name": str, "race_date": "YYYY-MM-DD", "race_distance_km": float, "goal_type": str},
+      "sessions": [
+        {"external_id": str, "date": "YYYY-MM-DD", "session_type": str,
+         "distance_km": float, "duration_min": int, "session_zone": str, "notes": str},
+        ...
+      ]
+    }
+
+    Returns: valid, summary (create/update/unchanged), race_date_change,
+    conflicts (hard errors — missing fields, duplicate external_id within the
+    block), warnings (collisions, empty block), sessions_preview.
+    """
+    conflicts: list[str] = []
+    warnings: list[str] = []
+    race = plan.get("race") or {}
+    sessions = plan.get("sessions") or []
+
+    if not race.get("race_date"):
+        conflicts.append("race.race_date fehlt")
+    if not sessions:
+        warnings.append("Keine Sessions im Block")
+
+    for i, s in enumerate(sessions):
+        conflicts.extend(_validate_session_fields(i, s))
+
+    # Duplikate innerhalb des eingereichten Blocks
+    ext_ids = [s.get("external_id") for s in sessions if s.get("external_id")]
+    for dupe in sorted({x for x in ext_ids if ext_ids.count(x) > 1}):
+        conflicts.append(f"external_id {dupe!r} kommt mehrfach im selben Block vor")
+
+    # Kollisionen: gleiches Datum + gleicher session_type mehrfach im Block
+    # (unterschiedliche session_types am selben Tag sind normal, z.B. Gym + Lauf)
+    date_type_pairs = [(s.get("date"), s.get("session_type")) for s in sessions if s.get("date") and s.get("session_type")]
+    for pair in sorted({p for p in date_type_pairs if date_type_pairs.count(p) > 1}):
+        warnings.append(f"Kollision: {pair[1]!r} kommt am {pair[0]} mehrfach im selben Block vor")
+
+    # Race-Date-Aenderung gegen den aktuell aktiven Plan — eigenes Feld, blockiert
+    # 'valid' NICHT (strukturell ok), aber upsert_training_block verlangt dafuer
+    # explizit confirm_race_date_change=True.
+    active_plan = _fetchone(
+        "SELECT id, race_date, race_name FROM plans WHERE status='active' ORDER BY created_at DESC LIMIT 1"
+    )
+    race_date_change = None
+    if active_plan and race.get("race_date"):
+        old_date = active_plan["race_date"]
+        old_date_str = old_date.isoformat() if hasattr(old_date, "isoformat") else str(old_date)
+        new_date_str = race["race_date"]
+        if old_date_str != new_date_str:
+            race_date_change = {
+                "plan_id": active_plan["id"],
+                "race_name": active_plan["race_name"],
+                "old_race_date": old_date_str,
+                "new_race_date": new_date_str,
+            }
+            warnings.append(
+                f"Race-Date-Aenderung: aktiver Plan (id={active_plan['id']}, {active_plan['race_name']}) "
+                f"hat race_date={old_date_str}, dieser Block will {new_date_str} — "
+                f"upsert_training_block lehnt das ohne confirm_race_date_change=True ab."
+            )
+
+    # Sessions klassifizieren: create / update / unchanged, gegen echte DB-Zeilen
+    create_count = update_count = unchanged_count = 0
+    sessions_preview = []
+    for s in sessions:
+        ext_id = s.get("external_id")
+        existing = _fetchone(
+            "SELECT id, session_type, distance_km, duration_min, session_zone "
+            "FROM training_plan WHERE external_id = %s", (ext_id,)
+        ) if ext_id else None
+
+        action = "create"
+        if existing:
+            existing_distance = float(existing["distance_km"]) if existing.get("distance_km") is not None else None
+            same = (
+                str(existing.get("session_type")) == str(s.get("session_type"))
+                and existing_distance == s.get("distance_km")
+                and existing.get("duration_min") == s.get("duration_min")
+                and (existing.get("session_zone") or None) == (s.get("session_zone") or None)
+            )
+            action = "unchanged" if same else "update"
+
+        if action == "create":
+            create_count += 1
+        elif action == "update":
+            update_count += 1
+        else:
+            unchanged_count += 1
+
+        sessions_preview.append({
+            "external_id": ext_id, "date": s.get("date"), "session_type": s.get("session_type"),
+            "action": action, "existing_training_plan_id": existing["id"] if existing else None,
+        })
+
+    return {
+        "valid": len(conflicts) == 0,
+        "summary": {"create": create_count, "update": update_count, "unchanged": unchanged_count, "total": len(sessions)},
+        "race_date_change": race_date_change,
+        "conflicts": conflicts,
+        "warnings": warnings,
+        "sessions_preview": sessions_preview,
+    }
+
+
+@mcp.tool()
+def upsert_training_block(plan: dict, confirm_race_date_change: bool = False) -> dict:
+    """
+    Save race + training block + all sessions atomically (single DB transaction —
+    all rows or none). Idempotent per session via external_id (ON CONFLICT DO
+    UPDATE, never duplicates). Always call preview_training_block first.
+
+    If the block's race.race_date differs from the currently active plan's
+    race_date, this call is REFUSED unless confirm_race_date_change=True is
+    passed explicitly — race-date changes on an active plan must be a
+    deliberate, confirmed decision, never a silent side effect.
+
+    plan shape: same as preview_training_block.
+    Returns: plan_id, created, updated, race_date_changed.
+    """
+    race = plan.get("race") or {}
+    sessions = plan.get("sessions") or []
+
+    errors = []
+    if not race.get("race_date"):
+        errors.append("race.race_date fehlt")
+    for i, s in enumerate(sessions):
+        errors.extend(_validate_session_fields(i, s))
+    ext_ids = [s.get("external_id") for s in sessions if s.get("external_id")]
+    for dupe in sorted({x for x in ext_ids if ext_ids.count(x) > 1}):
+        errors.append(f"external_id {dupe!r} kommt mehrfach im selben Block vor")
+    if errors:
+        return {"error": "Validierung fehlgeschlagen — zuerst preview_training_block aufrufen.", "conflicts": errors}
+
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT id, race_date, race_name FROM plans WHERE status='active' ORDER BY created_at DESC LIMIT 1"
+            )
+            row = cur.fetchone()
+            active_plan_id, active_race_date, active_race_name = row if row else (None, None, None)
+
+            race_date_changed = False
+            if active_plan_id and active_race_date and str(active_race_date) != race["race_date"]:
+                if not confirm_race_date_change:
+                    conn.rollback()
+                    return {
+                        "error": "Race-Date-Aenderung erkannt, aber nicht bestaetigt.",
+                        "plan_id": active_plan_id,
+                        "old_race_date": str(active_race_date),
+                        "new_race_date": race["race_date"],
+                        "hint": "upsert_training_block(plan, confirm_race_date_change=True) erneut aufrufen, "
+                                "um diese Aenderung bewusst zu bestaetigen.",
+                    }
+                race_date_changed = True
+                logger.info(
+                    "Race date change CONFIRMED for plan_id=%s: %s -> %s",
+                    active_plan_id, active_race_date, race["race_date"],
+                )
+
+            if active_plan_id:
+                plan_id = active_plan_id
+                cur.execute(
+                    """UPDATE plans SET name=%s, goal_type=%s, race_name=%s, race_date=%s,
+                           race_distance_km=%s
+                       WHERE id=%s""",
+                    (
+                        race.get("name") or race.get("race_name"), race.get("goal_type"),
+                        race.get("name") or race.get("race_name"), race["race_date"],
+                        race.get("race_distance_km"), plan_id,
+                    ),
+                )
+            else:
+                cur.execute(
+                    """INSERT INTO plans (name, goal_type, race_name, race_date, race_distance_km, status)
+                       VALUES (%s, %s, %s, %s, %s, 'active') RETURNING id""",
+                    (
+                        race.get("name") or race.get("race_name"), race.get("goal_type"),
+                        race.get("name") or race.get("race_name"), race["race_date"],
+                        race.get("race_distance_km"),
+                    ),
+                )
+                plan_id = cur.fetchone()[0]
+
+            created = updated = 0
+            for s in sessions:
+                session_date = datetime.date.fromisoformat(s["date"])
+                week_date, day_of_week = _week_date_and_dow(session_date)
+                cur.execute(
+                    """INSERT INTO training_plan
+                           (external_id, week_date, day_of_week, session_type, session_zone,
+                            distance_km, duration_min, notes, plan_id)
+                       VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                       ON CONFLICT (external_id) DO UPDATE SET
+                           week_date=EXCLUDED.week_date, day_of_week=EXCLUDED.day_of_week,
+                           session_type=EXCLUDED.session_type, session_zone=EXCLUDED.session_zone,
+                           distance_km=EXCLUDED.distance_km, duration_min=EXCLUDED.duration_min,
+                           notes=EXCLUDED.notes, plan_id=EXCLUDED.plan_id, updated_at=now()
+                       RETURNING (xmax = 0) AS inserted""",
+                    (
+                        s["external_id"], week_date, day_of_week, s["session_type"],
+                        s.get("session_zone"), s.get("distance_km"), s.get("duration_min"),
+                        s.get("notes"), plan_id,
+                    ),
+                )
+                inserted = cur.fetchone()[0]
+                if inserted:
+                    created += 1
+                else:
+                    updated += 1
+
+        conn.commit()
+        logger.info(
+            "upsert_training_block committed: plan_id=%s created=%s updated=%s race_date_changed=%s",
+            plan_id, created, updated, race_date_changed,
+        )
+        return {
+            "plan_id": plan_id, "created": created, "updated": updated,
+            "race_date_changed": race_date_changed,
+        }
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+@mcp.tool()
+def upsert_milestones(milestones: list) -> dict:
+    """
+    Save milestones (title, criterion, target_date, status, evidence) into the
+    milestones table. Matched on (plan_id, step_number) — updates existing rows
+    instead of duplicating (no DB-level unique constraint on that pair exists,
+    so this does an explicit check-then-update-or-insert per row).
+
+    milestones shape:
+    [{"plan_id": int, "step_number": int, "title": str, "criterion": str,
+      "target_date": "YYYY-MM-DD", "status": "open|achieved|changed",
+      "evidence": str, "notes": str}, ...]
+    """
+    if not milestones:
+        return {"created": 0, "updated": 0}
+
+    conn = get_connection()
+    try:
+        created = updated = 0
+        with conn.cursor() as cur:
+            for m in milestones:
+                if not m.get("plan_id") or m.get("step_number") is None or not m.get("title"):
+                    raise ValueError(f"Milestone fehlt plan_id/step_number/title: {m!r}")
+                cur.execute(
+                    "SELECT id FROM milestones WHERE plan_id=%s AND step_number=%s",
+                    (m["plan_id"], m["step_number"]),
+                )
+                row = cur.fetchone()
+                if row:
+                    cur.execute(
+                        """UPDATE milestones SET title=%s, criterion=%s, target_date=%s,
+                               status=%s, evidence=%s, notes=%s, updated_at=now()
+                           WHERE id=%s""",
+                        (m["title"], m.get("criterion"), m.get("target_date"),
+                         m.get("status", "open"), m.get("evidence"), m.get("notes"), row[0]),
+                    )
+                    updated += 1
+                else:
+                    cur.execute(
+                        """INSERT INTO milestones
+                               (plan_id, step_number, title, criterion, target_date, status, evidence, notes)
+                           VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""",
+                        (m["plan_id"], m["step_number"], m["title"], m.get("criterion"),
+                         m.get("target_date"), m.get("status", "open"), m.get("evidence"), m.get("notes")),
+                    )
+                    created += 1
+        conn.commit()
+        logger.info("upsert_milestones committed: created=%s updated=%s", created, updated)
+        return {"created": created, "updated": updated}
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+@mcp.tool()
+def reconcile_training_block(start_date: str, end_date: str) -> dict:
+    """
+    Compare CAIRN's training_plan sessions against the real Garmin calendar in
+    a date range. Read-only — makes real Garmin API calls (via
+    list_garmin_workouts) but writes nothing.
+
+    Categorizes each CAIRN session as:
+    - created:   garmin_workout_id set AND a matching Garmin entry exists on the same date
+    - updated:   garmin_workout_id set, Garmin entry exists, but on a DIFFERENT date
+                 (moved on the Garmin side without CAIRN's training_plan reflecting it)
+    - unchanged: garmin_workout_id NOT set, no Garmin entry expected yet
+    - conflict:  garmin_workout_id set but NO matching Garmin entry exists anymore
+                 (deleted/changed externally), or an unmatched Garmin entry exists
+                 on a day with a CAIRN session that has no garmin_workout_id
+    - failed:    garmin_mcp_log shows status='failed' for this session's external_id
+    """
+    plan_sessions = _fetchall(
+        """
+        SELECT id, external_id,
+               (week_date + (day_of_week - 1) * INTERVAL '1 day')::date AS session_date,
+               session_type, garmin_workout_id
+        FROM training_plan
+        WHERE (week_date + (day_of_week - 1) * INTERVAL '1 day')::date BETWEEN %s AND %s
+        ORDER BY session_date
+        """,
+        (start_date, end_date),
+    )
+    garmin_entries = list_garmin_workouts(start_date, end_date)
+    garmin_by_id = {e["workout_id"]: e for e in garmin_entries if e.get("workout_id")}
+    garmin_dates_matched: set[str] = set()
+
+    failed_external_ids: set[str] = set()
+    ext_ids = [s["external_id"] for s in plan_sessions if s.get("external_id")]
+    if ext_ids:
+        failed_rows = _fetchall(
+            "SELECT external_id FROM garmin_mcp_log WHERE external_id = ANY(%s) AND status = 'failed'",
+            (ext_ids,),
+        )
+        failed_external_ids = {r["external_id"] for r in failed_rows}
+
+    results = []
+    counts = {"created": 0, "updated": 0, "unchanged": 0, "conflict": 0, "failed": 0}
+    for s in plan_sessions:
+        status = "unchanged"
+        detail = None
+        if s.get("external_id") and s["external_id"] in failed_external_ids:
+            status = "failed"
+            detail = "garmin_mcp_log status=failed fuer diese external_id"
+        elif s.get("garmin_workout_id"):
+            gw_id_int = int(s["garmin_workout_id"]) if str(s["garmin_workout_id"]).isdigit() else None
+            match = garmin_by_id.get(gw_id_int)
+            if not match:
+                status = "conflict"
+                detail = f"garmin_workout_id={s['garmin_workout_id']} existiert nicht mehr auf Garmin"
+            elif match["date"] != str(s["session_date"]):
+                status = "updated"
+                detail = f"Garmin-Termin liegt jetzt am {match['date']}, CAIRN-Plan hat {s['session_date']}"
+                garmin_dates_matched.add(match["date"])
+            else:
+                status = "created"
+                garmin_dates_matched.add(match["date"])
+        counts[status] += 1
+        results.append({
+            "training_plan_id": s["id"], "external_id": s.get("external_id"),
+            "date": str(s["session_date"]), "session_type": s["session_type"],
+            "garmin_workout_id": s.get("garmin_workout_id"), "status": status, "detail": detail,
+        })
+
+    # Unzugeordnete Garmin-Eintraege: existieren auf Garmin, aber keine CAIRN-Session referenziert sie
+    orphan_garmin_entries = [e for e in garmin_entries if e["date"] not in garmin_dates_matched]
+    if orphan_garmin_entries:
+        counts["conflict"] += len(orphan_garmin_entries)
+
+    return {
+        "period": {"start_date": start_date, "end_date": end_date},
+        "counts": counts,
+        "sessions": results,
+        "orphan_garmin_entries": orphan_garmin_entries,
     }
 
 
