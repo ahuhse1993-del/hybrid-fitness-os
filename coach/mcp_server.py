@@ -35,7 +35,7 @@ from coach.garmin_push import (
     push_workout,
     schedule_workout,
 )
-from coach.session_routing import classify_for_push, split_training_block
+from coach.session_routing import classify_for_push, resolve_sync_target, split_training_block
 from database.connection import get_connection
 
 logger = logging.getLogger(__name__)
@@ -834,10 +834,10 @@ def preview_training_block(plan: dict) -> dict:
         sessions_preview.append({
             "external_id": ext_id, "date": s.get("date"), "session_type": s.get("session_type"),
             "action": action, "existing_training_plan_id": existing["id"] if existing else None,
-            "target": routing["target"], "garmin_sport": routing["garmin_sport"],
+            "sync_target": routing["sync_target"], "garmin_sport": routing["garmin_sport"],
         })
 
-        if routing["target"] == "hevy" and s.get("hevy_routine_key"):
+        if routing["sync_target"] == "hevy" and s.get("hevy_routine_key"):
             match = _fetchone("SELECT 1 AS ok FROM cairn_routines WHERE title = %s", (s["hevy_routine_key"],))
             if not match:
                 warnings.append(
@@ -857,6 +857,115 @@ def preview_training_block(plan: dict) -> dict:
         "warnings": warnings,
         "sessions_preview": sessions_preview,
     }
+
+
+@mcp.tool()
+def upsert_planned_workout(
+    external_id: str,
+    date: str,
+    session_type: str,
+    sport: str | None = None,
+    name: str | None = None,
+    duration_min: int | None = None,
+    distance_km: float | None = None,
+    structure: dict | list | None = None,
+    target: dict | None = None,
+    notes: str | None = None,
+    source: str | None = None,
+    sync_target: str | None = None,
+) -> dict:
+    """
+    Save a single planned session in CAIRN. Idempotent via external_id
+    (ON CONFLICT DO UPDATE, never duplicates). CAIRN-only write — never
+    calls Garmin or Hevy directly; call create_garmin_workout separately
+    afterward for sessions where the result's sync_target == "garmin".
+
+    Args:
+        external_id:  Stable caller ID for idempotency.
+        date:         YYYY-MM-DD.
+        session_type: e.g. "Easy Run", "Cross Training", "Strength Training".
+        sport:        Optional hint, e.g. "cycling" for a Cross Training
+                       session that IS a bike ride (see sync_target rules).
+        name:         Display title, e.g. "Upper Body" — separate from notes.
+        structure:    Workout step structure (stored in training_plan.workout_steps).
+        target:       HR/pace target structure, e.g. {"type":"hr_zone","zone":2}.
+        source:       Optional origin marker, e.g. "hevy" for strength sessions.
+        sync_target:  Optional caller-requested "garmin"|"hevy"|"cairn_only".
+                      VALIDATED, never trusted blindly: requesting "garmin" for
+                      a Strength/Mobility/Core/Rest Day session_type is a hard
+                      error (see coach/session_routing.py). A more conservative
+                      request (e.g. "cairn_only" for a run) is honored as-is.
+                      If omitted, sync_target is computed automatically.
+
+    Returns: training_plan id, sync_target (the actually applied value,
+    post-validation), garmin_sport, created (bool).
+    """
+    if not external_id or not date or not session_type:
+        return {"error": "external_id, date und session_type sind erforderlich."}
+    try:
+        session_date = datetime.date.fromisoformat(date)
+    except ValueError:
+        return {"error": f"date {date!r} ist kein gueltiges YYYY-MM-DD"}
+
+    try:
+        routing = resolve_sync_target(session_type, requested_sync_target=sync_target, sport_hint=sport)
+    except ValueError as exc:
+        return {"error": str(exc)}
+
+    week_date, day_of_week = _week_date_and_dow(session_date)
+    resolved_source = source or routing["source"]
+
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT id FROM plans WHERE status='active' ORDER BY created_at DESC LIMIT 1"
+            )
+            active = cur.fetchone()
+            plan_id = active[0] if active else None
+
+            columns = [
+                "external_id", "week_date", "day_of_week", "session_type", "sport",
+                "name", "distance_km", "duration_min", "notes", "workout_steps",
+                "target", "source", "garmin_push_required", "sync_target",
+            ]
+            values = [
+                external_id, week_date, day_of_week, session_type, sport,
+                name, distance_km, duration_min, notes,
+                json.dumps(structure) if structure is not None else None,
+                json.dumps(target) if target is not None else None,
+                resolved_source, routing["garmin_push_required"], routing["sync_target"],
+            ]
+            if plan_id is not None:
+                columns.append("plan_id")
+                values.append(plan_id)
+
+            placeholders = ", ".join(["%s"] * len(columns))
+            update_clause = ", ".join(
+                f"{c}=EXCLUDED.{c}" for c in columns if c != "external_id"
+            ) + ", updated_at=now()"
+            cur.execute(
+                f"""INSERT INTO training_plan ({", ".join(columns)})
+                    VALUES ({placeholders})
+                    ON CONFLICT (external_id) DO UPDATE SET {update_clause}
+                    RETURNING id, (xmax = 0) AS inserted""",
+                values,
+            )
+            row_id, inserted = cur.fetchone()
+        conn.commit()
+        logger.info(
+            "upsert_planned_workout committed: id=%s external_id=%s sync_target=%s created=%s",
+            row_id, external_id, routing["sync_target"], inserted,
+        )
+        return {
+            "id": row_id, "created": bool(inserted),
+            "sync_target": routing["sync_target"], "garmin_sport": routing["garmin_sport"],
+        }
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
 
 
 @mcp.tool()
@@ -941,7 +1050,7 @@ def upsert_training_block(plan: dict, confirm_race_date_change: bool = False) ->
 
             created = updated = 0
             routing_warnings: list[str] = []
-            routing_summary = {"garmin": 0, "hevy": 0, "none": 0}
+            routing_summary = {"garmin": 0, "hevy": 0, "cairn_only": 0}
             for s in sessions:
                 session_date = datetime.date.fromisoformat(s["date"])
                 week_date, day_of_week = _week_date_and_dow(session_date)
@@ -951,9 +1060,9 @@ def upsert_training_block(plan: dict, confirm_race_date_change: bool = False) ->
                 # bekommen hier garmin_push_required=False und werden von
                 # KEINEM Code-Pfad automatisch an Garmin geschickt.
                 routing = classify_for_push(s["session_type"], s.get("sport_hint"))
-                routing_summary[routing["target"]] += 1
+                routing_summary[routing["sync_target"]] += 1
 
-                hevy_routine_key = s.get("hevy_routine_key") if routing["target"] == "hevy" else None
+                hevy_routine_key = s.get("hevy_routine_key") if routing["sync_target"] == "hevy" else None
                 if hevy_routine_key:
                     cur.execute("SELECT 1 FROM cairn_routines WHERE title = %s", (hevy_routine_key,))
                     if not cur.fetchone():

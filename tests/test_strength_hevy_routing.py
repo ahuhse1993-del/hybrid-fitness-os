@@ -28,7 +28,7 @@ TEST_PREFIX = "test-shr-"
 class TestRunningAcceptedForGarmin:
     def test_classify_running_targets_garmin(self):
         r = classify_for_push("Easy Run")
-        assert r["target"] == "garmin"
+        assert r["sync_target"] == "garmin"
         assert r["garmin_sport"] == "running"
         assert r["garmin_push_required"] is True
 
@@ -44,11 +44,11 @@ class TestRunningAcceptedForGarmin:
 class TestCyclingOnlyWhenSupported:
     def test_cross_training_without_hint_not_auto_garmin(self):
         r = classify_for_push("Cross Training")
-        assert r["target"] == "none", "Cross Training ohne sport_hint darf nicht automatisch an Garmin"
+        assert r["sync_target"] == "cairn_only", "Cross Training ohne sport_hint darf nicht automatisch an Garmin"
 
     def test_cross_training_with_cycling_hint_targets_garmin(self):
         r = classify_for_push("Cross Training", sport_hint="cycling")
-        assert r["target"] == "garmin"
+        assert r["sync_target"] == "garmin"
         assert r["garmin_sport"] == "cycling"
 
     def test_cycling_payload_builds_via_supported_adapter(self):
@@ -69,7 +69,7 @@ class TestCyclingOnlyWhenSupported:
 class TestStrengthNeverToGarmin:
     def test_classify_strength_targets_hevy_not_garmin(self):
         r = classify_for_push("Strength Training")
-        assert r["target"] == "hevy"
+        assert r["sync_target"] == "hevy"
         assert r["garmin_push_required"] is False
         assert r["source"] == "hevy"
 
@@ -105,7 +105,7 @@ class TestStrengthVariantsAndNonPushTypes:
     @pytest.mark.parametrize("session_type", ["Core", "Mobility", "Rest Day"])
     def test_core_mobility_rest_day_blocked(self, session_type):
         r = classify_for_push(session_type)
-        assert r["target"] == "none"
+        assert r["sync_target"] == "cairn_only"
         assert r["garmin_push_required"] is False
 
 
@@ -123,7 +123,7 @@ class TestMixedBlockSplitting:
         split = split_training_block(sessions)
         assert len(split["garmin"]) == 2
         assert len(split["hevy"]) == 2
-        assert len(split["none"]) == 1
+        assert len(split["cairn_only"]) == 1
         assert all(s["_routing"]["garmin_sport"] in ("running", "cycling") for s in split["garmin"])
         assert all(s["_routing"]["source"] == "hevy" for s in split["hevy"])
 
@@ -289,3 +289,97 @@ class TestGarminAndHevyErrorsIsolated:
         result = sync_hevy_completions(days=1)
         assert isinstance(result, dict)
         assert "matched" in result and "unmatched_sessions" in result and "warnings" in result
+
+
+# ── upsert_planned_workout: einzelne Session, sync_target-Vertrag ─────────
+
+class TestUpsertPlannedWorkout:
+    def test_running_session_end_to_end(self, db_conn, cleanup_test_rows):
+        """Regressionstest fuer den ON-CONFLICT-Bug: der fruehere partielle
+        Unique-Index (WHERE external_id IS NOT NULL) wurde von Postgres nicht
+        durch ein einfaches ON CONFLICT (external_id) inferiert und schlug mit
+        InvalidColumnReference fehl — betraf auch upsert_training_block, das
+        bis dahin nie real gegen eine echte Zeile geschrieben worden war."""
+        from coach.mcp_server import upsert_planned_workout
+
+        ext_id = f"{TEST_PREFIX}upw-run-1"
+        result = upsert_planned_workout(
+            external_id=ext_id, date="2026-09-20", session_type="Easy Run",
+            sport="running", name="Easy Z2", duration_min=50, distance_km=8,
+        )
+        assert result.get("error") is None
+        assert result["created"] is True
+        assert result["sync_target"] == "garmin"
+        assert result["garmin_sport"] == "running"
+
+        cur = db_conn.cursor()
+        cur.execute("SELECT sync_target, garmin_push_required, name, sport FROM training_plan WHERE external_id = %s", (ext_id,))
+        sync_target, garmin_push_required, name, sport = cur.fetchone()
+        assert sync_target == "garmin"
+        assert garmin_push_required is True
+        assert name == "Easy Z2"
+        assert sport == "running"
+
+    def test_idempotent_upsert_updates_not_duplicates(self, db_conn, cleanup_test_rows):
+        from coach.mcp_server import upsert_planned_workout
+
+        ext_id = f"{TEST_PREFIX}upw-idem-1"
+        first = upsert_planned_workout(
+            external_id=ext_id, date="2026-09-21", session_type="Easy Run", duration_min=40,
+        )
+        second = upsert_planned_workout(
+            external_id=ext_id, date="2026-09-21", session_type="Easy Run", duration_min=45,
+        )
+        assert first["created"] is True
+        assert second["created"] is False
+        assert first["id"] == second["id"]
+
+        cur = db_conn.cursor()
+        cur.execute("SELECT COUNT(*), MAX(duration_min) FROM training_plan WHERE external_id = %s", (ext_id,))
+        count, duration = cur.fetchone()
+        assert count == 1, "Wiederholtes upsert_planned_workout darf keine Duplikate erzeugen"
+        assert duration == 45, "Zweiter Aufruf muss die bestehende Zeile aktualisieren"
+
+    def test_forced_garmin_sync_target_rejected_for_strength(self, db_conn, cleanup_test_rows):
+        """Kraft darf niemals an Garmin gesendet werden — auch nicht, wenn der
+        Aufrufer sync_target='garmin' explizit anfordert."""
+        from coach.mcp_server import upsert_planned_workout
+
+        ext_id = f"{TEST_PREFIX}upw-forced-garmin"
+        result = upsert_planned_workout(
+            external_id=ext_id, date="2026-09-22", session_type="Strength Training",
+            name="Upper Body", sync_target="garmin",
+        )
+        assert "error" in result
+
+        cur = db_conn.cursor()
+        cur.execute("SELECT COUNT(*) FROM training_plan WHERE external_id = %s", (ext_id,))
+        assert cur.fetchone()[0] == 0, "Bei abgelehntem sync_target darf keine Zeile geschrieben werden"
+
+    def test_strength_auto_routes_to_hevy(self, db_conn, cleanup_test_rows):
+        from coach.mcp_server import upsert_planned_workout
+
+        ext_id = f"{TEST_PREFIX}upw-strength-auto"
+        result = upsert_planned_workout(
+            external_id=ext_id, date="2026-09-23", session_type="Strength Training",
+            name="Lower Body + Arms", duration_min=45,
+        )
+        assert result["sync_target"] == "hevy"
+
+        cur = db_conn.cursor()
+        cur.execute("SELECT garmin_push_required, source FROM training_plan WHERE external_id = %s", (ext_id,))
+        garmin_push_required, source = cur.fetchone()
+        assert garmin_push_required is False
+        assert source == "hevy"
+
+    def test_conservative_sync_target_override_honored(self, db_conn, cleanup_test_rows):
+        """Ein restriktiverer Wunsch als die Berechnung (cairn_only statt
+        garmin fuer einen Lauf) ist sicher und wird respektiert."""
+        from coach.mcp_server import upsert_planned_workout
+
+        ext_id = f"{TEST_PREFIX}upw-conservative"
+        result = upsert_planned_workout(
+            external_id=ext_id, date="2026-09-24", session_type="Easy Run",
+            sync_target="cairn_only",
+        )
+        assert result["sync_target"] == "cairn_only"
