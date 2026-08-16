@@ -94,12 +94,11 @@ def _reject_if_never_garmin_session(workout_def: dict[str, Any]) -> None:
             f"(Strength/Mobility/Core/Rest Day sind Garmin-Push ausgeschlossen)."
         )
 
-# Session-Token-Cache (2026-08-15): garminconnect==0.3.6 hat kein .garth-
-# Attribut (frueherer Auftrag ging von client.garth.dump()/load() aus — das
-# existiert in der installierten Version nicht, siehe garminconnect/client.py).
-# Der Garmin-Client bringt dumps()/loads() aber DIREKT auf sich selbst mit —
-# JSON-Serialisierung von di_token/di_refresh_token/di_client_id, ohne
-# Email/Passwort. Genau dieser String wird gecacht, niemals Klartext-Credentials.
+# Session-Token-Cache: garminconnect==0.3.6 stellt dumps()/loads() NICHT
+# direkt auf dem Garmin-Objekt bereit, sondern auf dem internen HTTP-Client
+# (garminconnect.client.Client) unter client.client.dumps()/loads().
+# Serialisiert di_token/di_refresh_token — niemals Email/Passwort.
+# Gecacht in garmin_session_cache, TTL 55 Minuten.
 _SESSION_CACHE_MAX_AGE = "55 minutes"
 
 
@@ -150,7 +149,7 @@ def garmin_client() -> Garmin:
 
     if cached_token:
         try:
-            client.loads(cached_token)
+            client.client.loads(cached_token)
             logger.info("Garmin-Session aus Cache geladen — kein neuer Login noetig.")
             if conn is not None:
                 conn.close()
@@ -168,7 +167,7 @@ def garmin_client() -> Garmin:
     try:
         if conn is None:
             conn = get_connection()
-        _save_session_cache(conn, client.dumps())
+        _save_session_cache(conn, client.client.dumps())
     except Exception as exc:
         logger.warning("Garmin session cache write failed: %s", exc)
     finally:
