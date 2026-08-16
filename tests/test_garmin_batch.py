@@ -221,12 +221,74 @@ class TestIsolatedFailures:
 
 class TestWorkoutStepsFallback:
     def test_empty_workout_steps_falls_back_to_single_step(self):
+        # 2026-08-16: der Fallback baut kein echtes hr_zone-Target mehr aus
+        # session_zone -- No-Target-Policy gilt auch hier, Zone bleibt Freitext.
         steps = _build_workout_steps({"duration_min": 50, "session_zone": "Z3"})
         assert len(steps) == 1
         assert steps[0]["duration_secs"] == 3000
-        assert steps[0]["target"] == {"type": "hr_zone", "zone": 3}
+        assert steps[0]["target"] == {"type": "no_target"}
 
     def test_real_workout_steps_are_used_unchanged(self):
         real_steps = [{"type": "warmup", "duration_secs": 300}]
         steps = _build_workout_steps({"duration_min": 50, "workout_steps": real_steps})
         assert steps == real_steps
+
+
+# ── Test 14: Wiederholtes Pushen erzeugt keine Duplikate ───────────────────
+
+class TestRepeatedPushIsIdempotent:
+    def test_second_push_of_unchanged_session_triggers_no_new_garmin_call(self, db_conn, cleanup_rows, monkeypatch):
+        ext_id = f"{TEST_PREFIX}idem-1"
+        tp_id = _insert_session(db_conn, ext_id, session_type="Easy Run", distance_km=10, duration_min=60)
+
+        monkeypatch.setattr(garmin_batch, "garmin_client", lambda: MagicMock())
+        push_calls = {"n": 0}
+
+        def fake_push(workout_def, date_str, sport="running"):
+            push_calls["n"] += 1
+            return {"garmin_workout_id": 888888, "garmin_schedule_id": 333333,
+                    "workout_name": workout_def["name"], "scheduled_date": date_str}
+
+        monkeypatch.setattr(garmin_batch, "push_workout", fake_push)
+
+        result1 = run_batch(session_ids=[tp_id])
+        assert push_calls["n"] == 1
+        assert 888888 in result1["created"]
+
+        result2 = run_batch(session_ids=[tp_id])
+        assert push_calls["n"] == 1, "Zweiter Push eines unveraenderten Workouts darf keinen neuen Garmin-Call ausloesen"
+        assert tp_id in result2["unchanged"]
+
+
+# ── Test 15: Geaendertes Workout wird als Update erkannt ────────────────────
+
+class TestNameChangeDetectedAsUpdate:
+    def test_changing_name_only_triggers_update_not_unchanged(self, db_conn, cleanup_rows, monkeypatch):
+        # Vor der Erweiterung von HASH_FIELDS um "name" waere eine reine
+        # Namensaenderung fuer den Content-Hash unsichtbar gewesen und haette
+        # faelschlich "unchanged" ergeben.
+        ext_id = f"{TEST_PREFIX}namechg-1"
+        tp_id = _insert_session(db_conn, ext_id, session_type="Easy Run", distance_km=10, duration_min=60)
+
+        client_holder: dict = {}
+        monkeypatch.setattr(garmin_batch, "garmin_client", lambda: client_holder.setdefault("client", MagicMock()))
+        push_calls = {"n": 0}
+
+        def fake_push(workout_def, date_str, sport="running"):
+            push_calls["n"] += 1
+            return {"garmin_workout_id": 900001, "garmin_schedule_id": 400001,
+                    "workout_name": workout_def["name"], "scheduled_date": date_str}
+
+        monkeypatch.setattr(garmin_batch, "push_workout", fake_push)
+
+        result1 = run_batch(session_ids=[tp_id])
+        assert push_calls["n"] == 1
+
+        cur = db_conn.cursor()
+        cur.execute("UPDATE training_plan SET name = 'Renamed Session' WHERE id = %s", (tp_id,))
+        db_conn.commit()
+
+        result2 = run_batch(session_ids=[tp_id])
+        assert push_calls["n"] == 2, "Namensaenderung muss einen erneuten Push ausloesen"
+        assert tp_id not in result2["unchanged"]
+        client_holder["client"].delete_workout.assert_called_once_with("900001")

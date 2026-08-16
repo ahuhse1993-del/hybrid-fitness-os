@@ -30,7 +30,7 @@ import logging
 import time
 from database.connection import get_connection
 from coach.sync_utils import compute_content_hash, sessions_to_push
-from coach.garmin_push import garmin_client, push_workout, schedule_workout
+from coach.garmin_push import build_garmin_title, garmin_client, push_workout, schedule_workout
 from coach.session_routing import GARMIN_BLOCKED_TYPES
 
 logger = logging.getLogger(__name__)
@@ -74,23 +74,29 @@ def _mark_session(conn, session_id: int, status: str, error: str = None,
 
 def _build_workout_steps(session: dict) -> list[dict]:
     """
-    training_plan.workout_steps ist fuer real importierte Sessions aktuell
-    leer (siehe Modul-Docstring). Fallback: ein Schritt ueber die volle
-    Dauer, HF-Ziel aus session_zone geparst falls im Format "Z<1-5>"
-    vorhanden (z.B. "Z2" -> hr_zone 2) — sonst kein Ziel. Nutzt nur real
-    gespeicherte Felder (duration_min, session_zone), erfindet nichts.
+    Prioritaet (2026-08-16, Struktur-Ueberarbeitung):
+    1) Eine bereits vorhandene training_plan.workout_steps-Struktur wird IMMER
+       unveraendert uebernommen — nie durch einen Gesamtzeitblock ersetzt.
+    2) Ohne Struktur: Laufeinheiten (sport='running') mit distance_km > 0
+       bekommen einen einzelnen Distanzschritt (duration_meters) statt Zeit —
+       ein normaler Lauf wird ueber Kilometer gesteuert, nicht ueber Minuten.
+    3) Rennrad (sport='cycling') und Laeufe ohne distance_km bleiben zeitbasiert.
+    Kein Fallback-Pfad baut mehr ein echtes HF-/Pace-Target (fruehere Version
+    parste session_zone zu einem echten hr_zone-Target — das widersprach der
+    No-Target-Policy fuer lockere Einheiten). Zone/RPE bleiben reiner Freitext
+    in notes, nie ein Garmin-Alarm.
     """
     steps = session.get("workout_steps")
     if steps:
         return steps
+    sport = session.get("sport") or "running"
+    distance_km = session.get("distance_km")
+    no_target = {"type": "no_target"}
+    if sport == "running" and distance_km and float(distance_km) > 0:
+        meters = round(float(distance_km) * 1000)
+        return [{"type": "interval", "duration_meters": meters, "target": no_target}]
     duration_secs = (session.get("duration_min") or 60) * 60
-    target = {"type": "no_target"}
-    zone_str = (session.get("session_zone") or "").strip().upper()
-    if len(zone_str) == 2 and zone_str[0] == "Z" and zone_str[1].isdigit():
-        zone = int(zone_str[1])
-        if 1 <= zone <= 5:
-            target = {"type": "hr_zone", "zone": zone}
-    return [{"type": "interval", "duration_secs": duration_secs, "target": target}]
+    return [{"type": "interval", "duration_secs": duration_secs, "target": no_target}]
 
 
 def _push_single_session(client, conn, session: dict) -> dict:
@@ -109,9 +115,11 @@ def _push_single_session(client, conn, session: dict) -> dict:
 
     external_id = session.get("external_id") or f"cairn_{sid}_{session_date}"
 
-    # workout_def aufbauen (nutzt bestehenden build_workout_payload via push_workout)
+    # workout_def aufbauen (nutzt bestehenden build_workout_payload via push_workout).
+    # Titel OHNE Datum (2026-08-16): "CAIRN – {name} · {session_type}".
     workout_def = {
-        "name": f"CAIRN – {session['session_type']} {session_date}",
+        "name": build_garmin_title(session.get("name"), session["session_type"]),
+        "session_type": session["session_type"],
         "estimated_duration_secs": (session.get("duration_min") or 60) * 60,
         "description": session.get("notes") or "",
         "steps": _build_workout_steps(session),
@@ -217,7 +225,8 @@ def run_batch(session_ids: list[int] = None) -> dict:
                            (week_date + (day_of_week - 1) * INTERVAL '1 day')::date AS session_date,
                            session_type, session_zone, distance_km, duration_min,
                            notes, workout_steps, plan_week, phase, sport,
-                           garmin_workout_id, external_id, content_hash, sync_status
+                           garmin_workout_id, external_id, content_hash, sync_status,
+                           name, target
                     FROM training_plan WHERE id = ANY(%s)
                 """, (session_ids,))
                 cols = [d[0] for d in cur.description]

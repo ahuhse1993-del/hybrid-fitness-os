@@ -1045,6 +1045,7 @@ def upsert_planned_workout(
                     "distance_km": distance_km, "duration_min": duration_min,
                     "notes": notes, "workout_steps": structure,
                     "session_zone": existing_session_zone,
+                    "name": name, "target": target,
                 })
                 cur.execute("SELECT content_hash FROM training_plan WHERE id = %s", (row_id,))
                 old_hash = cur.fetchone()[0]
@@ -1235,6 +1236,7 @@ def upsert_training_block(plan: dict, confirm_race_date_change: bool = False) ->
                         "distance_km": s.get("distance_km"), "duration_min": s.get("duration_min"),
                         "notes": s.get("notes"), "workout_steps": None,
                         "session_zone": s.get("session_zone"),
+                        "name": s.get("name"), "target": s.get("target"),
                     })
                     if new_hash != old_hash:
                         cur.execute(

@@ -6,12 +6,21 @@ import hashlib
 import json
 
 HASH_FIELDS = ["date", "session_type", "distance_km", "duration_min",
-               "notes", "workout_steps", "session_zone"]
+               "notes", "workout_steps", "session_zone", "name", "target"]
 
 
 def compute_content_hash(session: dict) -> str:
-    """SHA256 der Push-relevanten Felder. Änderung = neuer Hash = dirty."""
+    """
+    SHA256 der Push-relevanten Felder. Aenderung = neuer Hash = dirty.
+    Erfasst jetzt auch name/target (2026-08-16) — ein geaenderter Titel oder
+    ein neu gesetztes/entferntes Pace-Target muss die Session als
+    aktualisierungsbeduerftig markieren, genau wie Distanz/Dauer/Struktur.
+    Akzeptiert sowohl "date" (z.B. aus upsert_planned_workout) als auch
+    "session_date" (aus den SQL-Queries in garmin_batch.py/sync_utils.py) —
+    dieselbe Session darf unter beiden Aufrufern denselben Hash ergeben.
+    """
     payload = {k: str(session.get(k) or "") for k in HASH_FIELDS}
+    payload["date"] = str(session.get("date") or session.get("session_date") or "")
     return hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()
 
 
@@ -34,7 +43,7 @@ def sessions_to_push(conn) -> list[dict]:
                    session_type, session_zone, distance_km, duration_min,
                    notes, workout_steps, plan_week, phase, sport,
                    garmin_workout_id, external_id, content_hash,
-                   sync_status
+                   sync_status, name, target
             FROM training_plan
             WHERE sync_target = 'garmin'
               AND status = 'planned'

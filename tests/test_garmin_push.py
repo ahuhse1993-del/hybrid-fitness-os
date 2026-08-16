@@ -102,8 +102,11 @@ class TestBuildWorkoutPayload:
             build_workout_payload({**VALID_WORKOUT, "steps": [bad_step]})
 
     def test_unknown_target_type_raises(self):
+        # "pace_zone" ist seit 2026-08-16 ein unterstuetzter Target-Typ (siehe
+        # TestPaceZoneTarget) -- fuer einen echten Unbekannten-Typ-Test hier
+        # ein Typ verwendet, der nie unterstuetzt war.
         bad_step = {"type": "interval", "duration_secs": 600,
-                    "target": {"type": "pace_zone"}, "enforce_garmin_target": True}
+                    "target": {"type": "cadence_zone"}, "enforce_garmin_target": True}
         with pytest.raises(GarminWorkoutValidationError, match="Unsupported target type"):
             build_workout_payload({**VALID_WORKOUT, "steps": [bad_step]})
 
@@ -460,13 +463,15 @@ class TestNoTargetPolicy:
 
 class TestSessionTokenCache:
     """
-    garmin_session_cache (2026-08-15): garminconnect==0.3.6 hat kein .garth-
-    Attribut (der urspruengliche Auftrag ging von client.garth.dump()/.load()
-    aus). Verifiziert gegen den echten Paket-Quellcode: der Garmin-Client
-    bringt dumps()/loads() DIREKT auf sich selbst mit — JSON aus
-    di_token/di_refresh_token/di_client_id, niemals Email/Passwort. Tests
-    laufen gegen die echte Dev-DB (garmin_session_cache), Garmin-Client
-    durchgehend gemockt.
+    garmin_session_cache: garminconnect==0.3.6 stellt dumps()/loads() NICHT
+    direkt auf dem Garmin-Objekt bereit, sondern auf dem internen HTTP-Client
+    (garminconnect.client.Client), erreichbar ueber Garmin.client — verifiziert
+    gegen den echten Paket-Quellcode (Garmin.__init__ setzt self.client =
+    client.Client(...); dumps/loads/dump/load sind ausschliesslich in
+    client.py definiert, siehe coach/garmin_push.py::garmin_client()).
+    JSON aus di_token/di_refresh_token, niemals Email/Passwort. Tests laufen
+    gegen die echte Dev-DB (garmin_session_cache), Garmin-Client durchgehend
+    gemockt.
     """
 
     @pytest.fixture
@@ -501,7 +506,7 @@ class TestSessionTokenCache:
         with patch("coach.garmin_push.Garmin") as M:
             client = garmin_client()
             M.return_value.login.assert_not_called()
-            M.return_value.loads.assert_called_once_with('{"di_token":"abc"}')
+            M.return_value.client.loads.assert_called_once_with('{"di_token":"abc"}')
             assert client is M.return_value
 
     def test_stale_cache_triggers_login(self, monkeypatch, clean_cache):
@@ -510,7 +515,7 @@ class TestSessionTokenCache:
         self._insert_cache_row('{"di_token":"old"}', age="56 minutes")
 
         with patch("coach.garmin_push.Garmin") as M:
-            M.return_value.dumps.return_value = '{"di_token":"new"}'
+            M.return_value.client.dumps.return_value = '{"di_token":"new"}'
             garmin_client()
             M.return_value.login.assert_called_once()
 
@@ -519,7 +524,7 @@ class TestSessionTokenCache:
         monkeypatch.setenv("GARMIN_PASSWORD", "pw")
 
         with patch("coach.garmin_push.Garmin") as M:
-            M.return_value.dumps.return_value = '{"di_token":"new"}'
+            M.return_value.client.dumps.return_value = '{"di_token":"new"}'
             garmin_client()
             M.return_value.login.assert_called_once()
 
@@ -529,8 +534,8 @@ class TestSessionTokenCache:
         self._insert_cache_row("garbage-token", age="5 minutes")
 
         with patch("coach.garmin_push.Garmin") as M:
-            M.return_value.loads.side_effect = Exception("bad token")
-            M.return_value.dumps.return_value = '{"di_token":"recovered"}'
+            M.return_value.client.loads.side_effect = Exception("bad token")
+            M.return_value.client.dumps.return_value = '{"di_token":"recovered"}'
             garmin_client()
             M.return_value.login.assert_called_once()
 
@@ -539,7 +544,7 @@ class TestSessionTokenCache:
         monkeypatch.setenv("GARMIN_PASSWORD", "pw")
 
         with patch("coach.garmin_push.Garmin") as M:
-            M.return_value.dumps.return_value = '{"di_token":"fresh"}'
+            M.return_value.client.dumps.return_value = '{"di_token":"fresh"}'
             garmin_client()
 
         from database.connection import get_connection
@@ -555,7 +560,7 @@ class TestSessionTokenCache:
         monkeypatch.setenv("GARMIN_PASSWORD", "ultra_secret_pw")
 
         with patch("coach.garmin_push.Garmin") as M:
-            M.return_value.dumps.return_value = '{"di_token":"xyz"}'
+            M.return_value.client.dumps.return_value = '{"di_token":"xyz"}'
             garmin_client()
 
         from database.connection import get_connection

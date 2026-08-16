@@ -43,6 +43,20 @@ _TIME_END_CONDITION: dict[str, Any] = {
     "displayOrder": 2,
     "displayable": True,
 }
+_DISTANCE_END_CONDITION: dict[str, Any] = {
+    "conditionTypeId": ConditionType.DISTANCE,
+    "conditionTypeKey": "distance",
+    "displayOrder": 3,
+    "displayable": True,
+}
+# Fuer variable Erholungsphasen ("locker bergab bis erholt") — der Athlet
+# beendet den Step selbst per Lap-Taste, keine feste Zeit/Distanz-Vorgabe.
+_LAP_BUTTON_END_CONDITION: dict[str, Any] = {
+    "conditionTypeId": ConditionType.LAP_BUTTON,
+    "conditionTypeKey": "lap.button",
+    "displayOrder": 1,
+    "displayable": True,
+}
 
 # ── No-Target-Policy (2026-08-15) ──────────────────────────────────────────
 # Garmin loest bei einem gesetzten HF-/Pace-/Power-Target auf der Uhr einen
@@ -62,6 +76,7 @@ NO_TARGET_STEP_TYPES: frozenset[str] = frozenset({
 NO_TARGET_SESSION_TYPES: frozenset[str] = frozenset({
     "Easy Run", "Recovery Run", "Long Run", "Trail Run",
     "Cross Training", "Hiking", "Cycling",  # lockere Einheiten
+    "Race", "Race Day",  # Renntag: kein Pace-/HF-Alarm, RPE/Zonen nur als Text
 })
 # Sport-Type-Dicts exakt aus garminconnect.workout.SportType (installiertes Paket,
 # /workout-service/workout/types) übernommen.
@@ -176,6 +191,13 @@ def garmin_client() -> Garmin:
 
     return client
 
+_PACE_ZONE_TARGET_TYPE: dict[str, Any] = {
+    "workoutTargetTypeId": TargetType.PACE_ZONE,
+    "workoutTargetTypeKey": "pace.zone",
+    "displayOrder": 6,
+}
+
+
 def _build_target(target_def: dict[str, Any] | None) -> dict[str, Any]:
     if target_def is None or target_def.get("type") == "no_target":
         return {"targetType": _NO_TARGET}
@@ -187,9 +209,79 @@ def _build_target(target_def: dict[str, Any] | None) -> dict[str, Any]:
         except (TypeError, ValueError, AssertionError):
             raise GarminWorkoutValidationError(f"hr_zone 'zone' must be 1-5, got {target_def.get('zone')!r}")
         return {"targetType": _HR_ZONE_TARGET_TYPE, "zoneNumber": zone}
+    if target_def["type"] == "pace_zone":
+        slow = target_def.get("slow_pace_sec_per_km")
+        fast = target_def.get("fast_pace_sec_per_km")
+        try:
+            slow = float(slow)
+            fast = float(fast)
+            assert slow > 0 and fast > 0
+        except (TypeError, ValueError, AssertionError):
+            raise GarminWorkoutValidationError(
+                f"pace_zone requires positive slow_pace_sec_per_km/fast_pace_sec_per_km, "
+                f"got slow={target_def.get('slow_pace_sec_per_km')!r} fast={target_def.get('fast_pace_sec_per_km')!r}"
+            )
+        if fast >= slow:
+            raise GarminWorkoutValidationError(
+                f"pace_zone: fast_pace_sec_per_km ({fast}) must be a smaller (faster) value than "
+                f"slow_pace_sec_per_km ({slow})"
+            )
+        # Garmin's pace.zone-Target speichert eine Geschwindigkeits-Spanne in m/s
+        # (targetValueOne = untere/langsamere, targetValueTwo = obere/schnellere
+        # Geschwindigkeit) — Standardkonvention der Garmin-Connect-workout-service-
+        # API fuer TargetType.PACE_ZONE (=6, siehe garminconnect.workout.TargetType).
+        # Nicht im garminconnect-Paket selbst dokumentiert, aber von
+        # ExecutableStep.model_config(extra="allow") unterstuetzt.
+        return {
+            "targetType": _PACE_ZONE_TARGET_TYPE,
+            "targetValueOne": 1000.0 / slow,
+            "targetValueTwo": 1000.0 / fast,
+        }
     raise GarminWorkoutValidationError(
-        f"Unsupported target type: {target_def['type']!r}. Supported: hr_zone, no_target"
+        f"Unsupported target type: {target_def['type']!r}. Supported: hr_zone, pace_zone, no_target"
     )
+
+
+def _build_end_condition(step_def: dict[str, Any], step_type_key: str) -> tuple[dict[str, Any], float | None]:
+    """
+    Genau eine Endbedingung pro Schritt: duration_secs (Zeit), duration_meters
+    (Distanz) oder lap_button=True (variable Erholung, Athlet beendet den Step
+    selbst per Lap-Taste — z.B. 'locker bergab bis erholt').
+    """
+    has_secs = step_def.get("duration_secs") is not None
+    has_meters = step_def.get("duration_meters") is not None
+    has_lap_button = bool(step_def.get("lap_button"))
+    provided_count = sum((has_secs, has_meters, has_lap_button))
+    if provided_count != 1:
+        raise GarminWorkoutValidationError(
+            f"Step '{step_type_key}' must specify exactly one of duration_secs, "
+            f"duration_meters, lap_button=True — got {provided_count} "
+            f"(duration_secs={step_def.get('duration_secs')!r}, "
+            f"duration_meters={step_def.get('duration_meters')!r}, "
+            f"lap_button={step_def.get('lap_button')!r})"
+        )
+    if has_lap_button:
+        return _LAP_BUTTON_END_CONDITION, None
+    if has_meters:
+        meters = step_def.get("duration_meters")
+        try:
+            meters = float(meters)
+            assert meters > 0
+        except (TypeError, ValueError, AssertionError):
+            raise GarminWorkoutValidationError(
+                f"Step '{step_type_key}' requires duration_meters > 0, got {step_def.get('duration_meters')!r}"
+            )
+        return _DISTANCE_END_CONDITION, meters
+    secs = step_def.get("duration_secs")
+    try:
+        secs = float(secs)
+        assert secs > 0
+    except (TypeError, ValueError, AssertionError):
+        raise GarminWorkoutValidationError(
+            f"Step '{step_type_key}' requires duration_secs > 0, got {step_def.get('duration_secs')!r}"
+        )
+    return _TIME_END_CONDITION, secs
+
 
 def _build_executable_step(
     step_def: dict[str, Any], step_order: int, force_no_target: bool = False,
@@ -199,14 +291,7 @@ def _build_executable_step(
         raise GarminWorkoutValidationError(
             f"Unknown step type: {step_type_key!r}. Supported: {sorted(_STEP_TYPE_MAP)}"
         )
-    duration_secs = step_def.get("duration_secs")
-    try:
-        duration_secs = float(duration_secs)
-        assert duration_secs > 0
-    except (TypeError, ValueError, AssertionError):
-        raise GarminWorkoutValidationError(
-            f"Step '{step_type_key}' requires duration_secs > 0, got {step_def.get('duration_secs')!r}"
-        )
+    end_condition, end_condition_value = _build_end_condition(step_def, step_type_key)
 
     # No-Target-Policy: no_target ist der Default. Ein echtes Target wird nur
     # gebaut, wenn explizit enforce_garmin_target=True auf einem interval-Step
@@ -221,12 +306,17 @@ def _build_executable_step(
     else:
         target_kwargs = {"targetType": _NO_TARGET}
 
+    extra_kwargs: dict[str, Any] = {}
+    if step_def.get("description"):
+        extra_kwargs["description"] = str(step_def["description"])
+
     return ExecutableStep(
         stepOrder=step_order,
         stepType=_STEP_TYPE_MAP[step_type_key],
-        endCondition=_TIME_END_CONDITION,
-        endConditionValue=duration_secs,
+        endCondition=end_condition,
+        endConditionValue=end_condition_value,
         **target_kwargs,
+        **extra_kwargs,
     )
 
 def _build_steps(steps_def: list[dict[str, Any]], session_type: str = "") -> list:
@@ -259,6 +349,34 @@ def _build_steps(steps_def: list[dict[str, Any]], session_type: str = "") -> lis
         else:
             result.append(_build_executable_step(step_def, i, force_no_target=session_force_no_target))
     return result
+
+# Garmin Connect begrenzt Workout-Namen serverseitig — in der garminconnect-
+# Bibliothek selbst nicht dokumentiert, aber in der Connect-Web-UI beobachtbar
+# abgeschnitten. 100 Zeichen als konservative, sichere Grenze angenommen.
+GARMIN_TITLE_MAX_LEN = 100
+
+
+def build_garmin_title(name: str | None, session_type: str) -> str:
+    """
+    Garmin-Titel OHNE Datum: "CAIRN – {name} · {session_type}", Fallback
+    "CAIRN – {session_type}" wenn kein name vorhanden ist. Wird der Titel zu
+    lang, wird ausschliesslich der Einheitsname gekuerzt — session_type bleibt
+    immer vollstaendig sichtbar.
+    """
+    session_type = (session_type or "").strip()
+    name = (name or "").strip()
+    prefix = "CAIRN – "
+    title = f"{prefix}{name} · {session_type}" if name else f"{prefix}{session_type}"
+    if len(title) <= GARMIN_TITLE_MAX_LEN or not name:
+        return title[:GARMIN_TITLE_MAX_LEN]
+    suffix = f" · {session_type}"
+    budget_for_name = GARMIN_TITLE_MAX_LEN - len(prefix) - len(suffix)
+    if budget_for_name < 1:
+        # session_type allein sprengt schon das Limit -> harte Kuerzung als letzter Ausweg
+        return title[:GARMIN_TITLE_MAX_LEN]
+    truncated_name = name[:budget_for_name].rstrip()
+    return f"{prefix}{truncated_name}{suffix}"
+
 
 _WORKOUT_CLASS_BY_SPORT: dict[str, type] = {
     "running": RunningWorkout,
