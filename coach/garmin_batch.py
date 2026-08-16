@@ -27,6 +27,7 @@ Implementieren gefunden — alle live gegen echte Daten verifiziert):
 """
 
 import logging
+import time
 from database.connection import get_connection
 from coach.sync_utils import compute_content_hash, sessions_to_push
 from coach.garmin_push import garmin_client, push_workout, schedule_workout
@@ -38,6 +39,10 @@ logger = logging.getLogger(__name__)
 # (5 Bytes = 40 Bit, weit innerhalb von signed int64). Ersetzt das ungueltige
 # Python-Literal 7472636e aus der urspruenglichen Aufgabenstellung.
 ADVISORY_LOCK_KEY = int.from_bytes(b"cairn", "big")
+
+# Pause nach jedem erfolgreichen Garmin-API-Call — reduziert Rate-Limiting
+# bei Batches mit mehreren Sessions hintereinander.
+GARMIN_CALL_DELAY_SECS = 0.8
 
 
 def acquire_lock(conn) -> bool:
@@ -132,12 +137,14 @@ def _push_single_session(client, conn, session: dict) -> dict:
             if old_schedule_id:
                 try:
                     client.unschedule_workout(old_schedule_id)
+                    time.sleep(GARMIN_CALL_DELAY_SECS)
                 except Exception as exc:
                     logger.warning(
                         "Konnte alte Terminierung %s nicht entfernen: %s — mache trotzdem weiter",
                         old_schedule_id, exc,
                     )
             result = schedule_workout(existing_garmin_id, session_date, client=client)
+            time.sleep(GARMIN_CALL_DELAY_SECS)
             new_schedule_id = result["garmin_schedule_id"]
             with conn.cursor() as cur:
                 cur.execute(
@@ -152,6 +159,7 @@ def _push_single_session(client, conn, session: dict) -> dict:
             # Inhalt geändert (gleiches Datum) → delete + recreate
             try:
                 client.delete_workout(existing_garmin_id)
+                time.sleep(GARMIN_CALL_DELAY_SECS)
                 with conn.cursor() as cur:
                     cur.execute(
                         "UPDATE garmin_mcp_log SET status='deleted', updated_at=NOW() WHERE external_id=%s",
@@ -163,6 +171,7 @@ def _push_single_session(client, conn, session: dict) -> dict:
 
     # Neu erstellen
     result = push_workout(workout_def, session_date, sport=sport)
+    time.sleep(GARMIN_CALL_DELAY_SECS)
     garmin_workout_id = result["garmin_workout_id"]
     garmin_schedule_id = result.get("garmin_schedule_id")
 

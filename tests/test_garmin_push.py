@@ -145,9 +145,19 @@ class TestCredentials:
             assert "ultra_secret_pw" not in str(exc)
 
 class TestLoginFailure:
+    # _load_cached_session() wird geblockt (get_connection() faellt hier
+    # absichtlich fehl), damit diese Tests nicht vom Inhalt der echten
+    # garmin_session_cache-Tabelle abhaengen — garmin_client() faengt das
+    # best-effort ab und faellt auf einen normalen Login zurueck.
+    def _block_session_cache(self, monkeypatch):
+        def _raise():
+            raise RuntimeError("no db in offline test")
+        monkeypatch.setattr("database.connection.get_connection", _raise)
+
     def test_login_raises_login_error(self, monkeypatch):
         monkeypatch.setenv("GARMIN_EMAIL", "t@t.com")
         monkeypatch.setenv("GARMIN_PASSWORD", "pw")
+        self._block_session_cache(monkeypatch)
         with patch("coach.garmin_push.Garmin") as M:
             M.return_value.login.side_effect = Exception("401")
             with pytest.raises(GarminLoginError, match="authentication failed"):
@@ -156,6 +166,7 @@ class TestLoginFailure:
     def test_password_not_in_login_error(self, monkeypatch):
         monkeypatch.setenv("GARMIN_EMAIL", "t@t.com")
         monkeypatch.setenv("GARMIN_PASSWORD", "my_super_secret")
+        self._block_session_cache(monkeypatch)
         with patch("coach.garmin_push.Garmin") as M:
             M.return_value.login.side_effect = Exception("err: my_super_secret")
             try:
@@ -445,3 +456,130 @@ class TestNoTargetPolicy:
         }
         p = build_workout_payload(wd)
         assert _target_key(p.workoutSegments[0].workoutSteps[0]) == "no.target"
+
+
+class TestSessionTokenCache:
+    """
+    garmin_session_cache (2026-08-15): garminconnect==0.3.6 hat kein .garth-
+    Attribut (der urspruengliche Auftrag ging von client.garth.dump()/.load()
+    aus). Verifiziert gegen den echten Paket-Quellcode: der Garmin-Client
+    bringt dumps()/loads() DIREKT auf sich selbst mit — JSON aus
+    di_token/di_refresh_token/di_client_id, niemals Email/Passwort. Tests
+    laufen gegen die echte Dev-DB (garmin_session_cache), Garmin-Client
+    durchgehend gemockt.
+    """
+
+    @pytest.fixture
+    def clean_cache(self):
+        from database.connection import get_connection
+        conn = get_connection()
+        conn.cursor().execute("DELETE FROM garmin_session_cache")
+        conn.commit()
+        conn.close()
+        yield
+        conn = get_connection()
+        conn.cursor().execute("DELETE FROM garmin_session_cache")
+        conn.commit()
+        conn.close()
+
+    def _insert_cache_row(self, token: str, age: str = "0 minutes"):
+        from database.connection import get_connection
+        conn = get_connection()
+        conn.cursor().execute(
+            f"INSERT INTO garmin_session_cache (token, updated_at) "
+            f"VALUES (%s, NOW() - INTERVAL '{age}')",
+            (token,),
+        )
+        conn.commit()
+        conn.close()
+
+    def test_fresh_cache_hit_skips_login(self, monkeypatch, clean_cache):
+        monkeypatch.setenv("GARMIN_EMAIL", "t@t.com")
+        monkeypatch.setenv("GARMIN_PASSWORD", "pw")
+        self._insert_cache_row('{"di_token":"abc"}', age="10 minutes")
+
+        with patch("coach.garmin_push.Garmin") as M:
+            client = garmin_client()
+            M.return_value.login.assert_not_called()
+            M.return_value.loads.assert_called_once_with('{"di_token":"abc"}')
+            assert client is M.return_value
+
+    def test_stale_cache_triggers_login(self, monkeypatch, clean_cache):
+        monkeypatch.setenv("GARMIN_EMAIL", "t@t.com")
+        monkeypatch.setenv("GARMIN_PASSWORD", "pw")
+        self._insert_cache_row('{"di_token":"old"}', age="56 minutes")
+
+        with patch("coach.garmin_push.Garmin") as M:
+            M.return_value.dumps.return_value = '{"di_token":"new"}'
+            garmin_client()
+            M.return_value.login.assert_called_once()
+
+    def test_no_cache_entry_triggers_login(self, monkeypatch, clean_cache):
+        monkeypatch.setenv("GARMIN_EMAIL", "t@t.com")
+        monkeypatch.setenv("GARMIN_PASSWORD", "pw")
+
+        with patch("coach.garmin_push.Garmin") as M:
+            M.return_value.dumps.return_value = '{"di_token":"new"}'
+            garmin_client()
+            M.return_value.login.assert_called_once()
+
+    def test_invalid_cached_token_falls_back_to_login(self, monkeypatch, clean_cache):
+        monkeypatch.setenv("GARMIN_EMAIL", "t@t.com")
+        monkeypatch.setenv("GARMIN_PASSWORD", "pw")
+        self._insert_cache_row("garbage-token", age="5 minutes")
+
+        with patch("coach.garmin_push.Garmin") as M:
+            M.return_value.loads.side_effect = Exception("bad token")
+            M.return_value.dumps.return_value = '{"di_token":"recovered"}'
+            garmin_client()
+            M.return_value.login.assert_called_once()
+
+    def test_successful_login_writes_cache(self, monkeypatch, clean_cache):
+        monkeypatch.setenv("GARMIN_EMAIL", "t@t.com")
+        monkeypatch.setenv("GARMIN_PASSWORD", "pw")
+
+        with patch("coach.garmin_push.Garmin") as M:
+            M.return_value.dumps.return_value = '{"di_token":"fresh"}'
+            garmin_client()
+
+        from database.connection import get_connection
+        conn = get_connection()
+        cur = conn.cursor()
+        cur.execute("SELECT token FROM garmin_session_cache")
+        row = cur.fetchone()
+        conn.close()
+        assert row == ('{"di_token":"fresh"}',)
+
+    def test_credentials_never_written_to_cache(self, monkeypatch, clean_cache):
+        monkeypatch.setenv("GARMIN_EMAIL", "secret@test.com")
+        monkeypatch.setenv("GARMIN_PASSWORD", "ultra_secret_pw")
+
+        with patch("coach.garmin_push.Garmin") as M:
+            M.return_value.dumps.return_value = '{"di_token":"xyz"}'
+            garmin_client()
+
+        from database.connection import get_connection
+        conn = get_connection()
+        cur = conn.cursor()
+        cur.execute("SELECT token FROM garmin_session_cache")
+        row = cur.fetchone()
+        conn.close()
+        assert "secret@test.com" not in row[0]
+        assert "ultra_secret_pw" not in row[0]
+
+    def test_login_failure_does_not_write_cache(self, monkeypatch, clean_cache):
+        monkeypatch.setenv("GARMIN_EMAIL", "t@t.com")
+        monkeypatch.setenv("GARMIN_PASSWORD", "pw")
+
+        with patch("coach.garmin_push.Garmin") as M:
+            M.return_value.login.side_effect = Exception("401")
+            with pytest.raises(GarminLoginError):
+                garmin_client()
+
+        from database.connection import get_connection
+        conn = get_connection()
+        cur = conn.cursor()
+        cur.execute("SELECT COUNT(*) FROM garmin_session_cache")
+        count = cur.fetchone()[0]
+        conn.close()
+        assert count == 0

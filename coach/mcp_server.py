@@ -1505,7 +1505,7 @@ def reconcile_training_block(start_date: str, end_date: str) -> dict:
 
 
 @mcp.tool()
-def push_sessions_to_garmin(session_ids: list[int]) -> dict:
+def push_sessions_to_garmin(session_ids: list[int], chunk_size: int = 7) -> dict:
     """
     Pusht eine Liste von CAIRN-Sessions gesammelt zu Garmin.
     Ein Login — mehrere Uploads — isolierte Fehlerbehandlung.
@@ -1515,14 +1515,32 @@ def push_sessions_to_garmin(session_ids: list[int]) -> dict:
     - Nach Wochenumstrukturierung: alle IDs der betroffenen Woche
     - Nachholpush: IDs aller fehlgeschlagenen Sessions
 
+    Werden mehr session_ids übergeben als chunk_size, wird nur der erste
+    Chunk gepusht (Timeout-/Rate-Limit-Schutz bei langen Listen). Die
+    Antwort enthält pushed_ids, remaining_ids und total_remaining, damit
+    ChatGPT sofort mit der nächsten Runde weitermachen kann.
+
     Gibt zurück: created / updated / moved / unchanged / failed pro Session.
     Strength, Core, Mobility werden vor dem ersten Garmin-Kontakt hart abgelehnt.
     """
+    chunk = session_ids[:chunk_size]
+    remaining = session_ids[chunk_size:]
     try:
         from coach.garmin_batch import run_batch
-        return run_batch(session_ids=session_ids)
+        result = run_batch(session_ids=chunk)
+        if isinstance(result, dict):
+            result["pushed_ids"] = chunk
+            result["remaining_ids"] = remaining
+            result["total_remaining"] = len(remaining)
+        return result
     except Exception as exc:
-        return {"error": str(exc), "type": type(exc).__name__}
+        return {
+            "error": str(exc),
+            "type": type(exc).__name__,
+            "pushed_ids": [],
+            "remaining_ids": session_ids,
+            "total_remaining": len(session_ids),
+        }
 
 
 # ── ASGI app factory ───────────────────────────────────────────────────────────

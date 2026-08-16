@@ -94,18 +94,88 @@ def _reject_if_never_garmin_session(workout_def: dict[str, Any]) -> None:
             f"(Strength/Mobility/Core/Rest Day sind Garmin-Push ausgeschlossen)."
         )
 
+# Session-Token-Cache (2026-08-15): garminconnect==0.3.6 hat kein .garth-
+# Attribut (frueherer Auftrag ging von client.garth.dump()/load() aus — das
+# existiert in der installierten Version nicht, siehe garminconnect/client.py).
+# Der Garmin-Client bringt dumps()/loads() aber DIREKT auf sich selbst mit —
+# JSON-Serialisierung von di_token/di_refresh_token/di_client_id, ohne
+# Email/Passwort. Genau dieser String wird gecacht, niemals Klartext-Credentials.
+_SESSION_CACHE_MAX_AGE = "55 minutes"
+
+
+def _load_cached_session(conn) -> str | None:
+    """Liefert den gecachten Garmin-Session-Token, falls juenger als 55 Minuten."""
+    with conn.cursor() as cur:
+        cur.execute(
+            f"SELECT token FROM garmin_session_cache "
+            f"WHERE updated_at > NOW() - INTERVAL '{_SESSION_CACHE_MAX_AGE}' "
+            f"ORDER BY updated_at DESC LIMIT 1"
+        )
+        row = cur.fetchone()
+    return row[0] if row else None
+
+
+def _save_session_cache(conn, token: str) -> None:
+    with conn.cursor() as cur:
+        # Nur der jeweils neueste Token wird behalten — Einzelnutzer-App,
+        # kein Bedarf fuer mehrere parallele Session-Caches.
+        cur.execute("DELETE FROM garmin_session_cache")
+        cur.execute(
+            "INSERT INTO garmin_session_cache (token, updated_at) VALUES (%s, NOW())",
+            (token,),
+        )
+    conn.commit()
+
+
 def garmin_client() -> Garmin:
     email = os.getenv("GARMIN_EMAIL")
     password = os.getenv("GARMIN_PASSWORD")
     missing = [k for k, v in {"GARMIN_EMAIL": email, "GARMIN_PASSWORD": password}.items() if not v]
     if missing:
         raise GarminCredentialsError(f"Missing required environment variable(s): {', '.join(missing)}")
+
+    client = Garmin(email=email, password=password, is_cn=False)
+
+    # DB-Zugriff ist best-effort: schlaegt die Cache-Lese-/Schreiboperation
+    # fehl (z.B. DB kurzzeitig nicht erreichbar), faellt garmin_client() auf
+    # einen normalen Login zurueck statt komplett zu scheitern.
+    from database.connection import get_connection
+    conn = None
     try:
-        client = Garmin(email=email, password=password, is_cn=False)
-        client.login()
-        return client
+        conn = get_connection()
+        cached_token = _load_cached_session(conn)
     except Exception as exc:
+        logger.warning("Garmin session cache read failed: %s", exc)
+        cached_token = None
+
+    if cached_token:
+        try:
+            client.loads(cached_token)
+            logger.info("Garmin-Session aus Cache geladen — kein neuer Login noetig.")
+            if conn is not None:
+                conn.close()
+            return client
+        except Exception as exc:
+            logger.warning("Gecachter Garmin-Token ungueltig/abgelaufen, neuer Login: %s", type(exc).__name__)
+
+    try:
+        client.login()
+    except Exception as exc:
+        if conn is not None:
+            conn.close()
         raise GarminLoginError("Garmin authentication failed") from exc
+
+    try:
+        if conn is None:
+            conn = get_connection()
+        _save_session_cache(conn, client.dumps())
+    except Exception as exc:
+        logger.warning("Garmin session cache write failed: %s", exc)
+    finally:
+        if conn is not None:
+            conn.close()
+
+    return client
 
 def _build_target(target_def: dict[str, Any] | None) -> dict[str, Any]:
     if target_def is None or target_def.get("type") == "no_target":
