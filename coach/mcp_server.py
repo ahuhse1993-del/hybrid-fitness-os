@@ -218,15 +218,32 @@ def get_races_and_goals() -> dict:
 
 
 @mcp.tool()
-def get_planned_workouts(days: int = 14) -> list[dict]:
+def get_planned_workouts(days: int = 14, start_date: str | None = None) -> list[dict]:
     """
-    Return planned training sessions for the next N days (default 14).
-    Includes session type, distance, target zone, structure, elevation_gain_m
-    (CAIRN-only planning metadata, never sent to Garmin), and Garmin workout
-    ID if already pushed.
+    Return planned training sessions for N days starting at start_date
+    (default: today). Includes session type, distance, target zone,
+    structure, elevation_gain_m (CAIRN-only planning metadata, never sent to
+    Garmin), and Garmin workout ID if already pushed.
+
+    Args:
+        days:       Number of days to include, counted from start_date.
+        start_date: Optional YYYY-MM-DD. Omit for today (previous default
+                    behavior unchanged). E.g. start_date="2026-08-16", days=3
+                    returns sessions from 2026-08-16 through 2026-08-18.
     """
+    if start_date:
+        try:
+            datetime.date.fromisoformat(start_date)
+        except ValueError:
+            return [{"error": f"start_date {start_date!r} ist kein gueltiges YYYY-MM-DD"}]
+        range_start_sql = "%s::date"
+        params = (start_date, start_date, days)
+    else:
+        range_start_sql = "CURRENT_DATE"
+        params = (days,)
+
     return _fetchall(
-        """
+        f"""
         SELECT id,
                (week_date + (day_of_week - 1) * INTERVAL '1 day')::date AS session_date,
                session_type, session_zone, distance_km, duration_min,
@@ -234,11 +251,65 @@ def get_planned_workouts(days: int = 14) -> list[dict]:
                elevation_gain_m
         FROM training_plan
         WHERE (week_date + (day_of_week - 1) * INTERVAL '1 day')::date
-              BETWEEN CURRENT_DATE AND CURRENT_DATE + (INTERVAL '1 day' * %s)
+              BETWEEN {range_start_sql} AND {range_start_sql} + (INTERVAL '1 day' * %s)
         ORDER BY session_date ASC
+        """,
+        params,
+    )
+
+
+@mcp.tool()
+def get_hevy_workouts(days: int = 60) -> list[dict]:
+    """
+    Return completed Hevy strength workouts from the last N days, with their
+    logged exercises. Read-only, CAIRN DB only — reads trainings/hevy_exercises
+    as already synced by data/hevy_sync.py, no live Hevy API call.
+
+    Returns: [{date, hevy_id, title, duration_minutes,
+               exercises: [{exercise_name, sets, reps_per_set, weight_kg_per_set}]}]
+    Newest workout first; exercises within a workout in logged order.
+    """
+    rows = _fetchall(
+        """
+        SELECT t.id AS training_id, t.date, t.hevy_id, t.notes, t.duration_minutes,
+               e.exercise_name, e.sets, e.reps_per_set, e.weight_kg_per_set, e.exercise_index
+        FROM trainings t
+        LEFT JOIN hevy_exercises e ON e.training_id = t.id
+        WHERE t.type = 'WeightTraining'
+          AND t.hevy_id IS NOT NULL
+          AND t.date >= CURRENT_DATE - (INTERVAL '1 day' * %s)
+        ORDER BY t.date DESC, t.id DESC, e.exercise_index ASC
         """,
         (days,),
     )
+
+    workouts: dict[int, dict] = {}
+    order: list[int] = []
+    for row in rows:
+        tid = row["training_id"]
+        if tid not in workouts:
+            workouts[tid] = {
+                "date": row["date"], "hevy_id": row["hevy_id"], "title": row["notes"],
+                "duration_minutes": row["duration_minutes"], "exercises": [],
+            }
+            order.append(tid)
+        if row["exercise_name"] is not None:
+            workouts[tid]["exercises"].append({
+                "exercise_name": row["exercise_name"], "sets": row["sets"],
+                "reps_per_set": row["reps_per_set"], "weight_kg_per_set": row["weight_kg_per_set"],
+            })
+    return [workouts[tid] for tid in order]
+
+
+@mcp.tool()
+def get_hevy_routines() -> list[dict]:
+    """
+    Return all CAIRN-known Hevy routines (synced via data/hevy_routines_sync.py
+    into cairn_routines). Read-only, CAIRN DB only — no live Hevy API call.
+
+    Returns: [{title, exercises: [str, ...]}]
+    """
+    return _fetchall("SELECT title, exercises FROM cairn_routines ORDER BY title")
 
 
 @mcp.tool()
@@ -1334,104 +1405,116 @@ def upsert_milestones(milestones: list) -> dict:
 
 
 @mcp.tool()
-def sync_hevy_completions(days: int = 14) -> dict:
+def sync_hevy_completions(days: int = 30) -> dict:
     """
-    Match completed Hevy workouts (trainings.hevy_id IS NOT NULL) to planned
-    Strength Training sessions in training_plan, over the last N days.
+    Match completed Hevy workouts (trainings.type='WeightTraining', hevy_id
+    IS NOT NULL) to planned CAIRN sessions in training_plan, over the last N
+    days. Links via training_plan.hevy_id = trainings.hevy_id (2026-08-17 —
+    replaces the earlier matched_training_id approach, which never produced
+    matches because training_plan had no hevy_id column at all).
 
-    Matching preference (per architecture doc):
-    1. Routine reference: training_plan.hevy_routine_key matches the Hevy
-       workout's title (trainings.notes, set by data/hevy_sync.py).
-    2. Fallback: same calendar date, session not yet matched.
+    Match rule, per Hevy workout:
+        training_plan.session_date = workout.date
+        AND session_type IN ('Strength Training', 'Krafttraining', 'Core', 'Mobility')
+        AND status = 'planned'
+    On match: training_plan.status = 'completed', training_plan.hevy_id = workout.hevy_id.
 
-    Idempotent: only considers training_plan rows with status='planned' AND
-    matched_training_id IS NULL, and only trainings not already referenced by
-    another training_plan.matched_training_id — repeated calls never create
-    duplicate matches or double-link the same Hevy workout.
+    Idempotent: a Hevy workout whose hevy_id is already linked to some
+    training_plan row is excluded from consideration up front — repeated
+    calls never re-match or double-link the same workout.
 
-    A failure matching one session does not abort the rest (isolated per-row
-    try/except) — this must never block Garmin sync, which is a separate tool.
+    A failure matching one workout does not abort the rest (isolated
+    per-workout try/except) — this must never block Garmin sync, a separate tool.
 
-    Returns: {matched: int, unmatched_sessions: [...], warnings: [...]}
+    Returns: {matched: int, unmatched_hevy: [...], unmatched_cairn: [...]}
+    - unmatched_hevy:  Hevy workouts in the window with no matching planned session.
+    - unmatched_cairn: planned Strength/Core/Mobility sessions in the window
+                        that are still unmatched after this run.
     """
     conn = get_connection()
     try:
         matched = 0
-        warnings: list[str] = []
-        unmatched: list[dict] = []
+        unmatched_hevy: list[dict] = []
 
         with conn.cursor() as cur:
             cur.execute(
                 """
-                SELECT id, external_id, hevy_routine_key,
+                SELECT id, date, hevy_id, notes
+                FROM trainings
+                WHERE type = 'WeightTraining'
+                  AND hevy_id IS NOT NULL
+                  AND date >= CURRENT_DATE - (INTERVAL '1 day' * %s)
+                  AND hevy_id NOT IN (
+                      SELECT hevy_id FROM training_plan WHERE hevy_id IS NOT NULL
+                  )
+                ORDER BY date
+                """,
+                (days,),
+            )
+            hevy_workouts = cur.fetchall()
+
+            for training_id, workout_date, hevy_id, notes in hevy_workouts:
+                try:
+                    cur.execute(
+                        """
+                        SELECT id, external_id FROM training_plan
+                        WHERE (week_date + (day_of_week - 1) * INTERVAL '1 day')::date = %s
+                          AND session_type IN ('Strength Training', 'Krafttraining', 'Core', 'Mobility')
+                          AND status = 'planned'
+                        ORDER BY id
+                        LIMIT 1
+                        """,
+                        (workout_date,),
+                    )
+                    row = cur.fetchone()
+
+                    if row:
+                        tp_id, ext_id = row
+                        cur.execute(
+                            "UPDATE training_plan SET status='completed', hevy_id=%s WHERE id=%s",
+                            (hevy_id, tp_id),
+                        )
+                        matched += 1
+                        logger.info(
+                            "sync_hevy_completions matched: training_plan_id=%s <- hevy_id=%s (training_id=%s)",
+                            tp_id, hevy_id, training_id,
+                        )
+                    else:
+                        unmatched_hevy.append({
+                            "hevy_id": hevy_id, "training_id": training_id,
+                            "date": str(workout_date), "title": notes,
+                        })
+                except Exception as exc:
+                    unmatched_hevy.append({
+                        "hevy_id": hevy_id, "training_id": training_id, "date": str(workout_date),
+                        "title": notes, "error": f"{type(exc).__name__}: {exc}",
+                    })
+                    continue
+
+            cur.execute(
+                """
+                SELECT id, external_id,
                        (week_date + (day_of_week - 1) * INTERVAL '1 day')::date AS session_date
                 FROM training_plan
-                WHERE session_type IN ('Strength Training', 'Krafttraining')
+                WHERE session_type IN ('Strength Training', 'Krafttraining', 'Core', 'Mobility')
                   AND status = 'planned'
-                  AND matched_training_id IS NULL
                   AND (week_date + (day_of_week - 1) * INTERVAL '1 day')::date
                       >= CURRENT_DATE - (INTERVAL '1 day' * %s)
                 ORDER BY session_date
                 """,
                 (days,),
             )
-            planned_sessions = cur.fetchall()
-
-            for tp_id, ext_id, routine_key, session_date in planned_sessions:
-                try:
-                    hevy_row = None
-                    if routine_key:
-                        cur.execute(
-                            """
-                            SELECT id FROM trainings
-                            WHERE hevy_id IS NOT NULL AND date = %s AND notes = %s
-                              AND id NOT IN (
-                                  SELECT matched_training_id FROM training_plan
-                                  WHERE matched_training_id IS NOT NULL
-                              )
-                            LIMIT 1
-                            """,
-                            (session_date, routine_key),
-                        )
-                        hevy_row = cur.fetchone()
-
-                    if not hevy_row:
-                        cur.execute(
-                            """
-                            SELECT id FROM trainings
-                            WHERE hevy_id IS NOT NULL AND date = %s
-                              AND id NOT IN (
-                                  SELECT matched_training_id FROM training_plan
-                                  WHERE matched_training_id IS NOT NULL
-                              )
-                            LIMIT 1
-                            """,
-                            (session_date,),
-                        )
-                        hevy_row = cur.fetchone()
-
-                    if hevy_row:
-                        cur.execute(
-                            "UPDATE training_plan SET status='completed', matched_training_id=%s WHERE id=%s",
-                            (hevy_row[0], tp_id),
-                        )
-                        matched += 1
-                        logger.info(
-                            "sync_hevy_completions matched: training_plan_id=%s -> training_id=%s",
-                            tp_id, hevy_row[0],
-                        )
-                    else:
-                        unmatched.append({
-                            "training_plan_id": tp_id, "external_id": ext_id,
-                            "date": str(session_date), "hevy_routine_key": routine_key,
-                        })
-                except Exception as exc:
-                    warnings.append(f"Session {ext_id!r} (id={tp_id}): Matching-Fehler — {type(exc).__name__}: {exc}")
-                    continue
+            unmatched_cairn = [
+                {"training_plan_id": r[0], "external_id": r[1], "date": str(r[2])}
+                for r in cur.fetchall()
+            ]
 
         conn.commit()
-        logger.info("sync_hevy_completions committed: matched=%s unmatched=%s", matched, len(unmatched))
-        return {"matched": matched, "unmatched_sessions": unmatched, "warnings": warnings}
+        logger.info(
+            "sync_hevy_completions committed: matched=%s unmatched_hevy=%s unmatched_cairn=%s",
+            matched, len(unmatched_hevy), len(unmatched_cairn),
+        )
+        return {"matched": matched, "unmatched_hevy": unmatched_hevy, "unmatched_cairn": unmatched_cairn}
     except Exception:
         conn.rollback()
         raise

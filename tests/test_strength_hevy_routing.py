@@ -22,6 +22,15 @@ from database.connection import get_connection
 
 TEST_PREFIX = "test-shr-"
 
+# Der neue sync_hevy_completions()-Matcher (2026-08-17) waehlt bei mehreren
+# planned Strength/Core/Mobility-Sessions am selben Datum per ORDER BY id
+# LIMIT 1 deterministisch die AELTESTE Zeile -- bei date.today() waere das
+# in der Praxis oft eine echte Produktionszeile (niedrigere id) statt der
+# gerade frisch angelegten Testzeile, was echte Daten faelschlich verlinken
+# wuerde (bereits einmal live passiert und manuell repariert). Ein Datum weit
+# in der Zukunft schliesst jede Kollision mit echten Plandaten sicher aus.
+_SAFE_TEST_DATE = date.today() + timedelta(days=3650)
+
 
 # ── Test 1: Lauftraining wird fuer den Garmin-Push akzeptiert ──────────────
 
@@ -180,24 +189,27 @@ def _insert_completed_hevy_training(db_conn, session_date: date, hevy_id: str, t
 
 
 # ── Test 6: Hevy-Sync ordnet absolviertes Workout dem geplanten Termin zu ──
+# (2026-08-17: Match-Algorithmus umgestellt von matched_training_id/routine_key
+# auf training_plan.hevy_id = trainings.hevy_id, reines Datum+session_type-Match.)
 
 class TestHevySyncMatchesPlannedSession:
-    def test_match_by_routine_key(self, db_conn, cleanup_test_rows):
+    def test_match_by_date_and_session_type(self, db_conn, cleanup_test_rows):
         from coach.mcp_server import sync_hevy_completions
 
-        today = date.today()
+        test_date = _SAFE_TEST_DATE
         ext_id = f"{TEST_PREFIX}match-1"
-        tp_id = _insert_planned_strength_session(db_conn, ext_id, today, routine_key="Upper Body CAIRN")
-        training_id = _insert_completed_hevy_training(db_conn, today, f"{TEST_PREFIX}hevy-1", "Upper Body CAIRN")
+        tp_id = _insert_planned_strength_session(db_conn, ext_id, test_date, routine_key="Upper Body CAIRN")
+        hevy_id = f"{TEST_PREFIX}hevy-1"
+        training_id = _insert_completed_hevy_training(db_conn, test_date, hevy_id, "Upper Body CAIRN")
         cleanup_test_rows.append(training_id)
 
         result = sync_hevy_completions(days=1)
 
         cur = db_conn.cursor()
-        cur.execute("SELECT status, matched_training_id FROM training_plan WHERE id = %s", (tp_id,))
-        status, matched_id = cur.fetchone()
+        cur.execute("SELECT status, hevy_id FROM training_plan WHERE id = %s", (tp_id,))
+        status, linked_hevy_id = cur.fetchone()
         assert status == "completed"
-        assert matched_id == training_id
+        assert linked_hevy_id == hevy_id
         assert result["matched"] >= 1
 
 
@@ -207,26 +219,24 @@ class TestHevySyncIdempotent:
     def test_repeated_sync_no_duplicate_match(self, db_conn, cleanup_test_rows):
         from coach.mcp_server import sync_hevy_completions
 
-        today = date.today()
+        test_date = _SAFE_TEST_DATE
         ext_id = f"{TEST_PREFIX}idem-1"
-        tp_id = _insert_planned_strength_session(db_conn, ext_id, today, routine_key="Lower Body + Arms CAIRN")
-        training_id = _insert_completed_hevy_training(db_conn, today, f"{TEST_PREFIX}hevy-2", "Lower Body + Arms CAIRN")
+        tp_id = _insert_planned_strength_session(db_conn, ext_id, test_date, routine_key="Lower Body + Arms CAIRN")
+        hevy_id = f"{TEST_PREFIX}hevy-2"
+        training_id = _insert_completed_hevy_training(db_conn, test_date, hevy_id, "Lower Body + Arms CAIRN")
         cleanup_test_rows.append(training_id)
 
         first = sync_hevy_completions(days=1)
         second = sync_hevy_completions(days=1)
 
         cur = db_conn.cursor()
-        cur.execute("SELECT COUNT(*) FROM training_plan WHERE matched_training_id = %s", (training_id,))
+        cur.execute("SELECT COUNT(*) FROM training_plan WHERE hevy_id = %s", (hevy_id,))
         count = cur.fetchone()[0]
         assert count == 1, "Der Hevy-Training darf nur genau einmal verknuepft sein, kein Duplikat"
-        assert any(u["training_plan_id"] == tp_id for u in first.get("unmatched_sessions", [])) or True
-        # Nach dem ersten Match ist die Session nicht mehr 'planned' -> zweiter
-        # Lauf darf sie nicht erneut in der Kandidatenliste sehen.
-        second_matched_this = [
-            u for u in second.get("unmatched_sessions", []) if u["training_plan_id"] == tp_id
-        ]
-        assert not second_matched_this
+        assert first["matched"] >= 1
+        # Nach dem ersten Match ist das Hevy-Workout bereits verlinkt -> der
+        # zweite Lauf darf es nicht erneut als unmatched_hevy auffuehren.
+        assert not any(u["hevy_id"] == hevy_id for u in second.get("unmatched_hevy", []))
 
 
 # ── Test 8: fehlende Hevy-Routine erzeugt Warning, nichts Erfundenes ───────
@@ -280,15 +290,15 @@ class TestGarminAndHevyErrorsIsolated:
         weiterhin ein Ergebnis (keine Exception nach aussen)."""
         from coach.mcp_server import sync_hevy_completions
 
-        today = date.today()
+        test_date = _SAFE_TEST_DATE
         ext_id = f"{TEST_PREFIX}isolate-1"
-        _insert_planned_strength_session(db_conn, ext_id, today, routine_key="Full Body Light CAIRN")
+        _insert_planned_strength_session(db_conn, ext_id, test_date, routine_key="Full Body Light CAIRN")
 
         # Kein Hevy-Match vorhanden -> Session bleibt unmatched, aber der Aufruf
         # selbst darf nicht crashen (kein try/except noetig aussenrum).
         result = sync_hevy_completions(days=1)
         assert isinstance(result, dict)
-        assert "matched" in result and "unmatched_sessions" in result and "warnings" in result
+        assert "matched" in result and "unmatched_hevy" in result and "unmatched_cairn" in result
 
 
 # ── upsert_planned_workout: einzelne Session, sync_target-Vertrag ─────────
