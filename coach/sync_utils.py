@@ -6,7 +6,8 @@ import hashlib
 import json
 
 HASH_FIELDS = ["date", "session_type", "distance_km", "duration_min",
-               "notes", "workout_steps", "session_zone", "name", "target"]
+               "notes", "workout_steps", "session_zone", "name", "target",
+               "elevation_gain_m"]
 
 
 def compute_content_hash(session: dict) -> str:
@@ -43,7 +44,7 @@ def sessions_to_push(conn) -> list[dict]:
                    session_type, session_zone, distance_km, duration_min,
                    notes, workout_steps, plan_week, phase, sport,
                    garmin_workout_id, external_id, content_hash,
-                   sync_status, name, target
+                   sync_status, name, target, elevation_gain_m
             FROM training_plan
             WHERE sync_target = 'garmin'
               AND status = 'planned'

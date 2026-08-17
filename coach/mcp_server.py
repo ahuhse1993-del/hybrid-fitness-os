@@ -221,14 +221,17 @@ def get_races_and_goals() -> dict:
 def get_planned_workouts(days: int = 14) -> list[dict]:
     """
     Return planned training sessions for the next N days (default 14).
-    Includes session type, distance, target zone, structure, and Garmin workout ID if already pushed.
+    Includes session type, distance, target zone, structure, elevation_gain_m
+    (CAIRN-only planning metadata, never sent to Garmin), and Garmin workout
+    ID if already pushed.
     """
     return _fetchall(
         """
         SELECT id,
                (week_date + (day_of_week - 1) * INTERVAL '1 day')::date AS session_date,
                session_type, session_zone, distance_km, duration_min,
-               notes, phase, garmin_workout_id, workout_steps, plan_week
+               notes, phase, garmin_workout_id, workout_steps, plan_week,
+               elevation_gain_m
         FROM training_plan
         WHERE (week_date + (day_of_week - 1) * INTERVAL '1 day')::date
               BETWEEN CURRENT_DATE AND CURRENT_DATE + (INTERVAL '1 day' * %s)
@@ -816,7 +819,8 @@ def preview_training_block(plan: dict) -> dict:
       "race": {"name": str, "race_date": "YYYY-MM-DD", "race_distance_km": float, "goal_type": str},
       "sessions": [
         {"external_id": str, "date": "YYYY-MM-DD", "session_type": str,
-         "distance_km": float, "duration_min": int, "session_zone": str, "notes": str},
+         "distance_km": float, "duration_min": int, "session_zone": str, "notes": str,
+         "elevation_gain_m": int},  # optional, CAIRN-only — never sent to Garmin
         ...
       ]
     }
@@ -944,6 +948,7 @@ def upsert_planned_workout(
     notes: str | None = None,
     source: str | None = None,
     sync_target: str | None = None,
+    elevation_gain_m: int | None = None,
 ) -> dict:
     """
     Save a single planned session in CAIRN. Idempotent via external_id
@@ -967,6 +972,10 @@ def upsert_planned_workout(
                       error (see coach/session_routing.py). A more conservative
                       request (e.g. "cairn_only" for a run) is honored as-is.
                       If omitted, sync_target is computed automatically.
+        elevation_gain_m: Optional planned elevation gain in meters. CAIRN-only
+                      metadata — never sent to Garmin (garmin_push.py has no
+                      concept of this field and workout_def is built explicitly
+                      key-by-key, so it can never leak into a Garmin push).
 
     Returns: training_plan id, sync_target (the actually applied value,
     post-validation), garmin_sport, created (bool).
@@ -1009,6 +1018,7 @@ def upsert_planned_workout(
                 "external_id", "week_date", "day_of_week", "session_type", "sport",
                 "name", "distance_km", "duration_min", "notes", "workout_steps",
                 "target", "source", "garmin_push_required", "sync_target",
+                "elevation_gain_m",
             ]
             values = [
                 external_id, week_date, day_of_week, session_type, sport,
@@ -1016,6 +1026,7 @@ def upsert_planned_workout(
                 json.dumps(structure) if structure is not None else None,
                 json.dumps(target) if target is not None else None,
                 resolved_source, routing["garmin_push_required"], routing["sync_target"],
+                elevation_gain_m,
             ]
             if plan_id is not None:
                 columns.append("plan_id")
@@ -1046,6 +1057,7 @@ def upsert_planned_workout(
                     "notes": notes, "workout_steps": structure,
                     "session_zone": existing_session_zone,
                     "name": name, "target": target,
+                    "elevation_gain_m": elevation_gain_m,
                 })
                 cur.execute("SELECT content_hash FROM training_plan WHERE id = %s", (row_id,))
                 old_hash = cur.fetchone()[0]
@@ -1200,8 +1212,8 @@ def upsert_training_block(plan: dict, confirm_race_date_change: bool = False) ->
                            (external_id, week_date, day_of_week, session_type, session_zone,
                             distance_km, duration_min, notes, plan_id,
                             status, source, garmin_push_required, hevy_routine_key,
-                            sport, sync_target, name, target)
-                       VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                            sport, sync_target, name, target, elevation_gain_m)
+                       VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                        ON CONFLICT (external_id) DO UPDATE SET
                            week_date=EXCLUDED.week_date, day_of_week=EXCLUDED.day_of_week,
                            session_type=EXCLUDED.session_type, session_zone=EXCLUDED.session_zone,
@@ -1210,7 +1222,8 @@ def upsert_training_block(plan: dict, confirm_race_date_change: bool = False) ->
                            source=EXCLUDED.source, garmin_push_required=EXCLUDED.garmin_push_required,
                            hevy_routine_key=EXCLUDED.hevy_routine_key,
                            sport=EXCLUDED.sport, sync_target=EXCLUDED.sync_target,
-                           name=EXCLUDED.name, target=EXCLUDED.target, updated_at=now()
+                           name=EXCLUDED.name, target=EXCLUDED.target,
+                           elevation_gain_m=EXCLUDED.elevation_gain_m, updated_at=now()
                        RETURNING id, (xmax = 0) AS inserted""",
                     (
                         s["external_id"], week_date, day_of_week, s["session_type"],
@@ -1220,6 +1233,7 @@ def upsert_training_block(plan: dict, confirm_race_date_change: bool = False) ->
                         routing["garmin_push_required"], hevy_routine_key,
                         resolved_sport, routing["sync_target"], s.get("name"),
                         json.dumps(s["target"]) if s.get("target") is not None else None,
+                        s.get("elevation_gain_m"),
                     ),
                 )
                 row_id, inserted = cur.fetchone()
@@ -1237,6 +1251,7 @@ def upsert_training_block(plan: dict, confirm_race_date_change: bool = False) ->
                         "notes": s.get("notes"), "workout_steps": None,
                         "session_zone": s.get("session_zone"),
                         "name": s.get("name"), "target": s.get("target"),
+                        "elevation_gain_m": s.get("elevation_gain_m"),
                     })
                     if new_hash != old_hash:
                         cur.execute(

@@ -226,7 +226,7 @@ def run_batch(session_ids: list[int] = None) -> dict:
                            session_type, session_zone, distance_km, duration_min,
                            notes, workout_steps, plan_week, phase, sport,
                            garmin_workout_id, external_id, content_hash, sync_status,
-                           name, target
+                           name, target, elevation_gain_m
                     FROM training_plan WHERE id = ANY(%s)
                 """, (session_ids,))
                 cols = [d[0] for d in cur.description]
