@@ -661,18 +661,33 @@ def bulk_delete_garmin_workouts(garmin_workout_ids: list[int]) -> dict:
 def get_activity_analysis_data(
     activity_id: int | None = None,
     garmin_id: str | None = None,
-    stream_resolution_s: int = 30,
+    include_stream: bool = True,
+    stream_resolution_m: int = 100,
 ) -> dict:
     """
-    Vollständige Analyse-Daten für einen abgeschlossenen Lauf.
+    Vollständige Analyse-Daten für eine abgeschlossene Einheit.
     Zuerst get_recent_activities() aufrufen um die activity_id zu erhalten.
+    Deckt das vollständige 25-Punkte-Analyse-Schema ab.
+
+    Args:
+        activity_id:         CAIRN trainings.id
+        garmin_id:           Alternativ: Garmin activityId als String
+        include_stream:      True = Activity Stream mitliefern (Standard).
+                             False = nur Splits/Kopf, schnellere Antwort.
+        stream_resolution_m: Auflösung des Streams in Metern (Standard 100m).
+                             50 = feinkörniger, 200 = kompakter.
+                             HR und Elevation sind auf Distanz-Achse ausgerichtet
+                             → ermöglicht HR-Terrain-Korrelation, Pace-HR-Effizienz,
+                             Cardiac Drift, Steigungsanalyse.
 
     Gibt zurück:
-    - summary:          23+ Felder Gesamtübersicht
-    - splits:           km-weise Aufschlüsselung mit Pace, HF, Elevation
-    - hr_zones:         Zeitverteilung in HR-Zonen (Minuten + Prozent)
-    - trail_segments:   Aggregierte Aufstiegs-/Abstiegs-/Flachphasen
-    - stream:           Downgesampelter HR-Stream (aus hr_tracks, ~30s Auflösung)
+    - summary:        Aktivitätskopf mit allen Kennzahlen
+    - splits:         km-weise Pace, HR, Cadence, Elevation
+    - trail_metrics:  Aufstieg, Abstieg, Max-Steigung, Vertikalgeschwindigkeit
+    - trail_segments: Aufstieg/Abstieg/Flach-Phasen mit Pace+HR pro Segment
+    - stream:         HR + Elevation + Pace + Cadence auf Distanz-Achse
+                      (aus activity_stream falls verfügbar, sonst hr_tracks Fallback)
+    - hr_zones:       Z1–Z5 aus athlete_profile Grenzen, in Zeit + Prozent
     """
     # ── Aktivität laden ──
     if activity_id:
@@ -703,7 +718,7 @@ def get_activity_analysis_data(
 
     # ── Splits ──
     splits_raw = _fetchall(
-        "SELECT split_number, distance_km, pace_seconds, heart_rate_avg, elevation_gain "
+        "SELECT split_number, distance_km, pace_seconds, heart_rate_avg, elevation_gain, cadence_avg "
         "FROM splits WHERE training_id = %s ORDER BY split_number",
         (tid,)
     )
@@ -722,12 +737,14 @@ def get_activity_analysis_data(
             "km": s["split_number"],
             "distance_km": float(s["distance_km"]) if s["distance_km"] else None,
             "pace_per_km": f"{pace_s//60}:{str(pace_s%60).zfill(2)}" if pace_s else None,
+            "pace_seconds": pace_s,
             "hr_avg": s["heart_rate_avg"],
             "elevation_m": round(elev, 1),
+            "cadence": s["cadence_avg"],
         })
 
-    # ── Trail-Segmente (aus Splits berechnet) ──
-    UPHILL_T, DOWNHILL_T = 30, -30
+    # ── Trail-Segmente (aus Splits: Aufstieg / Abstieg / Flach) ──
+    UPHILL_T, DOWNHILL_T = 30, -30   # m/km Steigung als Grenze
     classified = []
     for s in splits_raw:
         elev = float(s["elevation_gain"]) if s["elevation_gain"] else 0.0
@@ -769,45 +786,146 @@ def get_activity_analysis_data(
             "avg_hr": avg_hr,
         })
 
-    # ── HR-Zonen (aus athlete_profile + hr_tracks) ──
+    # ── Trail-Metriken (aus activity_stream falls verfügbar, sonst Splits-Summe) ──
+    stream_ele_rows = _fetchall(
+        "SELECT distance_m, elevation_m FROM activity_stream "
+        "WHERE training_id = %s AND elevation_m IS NOT NULL ORDER BY distance_m",
+        (tid,)
+    )
+
+    if stream_ele_rows:
+        ascent = descent = 0.0
+        max_grade_pct = 0.0
+        elevations = [r["elevation_m"] for r in stream_ele_rows]
+        for i in range(1, len(elevations)):
+            diff = elevations[i] - elevations[i - 1]
+            if diff > 0: ascent += diff
+            else: descent += abs(diff)
+
+        # Max-Steigung über 100m-Fenster
+        pts = [(r["distance_m"], r["elevation_m"]) for r in stream_ele_rows]
+        for i, (d1, e1) in enumerate(pts):
+            for d2, e2 in pts[i + 1:]:
+                if d2 - d1 >= 100:
+                    grade = abs(e2 - e1) / (d2 - d1) * 100
+                    if grade > max_grade_pct: max_grade_pct = grade
+                    break
+
+        total_dist_km = float(training["distance_km"]) if training["distance_km"] else 0
+        avg_grade = (ascent / (total_dist_km * 1000) * 100) if total_dist_km > 0 else 0
+        dur_h = (training["duration_minutes"] or 0) / 60
+        trail_metrics = {
+            "ascent_m": round(ascent, 1),
+            "descent_m": round(descent, 1),
+            "avg_grade_pct": round(avg_grade, 1),
+            "max_grade_pct": round(max_grade_pct, 1),
+            "vertical_speed_m_per_h": round(ascent / dur_h, 1) if dur_h > 0 else None,
+            "source": "activity_stream",
+        }
+    else:
+        trail_metrics = {
+            "ascent_m": training["elevation_gain_m"] or round(total_up, 1),
+            "descent_m": training["elevation_loss_m"] or round(total_down, 1),
+            "avg_grade_pct": None,
+            "max_grade_pct": None,
+            "vertical_speed_m_per_h": None,
+            "source": "splits_fallback",
+        }
+
+    # ── Activity Stream (distanzbasiert, ausgedünnt auf stream_resolution_m) ──
+    stream_out = None
+    stream_point_count = 0
+
+    if include_stream:
+        resolution = max(10, min(500, stream_resolution_m))
+        raw_stream = _fetchall(
+            "SELECT distance_m, heart_rate, elevation_m, speed_ms, cadence, power "
+            "FROM activity_stream WHERE training_id = %s ORDER BY distance_m",
+            (tid,)
+        )
+
+        if raw_stream:
+            points = []
+            last_d = -resolution
+            for r in raw_stream:
+                d = r["distance_m"]
+                if d >= last_d + resolution:
+                    p: dict[str, Any] = {"d": round(d)}
+                    if r["heart_rate"] is not None: p["hr"] = r["heart_rate"]
+                    if r["elevation_m"] is not None: p["ele"] = round(r["elevation_m"], 1)
+                    if r["speed_ms"] is not None and r["speed_ms"] > 0:
+                        p["pace_s"] = round(1000 / r["speed_ms"])
+                    if r["cadence"] is not None: p["cad"] = r["cadence"]
+                    if r["power"] is not None: p["pwr"] = r["power"]
+                    points.append(p)
+                    last_d = d
+            stream_point_count = len(points)
+            stream_out = {
+                "source": "activity_stream",
+                "resolution_m": resolution,
+                "point_count": stream_point_count,
+                "fields": "d=distance_m | hr=heart_rate_bpm | ele=elevation_m | pace_s=sec_per_km | cad=cadence_spm | pwr=power_watt",
+                "points": points,
+            }
+        else:
+            # Fallback: hr_tracks (zeitbasiert) — deutlich weniger nützlich für Terrain-Korrelation
+            hr_fallback = _fetchall(
+                "SELECT point_index, timestamp_ms, heart_rate FROM hr_tracks "
+                "WHERE training_id = %s AND MOD(point_index, 30) = 0 ORDER BY point_index",
+                (tid,)
+            )
+            if hr_fallback:
+                stream_point_count = len(hr_fallback)
+                stream_out = {
+                    "source": "hr_tracks_fallback",
+                    "note": "activity_stream noch nicht importiert — nur HR auf Zeitachse, keine Distanz-Korrelation möglich. Nächster sync_completed_activities Aufruf importiert den Stream.",
+                    "resolution_s": 30,
+                    "point_count": stream_point_count,
+                    "fields": "point_index | timestamp_ms | heart_rate",
+                    "data": [[p["point_index"], p["timestamp_ms"], p["heart_rate"]] for p in hr_fallback],
+                }
+            else:
+                stream_out = {"available": False, "reason": "Kein Stream vorhanden"}
+
+    # ── HR-Zonen (aus athlete_profile Grenzen) ──
     zones_out = []
     profile = _fetchone(
         "SELECT hr_z1_max, hr_z2_max, hr_z3_max, hr_z4_max, hr_z5_max "
         "FROM athlete_profile ORDER BY id DESC LIMIT 1"
     )
-    if profile and any(profile.values()):
-        hr_points = _fetchall(
-            "SELECT heart_rate FROM hr_tracks WHERE training_id = %s AND heart_rate IS NOT NULL",
+    if profile and any(v for v in profile.values() if v is not None):
+        # HR-Daten: bevorzuge activity_stream, Fallback hr_tracks
+        hr_vals_raw = _fetchall(
+            "SELECT heart_rate FROM activity_stream "
+            "WHERE training_id = %s AND heart_rate IS NOT NULL",
             (tid,)
         )
-        if hr_points:
+        if not hr_vals_raw:
+            hr_vals_raw = _fetchall(
+                "SELECT heart_rate FROM hr_tracks WHERE training_id = %s AND heart_rate IS NOT NULL",
+                (tid,)
+            )
+
+        if hr_vals_raw:
             zone_bounds = [
-                (1, "Regeneration", 0, profile["hr_z1_max"] or 130),
+                (1, "Regeneration", 0,                             profile["hr_z1_max"] or 130),
                 (2, "Basis",        (profile["hr_z1_max"] or 130) + 1, profile["hr_z2_max"] or 148),
                 (3, "Tempo",        (profile["hr_z2_max"] or 148) + 1, profile["hr_z3_max"] or 162),
                 (4, "Schwelle",     (profile["hr_z3_max"] or 162) + 1, profile["hr_z4_max"] or 174),
                 (5, "VO2max",       (profile["hr_z4_max"] or 174) + 1, 999),
             ]
-            total_pts = len(hr_points)
+            total_pts = len(hr_vals_raw)
+            dur_min = training["duration_minutes"] or 0
             for z_num, z_label, z_min, z_max in zone_bounds:
-                count = sum(1 for p in hr_points if z_min <= (p["heart_rate"] or 0) <= z_max)
-                time_min = round(count / 60, 1)
+                count = sum(1 for p in hr_vals_raw if z_min <= (p["heart_rate"] or 0) <= z_max)
                 zones_out.append({
                     "zone": z_num,
                     "label": z_label,
                     "min_hr": z_min,
                     "max_hr": z_max if z_max < 999 else None,
-                    "time_min": time_min,
-                    "pct": round(count / total_pts * 100) if total_pts > 0 else 0,
+                    "time_min": round(count / total_pts * dur_min, 1) if total_pts > 0 else 0,
+                    "pct": round(count / total_pts * 100, 1) if total_pts > 0 else 0,
                 })
-
-    # ── Stream (downgesampelt aus hr_tracks) ──
-    stream_data = _fetchall(
-        f"SELECT point_index, timestamp_ms, heart_rate FROM hr_tracks "
-        f"WHERE training_id = %s AND MOD(point_index, %s) = 0 "
-        f"ORDER BY point_index",
-        (tid, stream_resolution_s)
-    )
 
     # ── Summary ──
     dist = training["distance_km"]
@@ -825,8 +943,8 @@ def get_activity_analysis_data(
         "avg_pace_per_km": f"{avg_pace_s//60}:{str(avg_pace_s%60).zfill(2)}" if avg_pace_s else None,
         "avg_hr": training["heart_rate_avg"],
         "max_hr": training["max_hr"],
-        "elevation_gain_m": training["elevation_gain_m"] or round(total_up, 1),
-        "elevation_loss_m": training["elevation_loss_m"] or round(total_down, 1),
+        "elevation_gain_m": trail_metrics["ascent_m"],
+        "elevation_loss_m": trail_metrics["descent_m"],
         "avg_cadence": training["avg_cadence"],
         "training_load": training["training_load"],
         "aerobic_effect": training["aerobic_effect"],
@@ -836,19 +954,18 @@ def get_activity_analysis_data(
         "splits_count": len(splits_out),
         "trail_segments_count": len(trail_segments),
         "hr_zones_available": len(zones_out) > 0,
-        "stream_points": len(stream_data),
+        "stream_available": stream_out is not None and stream_out.get("available") is not False,
+        "stream_source": stream_out.get("source") if stream_out else None,
+        "stream_points": stream_point_count,
     }
 
     return {
         "summary": summary,
         "splits": splits_out,
+        "trail_metrics": trail_metrics,
         "trail_segments": trail_segments,
         "hr_zones": zones_out if zones_out else None,
-        "stream": {
-            "resolution_s": stream_resolution_s,
-            "fields": ["point_index", "timestamp_ms", "heart_rate"],
-            "data": [[p["point_index"], p["timestamp_ms"], p["heart_rate"]] for p in stream_data],
-        } if stream_data else None,
+        "stream": stream_out,
     }
 
 
