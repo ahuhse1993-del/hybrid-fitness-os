@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "cairn-flask",
+      "runtimeExecutable": "venv/bin/python",
+      "runtimeArgs": ["-m", "coach.api"],
+      "port": 5002
+    }
+  ]
+}

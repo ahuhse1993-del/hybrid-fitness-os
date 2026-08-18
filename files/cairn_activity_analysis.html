@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CAIRN &middot; Analyse</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#F0EDE6;--stone:#9E9B95;--mid:#2E2C2A;--black:#1A1918;--accent:#E8D84A;--accent-mid:#C9BB2E;--accent-dark:#8C7F0A;--red:#C4547A;--dl:radial-gradient(circle,rgba(46,44,42,.13) 1px,transparent 1px)}
+body{background:var(--bg);font-family:"DM Sans",sans-serif;color:var(--black);font-size:14px}
+.mono{font-family:"DM Mono",monospace}
+.wrap{max-width:1040px;margin:0 auto;padding-bottom:60px}
+.topbar{background:var(--black);display:flex;align-items:center;justify-content:space-between;padding:0 16px;height:48px;position:sticky;top:0;z-index:50;border-bottom:.5px solid #2A2826}
+.tsub{font-family:"DM Mono",monospace;font-size:9px;color:#6B6860;letter-spacing:.08em}
+.ttitle{color:#F0EDE6;font-size:13px}
+.back{background:transparent;border:none;color:#6B6860;font-family:"DM Mono",monospace;font-size:9px;cursor:pointer;letter-spacing:.06em}
+.sec{display:flex;align-items:center;gap:10px;padding:16px 16px 9px}
+.secl{font-family:"DM Mono",monospace;font-size:9px;color:#9E9B95;letter-spacing:.12em;flex-shrink:0;text-transform:uppercase}
+.secln{flex:1;height:.5px;background:rgba(46,44,42,.16)}
+.coach{background:var(--black);padding:20px 16px 22px;margin-bottom:2px;position:relative}
+.coach::before{content:"";position:absolute;top:0;left:0;right:0;height:2px;background:var(--accent)}
+.clbl{font-family:"DM Mono",monospace;font-size:9px;color:rgba(232,216,74,.5);letter-spacing:.12em;margin-bottom:7px;text-transform:uppercase}
+.ch{font-size:19px;font-weight:300;color:#F0EDE6;line-height:1.38;letter-spacing:-.01em;margin-bottom:12px}
+.cb{font-size:13px;color:rgba(240,237,230,.68);line-height:1.8;margin-bottom:4px}
+.tws{list-style:none;margin-top:14px;border-top:.5px solid rgba(240,237,230,.08);padding-top:14px}
+.tw{display:flex;gap:10px;padding:6px 0;border-bottom:.5px solid rgba(240,237,230,.06)}
+.tw:last-child{border-bottom:none}
+.twd{color:var(--accent);font-family:"DM Mono",monospace;font-size:12px;flex-shrink:0}
+.twt{font-size:12px;color:rgba(240,237,230,.62);line-height:1.6}
+.twt.warn{color:rgba(196,84,122,.85)}
+.hero{background:#E8E4DC;padding:14px 16px 12px;margin-bottom:2px}
+.hdn{font-family:"DM Mono",monospace;font-size:48px;font-weight:500;line-height:1;letter-spacing:-.03em}
+.hdu{font-family:"DM Mono",monospace;font-size:12px;color:#9E9B95}
+.hsub{font-family:"DM Mono",monospace;font-size:9px;color:#9E9B95;margin-top:2px}
+.hgrid{display:grid;grid-template-columns:repeat(4,1fr);border-top:.5px solid rgba(46,44,42,.15);margin-top:10px}
+.hs{padding:9px 0 5px}.hs+.hs{border-left:.5px solid rgba(46,44,42,.12);padding-left:12px}
+.hsl{font-family:"DM Mono",monospace;font-size:8px;color:#9E9B95;letter-spacing:.05em;margin-bottom:2px;text-transform:uppercase}
+.hsv{font-family:"DM Mono",monospace;font-size:15px;font-weight:500;line-height:1}
+.zr{display:flex;align-items:center;gap:6px;margin-bottom:4px}.zr:last-child{margin-bottom:0}
+.zl{font-family:"DM Mono",monospace;font-size:9px;width:16px;flex-shrink:0;color:#6B6860}
+.zb{flex:1;height:8px;display:flex;overflow:hidden;background:rgba(46,44,42,.08)}
+.zf{height:100%;background:var(--mid)}
+.zp{font-family:"DM Mono",monospace;font-size:9px;width:32px;text-align:right;flex-shrink:0;color:#6B6860}
+.card{background:#E8E4DC;padding:13px 12px 10px}
+.trail-block{background:var(--black);padding:18px 16px 20px;margin-bottom:2px}
+.trail-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-top:12px}
+@media(min-width:700px){.trail-grid{grid-template-columns:repeat(5,1fr)}}
+.trail-cell{padding:0 12px 8px;border-left:.5px solid rgba(240,237,230,.12)}
+.trail-cell:first-child{border-left:none;padding-left:0}
+.tc-lbl{font-family:"DM Mono",monospace;font-size:8px;color:rgba(232,216,74,.5);letter-spacing:.05em;text-transform:uppercase;margin-bottom:5px}
+.tc-val{font-family:"DM Mono",monospace;font-size:20px;font-weight:500;line-height:1;color:#F0EDE6}
+.tc-unit{font-family:"DM Mono",monospace;font-size:9px;color:rgba(240,237,230,.4);margin-left:2px;font-weight:400}
+.seg-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:.5px solid rgba(240,237,230,.06);font-family:"DM Mono",monospace;font-size:11px;color:#F0EDE6}
+.seg-tag{width:70px;flex-shrink:0;font-size:9px;letter-spacing:.05em;text-transform:uppercase;padding:3px 6px;text-align:center}
+.seg-tag.uphill{background:rgba(196,84,122,.18);color:#D98CA8}
+.seg-tag.downhill{background:rgba(58,123,213,.18);color:#7AA9E8}
+.seg-tag.flat{background:rgba(240,237,230,.08);color:#9E9B95}
+.stog{width:100%;background:var(--black);border:none;padding:14px 16px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;margin-bottom:2px;font-family:"DM Mono",monospace;font-size:10px;color:#F0EDE6;letter-spacing:.08em;text-transform:uppercase}
+.stog:hover{background:#2E2C2A}
+.stog #sarr{color:var(--accent)}
+.scnt{display:none;background:#1A1918;padding:0 16px 16px;margin-bottom:2px;overflow-x:auto}
+.scnt.open{display:block}
+.stbl{width:100%;border-collapse:collapse;font-family:"DM Mono",monospace;font-size:11px;min-width:480px}
+.stbl th{font-size:8px;color:rgba(232,216,74,.5);padding:10px 6px 8px;text-align:left;font-weight:400;border-bottom:.5px solid rgba(240,237,230,.12);white-space:nowrap;letter-spacing:.05em;text-transform:uppercase}
+.stbl td{padding:7px 6px;border-bottom:.5px solid rgba(240,237,230,.06);white-space:nowrap;color:#F0EDE6}
+.stbl tr:last-child td{border-bottom:none}
+.stbl tr.partial td{color:rgba(232,216,74,.75)}
+.lblock{background:#E8E4DC;padding:16px 16px 14px;margin-bottom:2px}
+.llbl{font-family:"DM Mono",monospace;font-size:9px;color:#6B6860;letter-spacing:.1em;text-transform:uppercase;margin-bottom:10px}
+.ltxt{font-size:13px;color:var(--mid);line-height:1.72;border-left:2px solid var(--black);padding-left:12px}
+.rec-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px 20px}
+@media(min-width:700px){.rec-grid{grid-template-columns:repeat(4,1fr)}}
+.rec-cell .hsl{margin-bottom:3px}
+.gear-box{background:#E8E4DC;padding:16px;margin-bottom:2px}
+.gear-select{width:100%;background:var(--bg);border:.5px solid rgba(46,44,42,.35);color:var(--black);font-family:"DM Mono",monospace;font-size:11px;padding:10px 12px;outline:none;cursor:pointer}
+.gear-stats{display:flex;gap:20px;flex-wrap:wrap;margin-top:14px}
+.gear-stats .hsl{margin-bottom:3px}
+.qual-warn{font-size:12px;color:#8C7F0A;line-height:1.7;padding:6px 0;border-bottom:.5px solid rgba(46,44,42,.08)}
+.qual-warn:last-child{border-bottom:none}
+.qual-ok{font-size:11px;color:#4a9a59;font-family:"DM Mono",monospace}
+.leaflet-container{background:#1A1918}
+.leaflet-tile-pane{filter:grayscale(100%) brightness(0.45) contrast(1.1)}
+.leaflet-control-zoom a{background:var(--black);color:var(--accent);border-color:#333;font-family:"DM Mono",monospace}
+.leaflet-control-attribution{display:none}
+.note{font-family:"DM Mono",monospace;font-size:9px;color:#9E9B95;padding:12px 16px}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div>
+    <div class="tsub" id="an-type">&mdash;</div>
+    <div class="ttitle" id="an-title">L&auml;dt&hellip;</div>
+  </div>
+  <button class="back" onclick="window.location='/'">&larr; ZUR&Uuml;CK</button>
+</div>
+
+<div class="wrap">
+
+  <div class="coach">
+    <div class="clbl">Coach &middot; Analyse</div>
+    <div class="ch" id="coach-verdict">L&auml;dt&hellip;</div>
+    <div class="cb" id="coach-summary"></div>
+    <ul class="tws" id="coach-findings"></ul>
+    <div class="cb" id="coach-recommendation" style="margin-top:10px"></div>
+  </div>
+
+  <div class="hero">
+    <div style="display:grid;grid-template-columns:3fr 1fr;gap:16px">
+      <div style="padding-bottom:10px">
+        <div style="display:flex;align-items:baseline;gap:5px;margin-bottom:3px">
+          <div class="hdn" id="hero-km">&mdash;</div><div class="hdu">km</div>
+        </div>
+        <div class="hsub" id="hero-name">&mdash;</div>
+      </div>
+      <div style="border-left:.5px solid rgba(46,44,42,.15);padding:0 0 10px 12px" id="hz-block">
+        <div style="font-family:'DM Mono',monospace;font-size:8px;color:#9E9B95;letter-spacing:.05em;text-transform:uppercase;margin-bottom:7px">HF-Zonen</div>
+        <div id="hz-rows"><div class="qual-ok mono" style="font-size:9px">nicht verf&uuml;gbar</div></div>
+      </div>
+    </div>
+    <div class="hgrid">
+      <div class="hs"><div class="hsl">Zeit</div><div class="hsv" id="hero-time">&mdash;</div></div>
+      <div class="hs"><div class="hsl">Pace &oslash;</div><div class="hsv" id="hero-pace">&mdash;</div></div>
+      <div class="hs"><div class="hsl">HF &oslash;</div><div class="hsv" id="hero-hr">&mdash;</div></div>
+      <div class="hs"><div class="hsl">Aufstieg</div><div class="hsv" id="hero-elev">&mdash;</div></div>
+    </div>
+  </div>
+
+  <div class="sec"><span class="secl">Route &amp; H&ouml;henprofil</span><div class="secln"></div></div>
+  <div style="display:grid;grid-template-columns:1fr;gap:2px;margin-bottom:2px" id="route-grid">
+    <div style="height:320px;position:relative">
+      <div id="map" style="width:100%;height:100%"></div>
+      <div id="map-note" class="note" style="display:none;position:absolute;inset:0;background:var(--black);color:#6B6860;align-items:center;justify-content:center">Keine GPS-Koordinaten verf&uuml;gbar.</div>
+    </div>
+    <div style="background:#E8E4DC;padding:12px">
+      <div style="display:flex;gap:20px;margin-bottom:6px">
+        <div><div class="hsl">Aufstieg</div><div class="hsv" id="elev-up">&mdash;</div></div>
+        <div><div class="hsl">Abstieg</div><div class="hsv" id="elev-down">&mdash;</div></div>
+      </div>
+      <div id="elev-chart" style="height:180px"></div>
+    </div>
+  </div>
+
+  <div class="sec" id="trail-sec" style="display:none"><span class="secl">Trail-Segmente</span><div class="secln"></div></div>
+  <div class="trail-block" id="trail-block" style="display:none">
+    <div class="trail-grid" id="trail-summary"></div>
+    <div style="margin-top:16px" id="trail-segments"></div>
+  </div>
+
+  <div class="sec"><span class="secl">Pace &amp; Herzfrequenz</span><div class="secln"></div></div>
+  <div style="display:grid;grid-template-columns:1fr;gap:2px;margin-bottom:2px">
+    <div class="card" style="padding-bottom:20px">
+      <div class="mono" style="font-size:9px;color:#6B6860;text-transform:uppercase;letter-spacing:.09em;margin-bottom:4px">Pace pro km</div>
+      <div id="pace-chart" style="margin-top:8px"></div>
+    </div>
+    <div style="background:#E8E4DC;padding:12px">
+      <div style="display:flex;gap:20px;margin-bottom:6px">
+        <div><div class="hsl">&Oslash; HF</div><div class="hsv" id="hf-avg-chart">&mdash;</div></div>
+        <div><div class="hsl">Max HF</div><div class="hsv" id="hf-max-chart">&mdash;</div></div>
+      </div>
+      <div id="hf-chart" style="height:180px"></div>
+    </div>
+  </div>
+
+  <div class="sec"><span class="secl">Erholung</span><div class="secln"></div></div>
+  <div class="gear-box" id="recovery-box">
+    <div class="rec-grid" id="recovery-grid"><div class="hsl">Keine Daten verf&uuml;gbar</div></div>
+  </div>
+
+  <div class="sec"><span class="secl">Schuh</span><div class="secln"></div></div>
+  <div class="gear-box">
+    <select class="gear-select" id="gear-select" onchange="onGearSelect()">
+      <option value="">&mdash; Schuh ausw&auml;hlen &mdash;</option>
+    </select>
+    <div class="gear-stats" id="gear-stats" style="display:none">
+      <div><div class="hsl">Aktivit&auml;t</div><div class="hsv" id="gs-activity">&mdash;</div></div>
+      <div><div class="hsl">Vorher</div><div class="hsv" id="gs-before">&mdash;</div></div>
+      <div><div class="hsl">Nachher</div><div class="hsv" id="gs-after">&mdash;</div></div>
+      <div><div class="hsl">Verbleibend</div><div class="hsv" id="gs-remaining">&mdash;</div></div>
+    </div>
+  </div>
+
+  <button class="stog" onclick="toggle('native-laps-content','nl-arr')"><span>Native Garmin-Laps</span><span id="nl-arr">&#9660;</span></button>
+  <div class="scnt" id="native-laps-content">
+    <table class="stbl"><thead><tr><th>Lap</th><th>Distanz</th><th>Pace</th><th>HF &oslash;/Max</th><th>Kadenz</th><th>Aufstieg/Abstieg</th><th>Typ</th></tr></thead><tbody id="native-laps-body"></tbody></table>
+  </div>
+
+  <button class="stog" onclick="toggle('km-splits-content','ks-arr')"><span>Kilometer-Splits</span><span id="ks-arr">&#9660;</span></button>
+  <div class="scnt" id="km-splits-content">
+    <div id="km-splits-note" class="note" style="display:none;padding:12px 0"></div>
+    <table class="stbl" id="km-splits-table"><thead><tr><th>Km</th><th>Pace</th><th>HF &oslash;/Max</th><th>Kadenz</th><th>Aufstieg/Abstieg</th></tr></thead><tbody id="km-splits-body"></tbody></table>
+  </div>
+
+  <button class="stog" onclick="toggle('quality-content','q-arr')"><span>Datenqualit&auml;t</span><span id="q-arr">&#9660;</span></button>
+  <div class="scnt" id="quality-content">
+    <div id="quality-warnings"></div>
+  </div>
+
+</div>
+
+<script>
+var activityId = window.location.pathname.split('/')[2];
+var smallMap = null;
+var analysisData = null;
+
+function setEl(id, val) { var el = document.getElementById(id); if (el) el.textContent = val; }
+function toggle(contentId, arrId) {
+  var el = document.getElementById(contentId);
+  el.classList.toggle('open');
+  var arr = document.getElementById(arrId);
+  if (arr) arr.innerHTML = el.classList.contains('open') ? '&#9650;' : '&#9660;';
+}
+function fmtPace(s) { if (!s) return '&mdash;'; var m = Math.floor(s/60), sec = Math.round(s%60); return m+':'+String(sec).padStart(2,'0'); }
+function fmtMin(m) { if (m==null) return '&mdash;'; var h = Math.floor(m/60), mm = Math.round(m%60); return h>0 ? (h+':'+String(mm).padStart(2,'0')+'h') : (mm+' min'); }
+
+function loadAnalysis() {
+  fetch('/api/activities/' + activityId + '/full-analysis')
+    .then(function(r){ return r.json(); })
+    .then(function(res){
+      if (res.status !== 'ok') { setEl('an-title', 'Fehler: ' + res.message); return; }
+      analysisData = res;
+      renderAll(res);
+    })
+    .catch(function(e){ setEl('an-title', 'Fehler beim Laden'); console.error(e); });
+}
+
+function renderAll(res) {
+  var d = res.analysis_data;
+  var s = d.summary;
+
+  setEl('an-type', (s.sport || '&mdash;').toUpperCase());
+  setEl('an-title', s.activity_name || s.sport || 'Aktivit&auml;t');
+  setEl('hero-km', s.distance_km != null ? s.distance_km.toFixed(2) : '&mdash;');
+  setEl('hero-name', s.activity_name || '');
+  setEl('hero-time', fmtMin(s.duration_min));
+  document.getElementById('hero-pace').innerHTML = s.avg_pace_per_km ? s.avg_pace_per_km + ' /km' : '&mdash;';
+  document.getElementById('hero-hr').innerHTML = s.avg_hr != null ? s.avg_hr + ' bpm' : '&mdash;';
+  document.getElementById('hero-elev').innerHTML = s.elevation_gain_m != null ? '+' + Math.round(s.elevation_gain_m) + ' m' : '&mdash;';
+
+  renderCoachAnalysis(res.existing_coach_analysis);
+  renderHrZones(d.hr_zones);
+  renderRoute(d.route);
+  renderElevation(d.stream, s.distance_km);
+  renderTrail(d.trail_metrics, d.trail_segments);
+  renderPaceChart(d.km_splits || []);
+  renderHrChart(d.stream, s);
+  renderNativeLaps(d.native_laps || []);
+  renderKmSplits(d.km_splits, d.km_splits_note);
+  renderRecovery(d.recovery_context);
+  renderQuality(d.data_quality);
+  loadGear(s.gear);
+}
+
+function renderCoachAnalysis(a) {
+  if (!a) {
+    setEl('coach-verdict', 'Noch keine Coach-Analyse gespeichert.');
+    document.getElementById('coach-summary').innerHTML = '<span style="color:rgba(240,237,230,.4)">Diese Aktivit&auml;t wurde noch nicht von ChatGPT analysiert. Sag deinem Coach &bdquo;Analysiere meinen Lauf&ldquo;, um eine Interpretation zu erhalten.</span>';
+    return;
+  }
+  setEl('coach-verdict', a.verdict || '&mdash;');
+  setEl('coach-summary', a.summary || '');
+  var findings = (a.positive_findings_json || []).map(function(f){ return '<li class="tw"><span class="twd">+</span><span class="twt">'+f+'</span></li>'; });
+  var limits = (a.limitations_json || []).map(function(f){ return '<li class="tw"><span class="twd">!</span><span class="twt warn">'+f+'</span></li>'; });
+  document.getElementById('coach-findings').innerHTML = findings.concat(limits).join('');
+  setEl('coach-recommendation', a.coach_recommendation ? ('Nächste Schritte: ' + a.coach_recommendation) : '');
+  if (!a.is_fresh) {
+    document.getElementById('coach-verdict').innerHTML += ' <span class="mono" style="font-size:9px;color:var(--red)">(veraltet &mdash; Rohdaten haben sich geändert)</span>';
+  }
+}
+
+function renderHrZones(zones) {
+  var el = document.getElementById('hz-rows');
+  if (!zones || !zones.zones || !zones.zones.length) { el.innerHTML = '<div class="mono" style="font-size:9px;color:#9E9B95">nicht verfügbar</div>'; return; }
+  var rows = zones.zones.slice().reverse().map(function(z){
+    return '<div class="zr"><span class="zl">Z'+z.zone+'</span><div class="zb"><div class="zf" style="width:'+z.percentage+'%"></div></div><span class="zp">'+z.percentage.toFixed(0)+'%</span></div>';
+  });
+  el.innerHTML = rows.join('');
+}
+
+function renderRoute(route) {
+  if (!route || !route.available || !route.coordinates || !route.coordinates.length) {
+    document.getElementById('map-note').style.display = 'flex';
+    return;
+  }
+  var latlngs = route.coordinates.map(function(c){ return [c[1], c[0]]; });
+  smallMap = L.map('map', {zoomControl:true, attributionControl:false}).setView(latlngs[Math.floor(latlngs.length/2)], 13);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(smallMap);
+  var line = L.polyline(latlngs, {color:'#E8D84A', weight:3}).addTo(smallMap);
+  L.circleMarker(latlngs[0], {radius:5, color:'#1A1918', weight:1.5, fillColor:'#4a9a59', fillOpacity:1}).addTo(smallMap);
+  L.circleMarker(latlngs[latlngs.length-1], {radius:5, color:'#1A1918', weight:1.5, fillColor:'#C4547A', fillOpacity:1}).addTo(smallMap);
+  smallMap.fitBounds(line.getBounds(), {padding:[20,20]});
+}
+
+function svgAreaChart(containerId, points, opts) {
+  var el = document.getElementById(containerId);
+  if (!el || !points || points.length < 2) { if(el) el.innerHTML = '<div class="mono" style="font-size:9px;color:#9E9B95;padding-top:8px">Keine Daten</div>'; return; }
+  var W = 1000, H = 180, padL = 36, padR = 8, padT = 8, padB = 20;
+  var cW = W-padL-padR, cH = H-padT-padB;
+  var xs = points.map(function(p){return p.x;}), ys = points.map(function(p){return p.y;});
+  var minX = Math.min.apply(null, xs), maxX = Math.max.apply(null, xs) || 1;
+  var minY = opts.minY != null ? opts.minY : Math.min.apply(null, ys);
+  var maxY = opts.maxY != null ? opts.maxY : Math.max.apply(null, ys);
+  var rangeY = (maxY - minY) || 1;
+  var yBot = minY - rangeY*0.08, yTop = maxY + rangeY*0.08, yRange = yTop - yBot;
+  var pts = points.map(function(p){
+    var x = padL + ((p.x-minX)/(maxX-minX||1))*cW;
+    var y = padT + cH - ((p.y-yBot)/yRange)*cH;
+    return {x:Math.round(x*10)/10, y:Math.round(y*10)/10};
+  });
+  var polyline = pts.map(function(p){return p.x+','+p.y}).join(' ');
+  var polygon = (padL+',')+(padT+cH)+' '+polyline+' '+(padL+cW)+','+(padT+cH);
+  var svg = '<svg width="100%" viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">';
+  svg += '<rect x="'+padL+'" y="'+padT+'" width="'+cW+'" height="'+cH+'" fill="'+(opts.bg||'#E8E4DC')+'"/>';
+  for (var i=0;i<=3;i++){ var y = padT+cH-(i/3)*cH; var val = yBot+(yRange*i/3);
+    svg += '<text x="'+(padL-4)+'" y="'+(y+3)+'" font-family="DM Mono" font-size="7" fill="#9E9B95" text-anchor="end">'+Math.round(val)+'</text>';
+    svg += '<line x1="'+padL+'" y1="'+y+'" x2="'+(padL+cW)+'" y2="'+y+'" stroke="rgba(46,44,42,.08)" stroke-width=".5"/>'; }
+  svg += '<polygon points="'+polygon+'" fill="'+(opts.fill||'rgba(46,44,42,.12)')+'"/>';
+  svg += '<polyline points="'+polyline+'" fill="none" stroke="'+(opts.stroke||'rgba(46,44,42,.9)')+'" stroke-width="1.5"/>';
+  if (opts.avgY != null) {
+    var ay = padT + cH - ((opts.avgY-yBot)/yRange)*cH;
+    svg += '<line x1="'+padL+'" y1="'+ay+'" x2="'+(padL+cW)+'" y2="'+ay+'" stroke="'+(opts.avgColor||'#E8D84A')+'" stroke-width="1" stroke-dasharray="3 3"/>';
+  }
+  svg += '</svg>';
+  el.innerHTML = svg;
+}
+
+function renderElevation(stream, totalKm) {
+  if (!stream || !stream.data || stream.available === false) { document.getElementById('elev-chart').innerHTML = '<div class="mono" style="font-size:9px;color:#9E9B95;padding-top:8px">Keine Höhendaten</div>'; return; }
+  var fields = stream.fields || [];
+  var iDist = fields.indexOf('distance_m'), iEle = fields.indexOf('altitude_m');
+  if (iDist < 0 || iEle < 0) return;
+  var pts = stream.data.filter(function(r){ return r[iEle] != null; }).map(function(r){ return {x:r[iDist], y:r[iEle]}; });
+  if (pts.length < 2) { document.getElementById('elev-chart').innerHTML = '<div class="mono" style="font-size:9px;color:#9E9B95;padding-top:8px">Keine Höhendaten</div>'; return; }
+  var up=0, down=0;
+  for (var i=1;i<pts.length;i++){ var diff=pts[i].y-pts[i-1].y; if (diff>0) up+=diff; else down+=Math.abs(diff); }
+  setEl('elev-up', '+' + Math.round(up) + ' m');
+  setEl('elev-down', '−' + Math.round(down) + ' m');
+  svgAreaChart('elev-chart', pts, {bg:'#F0EDE6', fill:'rgba(46,44,42,.1)', stroke:'rgba(46,44,42,.85)'});
+}
+
+function renderHrChart(stream, summary) {
+  if (!stream || !stream.data || stream.available === false) { document.getElementById('hf-chart').innerHTML = '<div class="mono" style="font-size:9px;color:#9E9B95;padding-top:8px">Keine HF-Daten</div>'; return; }
+  var fields = stream.fields || [];
+  var iX = fields.indexOf('elapsed_s') >= 0 ? fields.indexOf('elapsed_s') : fields.indexOf('point_index');
+  var iHr = fields.indexOf('heart_rate');
+  if (iHr < 0) { document.getElementById('hf-chart').innerHTML = '<div class="mono" style="font-size:9px;color:#9E9B95;padding-top:8px">Keine HF-Daten</div>'; return; }
+  var pts = stream.data.filter(function(r){ return r[iHr] != null; }).map(function(r, idx){ return {x: iX>=0 ? (r[iX]!=null?r[iX]:idx) : idx, y:r[iHr]}; });
+  if (pts.length < 2) { document.getElementById('hf-chart').innerHTML = '<div class="mono" style="font-size:9px;color:#9E9B95;padding-top:8px">Keine HF-Daten</div>'; return; }
+  var hrs = pts.map(function(p){return p.y;});
+  var avg = Math.round(hrs.reduce(function(a,b){return a+b;},0)/hrs.length);
+  setEl('hf-avg-chart', avg + ' bpm');
+  setEl('hf-max-chart', (summary.max_hr || Math.max.apply(null,hrs)) + ' bpm');
+  svgAreaChart('hf-chart', pts, {bg:'#F0EDE6', fill:'rgba(196,84,122,.25)', stroke:'rgba(196,84,122,.9)', avgY:avg, avgColor:'#1A1918'});
+}
+
+function renderTrail(metrics, segments) {
+  if (!metrics || metrics.ascent_m == null) return;
+  document.getElementById('trail-sec').style.display = 'flex';
+  document.getElementById('trail-block').style.display = 'block';
+  var cells = [
+    ['Aufstieg', metrics.ascent_m, 'm'], ['Abstieg', metrics.descent_m, 'm'],
+    ['Ø Steigung', metrics.avg_grade_pct, '%'], ['Max. Steigung', metrics.max_grade_pct, '%'],
+    ['Vertikalgeschw.', metrics.vertical_speed_m_per_h, 'm/h'],
+  ];
+  document.getElementById('trail-summary').innerHTML = cells.map(function(c){
+    return '<div class="trail-cell"><div class="tc-lbl">'+c[0]+'</div><div class="tc-val">'+(c[1]!=null?Math.round(c[1]):'&mdash;')+'<span class="tc-unit">'+c[2]+'</span></div></div>';
+  }).join('');
+
+  if (segments && segments.length) {
+    document.getElementById('trail-segments').innerHTML = segments.map(function(s){
+      return '<div class="seg-row"><span class="seg-tag '+s.type+'">'+s.type+'</span>'
+        + '<span>'+(s.distance_m/1000).toFixed(2)+' km</span>'
+        + '<span style="color:#9E9B95">'+(s.elevation_change_m>0?'+':'')+Math.round(s.elevation_change_m)+' m</span>'
+        + '<span style="color:#9E9B95">'+s.avg_grade_pct+'%</span>'
+        + (s.avg_hr ? '<span style="color:#9E9B95">'+s.avg_hr+' bpm</span>' : '')
+        + '</div>';
+    }).join('');
+  }
+}
+
+function renderPaceChart(splits) {
+  var el = document.getElementById('pace-chart');
+  var valid = splits.filter(function(s){ return s.pace_seconds_per_km; });
+  if (!valid.length) { el.innerHTML = '<div class="mono" style="font-size:9px;color:#9E9B95">Keine km-Splits verfügbar</div>'; return; }
+  var paces = valid.map(function(s){return s.pace_seconds_per_km;});
+  var minP = Math.min.apply(null, paces), maxP = Math.max.apply(null, paces);
+  var W = 1000, H = 160, padL = 34, padR = 8, padT = 8, padB = 20;
+  var cW = W-padL-padR, cH = H-padT-padB;
+  var bw = cW / valid.length;
+  var bars = '';
+  valid.forEach(function(s, i) {
+    var h = maxP > minP ? ((maxP - s.pace_seconds_per_km) / (maxP - minP)) * (cH*0.85) + cH*0.15 : cH*0.5;
+    var x = padL + i*bw + bw*0.15;
+    var w = bw*0.7;
+    var y = padT + cH - h;
+    var color = s.partial ? 'rgba(232,216,74,.65)' : 'rgba(46,44,42,.75)';
+    bars += '<rect x="'+x+'" y="'+y+'" width="'+w+'" height="'+h+'" fill="'+color+'"/>';
+    if (valid.length <= 25) bars += '<text x="'+(x+w/2)+'" y="'+(padT+cH+14)+'" font-family="DM Mono" font-size="7" fill="#9E9B95" text-anchor="middle">'+s.km+'</text>';
+  });
+  var svg = '<svg width="100%" viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">'
+    + '<rect x="'+padL+'" y="'+padT+'" width="'+cW+'" height="'+cH+'" fill="#F0EDE6"/>' + bars + '</svg>';
+  el.innerHTML = svg;
+}
+
+function renderNativeLaps(laps) {
+  document.getElementById('native-laps-body').innerHTML = laps.map(function(l){
+    return '<tr><td>'+l.lap_number+'</td><td>'+(l.distance_m!=null?(l.distance_m/1000).toFixed(2)+' km':'&mdash;')+'</td>'
+      + '<td>'+fmtPace(l.pace_seconds_per_km)+'</td>'
+      + '<td>'+(l.avg_hr||'&mdash;')+' / '+(l.max_hr||'&mdash;')+'</td>'
+      + '<td>'+(l.avg_cadence||'&mdash;')+'</td>'
+      + '<td>+'+(l.elevation_gain_m!=null?Math.round(l.elevation_gain_m):'&mdash;')+' / -'+(l.elevation_loss_m!=null?Math.round(l.elevation_loss_m):'&mdash;')+' m</td>'
+      + '<td>'+l.lap_type+'</td></tr>';
+  }).join('');
+}
+
+function renderKmSplits(splits, note) {
+  var noteEl = document.getElementById('km-splits-note');
+  var tbl = document.getElementById('km-splits-table');
+  if (!splits || !splits.length) {
+    noteEl.style.display = 'block';
+    noteEl.textContent = note || 'Kilometer-Splits nicht berechenbar.';
+    tbl.style.display = 'none';
+    return;
+  }
+  noteEl.style.display = 'none';
+  tbl.style.display = 'table';
+  document.getElementById('km-splits-body').innerHTML = splits.map(function(s){
+    return '<tr class="'+(s.partial?'partial':'')+'"><td>'+s.km+(s.partial?' (partial)':'')+'</td>'
+      + '<td>'+fmtPace(s.pace_seconds_per_km)+'</td>'
+      + '<td>'+(s.avg_hr||'&mdash;')+' / '+(s.max_hr||'&mdash;')+'</td>'
+      + '<td>'+(s.avg_cadence||'&mdash;')+'</td>'
+      + '<td>+'+(s.elevation_gain_m!=null?Math.round(s.elevation_gain_m):'&mdash;')+' / -'+(s.elevation_loss_m!=null?Math.round(s.elevation_loss_m):'&mdash;')+' m</td></tr>';
+  }).join('');
+}
+
+function renderRecovery(rc) {
+  if (!rc || (!rc.morning_of_activity && !rc.next_day)) return;
+  var cells = [];
+  function addBlock(label, d) {
+    if (!d) return;
+    cells.push('<div class="rec-cell"><div class="hsl">'+label+' &middot; Schlaf</div><div class="hsv">'+(d.sleep_duration_h!=null?d.sleep_duration_h+'h':'&mdash;')+' / '+(d.sleep_score!=null?d.sleep_score:'&mdash;')+'</div></div>');
+    cells.push('<div class="rec-cell"><div class="hsl">'+label+' &middot; HRV</div><div class="hsv">'+(d.hrv_last_night!=null?d.hrv_last_night:'&mdash;')+' ('+(d.hrv_status||'&mdash;')+')</div></div>');
+    cells.push('<div class="rec-cell"><div class="hsl">'+label+' &middot; Ruhepuls</div><div class="hsv">'+(d.resting_hr!=null?d.resting_hr:'&mdash;')+'</div></div>');
+    cells.push('<div class="rec-cell"><div class="hsl">'+label+' &middot; Body Battery</div><div class="hsv">'+(d.body_battery_charged!=null?d.body_battery_charged:'&mdash;')+'</div></div>');
+  }
+  addBlock('Vor der Einheit', rc.morning_of_activity);
+  addBlock('Folgetag', rc.next_day);
+  document.getElementById('recovery-grid').innerHTML = cells.join('') || '<div class="hsl">Keine Daten verfügbar</div>';
+}
+
+function renderQuality(q) {
+  if (!q) return;
+  var el = document.getElementById('quality-warnings');
+  if (!q.warnings || !q.warnings.length) { el.innerHTML = '<div class="qual-ok" style="padding:12px 0">Keine Auffälligkeiten.</div>'; return; }
+  el.innerHTML = q.warnings.map(function(w){ return '<div class="qual-warn">'+w+'</div>'; }).join('');
+}
+
+var currentGear = [];
+function loadGear(assignedGear) {
+  fetch('/api/athlete/gear?active_only=true')
+    .then(function(r){ return r.json(); })
+    .then(function(res){
+      if (res.status !== 'ok') return;
+      currentGear = (res.gear || []).filter(function(g){ return ['running_shoe','trail_shoe','hiking_shoe'].indexOf(g.gear_type) >= 0; });
+      var sel = document.getElementById('gear-select');
+      sel.innerHTML = '<option value="">&mdash; Schuh auswählen &mdash;</option>' + currentGear.map(function(g){
+        return '<option value="'+g.id+'">'+(g.nickname||g.model||g.brand)+' · '+g.total_distance_km+' km</option>';
+      }).join('');
+      var assigned = (assignedGear||[]).find(function(g){ return currentGear.some(function(c){return c.id===g.id;}); });
+      if (assigned) { sel.value = assigned.id; showGearStats(assigned.id, assigned.distance_km); }
+    });
+}
+
+function showGearStats(gearId, activityKm) {
+  var g = currentGear.find(function(c){ return c.id == gearId; });
+  if (!g) return;
+  document.getElementById('gear-stats').style.display = 'flex';
+  setEl('gs-activity', activityKm != null ? activityKm.toFixed(2)+' km' : '&mdash;');
+  setEl('gs-before', Math.max(0, g.total_distance_km - (activityKm||0)).toFixed(1) + ' km');
+  setEl('gs-after', g.total_distance_km.toFixed(1) + ' km');
+  setEl('gs-remaining', g.remaining_distance_km != null ? g.remaining_distance_km.toFixed(1)+' km' : '&mdash;');
+}
+
+function onGearSelect() {
+  var gearId = document.getElementById('gear-select').value;
+  if (!gearId) return;
+  fetch('/api/activities/' + activityId + '/gear', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({gear_id: parseInt(gearId, 10)}),
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(res){
+    if (res.status !== 'ok') { alert('Fehler: ' + res.message); return; }
+    var gear = res.gear;
+    document.getElementById('gear-stats').style.display = 'flex';
+    setEl('gs-activity', res.activity_distance_km.toFixed(2) + ' km');
+    setEl('gs-before', gear.previous_total_distance_km.toFixed(1) + ' km');
+    setEl('gs-after', gear.new_total_distance_km.toFixed(1) + ' km');
+    setEl('gs-remaining', gear.remaining_distance_km != null ? gear.remaining_distance_km.toFixed(1)+' km' : '&mdash;');
+  });
+}
+
+loadAnalysis();
+</script>
+</body>
+</html>

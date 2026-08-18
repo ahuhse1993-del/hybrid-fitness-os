@@ -42,17 +42,18 @@ GARMIN_TYPE_MAP = {
 # Garmin
 # ---------------------------------------------------------------------------
 
-def _garmin_is_duplicate(cur, garmin_id: str, start_time_str: str,
-                          activity_type: str, duration_min) -> bool:
-    """Duplikat-Check: zuerst via garmin_id, dann via Datum+Typ+Dauer±10%."""
+def _find_existing_training_id(cur, garmin_id: str, start_time_str: str,
+                                activity_type: str, duration_min) -> int | None:
+    """Findet eine bereits importierte Aktivität: zuerst via garmin_id, dann via Datum+Typ+Dauer±10%."""
     cur.execute("SELECT id FROM trainings WHERE garmin_id = %s", (garmin_id,))
-    if cur.fetchone():
-        return True
+    row = cur.fetchone()
+    if row:
+        return row[0]
 
     try:
         start_dt = datetime.fromisoformat(start_time_str.replace("Z", ""))
     except Exception:
-        return False
+        return None
 
     dur_low = (duration_min or 0) * 0.9
     dur_high = (duration_min or 0) * 1.1
@@ -62,7 +63,42 @@ def _garmin_is_duplicate(cur, garmin_id: str, start_time_str: str,
           AND date = %s
           AND duration_minutes BETWEEN %s AND %s
     """, (activity_type, start_dt.date().isoformat(), dur_low, dur_high))
-    return cur.fetchone() is not None
+    row = cur.fetchone()
+    return row[0] if row else None
+
+
+def _backfill_missing_details(cur, client, training_id: int, garmin_id: str, activity_type: str) -> list[str]:
+    """
+    Ergänzt fehlende Detaildaten (native Laps, Activity-Stream) für eine
+    BEREITS vorhandene Aktivität — behebt das frühere Verhalten, das eine
+    vorhandene Aktivität komplett übersprang, selbst wenn ihr Splits/Stream/
+    GPS fehlten. Fehler pro Kategorie sind nicht fatal (isolierte try/except).
+    """
+    added: list[str] = []
+
+    cur.execute("SELECT COUNT(*) FROM splits WHERE training_id = %s", (training_id,))
+    if cur.fetchone()[0] == 0:
+        try:
+            from data.garmin_import_splits import import_splits_for_activity
+            import_splits_for_activity(client, training_id, int(garmin_id))
+            added.append("native_laps")
+        except Exception as exc:
+            logger.warning("Backfill native_laps Fehler für training_id=%s garmin_id=%s: %s",
+                            training_id, garmin_id, exc)
+
+    if activity_type in ("Run", "TrailRun", "Ride", "Walk", "Hike", "Swim"):
+        cur.execute("SELECT COUNT(*) FROM activity_stream WHERE training_id = %s", (training_id,))
+        if cur.fetchone()[0] == 0:
+            try:
+                from data.garmin_import_stream import import_stream_for_activity
+                result = import_stream_for_activity(client, training_id, int(garmin_id), conn=None)
+                if "imported" in result:
+                    added.append("activity_stream")
+            except Exception as exc:
+                logger.warning("Backfill activity_stream Fehler für training_id=%s garmin_id=%s: %s",
+                                training_id, garmin_id, exc)
+
+    return added
 
 
 def _garmin_sync(conn) -> dict:
@@ -77,6 +113,7 @@ def _garmin_sync(conn) -> dict:
 
     imported = 0
     skipped = 0
+    backfilled = 0
 
     for a in activities:
         start_str = a.get("startTimeLocal", "")
@@ -101,9 +138,16 @@ def _garmin_sync(conn) -> dict:
         name = a.get("activityName", "")
         date_str = start_str[:10]
 
-        if _garmin_is_duplicate(cur, garmin_id, start_str, activity_type, duration_min):
+        existing_id = _find_existing_training_id(cur, garmin_id, start_str, activity_type, duration_min)
+        if existing_id:
             skipped += 1
-            logger.debug("Skip (dupe): %s %s %s", date_str, activity_type, name)
+            added = _backfill_missing_details(cur, client, existing_id, garmin_id, activity_type)
+            if added:
+                conn.commit()
+                backfilled += 1
+                logger.info("Backfill für bestehende Aktivität ID %s: %s", existing_id, added)
+            else:
+                logger.debug("Skip (dupe, bereits vollständig): %s %s %s", date_str, activity_type, name)
             continue
 
         notes = name
@@ -154,7 +198,7 @@ def _garmin_sync(conn) -> dict:
             logger.error("Insert Fehler für %s %s: %s", date_str, name, exc)
             conn.rollback()
 
-    return {"imported": imported, "skipped": skipped}
+    return {"imported": imported, "skipped": skipped, "backfilled": backfilled}
 
 
 # ---------------------------------------------------------------------------

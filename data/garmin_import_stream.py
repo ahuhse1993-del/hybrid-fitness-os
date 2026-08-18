@@ -26,15 +26,18 @@ METRIC_MAP = {
     "directLatitude":        "lat",
     "directLongitude":       "lon",
     "directAltitude":        "elevation_m",
+    "directElevation":       "elevation_m",   # von Garmin je Sportart directAltitude ODER directElevation
     "directHeartRate":       "heart_rate",
     "directSpeed":           "speed_ms",
-    "directDoubleCadence":   "cadence_raw",   # RPM×2 bei Laufen → ÷2 → spm
+    "directRunCadence":      "cadence",       # bereits in spm — Vorrang vor der Double-Cadence-Heuristik
+    "directDoubleCadence":   "cadence_raw",   # RPM×2 bei Laufen → ÷2 → spm (Fallback wenn directRunCadence fehlt)
     "directCadence":         "cadence_raw",   # Rad: echte RPM
     "directBikeCadence":     "cadence_raw",
     "directPower":           "power",
     "directRunningPower":    "power",
     "sumDistance":           "distance_m",
     "sumElapsedDuration":    "elapsed_s",
+    "sumMovingDuration":     "moving_s",
 }
 
 
@@ -69,11 +72,13 @@ def _parse_stream(details: dict) -> list[dict]:
         if dist is None or dist < 0:
             continue
 
-        # Kadenz normalisieren: directDoubleCadence = Schritte/min × 2
+        # Kadenz normalisieren: directRunCadence liefert bereits spm direkt und
+        # hat Vorrang (kein Raten noetig). Nur wenn das fehlt (z.B. Rad-Aktivitaeten
+        # ohne directRunCadence-Descriptor) auf die Double-Cadence-Heuristik
+        # zurueckfallen: directDoubleCadence = Schritte/min × 2 bei Laufen,
+        # echte RPM bei Rad.
         cadence_raw = row.pop("cadence_raw", None)
-        if cadence_raw is not None:
-            # Bei Laufen: durch 2 → spm; bei Rad: Garmin liefert echte RPM
-            # Heuristik: wenn > 80 meist Laufen (double), sonst Rad (single)
+        if row.get("cadence") is None and cadence_raw is not None:
             row["cadence"] = round(cadence_raw / 2) if cadence_raw > 80 else round(cadence_raw)
 
         # Typen sichern
@@ -87,6 +92,8 @@ def _parse_stream(details: dict) -> list[dict]:
         row["distance_m"] = round(float(dist), 1)
         if row.get("elapsed_s") is not None:
             row["elapsed_s"] = round(float(row["elapsed_s"]), 1)
+        if row.get("moving_s") is not None:
+            row["moving_s"] = round(float(row["moving_s"]), 1)
         if row.get("elevation_m") is not None:
             row["elevation_m"] = round(float(row["elevation_m"]), 1)
         if row.get("speed_ms") is not None:
@@ -140,9 +147,15 @@ def import_stream_for_activity(client, training_id: int, garmin_id: int,
             cur.execute("DELETE FROM activity_stream WHERE training_id = %s", (training_id,))
             logger.info("Alte Stream-Daten gelöscht für training_id=%s", training_id)
 
-        # Garmin API — max_metrics_count: 2000 Punkte reichen für ~33min@1Hz
-        # Bei längeren Aktivitäten liefert Garmin automatisch ausgedünnten Stream
-        details = client.get_activity_details(garmin_id, max_metrics_count=2000)
+        # Garmin API — maxchart: bis zu 3000 Punkte fuer lange Aktivitaeten (~109min
+        # @ Grellingen-Aktivitaet brauchten 1822 Punkte). Bei laengeren Aktivitaeten
+        # liefert Garmin automatisch einen ausgeduennten Stream.
+        # KORREKTUR: die Bibliothek (garminconnect==0.3.6) akzeptiert "maxchart",
+        # nicht "max_metrics_count" — der urspruengliche Parametername existiert
+        # nicht und liess jeden Aufruf mit TypeError scheitern (verifiziert gegen
+        # inspect.signature(Garmin.get_activity_details): (self, activity_id,
+        # maxchart=2000, maxpoly=4000)).
+        details = client.get_activity_details(garmin_id, maxchart=3000)
         points = _parse_stream(details)
 
         if not points:
@@ -156,6 +169,7 @@ def import_stream_for_activity(client, training_id: int, garmin_id: int,
                 training_id,
                 p["distance_m"],
                 p.get("elapsed_s"),
+                p.get("moving_s"),
                 p.get("heart_rate"),
                 p.get("speed_ms"),
                 p.get("cadence"),
@@ -167,9 +181,9 @@ def import_stream_for_activity(client, training_id: int, garmin_id: int,
 
         cur.executemany("""
             INSERT INTO activity_stream
-                (training_id, distance_m, elapsed_s, heart_rate,
+                (training_id, distance_m, elapsed_s, moving_s, heart_rate,
                  speed_ms, cadence, power, elevation_m, lat, lon)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """, rows)
 
         if own_conn:

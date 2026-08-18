@@ -22,15 +22,45 @@ def get_garmin_client():
     client.login()
     return client
 
+_INTENSITY_TO_LAP_TYPE = {
+    "WARMUP": "warmup",
+    "COOLDOWN": "cooldown",
+    "REST": "recovery",
+    "RECOVERY": "recovery",
+    "INTERVAL": "interval",
+    "ACTIVE": "interval",
+}
+
+
+def _classify_lap_type(split: dict, lap_count: int) -> str:
+    """
+    Garmins lapDTOs enthalten kein explizites warmup/interval/recovery/cooldown-
+    Flag als solches — nur "intensityType" (ACTIVE/REST/WARMUP/COOLDOWN, je nach
+    Aktivitaet). Ein einzelner Lap ueber die gesamte Aktivitaet (kein echtes
+    Intervall-Muster) wird bewusst als "unknown" belassen statt geraten —
+    "keine Werte erfinden".
+    """
+    if lap_count <= 1:
+        return "unknown"
+    intensity = (split.get("intensityType") or "").upper()
+    return _INTENSITY_TO_LAP_TYPE.get(intensity, "manual")
+
+
 def _insert_splits(cur, training_id, splits):
     """Hilfsfunktion: Splits für eine Aktivität in DB schreiben."""
     cur.execute("SELECT setval('splits_id_seq', (SELECT MAX(id) FROM splits))")
 
+    lap_count = len(splits)
     for i, split in enumerate(splits):
         distance_km = round(split.get("distance", 0) / 1000, 3)
         duration_s = split.get("duration", 0)
         avg_hr = split.get("averageHR")
+        max_hr = split.get("maxHR")
         elevation = split.get("elevationGain")
+        elevation_loss = split.get("elevationLoss")
+        moving_duration = split.get("movingDuration")
+        avg_power = split.get("averagePower") or split.get("avgPower")
+        start_time = split.get("startTimeGMT")
 
         # Kadenz — Garmin liefert Schritte/min (einfach, nicht doppelt)
         cadence = split.get("averageRunCadence") or split.get("averageCadence")
@@ -43,8 +73,10 @@ def _insert_splits(cur, training_id, splits):
         cur.execute("""
             INSERT INTO splits
                 (training_id, split_number, distance_km,
-                 pace_seconds, heart_rate_avg, elevation_gain, cadence_avg)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
+                 pace_seconds, heart_rate_avg, elevation_gain, cadence_avg,
+                 start_time, moving_duration_s, max_hr, avg_power,
+                 elevation_loss_m, lap_type)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """, (
             training_id,
             i + 1,
@@ -53,6 +85,12 @@ def _insert_splits(cur, training_id, splits):
             int(avg_hr) if avg_hr else None,
             round(elevation, 1) if elevation else None,
             int(cadence) if cadence else None,
+            start_time,
+            round(moving_duration) if moving_duration else None,
+            int(max_hr) if max_hr else None,
+            round(avg_power) if avg_power else None,
+            round(elevation_loss, 1) if elevation_loss else None,
+            _classify_lap_type(split, lap_count),
         ))
     return len(splits)
 

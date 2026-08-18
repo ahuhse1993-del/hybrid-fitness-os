@@ -30,6 +30,14 @@ from database.connection import get_connection
 
 TEST_PREFIX = "test-hevy-"
 
+# sync_hevy_completions() waehlt bei mehreren planned Strength/Core/Mobility-
+# Sessions am selben Datum deterministisch die AELTESTE Zeile (ORDER BY id).
+# date.today()-basierte Testdaten koennen daher eine ECHTE Produktionszeile
+# treffen, sobald die Systemuhr auf ein Datum faellt, das mit einer echten
+# geplanten Session zusammenfaellt (bereits zweimal live passiert und manuell
+# repariert). Ein Datum weit in der Zukunft schliesst jede Kollision sicher aus.
+_SAFE_TEST_DATE = datetime.date.today() + datetime.timedelta(days=3650)
+
 
 @pytest.fixture
 def db_conn():
@@ -170,7 +178,7 @@ class TestGetPlannedWorkoutsStartDate:
 
 class TestSyncHevyCompletionsMatching:
     def test_matches_by_date_and_session_type(self, db_conn, cleanup_rows):
-        session_date = datetime.date.today() - datetime.timedelta(days=2)
+        session_date = _SAFE_TEST_DATE
         hevy_id = f"{TEST_PREFIX}match1"
         _insert_hevy_training(db_conn, hevy_id, session_date, "Leg Day")
         ext_id = f"{TEST_PREFIX}planned1"
@@ -188,7 +196,7 @@ class TestSyncHevyCompletionsMatching:
         assert linked_hevy_id == hevy_id
 
     def test_core_and_mobility_session_types_also_match(self, db_conn, cleanup_rows):
-        session_date = datetime.date.today() - datetime.timedelta(days=4)
+        session_date = _SAFE_TEST_DATE + datetime.timedelta(days=1)
         hevy_id = f"{TEST_PREFIX}match2"
         _insert_hevy_training(db_conn, hevy_id, session_date, "Core Session")
         ext_id = f"{TEST_PREFIX}planned2"
@@ -204,7 +212,7 @@ class TestSyncHevyCompletionsMatching:
 
     def test_no_matching_date_stays_unmatched(self, db_conn, cleanup_rows):
         hevy_id = f"{TEST_PREFIX}nomatch1"
-        session_date = datetime.date.today() - datetime.timedelta(days=6)
+        session_date = _SAFE_TEST_DATE + datetime.timedelta(days=2)
         _insert_hevy_training(db_conn, hevy_id, session_date, "Solo Workout")
 
         result = sync_hevy_completions(days=30)
@@ -212,7 +220,7 @@ class TestSyncHevyCompletionsMatching:
         assert any(u["hevy_id"] == hevy_id for u in result["unmatched_hevy"])
 
     def test_repeated_call_does_not_rematch_or_duplicate(self, db_conn, cleanup_rows):
-        session_date = datetime.date.today() - datetime.timedelta(days=1)
+        session_date = _SAFE_TEST_DATE + datetime.timedelta(days=3)
         hevy_id = f"{TEST_PREFIX}idem1"
         _insert_hevy_training(db_conn, hevy_id, session_date, "Idem Session")
         ext_id = f"{TEST_PREFIX}planned-idem"

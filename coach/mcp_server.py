@@ -37,6 +37,17 @@ from coach.garmin_push import (
 )
 from coach.session_routing import classify_for_push, resolve_sync_target, split_training_block
 from coach.sync_utils import compute_content_hash
+from coach.activity_data import (
+    build_data_quality,
+    build_hr_zones,
+    build_native_laps,
+    build_recovery_context,
+    build_route,
+    build_summary,
+    build_trail_metrics_and_segments,
+    compute_km_splits,
+    compute_source_data_hash,
+)
 from database.connection import get_connection
 
 logger = logging.getLogger(__name__)
@@ -103,6 +114,13 @@ def get_athlete_profile() -> dict:
     """
     Return Alexander's athlete profile, active training plan metadata, and coach context.
     Always call this first to understand the athlete before suggesting workouts or plan changes.
+
+    athlete_profile includes (SELECT * — new fields appear automatically):
+    HR-Zonen (hr_zones jsonb, bevorzugt gegenüber den alten hr_z1_min..hr_z5_max
+    Spalten, die aus Rückwärtskompatibilität weiterbestehen), pace_zones,
+    preferred_surfaces/sports, training_preferences, injury_notes,
+    long_term_goals_json. Zusätzlich gear_summary: aktive Gear-Gegenstände
+    aus athlete_gear (siehe list_athlete_gear für Details je Gegenstand).
     """
     profile = _fetchone("SELECT * FROM athlete_profile ORDER BY id DESC LIMIT 1")
     plan = _fetchone(
@@ -111,11 +129,561 @@ def get_athlete_profile() -> dict:
         "FROM plans ORDER BY created_at DESC LIMIT 1"
     )
     context = _fetchone("SELECT * FROM coach_context ORDER BY id DESC LIMIT 1")
+    gear_summary = _fetchall(
+        "SELECT id, gear_type, nickname, brand, model, active, target_distance_km "
+        "FROM athlete_gear WHERE active = true ORDER BY gear_type, id"
+    )
     return {
         "athlete_profile": profile,
         "current_plan": plan,
         "coach_context": context,
+        "gear_summary": gear_summary,
     }
+
+
+# ── Athlete-Profil: partielles Update mit Validierung + Audit-Log ──────────
+
+_PROFILE_FIELD_TYPES: dict[str, type | tuple[type, ...]] = {
+    "name": str, "age": int, "height_cm": (int, float), "weight_kg": (int, float),
+    "resting_hr": int, "max_hr": int, "lactate_threshold_hr": int,
+    "hr_zone_method": str, "hr_zones": dict, "pace_zones": dict,
+    "preferred_surfaces": list, "preferred_sports": list,
+    "training_preferences": dict, "injury_notes": list, "long_term_goals": list,
+}
+
+# JSON-Feldname im patch -> tatsächliche DB-Spalte. long_term_goals mappt
+# bewusst auf die NEUE long_term_goals_json-Spalte, nicht auf die alte
+# long_term_goals-TEXT-Spalte (bleibt für bestehende Leser unverändert).
+_PROFILE_COLUMN_MAP: dict[str, str] = {"long_term_goals": "long_term_goals_json"}
+
+
+def _validate_hr_zones(hr_zones: dict) -> list[str]:
+    """Harte Fehler (leeren die Liste NICHT — sie werden zurückgegeben und
+    lehnen das gesamte Update ab): Min > Max, Überlappung. Lücken sind nur
+    eine Warnung (separat behandelt von der aufrufenden Funktion)."""
+    errors = []
+    zones = []
+    for i in range(1, 6):
+        z = hr_zones.get(f"z{i}")
+        if z is None:
+            errors.append(f"hr_zones.z{i} fehlt")
+            continue
+        if not isinstance(z, dict) or "min" not in z or "max" not in z:
+            errors.append(f"hr_zones.z{i} muss {{'min':int,'max':int}} sein")
+            continue
+        zmin, zmax = z["min"], z["max"]
+        if not isinstance(zmin, (int, float)) or not isinstance(zmax, (int, float)):
+            errors.append(f"hr_zones.z{i}: min/max müssen Zahlen sein")
+            continue
+        if zmin > zmax:
+            errors.append(f"hr_zones.z{i}: min ({zmin}) darf nicht größer als max ({zmax}) sein")
+        zones.append((i, zmin, zmax))
+
+    for (i1, _, max1), (i2, min2, _) in zip(zones, zones[1:]):
+        if min2 <= max1:
+            errors.append(f"hr_zones.z{i1} (max={max1}) und z{i2} (min={min2}) überlappen sich")
+    return errors
+
+
+def _hr_zone_gap_warnings(hr_zones: dict) -> list[str]:
+    warnings = []
+    zones = [(i, hr_zones[f"z{i}"]["min"], hr_zones[f"z{i}"]["max"])
+             for i in range(1, 6) if isinstance(hr_zones.get(f"z{i}"), dict)
+             and "min" in hr_zones[f"z{i}"] and "max" in hr_zones[f"z{i}"]]
+    for (i1, _, max1), (i2, min2, _) in zip(zones, zones[1:]):
+        if min2 > max1 + 1:
+            warnings.append(f"Lücke zwischen hr_zones.z{i1} (max={max1}) und z{i2} (min={min2}) — "
+                             f"{min2 - max1 - 1} bpm sind keiner Zone zugeordnet.")
+    return warnings
+
+
+@mcp.tool()
+def update_athlete_profile(patch: dict, expected_updated_at: str | None = None) -> dict:
+    """
+    Partielles Update von Alexanders Athlete-Profil. Nur im patch enthaltene
+    Felder werden geändert — alles andere bleibt unverändert. patch["feld"]=null
+    setzt das Feld explizit auf NULL; ein im patch komplett fehlendes Feld
+    wird NICHT angefasst (Unterschied zwischen "null" und "nicht übergeben").
+
+    Args:
+        patch: {"name": str, "age": int, "height_cm": number, "weight_kg": number,
+                "resting_hr": int, "max_hr": int, "lactate_threshold_hr": int,
+                "hr_zone_method": str, "hr_zones": {"z1":{"min":int,"max":int},...,"z5":{...}},
+                "pace_zones": dict|null, "preferred_surfaces": [str], "preferred_sports": [str],
+                "training_preferences": dict, "injury_notes": [str], "long_term_goals": [str]}
+        expected_updated_at: Optional — ISO-Timestamp aus einem vorherigen
+                get_athlete_profile-Aufruf. Wenn gesetzt und das Profil wurde
+                seither von woanders geändert (optimistic locking), wird das
+                Update mit einem Konflikt-Fehler abgelehnt statt es stillschweigend
+                zu überschreiben.
+
+    Returns: {updated, changed_fields, warnings, athlete_profile} oder
+    {updated: false, error, ...} bei Validierungsfehlern/Konflikt.
+    """
+    if not isinstance(patch, dict) or not patch:
+        return {"updated": False, "error": "patch darf nicht leer sein."}
+
+    unknown = [k for k in patch if k not in _PROFILE_FIELD_TYPES]
+    if unknown:
+        return {"updated": False, "error": f"Unbekannte Felder: {unknown}. "
+                f"Erlaubt: {sorted(_PROFILE_FIELD_TYPES)}"}
+
+    errors: list[str] = []
+    warnings: list[str] = []
+
+    for field, value in patch.items():
+        if value is None:
+            continue  # explizites null ist immer erlaubt (Feld wird geleert)
+        expected = _PROFILE_FIELD_TYPES[field]
+        if not isinstance(value, expected):
+            errors.append(f"{field}: erwartet {expected}, bekommen {type(value).__name__}")
+
+    if patch.get("hr_zones") is not None and isinstance(patch["hr_zones"], dict):
+        hr_errors = _validate_hr_zones(patch["hr_zones"])
+        errors.extend(hr_errors)
+        if not hr_errors:
+            warnings.extend(_hr_zone_gap_warnings(patch["hr_zones"]))
+
+    if "resting_hr" in patch and "max_hr" in patch and patch["resting_hr"] and patch["max_hr"]:
+        if patch["resting_hr"] >= patch["max_hr"]:
+            errors.append(f"resting_hr ({patch['resting_hr']}) muss kleiner als max_hr ({patch['max_hr']}) sein")
+
+    if patch.get("age") is not None and not (5 <= patch["age"] <= 110):
+        warnings.append(f"age={patch['age']} wirkt unplausibel.")
+    if patch.get("resting_hr") is not None and not (25 <= patch["resting_hr"] <= 110):
+        warnings.append(f"resting_hr={patch['resting_hr']} wirkt unplausibel.")
+    if patch.get("max_hr") is not None and not (100 <= patch["max_hr"] <= 230):
+        warnings.append(f"max_hr={patch['max_hr']} wirkt unplausibel.")
+
+    if errors:
+        return {"updated": False, "error": "Validierung fehlgeschlagen.", "errors": errors}
+
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT id, updated_at FROM athlete_profile ORDER BY id DESC LIMIT 1")
+            row = cur.fetchone()
+            if not row:
+                return {"updated": False, "error": "Kein athlete_profile-Datensatz vorhanden."}
+            profile_id, current_updated_at = row
+
+            if expected_updated_at:
+                try:
+                    expected_dt = datetime.datetime.fromisoformat(expected_updated_at)
+                except ValueError:
+                    return {"updated": False, "error": f"expected_updated_at {expected_updated_at!r} ist kein gültiges ISO-8601."}
+                if current_updated_at and abs((current_updated_at - expected_dt).total_seconds()) > 1:
+                    return {
+                        "updated": False,
+                        "error": "Konflikt: Profil wurde seit expected_updated_at bereits geändert.",
+                        "current_updated_at": current_updated_at.isoformat(),
+                    }
+
+            old_values = {}
+            columns = [_PROFILE_COLUMN_MAP.get(f, f) for f in patch]
+            cur.execute(
+                f"SELECT {', '.join(columns)} FROM athlete_profile WHERE id = %s", (profile_id,)
+            )
+            old_row = cur.fetchone()
+            for col, val in zip(columns, old_row):
+                old_values[col] = val.isoformat() if hasattr(val, "isoformat") else \
+                    (float(val) if isinstance(val, decimal.Decimal) else val)
+
+            set_clauses = []
+            values = []
+            for field, value in patch.items():
+                col = _PROFILE_COLUMN_MAP.get(field, field)
+                set_clauses.append(f"{col} = %s")
+                values.append(json.dumps(value) if isinstance(value, (dict, list)) else value)
+            set_clauses.append("updated_at = now()")
+            values.append(profile_id)
+
+            cur.execute(
+                f"UPDATE athlete_profile SET {', '.join(set_clauses)} WHERE id = %s",
+                values,
+            )
+
+            new_values = {_PROFILE_COLUMN_MAP.get(f, f): patch[f] for f in patch}
+            cur.execute(
+                """INSERT INTO athlete_profile_audit_log
+                       (athlete_profile_id, changed_fields, old_values, new_values, source)
+                   VALUES (%s, %s, %s, %s, %s)""",
+                (profile_id, json.dumps(sorted(patch.keys())), json.dumps(old_values, default=str),
+                 json.dumps(new_values, default=str), "mcp_update_athlete_profile"),
+            )
+        conn.commit()
+        # Nur Feldnamen loggen, niemals Werte (Gesundheitsdaten) — Sicherheitsvorgabe.
+        logger.info("update_athlete_profile: changed_fields=%s", sorted(patch.keys()))
+
+        updated_profile = _fetchone("SELECT * FROM athlete_profile WHERE id = %s", (profile_id,))
+        return {
+            "updated": True,
+            "changed_fields": sorted(patch.keys()),
+            "warnings": warnings,
+            "athlete_profile": updated_profile,
+        }
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+# ── Gear (Schuhe etc.) ───────────────────────────────────────────────────────
+
+_SHOE_GEAR_TYPES = frozenset({"running_shoe", "trail_shoe", "hiking_shoe"})
+_GEAR_TYPES = frozenset({
+    "running_shoe", "trail_shoe", "hiking_shoe", "bicycle", "watch",
+    "heart_rate_sensor", "vest", "poles", "other",
+})
+
+
+def _gear_row_out(row: dict) -> dict:
+    # row kommt aus _fetchall() (mcp_server.py) — dessen _to_serializable()
+    # hat date/datetime bereits zu ISO-Strings und Decimal bereits zu float
+    # konvertiert. Hier also direkt durchreichen, nicht erneut .isoformat().
+    initial = float(row["initial_distance_km"] or 0)
+    activity_dist = float(row["activity_distance_km"] or 0)
+    total = round(initial + activity_dist, 2)
+    target = float(row["target_distance_km"]) if row["target_distance_km"] is not None else None
+    return {
+        "id": row["id"], "gear_type": row["gear_type"], "brand": row["brand"], "model": row["model"],
+        "nickname": row["nickname"], "size": row["size"], "color": row["color"],
+        "primary_surface": row["primary_surface"], "active": row["active"],
+        "initial_distance_km": round(initial, 2), "activity_distance_km": round(activity_dist, 2),
+        "total_distance_km": total, "target_distance_km": target,
+        "remaining_distance_km": round(target - total, 2) if target is not None else None,
+        "activity_count": row["activity_count"] or 0,
+        "last_used_at": row["last_used_at"],
+        "purchase_date": row["purchase_date"],
+        "first_use_date": row["first_use_date"],
+        "retired_date": row["retired_date"],
+        "notes": row["notes"],
+    }
+
+
+@mcp.tool()
+def list_athlete_gear(gear_type: str | None = None, active_only: bool = True) -> list[dict]:
+    """
+    Liste aller Gear-Gegenstände (Schuhe, Rad, Uhr, ...) mit berechneter
+    Gesamtdistanz (initial_distance_km + Summe der zugeordneten Aktivitäten —
+    live berechnet, nicht blind hochgezählt).
+
+    Args:
+        gear_type:   Optional auf einen Typ filtern (z.B. "trail_shoe").
+        active_only: True (Standard) = nur aktive, nicht stillgelegte Gegenstände.
+    """
+    if gear_type and gear_type not in _GEAR_TYPES:
+        return [{"error": f"Unbekannter gear_type {gear_type!r}. Erlaubt: {sorted(_GEAR_TYPES)}"}]
+
+    where = ["1=1"]
+    params: list = []
+    if gear_type:
+        where.append("g.gear_type = %s")
+        params.append(gear_type)
+    if active_only:
+        where.append("g.active = true")
+
+    rows = _fetchall(
+        f"""
+        SELECT g.id, g.gear_type, g.brand, g.model, g.nickname, g.size, g.color,
+               g.primary_surface, g.active, g.initial_distance_km, g.target_distance_km,
+               g.purchase_date, g.first_use_date, g.retired_date, g.notes,
+               COALESCE(SUM(u.distance_km), 0) AS activity_distance_km,
+               COUNT(u.id) AS activity_count,
+               MAX(t.date) AS last_used_at
+        FROM athlete_gear g
+        LEFT JOIN activity_gear_usage u ON u.gear_id = g.id
+        LEFT JOIN trainings t ON t.id = u.training_id
+        WHERE {' AND '.join(where)}
+        GROUP BY g.id
+        ORDER BY g.gear_type, g.id
+        """,
+        tuple(params),
+    )
+    return [_gear_row_out(r) for r in rows]
+
+
+@mcp.tool()
+def create_athlete_gear(
+    gear_type: str,
+    brand: str | None = None,
+    model: str | None = None,
+    nickname: str | None = None,
+    size: str | None = None,
+    color: str | None = None,
+    primary_surface: str | None = None,
+    purchase_date: str | None = None,
+    first_use_date: str | None = None,
+    initial_distance_km: float = 0,
+    target_distance_km: float | None = None,
+    notes: str | None = None,
+) -> dict:
+    """
+    Legt einen neuen Gear-Gegenstand an (z.B. einen neuen Trailschuh).
+
+    Args:
+        gear_type: Einer von running_shoe, trail_shoe, hiking_shoe, bicycle,
+                   watch, heart_rate_sensor, vest, poles, other.
+        initial_distance_km: Bereits vor CAIRN gelaufene/gefahrene Kilometer
+                   (z.B. beim Nacherfassen eines schon benutzten Schuhs).
+    """
+    if gear_type not in _GEAR_TYPES:
+        return {"error": f"Unbekannter gear_type {gear_type!r}. Erlaubt: {sorted(_GEAR_TYPES)}"}
+
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT id FROM athlete_profile ORDER BY id DESC LIMIT 1")
+            row = cur.fetchone()
+            athlete_id = row[0] if row else None
+            cur.execute(
+                """INSERT INTO athlete_gear
+                       (athlete_id, gear_type, brand, model, nickname, size, color,
+                        primary_surface, purchase_date, first_use_date,
+                        initial_distance_km, target_distance_km, notes)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                   RETURNING id""",
+                (athlete_id, gear_type, brand, model, nickname, size, color, primary_surface,
+                 purchase_date, first_use_date, initial_distance_km, target_distance_km, notes),
+            )
+            gear_id = cur.fetchone()[0]
+        conn.commit()
+    finally:
+        conn.close()
+
+    return {"created": True, "gear": _fetchone_gear(gear_id)}
+
+
+def _fetchone_gear(gear_id: int) -> dict | None:
+    rows = _fetchall(
+        """
+        SELECT g.id, g.gear_type, g.brand, g.model, g.nickname, g.size, g.color,
+               g.primary_surface, g.active, g.initial_distance_km, g.target_distance_km,
+               g.purchase_date, g.first_use_date, g.retired_date, g.notes,
+               COALESCE(SUM(u.distance_km), 0) AS activity_distance_km,
+               COUNT(u.id) AS activity_count,
+               MAX(t.date) AS last_used_at
+        FROM athlete_gear g
+        LEFT JOIN activity_gear_usage u ON u.gear_id = g.id
+        LEFT JOIN trainings t ON t.id = u.training_id
+        WHERE g.id = %s
+        GROUP BY g.id
+        """,
+        (gear_id,),
+    )
+    return _gear_row_out(rows[0]) if rows else None
+
+
+@mcp.tool()
+def update_athlete_gear(gear_id: int, patch: dict) -> dict:
+    """
+    Partielles Update eines Gear-Gegenstands. Nur im patch enthaltene Felder
+    werden geändert. Erlaubte Felder: brand, model, nickname, size, color,
+    primary_surface, purchase_date, first_use_date, target_distance_km,
+    initial_distance_km, notes, active.
+    """
+    allowed = {"brand", "model", "nickname", "size", "color", "primary_surface",
+               "purchase_date", "first_use_date", "target_distance_km",
+               "initial_distance_km", "notes", "active"}
+    unknown = [k for k in patch if k not in allowed]
+    if unknown:
+        return {"error": f"Unbekannte Felder: {unknown}. Erlaubt: {sorted(allowed)}"}
+    if not patch:
+        return {"error": "patch darf nicht leer sein."}
+
+    existing = _fetchone_gear(gear_id)
+    if not existing:
+        return {"error": f"Gear id={gear_id} nicht gefunden."}
+
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            set_clauses = [f"{k} = %s" for k in patch] + ["updated_at = now()"]
+            cur.execute(
+                f"UPDATE athlete_gear SET {', '.join(set_clauses)} WHERE id = %s",
+                [*patch.values(), gear_id],
+            )
+        conn.commit()
+    finally:
+        conn.close()
+
+    return {"updated": True, "changed_fields": sorted(patch.keys()), "gear": _fetchone_gear(gear_id)}
+
+
+@mcp.tool()
+def retire_athlete_gear(gear_id: int, retired_date: str | None = None) -> dict:
+    """Stillgelegten Gegenstand markieren (active=false) — Historie bleibt erhalten."""
+    existing = _fetchone_gear(gear_id)
+    if not existing:
+        return {"error": f"Gear id={gear_id} nicht gefunden."}
+
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "UPDATE athlete_gear SET active = false, retired_date = COALESCE(%s, CURRENT_DATE), "
+                "updated_at = now() WHERE id = %s",
+                (retired_date, gear_id),
+            )
+        conn.commit()
+    finally:
+        conn.close()
+
+    return {"retired": True, "gear": _fetchone_gear(gear_id)}
+
+
+def _resolve_training_id(activity_id: int | None, garmin_id: str | None) -> dict | None:
+    if activity_id:
+        return _fetchone("SELECT id, distance_km FROM trainings WHERE id = %s", (activity_id,))
+    if garmin_id:
+        return _fetchone("SELECT id, distance_km FROM trainings WHERE garmin_id = %s", (str(garmin_id),))
+    return None
+
+
+@mcp.tool()
+def assign_activity_gear(
+    activity_id: int | None = None,
+    garmin_id: str | None = None,
+    gear_id: int = 0,
+    distance_km: float | None = None,
+    assignment_source: str | None = None,
+) -> dict:
+    """
+    Ordnet einer Aktivität ein Gear-Item zu (z.B. den benutzten Schuh) und
+    aktualisiert dessen Gesamtkilometer. Idempotent: derselbe Aufruf mit
+    identischer distance_km zählt die Kilometer nicht doppelt.
+
+    Bei Schuhen (running_shoe/trail_shoe/hiking_shoe): pro Aktivität ist
+    maximal ein Schuh zugeordnet — ein neuer Schuh ersetzt automatisch einen
+    zuvor zugeordneten anderen Schuh derselben Aktivität (Schuhwechsel-Logik).
+    Andere Gear-Typen (Uhr, Weste, ...) werden zusätzlich zugeordnet, nie ersetzt.
+
+    Args:
+        distance_km: None (Standard) = Distanz der Aktivität übernehmen.
+                     Explizit angeben, wenn nur ein Teil der Strecke zählt.
+    """
+    training = _resolve_training_id(activity_id, garmin_id)
+    if not training:
+        return {"error": "Aktivität nicht gefunden."}
+    gear = _fetchone(
+        "SELECT id, gear_type, nickname, initial_distance_km, target_distance_km "
+        "FROM athlete_gear WHERE id = %s", (gear_id,)
+    )
+    if not gear:
+        return {"error": f"Gear id={gear_id} nicht gefunden."}
+
+    tid = training["id"]
+    resolved_distance = float(distance_km) if distance_km is not None else \
+        (float(training["distance_km"]) if training["distance_km"] is not None else 0.0)
+
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            def _current_total(gid: int) -> float:
+                cur.execute(
+                    "SELECT COALESCE(SUM(distance_km),0) FROM activity_gear_usage WHERE gear_id = %s",
+                    (gid,),
+                )
+                return float(cur.fetchone()[0])
+
+            cur.execute(
+                "SELECT id, distance_km FROM activity_gear_usage WHERE training_id = %s AND gear_id = %s",
+                (tid, gear_id),
+            )
+            existing_usage = cur.fetchone()
+
+            if existing_usage and float(existing_usage[1]) == round(resolved_distance, 2):
+                gear_full = _fetchone_gear(gear_id)
+                return {
+                    "assigned": True, "idempotent": True, "distance_added_km": 0,
+                    "activity_id": tid, "activity_distance_km": resolved_distance,
+                    "gear": gear_full, "replaced_gear": None, "warnings": [],
+                }
+
+            replaced_gear = None
+            if gear["gear_type"] in _SHOE_GEAR_TYPES:
+                cur.execute(
+                    """SELECT g.id, g.nickname FROM activity_gear_usage u
+                           JOIN athlete_gear g ON g.id = u.gear_id
+                       WHERE u.training_id = %s AND g.gear_type IN %s AND g.id != %s""",
+                    (tid, tuple(_SHOE_GEAR_TYPES), gear_id),
+                )
+                old_shoe = cur.fetchone()
+                if old_shoe:
+                    old_gear_id, old_nickname = old_shoe
+                    prev_total = _current_total(old_gear_id)
+                    cur.execute(
+                        "DELETE FROM activity_gear_usage WHERE training_id = %s AND gear_id = %s",
+                        (tid, old_gear_id),
+                    )
+                    new_total = _current_total(old_gear_id)
+                    replaced_gear = {
+                        "id": old_gear_id, "nickname": old_nickname,
+                        "previous_total_distance_km": round(prev_total, 2),
+                        "new_total_distance_km": round(new_total, 2),
+                    }
+
+            previous_total = _current_total(gear_id)
+            cur.execute(
+                """INSERT INTO activity_gear_usage (training_id, gear_id, distance_km, assignment_source)
+                       VALUES (%s, %s, %s, %s)
+                   ON CONFLICT (training_id, gear_id) DO UPDATE SET
+                       distance_km = EXCLUDED.distance_km,
+                       assignment_source = EXCLUDED.assignment_source,
+                       updated_at = now()""",
+                (tid, gear_id, round(resolved_distance, 2), assignment_source),
+            )
+            new_total = _current_total(gear_id)
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+    gear_full = _fetchone_gear(gear_id)
+    return {
+        "assigned": True, "idempotent": False,
+        "activity_id": tid, "activity_distance_km": round(resolved_distance, 2),
+        "gear": {
+            "id": gear_id, "nickname": gear["nickname"],
+            "previous_total_distance_km": round(previous_total, 2),
+            "new_total_distance_km": round(new_total, 2),
+            "target_distance_km": float(gear["target_distance_km"]) if gear["target_distance_km"] is not None else None,
+            "remaining_distance_km": round(float(gear["target_distance_km"]) - new_total, 2)
+                if gear["target_distance_km"] is not None else None,
+        },
+        "replaced_gear": replaced_gear,
+        "warnings": [],
+    }
+
+
+@mcp.tool()
+def remove_activity_gear(
+    activity_id: int | None = None,
+    garmin_id: str | None = None,
+    gear_id: int = 0,
+) -> dict:
+    """Entfernt eine Gear-Zuordnung von einer Aktivität (Korrektur einer Fehlzuordnung)."""
+    training = _resolve_training_id(activity_id, garmin_id)
+    if not training:
+        return {"error": "Aktivität nicht gefunden."}
+
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "DELETE FROM activity_gear_usage WHERE training_id = %s AND gear_id = %s RETURNING id",
+                (training["id"], gear_id),
+            )
+            removed = cur.fetchone() is not None
+        conn.commit()
+    finally:
+        conn.close()
+
+    return {"removed": removed, "activity_id": training["id"], "gear_id": gear_id,
+            "gear": _fetchone_gear(gear_id)}
 
 
 @mcp.tool()
@@ -662,34 +1230,27 @@ def get_activity_analysis_data(
     activity_id: int | None = None,
     garmin_id: str | None = None,
     include_stream: bool = True,
-    stream_resolution_m: int = 100,
+    stream_resolution_m: int = 50,
 ) -> dict:
     """
-    Vollständige Analyse-Daten für eine abgeschlossene Einheit.
+    Vollständige, deterministische Analyse-Daten für eine abgeschlossene
+    Einheit — die objektive Grundlage, auf der ChatGPT die individuelle
+    Coach-Interpretation aufbaut (siehe save_activity_coach_analysis).
     Zuerst get_recent_activities() aufrufen um die activity_id zu erhalten.
-    Deckt das vollständige 25-Punkte-Analyse-Schema ab.
 
     Args:
         activity_id:         CAIRN trainings.id
         garmin_id:           Alternativ: Garmin activityId als String
         include_stream:      True = Activity Stream mitliefern (Standard).
-                             False = nur Splits/Kopf, schnellere Antwort.
-        stream_resolution_m: Auflösung des Streams in Metern (Standard 100m).
-                             50 = feinkörniger, 200 = kompakter.
-                             HR und Elevation sind auf Distanz-Achse ausgerichtet
-                             → ermöglicht HR-Terrain-Korrelation, Pace-HR-Effizienz,
-                             Cardiac Drift, Steigungsanalyse.
+        stream_resolution_m: Ziel-Punktabstand des zurückgegebenen Streams in
+                             Metern (Standard 50). Rohdaten bleiben in der DB
+                             unverändert — nur die Tool-Antwort wird ausgedünnt.
 
-    Gibt zurück:
-    - summary:        Aktivitätskopf mit allen Kennzahlen
-    - splits:         km-weise Pace, HR, Cadence, Elevation
-    - trail_metrics:  Aufstieg, Abstieg, Max-Steigung, Vertikalgeschwindigkeit
-    - trail_segments: Aufstieg/Abstieg/Flach-Phasen mit Pace+HR pro Segment
-    - stream:         HR + Elevation + Pace + Cadence auf Distanz-Achse
-                      (aus activity_stream falls verfügbar, sonst hr_tracks Fallback)
-    - hr_zones:       Z1–Z5 aus athlete_profile Grenzen, in Zeit + Prozent
+    Gibt zurück: summary, native_laps, km_splits, stream, route,
+    trail_metrics, trail_segments, hr_zones, recovery_context, data_quality.
+    Fehlende Werte sind null — nichts wird erfunden. Wenn Detaildaten fehlen,
+    zuerst sync_activity_details aufrufen.
     """
-    # ── Aktivität laden ──
     if activity_id:
         training = _fetchone(
             "SELECT id, date, type, notes, distance_km, duration_minutes, "
@@ -715,258 +1276,153 @@ def get_activity_analysis_data(
         return {"error": "Aktivität nicht gefunden"}
 
     tid = training["id"]
+    conn = get_connection()
+    try:
+        native_laps = build_native_laps(conn, tid)
+        km_splits, km_splits_reason = compute_km_splits(conn, tid)
+        route = build_route(conn, tid)
+        trail_metrics, trail_segments = build_trail_metrics_and_segments(conn, tid)
+        summary = build_summary(conn, training)
+        recovery_context = build_recovery_context(conn, training["date"]) if training.get("date") else None
+        hr_zones = build_hr_zones(conn, tid)
 
-    # ── Splits ──
-    splits_raw = _fetchall(
-        "SELECT split_number, distance_km, pace_seconds, heart_rate_avg, elevation_gain, cadence_avg "
-        "FROM splits WHERE training_id = %s ORDER BY split_number",
-        (tid,)
-    )
+        # Stream-basierte Werte haben Vorrang vor evtl. veralteten trainings-
+        # Spalten (elevation_gain_m/loss_m dort oft NULL bei Altimporten).
+        if trail_metrics.get("ascent_m") is not None:
+            summary["elevation_gain_m"] = trail_metrics["ascent_m"]
+        if trail_metrics.get("descent_m") is not None:
+            summary["elevation_loss_m"] = trail_metrics["descent_m"]
+        if trail_metrics.get("min_elevation_m") is not None:
+            summary["min_elevation_m"] = trail_metrics["min_elevation_m"]
+        if trail_metrics.get("max_elevation_m") is not None:
+            summary["max_elevation_m"] = trail_metrics["max_elevation_m"]
+        # trainings-Spalten sind bei Altimporten oft leer, obwohl Garmins
+        # native Laps den Wert bereits liefern (z.B. maxHR aus lapDTOs).
+        if summary.get("max_hr") is None and native_laps:
+            lap_max_hrs = [lap["max_hr"] for lap in native_laps if lap.get("max_hr") is not None]
+            if lap_max_hrs:
+                summary["max_hr"] = max(lap_max_hrs)
+        if summary.get("avg_cadence") is None and native_laps:
+            lap_cadences = [lap["avg_cadence"] for lap in native_laps if lap.get("avg_cadence") is not None]
+            if lap_cadences:
+                summary["avg_cadence"] = round(sum(lap_cadences) / len(lap_cadences))
 
-    splits_out = []
-    total_up = 0.0
-    total_down = 0.0
-    for s in splits_raw:
-        elev = float(s["elevation_gain"]) if s["elevation_gain"] else 0.0
-        if elev > 0:
-            total_up += elev
-        else:
-            total_down += abs(elev)
-        pace_s = s["pace_seconds"]
-        splits_out.append({
-            "km": s["split_number"],
-            "distance_km": float(s["distance_km"]) if s["distance_km"] else None,
-            "pace_per_km": f"{pace_s//60}:{str(pace_s%60).zfill(2)}" if pace_s else None,
-            "pace_seconds": pace_s,
-            "hr_avg": s["heart_rate_avg"],
-            "elevation_m": round(elev, 1),
-            "cadence": s["cadence_avg"],
-        })
+        # ── Stream (distanzbasiert, ausgedünnt auf stream_resolution_m) ──
+        stream_out = None
+        hr_stream_available = pace_stream_available = elevation_stream_available = False
+        power_available = False
+        stream_point_count = 0
 
-    # ── Trail-Segmente (aus Splits: Aufstieg / Abstieg / Flach) ──
-    UPHILL_T, DOWNHILL_T = 30, -30   # m/km Steigung als Grenze
-    classified = []
-    for s in splits_raw:
-        elev = float(s["elevation_gain"]) if s["elevation_gain"] else 0.0
-        dist = float(s["distance_km"]) if s["distance_km"] else 1.0
-        gradient = elev / dist if dist > 0 else 0
-        terrain = "uphill" if gradient > UPHILL_T else ("downhill" if gradient < DOWNHILL_T else "flat")
-        classified.append({"km": s["split_number"], "distance_km": dist, "pace_s": s["pace_seconds"],
-                           "hr": s["heart_rate_avg"] or 0, "elevation_m": elev, "terrain": terrain})
+        if include_stream:
+            resolution = max(10, min(500, stream_resolution_m))
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT distance_m, elapsed_s, moving_s, heart_rate, speed_ms, "
+                    "cadence, power, elevation_m, lat, lon "
+                    "FROM activity_stream WHERE training_id = %s ORDER BY distance_m",
+                    (tid,)
+                )
+                cols = [d[0] for d in cur.description]
+                raw_stream = [dict(zip(cols, row)) for row in cur.fetchall()]
 
-    segments, current = [], None
-    for point in classified:
-        if current is None or point["terrain"] != current["terrain"]:
-            if current: segments.append(current)
-            current = {"terrain": point["terrain"], "start_km": point["km"] - 1, "end_km": point["km"],
-                      "total_elevation_m": point["elevation_m"], "total_distance_km": point["distance_km"],
-                      "pace_seconds": [point["pace_s"]] if point["pace_s"] else [],
-                      "hr_values": [point["hr"]] if point["hr"] else []}
-        else:
-            current["end_km"] = point["km"]
-            current["total_elevation_m"] += point["elevation_m"]
-            current["total_distance_km"] += point["distance_km"]
-            if point["pace_s"]: current["pace_seconds"].append(point["pace_s"])
-            if point["hr"]: current["hr_values"].append(point["hr"])
-    if current: segments.append(current)
-
-    trail_segments = []
-    for seg in segments:
-        avg_pace_s = int(sum(seg["pace_seconds"]) / len(seg["pace_seconds"])) if seg["pace_seconds"] else None
-        avg_hr = int(sum(seg["hr_values"]) / len(seg["hr_values"])) if seg["hr_values"] else None
-        gradient_pct = round(abs(seg["total_elevation_m"]) / (seg["total_distance_km"] * 1000) * 100, 1) if seg["total_distance_km"] > 0 else 0
-        trail_segments.append({
-            "type": seg["terrain"],
-            "start_km": seg["start_km"],
-            "end_km": seg["end_km"],
-            "distance_km": round(seg["total_distance_km"], 2),
-            "elevation_m": round(seg["total_elevation_m"], 1),
-            "gradient_pct": gradient_pct,
-            "avg_pace_per_km": f"{avg_pace_s//60}:{str(avg_pace_s%60).zfill(2)}" if avg_pace_s else None,
-            "avg_hr": avg_hr,
-        })
-
-    # ── Trail-Metriken (aus activity_stream falls verfügbar, sonst Splits-Summe) ──
-    stream_ele_rows = _fetchall(
-        "SELECT distance_m, elevation_m FROM activity_stream "
-        "WHERE training_id = %s AND elevation_m IS NOT NULL ORDER BY distance_m",
-        (tid,)
-    )
-
-    if stream_ele_rows:
-        ascent = descent = 0.0
-        max_grade_pct = 0.0
-        elevations = [r["elevation_m"] for r in stream_ele_rows]
-        for i in range(1, len(elevations)):
-            diff = elevations[i] - elevations[i - 1]
-            if diff > 0: ascent += diff
-            else: descent += abs(diff)
-
-        # Max-Steigung über 100m-Fenster
-        pts = [(r["distance_m"], r["elevation_m"]) for r in stream_ele_rows]
-        for i, (d1, e1) in enumerate(pts):
-            for d2, e2 in pts[i + 1:]:
-                if d2 - d1 >= 100:
-                    grade = abs(e2 - e1) / (d2 - d1) * 100
-                    if grade > max_grade_pct: max_grade_pct = grade
-                    break
-
-        total_dist_km = float(training["distance_km"]) if training["distance_km"] else 0
-        avg_grade = (ascent / (total_dist_km * 1000) * 100) if total_dist_km > 0 else 0
-        dur_h = (training["duration_minutes"] or 0) / 60
-        trail_metrics = {
-            "ascent_m": round(ascent, 1),
-            "descent_m": round(descent, 1),
-            "avg_grade_pct": round(avg_grade, 1),
-            "max_grade_pct": round(max_grade_pct, 1),
-            "vertical_speed_m_per_h": round(ascent / dur_h, 1) if dur_h > 0 else None,
-            "source": "activity_stream",
-        }
-    else:
-        trail_metrics = {
-            "ascent_m": training["elevation_gain_m"] or round(total_up, 1),
-            "descent_m": training["elevation_loss_m"] or round(total_down, 1),
-            "avg_grade_pct": None,
-            "max_grade_pct": None,
-            "vertical_speed_m_per_h": None,
-            "source": "splits_fallback",
-        }
-
-    # ── Activity Stream (distanzbasiert, ausgedünnt auf stream_resolution_m) ──
-    stream_out = None
-    stream_point_count = 0
-
-    if include_stream:
-        resolution = max(10, min(500, stream_resolution_m))
-        raw_stream = _fetchall(
-            "SELECT distance_m, heart_rate, elevation_m, speed_ms, cadence, power "
-            "FROM activity_stream WHERE training_id = %s ORDER BY distance_m",
-            (tid,)
-        )
-
-        if raw_stream:
-            points = []
-            last_d = -resolution
-            for r in raw_stream:
-                d = r["distance_m"]
-                if d >= last_d + resolution:
-                    p: dict[str, Any] = {"d": round(d)}
-                    if r["heart_rate"] is not None: p["hr"] = r["heart_rate"]
-                    if r["elevation_m"] is not None: p["ele"] = round(r["elevation_m"], 1)
-                    if r["speed_ms"] is not None and r["speed_ms"] > 0:
-                        p["pace_s"] = round(1000 / r["speed_ms"])
-                    if r["cadence"] is not None: p["cad"] = r["cadence"]
-                    if r["power"] is not None: p["pwr"] = r["power"]
-                    points.append(p)
-                    last_d = d
-            stream_point_count = len(points)
-            stream_out = {
-                "source": "activity_stream",
-                "resolution_m": resolution,
-                "point_count": stream_point_count,
-                "fields": "d=distance_m | hr=heart_rate_bpm | ele=elevation_m | pace_s=sec_per_km | cad=cadence_spm | pwr=power_watt",
-                "points": points,
-            }
-        else:
-            # Fallback: hr_tracks (zeitbasiert) — deutlich weniger nützlich für Terrain-Korrelation
-            hr_fallback = _fetchall(
-                "SELECT point_index, timestamp_ms, heart_rate FROM hr_tracks "
-                "WHERE training_id = %s AND MOD(point_index, 30) = 0 ORDER BY point_index",
-                (tid,)
-            )
-            if hr_fallback:
-                stream_point_count = len(hr_fallback)
+            if raw_stream:
+                points = []
+                last_d = -resolution
+                orig_count = len(raw_stream)
+                for r in raw_stream:
+                    d = r["distance_m"]
+                    if d >= last_d + resolution:
+                        row_out = [
+                            None,  # timestamp_ms — nicht separat gespeichert (elapsed_s deckt das ab)
+                            round(r["elapsed_s"], 1) if r["elapsed_s"] is not None else None,
+                            round(r["moving_s"], 1) if r["moving_s"] is not None else None,
+                            round(d, 1),
+                            r["heart_rate"],
+                            round(r["speed_ms"], 3) if r["speed_ms"] is not None else None,
+                            round(1000 / r["speed_ms"]) if r["speed_ms"] else None,
+                            r["cadence"],
+                            r["power"],
+                            round(r["elevation_m"], 1) if r["elevation_m"] is not None else None,
+                            None,  # grade_pct — bewusst nicht pro Punkt berechnet (siehe trail_segments)
+                            r["lat"], r["lon"],
+                        ]
+                        points.append(row_out)
+                        if r["heart_rate"] is not None: hr_stream_available = True
+                        if r["speed_ms"] is not None: pace_stream_available = True
+                        if r["elevation_m"] is not None: elevation_stream_available = True
+                        if r["power"] is not None: power_available = True
+                        last_d = d
+                stream_point_count = len(points)
                 stream_out = {
-                    "source": "hr_tracks_fallback",
-                    "note": "activity_stream noch nicht importiert — nur HR auf Zeitachse, keine Distanz-Korrelation möglich. Nächster sync_completed_activities Aufruf importiert den Stream.",
-                    "resolution_s": 30,
-                    "point_count": stream_point_count,
-                    "fields": "point_index | timestamp_ms | heart_rate",
-                    "data": [[p["point_index"], p["timestamp_ms"], p["heart_rate"]] for p in hr_fallback],
+                    "source": "garmin_activity_stream",
+                    "resolution_requested_m": stream_resolution_m,
+                    "resolution_actual_m": resolution,
+                    "original_point_count": orig_count,
+                    "returned_point_count": stream_point_count,
+                    "fields": ["timestamp_ms", "elapsed_s", "timer_time_s", "distance_m", "heart_rate",
+                               "speed_mps", "pace_seconds_per_km", "cadence", "power", "altitude_m",
+                               "grade_pct", "latitude", "longitude"],
+                    "data": points,
                 }
             else:
-                stream_out = {"available": False, "reason": "Kein Stream vorhanden"}
+                hr_fallback = _fetchall(
+                    "SELECT point_index, timestamp_ms, heart_rate FROM hr_tracks "
+                    "WHERE training_id = %s ORDER BY point_index",
+                    (tid,)
+                )
+                if hr_fallback:
+                    hr_stream_available = True
+                    stream_point_count = len(hr_fallback)
+                    stream_out = {
+                        "source": "hr_tracks_fallback",
+                        "note": "activity_stream noch nicht importiert — nur HF auf Zeitachse, keine "
+                                "Distanz-Korrelation möglich. sync_activity_details aufrufen, um den "
+                                "vollen Distanz-Stream nachzuladen.",
+                        "fallback": True,
+                        "resolution_requested_m": stream_resolution_m,
+                        "point_count": stream_point_count,
+                        "fields": ["point_index", "timestamp_ms", "heart_rate"],
+                        "data": [[p["point_index"], p["timestamp_ms"], p["heart_rate"]] for p in hr_fallback],
+                    }
+                else:
+                    stream_out = {"available": False, "reason": "Kein Stream vorhanden"}
 
-    # ── HR-Zonen (aus athlete_profile Grenzen) ──
-    zones_out = []
-    profile = _fetchone(
-        "SELECT hr_z1_max, hr_z2_max, hr_z3_max, hr_z4_max, hr_z5_max "
-        "FROM athlete_profile ORDER BY id DESC LIMIT 1"
-    )
-    if profile and any(v for v in profile.values() if v is not None):
-        # HR-Daten: bevorzuge activity_stream, Fallback hr_tracks
-        hr_vals_raw = _fetchall(
-            "SELECT heart_rate FROM activity_stream "
-            "WHERE training_id = %s AND heart_rate IS NOT NULL",
-            (tid,)
+        gps_route_available = bool(route.get("available"))
+
+        data_quality = build_data_quality(
+            native_laps=native_laps, km_splits=km_splits,
+            stream_available=stream_out is not None and stream_out.get("available") is not False,
+            hr_stream_available=hr_stream_available, pace_stream_available=pace_stream_available,
+            elevation_stream_available=elevation_stream_available, gps_route_available=gps_route_available,
+            power_available=power_available, hr_zones_available=hr_zones is not None,
+            summary=summary, hr_stream_point_count=stream_point_count,
         )
-        if not hr_vals_raw:
-            hr_vals_raw = _fetchall(
-                "SELECT heart_rate FROM hr_tracks WHERE training_id = %s AND heart_rate IS NOT NULL",
-                (tid,)
-            )
+        if km_splits_reason:
+            data_quality["warnings"].append(km_splits_reason)
 
-        if hr_vals_raw:
-            zone_bounds = [
-                (1, "Regeneration", 0,                             profile["hr_z1_max"] or 130),
-                (2, "Basis",        (profile["hr_z1_max"] or 130) + 1, profile["hr_z2_max"] or 148),
-                (3, "Tempo",        (profile["hr_z2_max"] or 148) + 1, profile["hr_z3_max"] or 162),
-                (4, "Schwelle",     (profile["hr_z3_max"] or 162) + 1, profile["hr_z4_max"] or 174),
-                (5, "VO2max",       (profile["hr_z4_max"] or 174) + 1, 999),
-            ]
-            total_pts = len(hr_vals_raw)
-            dur_min = training["duration_minutes"] or 0
-            for z_num, z_label, z_min, z_max in zone_bounds:
-                count = sum(1 for p in hr_vals_raw if z_min <= (p["heart_rate"] or 0) <= z_max)
-                zones_out.append({
-                    "zone": z_num,
-                    "label": z_label,
-                    "min_hr": z_min,
-                    "max_hr": z_max if z_max < 999 else None,
-                    "time_min": round(count / total_pts * dur_min, 1) if total_pts > 0 else 0,
-                    "pct": round(count / total_pts * 100, 1) if total_pts > 0 else 0,
-                })
+        summary["stream_available"] = data_quality["hr_stream_available"] or data_quality["pace_stream_available"]
+        summary["stream_source"] = stream_out.get("source") if stream_out else None
 
-    # ── Summary ──
-    dist = training["distance_km"]
-    dur = training["duration_minutes"]
-    avg_pace_s = int(dur * 60 / float(dist)) if dist and dur and float(dist) > 0 else None
+        source_data_hash = compute_source_data_hash(
+            summary=summary, native_laps=native_laps, km_splits=km_splits, trail_metrics=trail_metrics,
+        )
 
-    summary = {
-        "training_id": tid,
-        "garmin_id": training["garmin_id"],
-        "date": str(training["date"]) if training["date"] else None,
-        "type": training["type"],
-        "activity_name": training["notes"],
-        "distance_km": float(dist) if dist else None,
-        "duration_min": dur,
-        "avg_pace_per_km": f"{avg_pace_s//60}:{str(avg_pace_s%60).zfill(2)}" if avg_pace_s else None,
-        "avg_hr": training["heart_rate_avg"],
-        "max_hr": training["max_hr"],
-        "elevation_gain_m": trail_metrics["ascent_m"],
-        "elevation_loss_m": trail_metrics["descent_m"],
-        "avg_cadence": training["avg_cadence"],
-        "training_load": training["training_load"],
-        "aerobic_effect": training["aerobic_effect"],
-        "anaerobic_effect": training["anaerobic_effect"],
-        "vo2max_estimate": training["vo2max_estimate"],
-        "avg_power": training["avg_power"],
-        "splits_count": len(splits_out),
-        "trail_segments_count": len(trail_segments),
-        "hr_zones_available": len(zones_out) > 0,
-        "stream_available": stream_out is not None and stream_out.get("available") is not False,
-        "stream_source": stream_out.get("source") if stream_out else None,
-        "stream_points": stream_point_count,
-    }
-
-    return {
-        "summary": summary,
-        "splits": splits_out,
-        "trail_metrics": trail_metrics,
-        "trail_segments": trail_segments,
-        "hr_zones": zones_out if zones_out else None,
-        "stream": stream_out,
-    }
+        return {
+            "summary": summary,
+            "native_laps": native_laps,
+            "km_splits": km_splits,
+            "km_splits_note": km_splits_reason,
+            "stream": stream_out,
+            "route": route,
+            "trail_metrics": trail_metrics,
+            "trail_segments": trail_segments,
+            "hr_zones": hr_zones,
+            "recovery_context": recovery_context,
+            "data_quality": data_quality,
+            "source_data_hash": source_data_hash,
+        }
+    finally:
+        conn.close()
 
 
 # ── Training-Block-Verwaltung (Rennen + Sessions + Milestones) ─────────────────
@@ -1758,6 +2214,314 @@ def push_sessions_to_garmin(session_ids: list[int], chunk_size: int = 7) -> dict
             "remaining_ids": session_ids,
             "total_remaining": len(session_ids),
         }
+
+
+@mcp.tool()
+def sync_activity_details(
+    activity_id: int | None = None,
+    garmin_id: str | None = None,
+    force_refresh: bool = False,
+) -> dict:
+    """
+    Lädt fehlende Detaildaten für EINE bereits importierte Aktivität nach:
+    native Garmin-Laps, den distanzbasierten Activity-Stream (HF/Pace/
+    Höhe/GPS) und daraus ableitbare km_splits/route. Macht echte, read-only
+    Garmin-API-Calls. Idempotent: mit force_refresh=False wird nur ergänzt,
+    was noch fehlt — bereits vorhandene Daten werden nicht neu geholt.
+
+    Call this vor get_activity_analysis_data, wenn dessen data_quality-Block
+    fehlende Kategorien meldet (z.B. kein Stream, keine Route).
+
+    Args:
+        activity_id:   CAIRN trainings.id
+        garmin_id:     Alternativ: Garmin activityId als String
+        force_refresh: True = bestehende native_laps/activity_stream löschen
+                       und komplett neu importieren.
+    """
+    if activity_id:
+        training = _fetchone("SELECT id, garmin_id FROM trainings WHERE id = %s", (activity_id,))
+    elif garmin_id:
+        training = _fetchone("SELECT id, garmin_id FROM trainings WHERE garmin_id = %s", (str(garmin_id),))
+    else:
+        return {"error": "activity_id oder garmin_id erforderlich"}
+
+    if not training:
+        return {"error": "Aktivität nicht gefunden"}
+    if not training.get("garmin_id"):
+        return {"error": "Keine Garmin-ID für diese Aktivität hinterlegt — Nachladen nicht möglich."}
+
+    tid = training["id"]
+    g_id = int(training["garmin_id"])
+    fields_added: list[str] = []
+    warnings: list[str] = []
+    stream_points_imported = 0
+
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT COUNT(*) FROM splits WHERE training_id = %s", (tid,))
+            has_splits = cur.fetchone()[0] > 0
+            cur.execute("SELECT COUNT(*) FROM activity_stream WHERE training_id = %s", (tid,))
+            has_stream = cur.fetchone()[0] > 0
+
+        if force_refresh or not has_splits:
+            try:
+                client = garmin_client()
+                from data.garmin_import_splits import import_splits_for_activity
+                import_splits_for_activity(client, tid, g_id, force=force_refresh)
+                fields_added.append("native_laps")
+            except Exception as exc:
+                warnings.append(f"native_laps: {type(exc).__name__}: {exc}")
+
+        if force_refresh or not has_stream:
+            try:
+                client = garmin_client()
+                from data.garmin_import_stream import import_stream_for_activity
+                result = import_stream_for_activity(client, tid, g_id, force=force_refresh)
+                if "imported" in result:
+                    stream_points_imported = result["imported"]
+                    fields_added.append("activity_stream")
+                    fields_added.append("route")
+                elif "error" in result:
+                    warnings.append(f"activity_stream: {result['error']}")
+            except Exception as exc:
+                warnings.append(f"activity_stream: {type(exc).__name__}: {exc}")
+
+        km_splits, km_reason = compute_km_splits(conn, tid)
+        if km_splits:
+            fields_added.append("km_splits")
+        elif km_reason:
+            warnings.append(km_reason)
+    finally:
+        conn.close()
+
+    return {
+        "activity_id": tid,
+        "garmin_id": str(g_id),
+        "updated": bool(fields_added),
+        "fields_added": fields_added,
+        "stream_points_imported": stream_points_imported,
+        "warnings": warnings,
+    }
+
+
+# ── Persistente Coach-Analyse: Status / Vorbereitung / Speichern ───────────
+
+def _frontend_url(activity_id: int) -> str:
+    return f"/activities/{activity_id}/analysis"
+
+
+def _latest_analysis(training_id: int) -> dict | None:
+    return _fetchone(
+        "SELECT * FROM activity_analyses WHERE training_id = %s ORDER BY version DESC LIMIT 1",
+        (training_id,),
+    )
+
+
+@mcp.tool()
+def get_activity_analysis_status(activity_id: int) -> dict:
+    """
+    Prüft, ob für eine Aktivität bereits eine gespeicherte Coach-Analyse
+    existiert und ob sie noch zu den aktuellen Rohdaten passt ("fresh") oder
+    veraltet ist ("stale", weil sich Distanz/HF/Stream seither geändert haben —
+    z.B. durch einen nachträglichen sync_activity_details-Aufruf).
+
+    Call this als ersten Schritt im Analyse-Workflow, um unnötige Neuberechnung
+    zu vermeiden, wenn bereits eine aktuelle Analyse vorliegt.
+    """
+    training = _fetchone("SELECT id, date FROM trainings WHERE id = %s", (activity_id,))
+    if not training:
+        return {"error": "Aktivität nicht gefunden."}
+
+    latest = _latest_analysis(activity_id)
+    if not latest:
+        return {
+            "activity_id": activity_id, "analysis_exists": False, "status": "missing",
+            "source_data_hash": None, "analysis_schema_version": None,
+            "frontend_url": _frontend_url(activity_id), "generated_at": None,
+        }
+
+    current = get_activity_analysis_data(activity_id=activity_id, include_stream=False)
+    current_hash = current.get("source_data_hash")
+    status = "fresh" if current_hash == latest["source_data_hash"] else "stale"
+
+    if status == "stale" and latest["status"] == "fresh":
+        conn = get_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "UPDATE activity_analyses SET status = 'stale', updated_at = now() WHERE id = %s",
+                    (latest["id"],),
+                )
+            conn.commit()
+        finally:
+            conn.close()
+
+    return {
+        "activity_id": activity_id,
+        "analysis_exists": True,
+        "status": status,
+        "source_data_hash": latest["source_data_hash"],
+        "analysis_schema_version": latest["analysis_schema_version"],
+        "frontend_url": _frontend_url(activity_id),
+        "generated_at": latest["generated_at"],
+    }
+
+
+@mcp.tool()
+def prepare_activity_analysis(
+    activity_id: int,
+    force_refresh: bool = False,
+    stream_resolution_m: int = 50,
+) -> dict:
+    """
+    Ergänzt fehlende Aktivitätsdaten (ruft intern sync_activity_details auf —
+    das ist ein No-Op ohne Garmin-Zugriff, wenn native Laps und Stream bereits
+    vorhanden sind) und liefert dann alle deterministischen Analysewerte plus
+    eine evtl. bereits gespeicherte Coach-Analyse zur Wiederverwendung.
+
+    Args:
+        force_refresh: True = Rohdaten zwangsweise neu von Garmin laden,
+                       auch wenn schon vorhanden.
+    """
+    training = _fetchone("SELECT id, garmin_id FROM trainings WHERE id = %s", (activity_id,))
+    if not training:
+        return {"error": "Aktivität nicht gefunden."}
+
+    sync_warnings: list[str] = []
+    if training.get("garmin_id"):
+        sync_result = sync_activity_details(activity_id=activity_id, force_refresh=force_refresh)
+        sync_warnings = sync_result.get("warnings", [])
+
+    analysis_data = get_activity_analysis_data(
+        activity_id=activity_id, include_stream=True, stream_resolution_m=stream_resolution_m,
+    )
+    if "error" in analysis_data:
+        return analysis_data
+
+    data_quality = analysis_data["data_quality"]
+    missing_data = []
+    if not data_quality["native_laps_available"] and not data_quality["km_splits_available"]:
+        missing_data.append("splits")
+    if not data_quality["hr_stream_available"]:
+        missing_data.append("hr_stream")
+    if not data_quality["gps_route_available"]:
+        missing_data.append("route")
+    if not data_quality["elevation_stream_available"]:
+        missing_data.append("elevation_stream")
+
+    existing = _latest_analysis(activity_id)
+    existing_out = None
+    if existing:
+        existing_out = {**existing, "is_fresh": existing["source_data_hash"] == analysis_data["source_data_hash"]}
+
+    return {
+        "activity_id": activity_id,
+        "ready": True,
+        "source_data_hash": analysis_data["source_data_hash"],
+        "analysis_data": analysis_data,
+        "missing_data": missing_data,
+        "data_quality": data_quality,
+        "existing_coach_analysis": existing_out,
+        "frontend_url": _frontend_url(activity_id),
+        "sync_warnings": sync_warnings,
+    }
+
+
+@mcp.tool()
+def save_activity_coach_analysis(
+    activity_id: int,
+    source_data_hash: str,
+    analysis: dict,
+    analysis_schema_version: int = 1,
+) -> dict:
+    """
+    Speichert ChatGPTs Coach-Interpretation dauerhaft und versioniert bei der
+    Aktivität. Verändert NIEMALS objektive Garmin-/CAIRN-Werte (trainings/
+    splits/activity_stream) — nur die subjektive Interpretation.
+
+    Args:
+        source_data_hash: Muss exakt dem source_data_hash aus dem letzten
+                prepare_activity_analysis/get_activity_analysis_data-Aufruf
+                entsprechen — verhindert, dass eine Analyse gegen inzwischen
+                veraltete Rohdaten gespeichert wird. Bei Mismatch: Fehler,
+                zuerst prepare_activity_analysis erneut aufrufen.
+        analysis: {"verdict": str, "goal_achievement": str, "summary": str,
+                   "positive_findings": [str], "limitations": [str],
+                   "recovery_context": str, "coach_recommendation": str,
+                   "data_quality_note": str}
+
+    Idempotent: identischer source_data_hash + identischer Analyseinhalt wie
+    die bereits gespeicherte neueste Version erzeugt keine neue Version.
+    """
+    training = _fetchone("SELECT id FROM trainings WHERE id = %s", (activity_id,))
+    if not training:
+        return {"error": "Aktivität nicht gefunden."}
+
+    current = get_activity_analysis_data(activity_id=activity_id, include_stream=False)
+    if "error" in current:
+        return current
+    if current.get("source_data_hash") != source_data_hash:
+        return {
+            "error": "source_data_hash stimmt nicht mit den aktuellen Rohdaten überein — "
+                     "die Analyse würde gegen veraltete Daten gespeichert. "
+                     "Zuerst prepare_activity_analysis erneut aufrufen.",
+            "current_source_data_hash": current.get("source_data_hash"),
+        }
+
+    latest = _latest_analysis(activity_id)
+    content_fields = ("verdict", "goal_achievement", "summary", "recovery_context",
+                       "coach_recommendation", "data_quality_note")
+    if latest and latest["source_data_hash"] == source_data_hash and latest["status"] != "stale":
+        same_content = all(
+            (latest.get(f) or None) == (analysis.get(f) or None) for f in content_fields
+        ) and (latest.get("positive_findings_json") or []) == (analysis.get("positive_findings") or []) \
+          and (latest.get("limitations_json") or []) == (analysis.get("limitations") or [])
+        if same_content:
+            return {
+                "saved": True, "idempotent": True, "analysis_id": latest["id"],
+                "version": latest["version"], "frontend_url": _frontend_url(activity_id),
+            }
+
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            next_version = 1
+            if latest:
+                cur.execute(
+                    "UPDATE activity_analyses SET status = 'superseded', updated_at = now() WHERE id = %s",
+                    (latest["id"],),
+                )
+                next_version = latest["version"] + 1
+
+            cur.execute(
+                """INSERT INTO activity_analyses
+                       (training_id, analysis_schema_version, version, source_data_hash, status,
+                        verdict, goal_achievement, summary, positive_findings_json, limitations_json,
+                        recovery_context, coach_recommendation, data_quality_note, generated_by, generated_at)
+                   VALUES (%s, %s, %s, %s, 'fresh', %s, %s, %s, %s, %s, %s, %s, %s, %s, now())
+                   RETURNING id""",
+                (
+                    activity_id, analysis_schema_version, next_version, source_data_hash,
+                    analysis.get("verdict"), analysis.get("goal_achievement"), analysis.get("summary"),
+                    json.dumps(analysis.get("positive_findings") or []),
+                    json.dumps(analysis.get("limitations") or []),
+                    analysis.get("recovery_context"), analysis.get("coach_recommendation"),
+                    analysis.get("data_quality_note"), "chatgpt",
+                ),
+            )
+            analysis_id = cur.fetchone()[0]
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+    return {
+        "saved": True, "idempotent": False, "analysis_id": analysis_id,
+        "version": next_version, "frontend_url": _frontend_url(activity_id),
+    }
 
 
 @mcp.tool()

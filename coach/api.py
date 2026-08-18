@@ -1437,6 +1437,87 @@ def mark_analysed(training_id):
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
+@app.route('/activities/<int:activity_id>/analysis')
+def activity_analysis_page(activity_id):
+    """Native CAIRN-Analyseseite — statisches HTML, laedt Daten selbst per fetch()."""
+    return send_file(os.path.join(os.path.dirname(__file__), '..', 'files', 'cairn_activity_analysis.html'))
+
+
+@app.route('/api/activities/<int:activity_id>/full-analysis', methods=['GET'])
+def get_full_activity_analysis(activity_id):
+    """
+    Backend fuer /activities/<id>/analysis: deterministische Analysewerte +
+    evtl. bereits gespeicherte Coach-Analyse. Nutzt dieselbe Logik wie das
+    MCP-Tool prepare_activity_analysis — Frontend und ChatGPT sehen exakt
+    denselben Datensatz.
+    """
+    try:
+        from coach.mcp_server import prepare_activity_analysis
+        force_refresh = request.args.get('force_refresh', 'false').lower() == 'true'
+        result = prepare_activity_analysis(activity_id, force_refresh=force_refresh)
+        if "error" in result:
+            return jsonify({"status": "error", "message": result["error"]}), 404
+        return jsonify({"status": "ok", **result})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e), "trace": traceback.format_exc()}), 500
+
+
+@app.route('/api/athlete/gear', methods=['GET'])
+def list_gear_for_frontend():
+    """Fuer die Schuhauswahl-Dropdown auf der Analyseseite."""
+    try:
+        from coach.mcp_server import list_athlete_gear
+        gear_type = request.args.get('gear_type')
+        active_only = request.args.get('active_only', 'true').lower() != 'false'
+        return jsonify({"status": "ok", "gear": list_athlete_gear(gear_type=gear_type, active_only=active_only)})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e), "trace": traceback.format_exc()}), 500
+
+
+@app.route('/api/activities/<int:activity_id>/gear', methods=['POST'])
+def assign_gear_for_frontend(activity_id):
+    """
+    Ordnet der Aktivitaet ein Gear-Item zu — ruft dieselbe Funktion wie das
+    MCP-Tool assign_activity_gear auf, damit Frontend und ChatGPT denselben
+    Datensatz verwenden (keine getrennte Zuordnungslogik).
+    """
+    try:
+        from coach.mcp_server import assign_activity_gear
+        data = request.get_json(force=True) or {}
+        gear_id = data.get('gear_id')
+        if not gear_id:
+            return jsonify({"status": "error", "message": "gear_id erforderlich"}), 400
+        result = assign_activity_gear(
+            activity_id=activity_id, gear_id=gear_id,
+            distance_km=data.get('distance_km'), assignment_source="frontend",
+        )
+        if "error" in result:
+            return jsonify({"status": "error", "message": result["error"]}), 400
+        return jsonify({"status": "ok", **result})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e), "trace": traceback.format_exc()}), 500
+
+
+@app.route('/api/activities/<int:activity_id>/coach-analysis', methods=['POST'])
+def save_coach_analysis_for_frontend(activity_id):
+    """Erlaubt dem Frontend (nicht nur ChatGPT), eine Coach-Analyse zu speichern —
+    dieselbe Funktion wie das MCP-Tool save_activity_coach_analysis."""
+    try:
+        from coach.mcp_server import save_activity_coach_analysis
+        data = request.get_json(force=True) or {}
+        result = save_activity_coach_analysis(
+            activity_id=activity_id,
+            source_data_hash=data.get('source_data_hash'),
+            analysis=data.get('analysis') or {},
+            analysis_schema_version=data.get('analysis_schema_version', 1),
+        )
+        if "error" in result:
+            return jsonify({"status": "error", "message": result["error"]}), 400
+        return jsonify({"status": "ok", **result})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e), "trace": traceback.format_exc()}), 500
+
+
 @app.route('/api/strava/webhook', methods=['GET', 'POST'])
 def strava_webhook():
     if request.method == 'GET':
