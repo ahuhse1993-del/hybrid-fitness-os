@@ -151,6 +151,64 @@ small, .text-small { font-size: .8rem; line-height: 1.5; }
 #cairn-week-soft .today { display: inline-block; margin-bottom: .2rem; padding: .15rem .45rem; border-radius: 999px; background: var(--paper); color: var(--ink); }
 #cairn-week-soft .art { flex: 0 0 132px; align-self: stretch; display: grid; place-items: center; padding: .15rem .4rem; background: color-mix(in srgb, var(--paper) 55%, transparent); overflow: hidden; }
 #cairn-week-soft .art img { display: block; width: 100%; height: 76px; object-fit: contain; pointer-events: none; }
+#cairn-week-soft .week-card { cursor: pointer; }
+#cairn-week-soft .week-card:active { opacity: .88; }
+
+/* ── SESSION DETAIL BOTTOM-SHEET ── */
+#session-backdrop {
+  display: none;
+  position: fixed; inset: 0; z-index: 200;
+  background: rgb(0 0 0 / .45);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+}
+#session-backdrop.open { display: block; }
+#session-sheet {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 201;
+  max-height: 88dvh;
+  background: var(--paper, #f5f4ef);
+  color: var(--ink, #17201d);
+  border-radius: 1.5rem 1.5rem 0 0;
+  overflow: hidden;
+  display: flex; flex-direction: column;
+  transform: translateY(100%);
+  transition: transform .32s cubic-bezier(.32,1,.5,1);
+}
+#session-sheet.open { transform: translateY(0); }
+#session-sheet .sheet-handle { flex-shrink: 0; display: flex; justify-content: center; padding: .7rem 0 .3rem; }
+#session-sheet .sheet-handle span { width: 2.5rem; height: 4px; border-radius: 99px; background: color-mix(in srgb, currentColor 22%, transparent); }
+#session-sheet .sheet-scroll { flex: 1; overflow-y: auto; padding: 0 1.1rem 1.5rem; }
+#session-sheet .sheet-header { display: flex; align-items: flex-start; gap: .8rem; margin-bottom: 1rem; }
+#session-sheet .sheet-art { flex: 0 0 72px; height: 72px; display: grid; place-items: center; border-radius: 1rem; background: var(--soft, #e9e8e2); overflow: hidden; }
+#session-sheet .sheet-art img { width: 100%; height: 100%; object-fit: contain; padding: .35rem; }
+#session-sheet .sheet-title { flex: 1; min-width: 0; }
+#session-sheet .sheet-title h2 { margin: 0 0 .2rem; font-weight: 500; letter-spacing: -.04em; line-height: 1.15; }
+#session-sheet .sheet-title p { margin: 0; opacity: .6; }
+#session-sheet .sheet-close { flex-shrink: 0; width: 2rem; height: 2rem; display: grid; place-items: center; border-radius: 50%; background: var(--soft, #e9e8e2); border: none; cursor: pointer; font-size: 1.1rem; line-height: 1; }
+#session-sheet .metrics-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .65rem; margin-bottom: 1rem; }
+#session-sheet .metric-cell { padding: .7rem; border-radius: .9rem; background: var(--soft, #e9e8e2); }
+#session-sheet .metric-cell span { display: block; font-size: .72rem; text-transform: uppercase; letter-spacing: .04em; opacity: .6; margin-bottom: .2rem; }
+#session-sheet .metric-cell strong { display: block; font-weight: 500; font-size: 1.05rem; letter-spacing: -.025em; }
+#session-sheet .sheet-section { margin-bottom: .9rem; }
+#session-sheet .sheet-section h3 { font-size: .72rem; text-transform: uppercase; letter-spacing: .05em; opacity: .5; margin: 0 0 .5rem; font-weight: 500; }
+#session-sheet .notes-box { padding: .75rem .9rem; border-radius: .9rem; background: var(--soft, #e9e8e2); line-height: 1.6; white-space: pre-wrap; }
+#session-sheet .step-list { display: grid; gap: .35rem; }
+#session-sheet .step-row { display: grid; grid-template-columns: 28px 1fr auto; align-items: center; gap: .5rem; padding: .55rem .75rem; border-radius: .75rem; }
+#session-sheet .step-row.warmup, #session-sheet .step-row.cooldown { background: color-mix(in srgb, var(--forest, #29483e) 12%, var(--paper)); }
+#session-sheet .step-row.active { background: color-mix(in srgb, var(--forest, #29483e) 22%, var(--paper)); }
+#session-sheet .step-row.recovery { background: color-mix(in srgb, var(--ink, #17201d) 7%, var(--paper)); }
+#session-sheet .step-row.repeat-group { background: color-mix(in srgb, var(--coral, #ff6b61) 10%, var(--paper)); }
+#session-sheet .step-icon { font-size: .9rem; text-align: center; }
+#session-sheet .step-label { font-weight: 500; font-size: .9rem; display: flex; flex-direction: column; gap: .1rem; }
+#session-sheet .step-label strong { font-weight: 500; }
+#session-sheet .step-label span { font-size: .78rem; opacity: .6; font-weight: 400; }
+#session-sheet .step-detail { font-size: .8rem; opacity: .6; text-align: right; }
+#session-sheet .repeat-badge { font-size: .72rem; text-transform: uppercase; letter-spacing: .04em; opacity: .6; padding: .1rem .4rem; border-radius: 99px; background: color-mix(in srgb, var(--coral, #ff6b61) 20%, transparent); }
+#session-sheet .step-children { padding-left: 1rem; display: grid; gap: .3rem; margin-top: .3rem; }
+@media (max-width: 390px) {
+  #session-sheet .metrics-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
 #cairn-week-soft .nav { display: flex; align-items: center; justify-content: space-between; gap: .25rem; flex-shrink: 0; margin-top: .5rem; padding: .45rem; border: 1px solid var(--line); border-radius: 999px; background: var(--paper); }
 #cairn-week-soft .nav button { flex: 1; }
 #cairn-week-soft .nav .active { background: var(--forest); color: var(--forest-ink); border-radius: 999px; }
@@ -607,6 +665,33 @@ small, .text-small { font-size: .8rem; line-height: 1.5; }
   </div>
 </div>
 
+<!-- ============================================================ -->
+<!-- SESSION DETAIL BOTTOM-SHEET                                 -->
+<!-- ============================================================ -->
+<div id="session-backdrop" onclick="closeSessionSheet()"></div>
+<div id="session-sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title">
+  <div class="sheet-handle"><span></span></div>
+  <div class="sheet-scroll">
+    <div class="sheet-header">
+      <div class="sheet-art"><img id="sheet-art-img" src="" alt=""></div>
+      <div class="sheet-title">
+        <h2 id="sheet-title">—</h2>
+        <p id="sheet-subtitle">—</p>
+      </div>
+      <button class="sheet-close btn" onclick="closeSessionSheet()" aria-label="Schliessen">✕</button>
+    </div>
+    <div class="metrics-grid" id="sheet-metrics"></div>
+    <div class="sheet-section" id="sheet-notes-section" style="display:none">
+      <h3>Notizen &amp; Gelände</h3>
+      <div class="notes-box" id="sheet-notes"></div>
+    </div>
+    <div class="sheet-section" id="sheet-steps-section" style="display:none">
+      <h3>Struktur</h3>
+      <div class="step-list" id="sheet-steps"></div>
+    </div>
+  </div>
+</div>
+
 <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
 <script>
 'use strict';
@@ -828,11 +913,24 @@ function renderWeek(weeks) {
 function buildWeekCard(sess) {
   const color = weekCardColor(sess);
   const hasStructure = STRUCTURED_TYPES.has(sess.session_type);
-  const classes = ['card', 'week-card', color, hasStructure ? 'has-structure' : ''].filter(Boolean).join(' ');
+  const isRest = /rest|ruhetag/i.test(sess.session_type || '');
+  const clickable = !isRest;
+  const classes = ['card', 'week-card', color, hasStructure ? 'has-structure' : '', clickable ? 'clickable' : ''].filter(Boolean).join(' ');
+
+  // Store session in map so onclick can retrieve it
+  const storeKey = sess.id ? `s${sess.id}` : `s${(sess.date || '')}${(sess.session_type || '').replace(/\W/g, '')}`;
+  _sessionStore[storeKey] = sess;
 
   const article = document.createElement('article');
   article.className = classes;
   article.setAttribute('aria-labelledby', `day-${sess.date}`);
+  if (clickable) {
+    article.setAttribute('tabindex', '0');
+    article.setAttribute('role', 'button');
+    article.setAttribute('aria-label', `Details zu ${sess.session_type || 'Session'}`);
+    article.onclick = () => openSessionSheet(storeKey);
+    article.onkeydown = (ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); openSessionSheet(storeKey); } };
+  }
 
   // Day column
   const day = document.createElement('div');
@@ -1511,6 +1609,173 @@ function buildHRZones(zones, lthr) {
     <div class="head"><div><p class="eyebrow text-small">ZEIT IN ZONE</p><h2 id="soft-zones">Herzfrequenzzonen</h2></div><span class="pill text-small">${lthr ? 'LTHR ' + lthr : 'HF-ZONEN'}</span></div>
     ${rows}
   </section>`;
+}
+
+/* ============================================================
+   SESSION DETAIL BOTTOM-SHEET
+   ============================================================ */
+const _sessionStore = {};
+
+function openSessionSheet(key) {
+  const sess = _sessionStore[key];
+  if (!sess) return;
+
+  // Art
+  const img = document.getElementById('sheet-art-img');
+  img.src = assetUrl(sess.session_type);
+  img.alt = sess.session_type || '';
+
+  // Title / subtitle
+  document.getElementById('sheet-title').textContent = sess.name || sess.session_type || '—';
+  const d = sess.date ? new Date(sess.date + 'T12:00:00') : null;
+  const dateStr = d ? d.toLocaleDateString('de-CH', { weekday: 'long', day: 'numeric', month: 'long' }) : '';
+  document.getElementById('sheet-subtitle').textContent = dateStr;
+
+  // Metrics grid
+  const metrics = [
+    { label: 'Distanz',    val: fmtKm(sess.planned_km) },
+    { label: 'Dauer',      val: fmtMin(sess.planned_duration_min) },
+    { label: 'Zone',       val: sess.session_zone || null },
+    { label: 'Höhenmeter', val: sess.elevation_gain_m ? `${sess.elevation_gain_m} HM` : null },
+  ].filter(m => m.val);
+
+  document.getElementById('sheet-metrics').innerHTML = metrics.map(m =>
+    `<div class="metric-cell"><span class="text-small">${m.label}</span><strong>${m.val}</strong></div>`
+  ).join('');
+
+  // Notes
+  const notesSection = document.getElementById('sheet-notes-section');
+  const notesEl      = document.getElementById('sheet-notes');
+  if (sess.notes && sess.notes.trim()) {
+    notesEl.textContent = sess.notes;
+    notesSection.style.display = '';
+  } else {
+    notesSection.style.display = 'none';
+  }
+
+  // Step structure
+  const stepsSection = document.getElementById('sheet-steps-section');
+  const stepsEl      = document.getElementById('sheet-steps');
+  if (sess.steps && sess.steps.length) {
+    stepsEl.innerHTML = renderSheetStepList(sess.steps);
+    stepsSection.style.display = '';
+  } else {
+    stepsSection.style.display = 'none';
+  }
+
+  // Open
+  document.getElementById('session-backdrop').classList.add('open');
+  document.getElementById('session-sheet').classList.add('open');
+  document.body.style.overflow = 'hidden';
+
+  if (window.lucide) lucide.createIcons();
+}
+
+function closeSessionSheet() {
+  document.getElementById('session-backdrop').classList.remove('open');
+  document.getElementById('session-sheet').classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+/* Format a step's duration field */
+function fmtStepDuration(step) {
+  const type = (step.duration_type || step.durationType || '').toLowerCase();
+  const val  = step.duration_value || step.durationValue || 0;
+  if (type === 'lap.button' || type === 'lap_button') return 'bis Knopfdruck';
+  if (type === 'time') {
+    if (!val) return '';
+    if (val >= 60) {
+      const m = Math.floor(val / 60), s = val % 60;
+      return s > 0 ? `${m}:${String(s).padStart(2,'0')} min` : `${m} min`;
+    }
+    return `${val} sek`;
+  }
+  if (type === 'distance') {
+    if (!val) return '';
+    return val >= 1000 ? `${(val / 1000).toFixed(1)} km` : `${val} m`;
+  }
+  if (val) return `${val}`;
+  return '';
+}
+
+/* Format a step's target (pace/HR zone) */
+function fmtStepTarget(step) {
+  const tType = (step.target_type || step.targetType || '').toLowerCase();
+  const tLow  = step.target_value_low  || step.targetValueLow;
+  const tHigh = step.target_value_high || step.targetValueHigh;
+  if (!tType || tType === 'no.target' || tType === 'open' || tType === 'no_target') return '';
+  if (tType === 'pace.zone' || tType === 'speed.zone')
+    return tLow ? `Pace Zone ${tLow}${tHigh && tHigh !== tLow ? '–' + tHigh : ''}` : '';
+  if (tType === 'heart.rate.zone')
+    return tLow ? `HF Zone ${tLow}${tHigh && tHigh !== tLow ? '–' + tHigh : ''}` : '';
+  if (tType === 'heart.rate' || tType === 'heart_rate')
+    return tLow ? `${tLow}${tHigh && tHigh !== tLow ? '–' + tHigh : ''} bpm` : '';
+  if (tType === 'power.zone')
+    return tLow ? `Power Zone ${tLow}` : '';
+  return '';
+}
+
+/* Render step list for the bottom-sheet (preserves repeat-group structure) */
+function renderSheetStepList(steps) {
+  let html = '';
+  for (const step of (steps || [])) {
+    const rawType = (step.type || step.step_type || step.stepType || '').toLowerCase();
+    const name    = step.name || step.description || '';
+
+    if (rawType === 'repeat' || rawType === 'repeatgroup' || rawType === 'repeat_group') {
+      const count = step.repeat_count || step.iterations || step.numberOfIterations || step.repeatCount || 1;
+      const sub   = step.steps || step.workoutSteps || step.sub_steps || [];
+      html += `<div class="step-row repeat-group">
+        <span class="step-icon"><i data-lucide="repeat-2" aria-hidden="true"></i></span>
+        <div class="step-label"><strong>${count}× wiederholen</strong></div>
+        <span class="repeat-badge">${count}×</span>
+      </div>`;
+      if (sub.length) html += `<div class="step-children">${renderSheetStepList(sub)}</div>`;
+
+    } else if (rawType === 'warmup') {
+      const dur = fmtStepDuration(step), tgt = fmtStepTarget(step);
+      html += `<div class="step-row warmup">
+        <span class="step-icon"><i data-lucide="sun" aria-hidden="true"></i></span>
+        <div class="step-label"><strong>Warm-up</strong>${tgt ? `<span>${tgt}</span>` : ''}${name && !/warmup/i.test(name) ? `<span>${name}</span>` : ''}</div>
+        ${dur ? `<span class="step-detail">${dur}</span>` : ''}
+      </div>`;
+
+    } else if (rawType === 'cooldown') {
+      const dur = fmtStepDuration(step), tgt = fmtStepTarget(step);
+      html += `<div class="step-row cooldown">
+        <span class="step-icon"><i data-lucide="wind" aria-hidden="true"></i></span>
+        <div class="step-label"><strong>Cooldown</strong>${tgt ? `<span>${tgt}</span>` : ''}</div>
+        ${dur ? `<span class="step-detail">${dur}</span>` : ''}
+      </div>`;
+
+    } else if (rawType === 'active' || rawType === 'interval' || rawType === 'run') {
+      const dur = fmtStepDuration(step), tgt = fmtStepTarget(step);
+      const label = name || 'Aktiv';
+      html += `<div class="step-row active">
+        <span class="step-icon"><i data-lucide="zap" aria-hidden="true"></i></span>
+        <div class="step-label"><strong>${label}</strong>${tgt ? `<span>${tgt}</span>` : ''}</div>
+        ${dur ? `<span class="step-detail">${dur}</span>` : ''}
+      </div>`;
+
+    } else if (rawType === 'recovery' || rawType === 'rest' || rawType === 'walk') {
+      const dur = fmtStepDuration(step), tgt = fmtStepTarget(step);
+      const label = rawType === 'walk' ? 'Gehen' : 'Recovery';
+      html += `<div class="step-row recovery">
+        <span class="step-icon"><i data-lucide="pause-circle" aria-hidden="true"></i></span>
+        <div class="step-label"><strong>${label}</strong>${tgt ? `<span>${tgt}</span>` : ''}</div>
+        ${dur ? `<span class="step-detail">${dur}</span>` : ''}
+      </div>`;
+
+    } else if (rawType) {
+      const dur = fmtStepDuration(step);
+      html += `<div class="step-row active">
+        <span class="step-icon"><i data-lucide="circle-dot" aria-hidden="true"></i></span>
+        <div class="step-label"><strong>${name || rawType}</strong></div>
+        ${dur ? `<span class="step-detail">${dur}</span>` : ''}
+      </div>`;
+    }
+  }
+  return html;
 }
 
 /* ============================================================
