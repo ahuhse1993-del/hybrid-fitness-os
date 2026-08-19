@@ -1798,7 +1798,7 @@ def frontend_week_all():
                    week_date,
                    session_type, session_zone, distance_km, duration_min,
                    notes, phase, garmin_workout_id, workout_steps,
-                   sync_status
+                   sync_status, elevation_gain_m
             FROM training_plan
             ORDER BY week_date, day_of_week
         """)
@@ -1878,7 +1878,11 @@ def frontend_week_all():
             steps = []
             if r[10]:
                 try:
-                    steps = r[10] if isinstance(r[10], list) else json.loads(r[10])
+                    raw = r[10] if isinstance(r[10], (list, dict)) else json.loads(r[10])
+                    if isinstance(raw, list):
+                        steps = raw
+                    elif isinstance(raw, dict):
+                        steps = raw.get("steps") or []
                 except Exception:
                     steps = []
 
@@ -1900,6 +1904,7 @@ def frontend_week_all():
                 "sync_status": sync_status,
                 "garmin_workout_id": garmin_info.get("garmin_workout_id") or r[9],
                 "steps": steps,
+                "elevation_gain_m": int(r[12]) if r[12] else None,
                 "actual_km": actual.get("distance_km"),
                 "actual_duration_min": actual.get("duration_min"),
                 "actual_avg_hr": actual.get("avg_hr"),

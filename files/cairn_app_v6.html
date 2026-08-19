@@ -1673,12 +1673,16 @@ function openSessionSheet(key) {
     notesSection.style.display = 'none';
   }
 
-  // Step structure
+  // Step structure — normalize: may be a list or a dict {steps:[...]}
   const stepsSection = document.getElementById('sheet-steps-section');
   const stepsEl      = document.getElementById('sheet-steps');
-  if (sess.steps && sess.steps.length) {
+  let stepsArr = sess.steps;
+  if (stepsArr && !Array.isArray(stepsArr) && typeof stepsArr === 'object') {
+    stepsArr = stepsArr.steps || [];
+  }
+  if (Array.isArray(stepsArr) && stepsArr.length) {
     try {
-      stepsEl.innerHTML = renderSheetStepList(sess.steps);
+      stepsEl.innerHTML = renderSheetStepList(stepsArr);
       stepsSection.style.display = '';
     } catch(e) {
       stepsSection.style.display = 'none';
@@ -1702,60 +1706,52 @@ function closeSessionSheet() {
   document.body.style.overflow = '';
 }
 
-/* Format a step's duration — safe, tries all known field names + name-based fallback */
+/* Format a step's duration — uses garmin_push.py field names: duration_secs, duration_meters, lap_button */
 function fmtStepDuration(step) {
-  const rawType = step.duration_type || step.durationType || step.durationtype || '';
-  const type = (typeof rawType === 'string' ? rawType : '').toLowerCase().replace(/[\s_.-]/g, '');
+  // Primary fields (from garmin_push.py / upsert_planned_workout structure)
+  if (step.lap_button) return 'bis Knopfdruck';
 
-  // Try every known field name, including ChatGPT variants
-  let val = step.duration_value ?? step.durationValue ??
-            step.duration_seconds ?? step.durationSeconds ??
-            step.time_seconds ?? step.timeSeconds ??
-            (typeof step.duration === 'number' ? step.duration : null) ??
-            (typeof step.seconds === 'number' ? step.seconds : null) ?? null;
-
-  // distance_km / km → convert to meters
-  let distM = null;
-  if (step.distance_km != null) distM = parseFloat(step.distance_km) * 1000;
-  else if (step.km != null) distM = parseFloat(step.km) * 1000;
-  else if (step.distance_m != null) distM = parseFloat(step.distance_m);
-  else if (step.meters != null) distM = parseFloat(step.meters);
-  else if (step.distance != null && typeof step.distance === 'number' && step.distance < 100)
-    distM = step.distance * 1000; // assume km if small number
-
-  const numVal = val != null ? (typeof val === 'number' ? val : parseFloat(val) || 0) : 0;
-
-  if (type === 'lapbutton' || type === 'lapbtn' || type === 'open') return 'bis Knopfdruck';
-
-  if (type === 'distance') {
-    const m = distM || numVal;
-    if (!m) return '';
-    return m >= 1000 ? `${(m/1000).toFixed(m % 1000 === 0 ? 0 : 1)} km` : `${Math.round(m)} m`;
+  // Distance: duration_meters is the canonical field
+  const meters = step.duration_meters != null ? parseFloat(step.duration_meters) : null;
+  if (meters != null && meters > 0) {
+    return meters >= 1000
+      ? `${(meters / 1000).toFixed(meters % 1000 === 0 ? 0 : 1)} km`
+      : `${Math.round(meters)} m`;
   }
 
-  if (distM && !numVal) {
-    // Only distance info available
-    return distM >= 1000 ? `${(distM/1000).toFixed(distM % 1000 === 0 ? 0 : 1)} km` : `${Math.round(distM)} m`;
+  // Time: duration_secs is the canonical field
+  const secs = step.duration_secs != null ? parseFloat(step.duration_secs) : null;
+  if (secs != null && secs > 0) {
+    if (secs < 60) return `${Math.round(secs)} sek`;
+    const m = Math.floor(secs / 60), s = Math.round(secs % 60);
+    return s > 0 ? `${m}:${String(s).padStart(2, '0')} min` : `${m} min`;
   }
 
-  if (type === 'time' || (!type && numVal > 0 && numVal <= 3600)) {
-    if (!numVal) return '';
-    if (numVal >= 60) {
-      const m = Math.floor(numVal/60), s = numVal % 60;
-      return s > 0 ? `${m}:${String(s).padStart(2,'0')} min` : `${m} min`;
-    }
-    return `${numVal} sek`;
+  // Legacy fallbacks (older data or ChatGPT writing different field names)
+  const legacySecs = step.duration_seconds ?? step.durationSeconds ??
+                     step.time_seconds ?? step.timeSeconds ??
+                     step.duration_value ?? step.durationValue ??
+                     (typeof step.duration === 'number' ? step.duration : null) ??
+                     (typeof step.seconds === 'number' ? step.seconds : null) ?? null;
+  let legacyDistM = null;
+  if (step.distance_km != null) legacyDistM = parseFloat(step.distance_km) * 1000;
+  else if (step.km != null) legacyDistM = parseFloat(step.km) * 1000;
+  else if (step.distance_m != null) legacyDistM = parseFloat(step.distance_m);
+  else if (step.meters != null) legacyDistM = parseFloat(step.meters);
+
+  if (legacyDistM && legacyDistM > 0) {
+    return legacyDistM >= 1000
+      ? `${(legacyDistM / 1000).toFixed(legacyDistM % 1000 === 0 ? 0 : 1)} km`
+      : `${Math.round(legacyDistM)} m`;
+  }
+  if (legacySecs != null && legacySecs > 0) {
+    const n = parseFloat(legacySecs) || 0;
+    if (n < 60) return `${Math.round(n)} sek`;
+    const m = Math.floor(n / 60), s = Math.round(n % 60);
+    return s > 0 ? `${m}:${String(s).padStart(2, '0')} min` : `${m} min`;
   }
 
-  if (numVal > 0) {
-    if (numVal <= 3600) {
-      const m = Math.floor(numVal/60), s = numVal % 60;
-      return numVal < 60 ? `${numVal} sek` : (s > 0 ? `${m}:${String(s).padStart(2,'0')} min` : `${m} min`);
-    }
-    if (numVal >= 1000) return `${(numVal/1000).toFixed(1)} km`; // probably meters
-  }
-
-  // Last resort: extract from step name  (e.g. "Stride 20s", "2km @ pace")
+  // Last resort: extract from step name (e.g. "Stride 20s", "2km @ pace")
   return extractDurFromName(step.name || step.description || '');
 }
 
