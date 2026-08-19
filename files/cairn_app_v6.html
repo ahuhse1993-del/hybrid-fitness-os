@@ -1702,41 +1702,77 @@ function closeSessionSheet() {
   document.body.style.overflow = '';
 }
 
-/* Format a step's duration — safe, handles all field name variants */
+/* Format a step's duration — safe, tries all known field names + name-based fallback */
 function fmtStepDuration(step) {
-  // Safely coerce to string — some fields may be objects
   const rawType = step.duration_type || step.durationType || step.durationtype || '';
   const type = (typeof rawType === 'string' ? rawType : '').toLowerCase().replace(/[\s_.-]/g, '');
 
-  // Try every known numeric field; skip objects
-  const rawVal = step.duration_value ?? step.durationValue ??
-                 step.duration_seconds ?? step.durationSeconds ??
-                 (typeof step.duration === 'number' ? step.duration : undefined) ??
-                 (typeof step.seconds === 'number' ? step.seconds : undefined) ?? 0;
-  const val = typeof rawVal === 'number' ? rawVal : (parseFloat(rawVal) || 0);
+  // Try every known field name, including ChatGPT variants
+  let val = step.duration_value ?? step.durationValue ??
+            step.duration_seconds ?? step.durationSeconds ??
+            step.time_seconds ?? step.timeSeconds ??
+            (typeof step.duration === 'number' ? step.duration : null) ??
+            (typeof step.seconds === 'number' ? step.seconds : null) ?? null;
+
+  // distance_km / km → convert to meters
+  let distM = null;
+  if (step.distance_km != null) distM = parseFloat(step.distance_km) * 1000;
+  else if (step.km != null) distM = parseFloat(step.km) * 1000;
+  else if (step.distance_m != null) distM = parseFloat(step.distance_m);
+  else if (step.meters != null) distM = parseFloat(step.meters);
+  else if (step.distance != null && typeof step.distance === 'number' && step.distance < 100)
+    distM = step.distance * 1000; // assume km if small number
+
+  const numVal = val != null ? (typeof val === 'number' ? val : parseFloat(val) || 0) : 0;
 
   if (type === 'lapbutton' || type === 'lapbtn' || type === 'open') return 'bis Knopfdruck';
 
-  if (type === 'time' || (!type && val > 0 && val <= 3600)) {
-    if (!val) return '';
-    if (val >= 60) {
-      const m = Math.floor(val / 60), s = val % 60;
+  if (type === 'distance') {
+    const m = distM || numVal;
+    if (!m) return '';
+    return m >= 1000 ? `${(m/1000).toFixed(m % 1000 === 0 ? 0 : 1)} km` : `${Math.round(m)} m`;
+  }
+
+  if (distM && !numVal) {
+    // Only distance info available
+    return distM >= 1000 ? `${(distM/1000).toFixed(distM % 1000 === 0 ? 0 : 1)} km` : `${Math.round(distM)} m`;
+  }
+
+  if (type === 'time' || (!type && numVal > 0 && numVal <= 3600)) {
+    if (!numVal) return '';
+    if (numVal >= 60) {
+      const m = Math.floor(numVal/60), s = numVal % 60;
       return s > 0 ? `${m}:${String(s).padStart(2,'0')} min` : `${m} min`;
     }
-    return `${val} sek`;
+    return `${numVal} sek`;
   }
-  if (type === 'distance' || type === 'meter' || type === 'km') {
-    if (!val) return '';
-    return val >= 1000 ? `${(val / 1000).toFixed(val % 1000 === 0 ? 0 : 1)} km` : `${val} m`;
-  }
-  // Fallback: numeric value without type — assume seconds if small, meters if large
-  if (val > 0) {
-    if (val <= 3600) {
-      const m = Math.floor(val / 60), s = val % 60;
-      return val < 60 ? `${val} sek` : (s > 0 ? `${m}:${String(s).padStart(2,'0')} min` : `${m} min`);
+
+  if (numVal > 0) {
+    if (numVal <= 3600) {
+      const m = Math.floor(numVal/60), s = numVal % 60;
+      return numVal < 60 ? `${numVal} sek` : (s > 0 ? `${m}:${String(s).padStart(2,'0')} min` : `${m} min`);
     }
-    return val >= 1000 ? `${(val / 1000).toFixed(1)} km` : `${val} m`;
+    if (numVal >= 1000) return `${(numVal/1000).toFixed(1)} km`; // probably meters
   }
+
+  // Last resort: extract from step name  (e.g. "Stride 20s", "2km @ pace")
+  return extractDurFromName(step.name || step.description || '');
+}
+
+function extractDurFromName(name) {
+  if (!name) return '';
+  // "20s", "20 s", "20sek"
+  let m = name.match(/\b(\d{1,3})\s*s(?:ek|ec)?\b(?!\s*\/)/i);
+  if (m && parseInt(m[1]) <= 300) return `${m[1]} sek`;
+  // "3min", "3 min"
+  m = name.match(/\b(\d{1,3})\s*min\b/i);
+  if (m) return `${m[1]} min`;
+  // "2km", "2 km"
+  m = name.match(/\b(\d+(?:[.,]\d)?)\s*km\b/i);
+  if (m) return `${m[1]} km`;
+  // "500m"
+  m = name.match(/\b(\d{3,4})\s*m\b(?!\/)/i);
+  if (m) return `${m[1]} m`;
   return '';
 }
 
@@ -1768,8 +1804,53 @@ function fmtStepTarget(step) {
   return '';
 }
 
+/* Detect flat repeating patterns and wrap them in synthetic repeat groups */
+function groupRepeatSteps(steps) {
+  if (!steps || steps.length < 2) return steps || [];
+  const stepKey = s => {
+    const t = (s.type || s.step_type || s.stepType || '').toLowerCase();
+    const n = s.name || s.description || '';
+    return `${t}::${n}`;
+  };
+  const isFixed = s => {
+    const t = (s.type || s.step_type || s.stepType || '').toLowerCase();
+    return t === 'warmup' || t === 'cooldown' || t === 'repeat' || t === 'repeatgroup' || t === 'repeat_group';
+  };
+
+  const result = [];
+  let i = 0;
+  while (i < steps.length) {
+    if (isFixed(steps[i])) { result.push(steps[i++]); continue; }
+
+    // Try pattern length 2 (active+recovery pair), then 1 (single)
+    let grouped = false;
+    for (let patLen = 2; patLen >= 1 && !grouped; patLen--) {
+      if (i + patLen < steps.length) { // Need at least 2 occurrences
+        const pat = steps.slice(i, i + patLen);
+        if (pat.some(isFixed)) continue;
+        const patKeys = pat.map(stepKey);
+        let reps = 1;
+        while (i + patLen * (reps + 1) <= steps.length) {
+          const nxt = steps.slice(i + patLen * reps, i + patLen * (reps + 1));
+          if (nxt.every((s, idx) => stepKey(s) === patKeys[idx])) reps++;
+          else break;
+        }
+        if (reps >= 2) {
+          result.push({ type: 'repeat', repeat_count: reps, steps: pat, _synthetic: true });
+          i += patLen * reps;
+          grouped = true;
+        }
+      }
+    }
+    if (!grouped) result.push(steps[i++]);
+  }
+  return result;
+}
+
 /* Render step list for the bottom-sheet (preserves repeat-group structure) */
 function renderSheetStepList(steps) {
+  // Auto-group flat repeating patterns before rendering
+  steps = groupRepeatSteps(steps);
   let html = '';
   for (const step of (steps || [])) {
     const rawType = (step.type || step.step_type || step.stepType || '').toLowerCase();
