@@ -1798,7 +1798,7 @@ def frontend_week_all():
                    week_date,
                    session_type, session_zone, distance_km, duration_min,
                    notes, phase, garmin_workout_id, workout_steps,
-                   sync_status, elevation_gain_m
+                   sync_status, elevation_gain_m, sport
             FROM training_plan
             ORDER BY week_date, day_of_week
         """)
@@ -1905,6 +1905,7 @@ def frontend_week_all():
                 "garmin_workout_id": garmin_info.get("garmin_workout_id") or r[9],
                 "steps": steps,
                 "elevation_gain_m": int(r[12]) if r[12] else None,
+                "sport": r[13] or None,
                 "actual_km": actual.get("distance_km"),
                 "actual_duration_min": actual.get("duration_min"),
                 "actual_avg_hr": actual.get("avg_hr"),

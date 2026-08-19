@@ -900,6 +900,9 @@ const PHASE_LABELS = {
 };
 
 function isCyclingSess(sess) {
+  // Primär: sport-Feld aus der DB (gesetzt wenn Cross Training explizit als Rennrad markiert)
+  if (sess.sport === 'cycling') return true;
+  // Fallback: session_type-Name für direkte Rad-Typen
   return /cycl|bike|rennrad|velo\b/i.test(sess.session_type || '');
 }
 
