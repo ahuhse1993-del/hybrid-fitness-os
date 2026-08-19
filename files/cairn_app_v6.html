@@ -1641,10 +1641,13 @@ function openSessionSheet(key) {
   const dateStr = d ? d.toLocaleDateString('de-CH', { weekday: 'long', day: 'numeric', month: 'long' }) : '';
   document.getElementById('sheet-subtitle').textContent = dateStr;
 
-  // HM: DB-Wert oder Fallback aus Notizen (z.B. "800 HM" oder "800 hm")
-  let hmVal = sess.elevation_gain_m;
+  // HM: DB-Wert oder Fallback aus Notizen
+  // elevation_gain_m kann auch als String kommen → parseInt
+  let hmVal = sess.elevation_gain_m ? parseInt(sess.elevation_gain_m) : 0;
   if (!hmVal && sess.notes) {
-    const m = sess.notes.match(/(\d{2,4})\s*(?:hm|höhenmeter)/i);
+    // Treffer: "800 HM", "800HM+", "ca. 800 Höhenmeter", "800m Aufstieg", "+800m"
+    const m = sess.notes.match(/(?:\+|ca\.?\s*)?(\d{2,5})\s*(?:hm\+?|höhenmeter|m\s*(?:aufstieg|hoch))/i)
+           || sess.notes.match(/aufstieg[:\s]+(\d{2,5})/i);
     if (m) hmVal = parseInt(m[1]);
   }
 
@@ -1674,8 +1677,13 @@ function openSessionSheet(key) {
   const stepsSection = document.getElementById('sheet-steps-section');
   const stepsEl      = document.getElementById('sheet-steps');
   if (sess.steps && sess.steps.length) {
-    stepsEl.innerHTML = renderSheetStepList(sess.steps);
-    stepsSection.style.display = '';
+    try {
+      stepsEl.innerHTML = renderSheetStepList(sess.steps);
+      stepsSection.style.display = '';
+    } catch(e) {
+      stepsSection.style.display = 'none';
+      console.warn('[CAIRN] Step-Render Fehler:', e);
+    }
   } else {
     stepsSection.style.display = 'none';
   }
@@ -1694,22 +1702,22 @@ function closeSessionSheet() {
   document.body.style.overflow = '';
 }
 
-/* Format a step's duration — handles many field name variants */
+/* Format a step's duration — safe, handles all field name variants */
 function fmtStepDuration(step) {
-  // Try every known field name for duration type
-  const type = (
-    step.duration_type || step.durationType ||
-    step.durationtype || step.type_duration || ''
-  ).toLowerCase().replace(/[\s_]/g, '');
+  // Safely coerce to string — some fields may be objects
+  const rawType = step.duration_type || step.durationType || step.durationtype || '';
+  const type = (typeof rawType === 'string' ? rawType : '').toLowerCase().replace(/[\s_.-]/g, '');
 
-  // Try every known field name for the value
-  const val = step.duration_value ?? step.durationValue ??
-              step.duration_seconds ?? step.durationSeconds ??
-              step.duration ?? step.seconds ?? step.value ?? 0;
+  // Try every known numeric field; skip objects
+  const rawVal = step.duration_value ?? step.durationValue ??
+                 step.duration_seconds ?? step.durationSeconds ??
+                 (typeof step.duration === 'number' ? step.duration : undefined) ??
+                 (typeof step.seconds === 'number' ? step.seconds : undefined) ?? 0;
+  const val = typeof rawVal === 'number' ? rawVal : (parseFloat(rawVal) || 0);
 
   if (type === 'lapbutton' || type === 'lapbtn' || type === 'open') return 'bis Knopfdruck';
 
-  if (type === 'time' || type === 'seconds' || (!type && val > 0 && val < 7200)) {
+  if (type === 'time' || (!type && val > 0 && val <= 3600)) {
     if (!val) return '';
     if (val >= 60) {
       const m = Math.floor(val / 60), s = val % 60;
@@ -1721,24 +1729,23 @@ function fmtStepDuration(step) {
     if (!val) return '';
     return val >= 1000 ? `${(val / 1000).toFixed(val % 1000 === 0 ? 0 : 1)} km` : `${val} m`;
   }
-  // Fallback: if we have a numeric value, guess it's seconds
-  if (val && typeof val === 'number') {
-    if (val >= 60 && val < 7200) {
+  // Fallback: numeric value without type — assume seconds if small, meters if large
+  if (val > 0) {
+    if (val <= 3600) {
       const m = Math.floor(val / 60), s = val % 60;
-      return s > 0 ? `${m}:${String(s).padStart(2,'0')} min` : `${m} min`;
+      return val < 60 ? `${val} sek` : (s > 0 ? `${m}:${String(s).padStart(2,'0')} min` : `${m} min`);
     }
-    if (val < 60) return `${val} sek`;
-    if (val >= 7200) return `${(val / 1000).toFixed(1)} km`; // likely meters
+    return val >= 1000 ? `${(val / 1000).toFixed(1)} km` : `${val} m`;
   }
   return '';
 }
 
-/* Format a step's target (pace/HR zone) — handles many variants */
+/* Format a step's target (pace/HR zone) — safe, handles all variants */
 function fmtStepTarget(step) {
-  const tType = (
-    step.target_type || step.targetType ||
-    step.target || step.zone_type || ''
-  ).toLowerCase().replace(/[\s._]/g, '');
+  // Never call .toLowerCase() on an object — check type first
+  const rawTType = step.target_type || step.targetType || step.zone_type ||
+                   (typeof step.target === 'string' ? step.target : '') || '';
+  const tType = (typeof rawTType === 'string' ? rawTType : '').toLowerCase().replace(/[\s._-]/g, '');
 
   const tLow  = step.target_value_low  ?? step.targetValueLow  ?? step.targetValueOne ?? step.target_low  ?? step.zone;
   const tHigh = step.target_value_high ?? step.targetValueHigh ?? step.targetValueTwo ?? step.target_high;
