@@ -143,6 +143,59 @@ small, .text-small { font-size: .8rem; line-height: 1.5; }
 #cairn-week-soft .week-km-bar { display: flex; height: 4px; border-radius: 99px; overflow: hidden; min-width: 60px; max-width: 90px; background: color-mix(in srgb, var(--ink) 8%, transparent); }
 #cairn-week-soft .week-km-bar .bar-run  { background: var(--green,#29483e); }
 #cairn-week-soft .week-km-bar .bar-bike { background: color-mix(in srgb, var(--green,#29483e) 45%, var(--sand,#f5c97a)); }
+
+/* ── STATS VIEW ────────────────────────────────────────────────── */
+#cairn-stats-soft {
+  --chart-planned: #2a78d6;
+  --chart-actual:  #1baf7a;
+  --chart-grid:    #e1e0d9;
+  --chart-axis:    #c3c2b7;
+  --chart-muted:   #898781;
+}
+@media (prefers-color-scheme: dark) {
+  #cairn-stats-soft {
+    --chart-planned: #3987e5;
+    --chart-actual:  #199e70;
+    --chart-grid:    #2c2c2a;
+    --chart-axis:    #383835;
+    --chart-muted:   #898781;
+  }
+}
+#cairn-stats-soft .stats-body { display: flex; flex-direction: column; gap: 1.25rem; padding: .75rem 1rem 0; overflow-y: auto; flex: 1; }
+#cairn-stats-soft .stats-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: .65rem; }
+#cairn-stats-soft .stat-tile { background: var(--card,#fff); border-radius: 14px; padding: .85rem 1rem; display: flex; flex-direction: column; gap: .25rem; }
+#cairn-stats-soft .stat-tile .tile-label { font-size: .7rem; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--muted-foreground); }
+#cairn-stats-soft .stat-tile .tile-value { font-size: 1.65rem; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; line-height: 1; }
+#cairn-stats-soft .stat-tile .tile-sub   { font-size: .72rem; color: var(--muted-foreground); }
+#cairn-stats-soft .tile-value.good  { color: #006300; }
+#cairn-stats-soft .tile-value.warn  { color: var(--coral,#ff6b61); }
+@media (prefers-color-scheme: dark) {
+  #cairn-stats-soft .tile-value.good { color: #0ca30c; }
+}
+#cairn-stats-soft .stats-chart-wrap { display: flex; flex-direction: column; gap: .5rem; }
+#cairn-stats-soft .chart-legend { display: flex; align-items: center; gap: 1rem; }
+#cairn-stats-soft .legend-dot   { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+#cairn-stats-soft .legend-label { font-size: .75rem; color: var(--muted-foreground); }
+#cairn-stats-soft .chart-container { position: relative; width: 100%; overflow: visible; }
+#cairn-stats-soft .chart-svg { width: 100%; display: block; overflow: visible; }
+#cairn-stats-soft .chart-caption { font-size: .68rem; color: var(--muted-foreground); text-align: center; margin: 0; }
+#cairn-stats-soft .chart-tooltip {
+  position: absolute; pointer-events: none;
+  background: var(--card,#fff); border: 1px solid var(--chart-axis);
+  border-radius: 10px; padding: .5rem .75rem;
+  font-size: .78rem; color: var(--ink);
+  box-shadow: 0 4px 16px rgba(0,0,0,.12);
+  white-space: nowrap; z-index: 10;
+  transition: opacity .12s;
+}
+#cairn-stats-soft .chart-tooltip.hidden, #cairn-stats-soft .chart-tooltip[hidden] { opacity: 0; pointer-events: none; }
+#cairn-stats-soft .tt-kw    { font-weight: 700; margin-bottom: .2rem; }
+#cairn-stats-soft .tt-row   { display: flex; align-items: center; gap: .4rem; }
+#cairn-stats-soft .tt-dot   { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
+#cairn-stats-soft .tt-delta { font-size: .72rem; margin-left: .3rem; }
+#cairn-stats-soft .tt-delta.pos { color: #006300; }
+#cairn-stats-soft .tt-delta.neg { color: var(--coral,#ff6b61); }
+
 #cairn-week-soft .week-card { position: relative; min-height: 88px; display: flex; align-items: center; gap: 0; overflow: hidden; color: var(--ink); }
 #cairn-week-soft .week-card.is-dark { --card: var(--forest); color: var(--forest-ink); }
 #cairn-week-soft .week-card.is-coral { --card: var(--coral); color: var(--coral-ink); }
@@ -592,6 +645,7 @@ small, .text-small { font-size: .8rem; line-height: 1.5; }
     <nav class="nav" aria-label="Hauptnavigation">
       <button class="btn active" type="button" onclick="navigate('week')"><span class="nav-item"><i data-lucide="calendar-days" aria-hidden="true"></i><span class="nav-text">Woche</span></span></button>
       <button class="btn btn-ghost" type="button" onclick="navigate('plan')"><span class="nav-item"><i data-lucide="list" aria-hidden="true"></i><span class="nav-text">Plan</span></span></button>
+      <button class="btn btn-ghost" type="button" onclick="navigate('stats')"><span class="nav-item"><i data-lucide="bar-chart-2" aria-hidden="true"></i><span class="nav-text">Stats</span></span></button>
       <button class="btn btn-ghost" type="button" onclick="navigate('sync')"><span class="nav-item"><i data-lucide="refresh-cw" aria-hidden="true"></i><span class="nav-text">Sync</span></span></button>
       <button class="btn btn-ghost" type="button" onclick="navigate('activities')"><span class="nav-item"><i data-lucide="activity" aria-hidden="true"></i><span class="nav-text">Aktivitäten</span></span></button>
     </nav>
@@ -615,6 +669,7 @@ small, .text-small { font-size: .8rem; line-height: 1.5; }
     <nav class="nav" aria-label="Hauptnavigation">
       <button class="btn btn-ghost" type="button" onclick="navigate('week')"><span class="nav-item"><i data-lucide="calendar-days" aria-hidden="true"></i><span class="nav-text">Woche</span></span></button>
       <button class="btn active" type="button" onclick="navigate('plan')"><span class="nav-item"><i data-lucide="list" aria-hidden="true"></i><span class="nav-text">Plan</span></span></button>
+      <button class="btn btn-ghost" type="button" onclick="navigate('stats')"><span class="nav-item"><i data-lucide="bar-chart-2" aria-hidden="true"></i><span class="nav-text">Stats</span></span></button>
       <button class="btn btn-ghost" type="button" onclick="navigate('sync')"><span class="nav-item"><i data-lucide="refresh-cw" aria-hidden="true"></i><span class="nav-text">Sync</span></span></button>
       <button class="btn btn-ghost" type="button" onclick="navigate('activities')"><span class="nav-item"><i data-lucide="activity" aria-hidden="true"></i><span class="nav-text">Aktivitäten</span></span></button>
     </nav>
@@ -639,6 +694,7 @@ small, .text-small { font-size: .8rem; line-height: 1.5; }
     <nav class="nav" aria-label="Hauptnavigation">
       <button class="btn btn-ghost" type="button" onclick="navigate('week')"><span class="nav-item"><i data-lucide="calendar-days" aria-hidden="true"></i><span class="nav-text">Woche</span></span></button>
       <button class="btn btn-ghost" type="button" onclick="navigate('plan')"><span class="nav-item"><i data-lucide="list" aria-hidden="true"></i><span class="nav-text">Plan</span></span></button>
+      <button class="btn btn-ghost" type="button" onclick="navigate('stats')"><span class="nav-item"><i data-lucide="bar-chart-2" aria-hidden="true"></i><span class="nav-text">Stats</span></span></button>
       <button class="btn active" type="button" onclick="navigate('sync')"><span class="nav-item"><i data-lucide="refresh-cw" aria-hidden="true"></i><span class="nav-text">Sync</span></span></button>
       <button class="btn btn-ghost" type="button" onclick="navigate('activities')"><span class="nav-item"><i data-lucide="activity" aria-hidden="true"></i><span class="nav-text">Aktivitäten</span></span></button>
     </nav>
@@ -668,8 +724,41 @@ small, .text-small { font-size: .8rem; line-height: 1.5; }
     <nav class="nav" aria-label="Hauptnavigation">
       <button class="btn btn-ghost" type="button" onclick="navigate('week')"><span class="nav-item"><i data-lucide="calendar-days" aria-hidden="true"></i><span class="nav-text">Woche</span></span></button>
       <button class="btn btn-ghost" type="button" onclick="navigate('plan')"><span class="nav-item"><i data-lucide="list" aria-hidden="true"></i><span class="nav-text">Plan</span></span></button>
+      <button class="btn btn-ghost" type="button" onclick="navigate('stats')"><span class="nav-item"><i data-lucide="bar-chart-2" aria-hidden="true"></i><span class="nav-text">Stats</span></span></button>
       <button class="btn btn-ghost" type="button" onclick="navigate('sync')"><span class="nav-item"><i data-lucide="refresh-cw" aria-hidden="true"></i><span class="nav-text">Sync</span></span></button>
       <button class="btn active" type="button" onclick="navigate('activities')"><span class="nav-item"><i data-lucide="activity" aria-hidden="true"></i><span class="nav-text">Aktivitäten</span></span></button>
+    </nav>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- VIEW: STATS                                                   -->
+<!-- ============================================================ -->
+<div id="cairn-stats-soft" class="view">
+  <div class="shell">
+    <header>
+      <h1>Training</h1>
+    </header>
+    <div class="stats-body" id="stats-body">
+      <div class="stats-tiles" id="stats-tiles"></div>
+      <div class="stats-chart-wrap">
+        <div class="chart-legend">
+          <span class="legend-dot" style="background:var(--chart-planned)"></span><span class="legend-label">Geplant</span>
+          <span class="legend-dot" style="background:var(--chart-actual)"></span><span class="legend-label">Gemacht</span>
+        </div>
+        <div class="chart-container" id="stats-chart-container" aria-label="Wochenvolumen geplant vs gemacht">
+          <svg id="stats-chart-svg" class="chart-svg"></svg>
+          <div id="stats-chart-tooltip" class="chart-tooltip" role="tooltip" hidden></div>
+        </div>
+        <p class="chart-caption">km als Laufäquivalent (Rennrad ÷ 4)</p>
+      </div>
+    </div>
+    <nav class="nav" aria-label="Hauptnavigation">
+      <button class="btn btn-ghost" type="button" onclick="navigate('week')"><span class="nav-item"><i data-lucide="calendar-days" aria-hidden="true"></i><span class="nav-text">Woche</span></span></button>
+      <button class="btn btn-ghost" type="button" onclick="navigate('plan')"><span class="nav-item"><i data-lucide="list" aria-hidden="true"></i><span class="nav-text">Plan</span></span></button>
+      <button class="btn active" type="button" onclick="navigate('stats')"><span class="nav-item"><i data-lucide="bar-chart-2" aria-hidden="true"></i><span class="nav-text">Stats</span></span></button>
+      <button class="btn btn-ghost" type="button" onclick="navigate('sync')"><span class="nav-item"><i data-lucide="refresh-cw" aria-hidden="true"></i><span class="nav-text">Sync</span></span></button>
+      <button class="btn btn-ghost" type="button" onclick="navigate('activities')"><span class="nav-item"><i data-lucide="activity" aria-hidden="true"></i><span class="nav-text">Aktivitäten</span></span></button>
     </nav>
   </div>
 </div>
@@ -693,6 +782,7 @@ small, .text-small { font-size: .8rem; line-height: 1.5; }
     <nav class="nav" aria-label="Hauptnavigation">
       <button class="btn btn-ghost" type="button" onclick="navigate('week')"><span class="nav-item"><i data-lucide="calendar-days" aria-hidden="true"></i><span class="nav-text">Woche</span></span></button>
       <button class="btn btn-ghost" type="button" onclick="navigate('plan')"><span class="nav-item"><i data-lucide="list" aria-hidden="true"></i><span class="nav-text">Plan</span></span></button>
+      <button class="btn btn-ghost" type="button" onclick="navigate('stats')"><span class="nav-item"><i data-lucide="bar-chart-2" aria-hidden="true"></i><span class="nav-text">Stats</span></span></button>
       <button class="btn btn-ghost" type="button" onclick="navigate('sync')"><span class="nav-item"><i data-lucide="refresh-cw" aria-hidden="true"></i><span class="nav-text">Sync</span></span></button>
       <button class="btn active" type="button" onclick="navigate('activities')"><span class="nav-item"><i data-lucide="activity" aria-hidden="true"></i><span class="nav-text">Aktivitäten</span></span></button>
     </nav>
@@ -812,6 +902,7 @@ const state = {
 const VIEW_IDS = {
   week: 'cairn-week-soft',
   plan: 'cairn-plan-soft',
+  stats: 'cairn-stats-soft',
   sync: 'cairn-sync-soft',
   activities: 'cairn-activities-soft',
   analysis: 'cairn-soft',
@@ -828,6 +919,7 @@ function navigate(view, id) {
   switch (view) {
     case 'week':       if (!state.weekLoaded) loadWeek(); break;
     case 'plan':       if (!state.planLoaded) loadPlan(); break;
+    case 'stats':      loadStats(); break;
     case 'sync':       loadSync(); break;
     case 'activities': loadActivities(); break;
     case 'analysis':   if (state.activityId) loadAnalysis(state.activityId); break;
@@ -1290,6 +1382,211 @@ function buildMilestonesCard(milestones, race) {
     <div class="milestone-list">${items}</div>
     ${raceDate ? `<p class="race-finish"><strong>RACE DAY</strong> · ${raceDate.toUpperCase()}</p>` : ''}
   `;
+}
+
+/* ============================================================
+   STATS VIEW — Geplant vs. Gemacht
+   ============================================================ */
+async function loadStats() {
+  const body = document.getElementById('stats-body');
+  if (!body) return;
+
+  let weeks;
+  try {
+    weeks = await apiGet('/api/frontend/week/all');
+  } catch (err) {
+    body.innerHTML = `<p class="loading-msg">Fehler: ${err.message}</p>`;
+    return;
+  }
+
+  // ── Aggregation pro KW ─────────────────────────────────────
+  const kwData = [];
+  let totalPlanned = 0, totalActual = 0, weeksWithActual = 0;
+
+  for (const week of weeks) {
+    let planned = 0, actual = 0, hasActual = false;
+    for (const s of week.sessions || []) {
+      if (/rest|ruhetag/i.test(s.session_type || '')) continue;
+      planned += parseFloat(s.planned_km) || 0;
+
+      const rawActual = s.actual_distance_km != null
+        ? parseFloat(s.actual_distance_km)
+        : (parseFloat(s.actual_km) || 0);
+      const factor = s.km_factor != null ? parseFloat(s.km_factor) : 1.0;
+      if (rawActual > 0) { actual += rawActual * factor; hasActual = true; }
+    }
+    planned = Math.round(planned * 10) / 10;
+    actual  = Math.round(actual  * 10) / 10;
+    totalPlanned += planned;
+    if (hasActual) { totalActual += actual; weeksWithActual++; }
+    kwData.push({ kw: week.kw, monday: week.monday, planned, actual, hasActual,
+                  isPast: week.is_past, isCurrent: week.is_current });
+  }
+  totalPlanned = Math.round(totalPlanned * 10) / 10;
+  totalActual  = Math.round(totalActual  * 10) / 10;
+
+  // ── Stat Tiles ─────────────────────────────────────────────
+  const pct = totalPlanned > 0
+    ? Math.round((totalActual / totalPlanned) * 100) : null;
+  const pctCls = pct == null ? '' : pct >= 90 ? 'good' : pct >= 70 ? '' : 'warn';
+  const delta = Math.round((totalActual - totalPlanned) * 10) / 10;
+  const deltaCls = delta >= 0 ? 'good' : 'warn';
+  const sign = delta >= 0 ? '+' : '';
+
+  document.getElementById('stats-tiles').innerHTML = `
+    <div class="stat-tile">
+      <span class="tile-label">Geplant gesamt</span>
+      <span class="tile-value">${totalPlanned}</span>
+      <span class="tile-sub">km Laufäquivalent</span>
+    </div>
+    <div class="stat-tile">
+      <span class="tile-label">Gemacht gesamt</span>
+      <span class="tile-value ${totalActual > 0 ? deltaCls : ''}">${totalActual}</span>
+      <span class="tile-sub">${totalActual > 0 ? `${sign}${delta} km` : '—'}</span>
+    </div>
+    <div class="stat-tile">
+      <span class="tile-label">Erfüllungsgrad</span>
+      <span class="tile-value ${pctCls}">${pct != null ? pct + ' %' : '—'}</span>
+      <span class="tile-sub">${weeksWithActual} Wochen mit Daten</span>
+    </div>
+    <div class="stat-tile">
+      <span class="tile-label">Wochen geplant</span>
+      <span class="tile-value">${kwData.length}</span>
+      <span class="tile-sub">im aktiven Plan</span>
+    </div>
+  `;
+
+  // ── SVG-Chart ──────────────────────────────────────────────
+  renderStatsChart(kwData);
+}
+
+function renderStatsChart(kwData) {
+  const svg = document.getElementById('stats-chart-svg');
+  const container = document.getElementById('stats-chart-container');
+  const tooltip = document.getElementById('stats-chart-tooltip');
+  if (!svg || !kwData.length) return;
+
+  const W = container.clientWidth || 340;
+  const PAD = { top: 12, right: 8, bottom: 36, left: 32 };
+  const innerW = W - PAD.left - PAD.right;
+
+  // Nur KWs mit Daten anzeigen (planned > 0)
+  const visible = kwData.filter(d => d.planned > 0);
+  if (!visible.length) { svg.innerHTML = ''; return; }
+
+  const maxVal = Math.max(...visible.map(d => Math.max(d.planned, d.actual)), 1);
+  const yMax   = Math.ceil(maxVal / 10) * 10 || 10;
+
+  // Responsive Höhe: min 160px, max 240px
+  const H = Math.min(240, Math.max(160, Math.round(innerW * 0.55)));
+  const innerH = H - PAD.top - PAD.bottom;
+
+  const n = visible.length;
+  const groupW = innerW / n;
+  const barW   = Math.max(4, Math.min(18, groupW * 0.35));
+  const gap    = Math.max(2, barW * 0.3);
+
+  const yScale = v => innerH - (v / yMax) * innerH;
+
+  // Grid-Linien
+  const gridTicks = [0, 0.25, 0.5, 0.75, 1].map(f => Math.round(yMax * f));
+  let gridLines = gridTicks.map(v => {
+    const y = yScale(v);
+    return `<line x1="0" y1="${y}" x2="${innerW}" y2="${y}"
+              stroke="var(--chart-grid)" stroke-width="1" />`
+          + `<text x="-4" y="${y + 4}" text-anchor="end" font-size="9"
+              fill="var(--chart-muted)">${v}</text>`;
+  }).join('');
+
+  // Balken + X-Labels + Hit-targets
+  let bars = '', hits = '';
+  visible.forEach((d, i) => {
+    const cx = groupW * i + groupW / 2;
+    const px = cx - gap / 2 - barW;
+    const ax = cx + gap / 2;
+
+    // Geplant-Balken (blau)
+    const ph = Math.max(2, (d.planned / yMax) * innerH);
+    const py = innerH - ph;
+    bars += `<rect x="${px}" y="${py}" width="${barW}" height="${ph}"
+               rx="3" fill="var(--chart-planned)" data-i="${i}" />`;
+
+    // Gemacht-Balken (grün), nur wenn Daten vorhanden
+    if (d.hasActual) {
+      const ah = Math.max(2, (d.actual / yMax) * innerH);
+      const ay = innerH - ah;
+      bars += `<rect x="${ax}" y="${ay}" width="${barW}" height="${ah}"
+                 rx="3" fill="var(--chart-actual)" data-i="${i}" />`;
+    }
+
+    // X-Label
+    bars += `<text x="${cx}" y="${innerH + 16}" text-anchor="middle"
+               font-size="9" fill="var(--chart-muted)">KW${d.kw}</text>`;
+
+    // Unsichtbares Hit-Target für Tooltip
+    hits += `<rect x="${groupW * i}" y="0" width="${groupW}" height="${innerH}"
+               fill="transparent" data-i="${i}"
+               onmouseenter="showStatsTooltip(event,${i})"
+               ontouchstart="showStatsTooltip(event,${i})"
+               onmouseleave="hideStatsTooltip()"
+               ontouchend="hideStatsTooltip()" />`;
+  });
+
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  svg.setAttribute('height', H);
+  svg.innerHTML = `
+    <g transform="translate(${PAD.left},${PAD.top})">
+      ${gridLines}
+      <line x1="0" y1="${innerH}" x2="${innerW}" y2="${innerH}"
+            stroke="var(--chart-axis)" stroke-width="1.5" />
+      ${bars}
+      ${hits}
+    </g>`;
+
+  // Daten für Tooltip
+  svg._chartData = visible;
+  svg._chartPad  = PAD;
+  svg._groupW    = groupW;
+}
+
+function showStatsTooltip(e, i) {
+  const svg = document.getElementById('stats-chart-svg');
+  const tooltip = document.getElementById('stats-chart-tooltip');
+  if (!svg._chartData || !tooltip) return;
+  const d = svg._chartData[i];
+  if (!d) return;
+
+  const delta = d.hasActual ? Math.round((d.actual - d.planned) * 10) / 10 : null;
+  const sign  = delta != null && delta >= 0 ? '+' : '';
+  const cls   = delta != null ? (delta >= 0 ? 'pos' : 'neg') : '';
+
+  tooltip.innerHTML = `
+    <div class="tt-kw">KW ${d.kw} · ${d.monday}</div>
+    <div class="tt-row"><span class="tt-dot" style="background:var(--chart-planned)"></span>
+      Geplant: <strong>${d.planned} km</strong></div>
+    ${d.hasActual
+      ? `<div class="tt-row"><span class="tt-dot" style="background:var(--chart-actual)"></span>
+           Gemacht: <strong>${d.actual} km</strong>
+           <span class="tt-delta ${cls}">${sign}${delta}</span></div>`
+      : `<div class="tt-row" style="color:var(--chart-muted)">Noch keine Daten</div>`}
+  `;
+  tooltip.hidden = false;
+  tooltip.classList.remove('hidden');
+
+  // Position: above the group
+  const container = document.getElementById('stats-chart-container');
+  const rect = container.getBoundingClientRect();
+  const ex = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
+  const ttW = 180;
+  let left = ex - ttW / 2;
+  left = Math.max(0, Math.min(left, rect.width - ttW));
+  tooltip.style.left = left + 'px';
+  tooltip.style.top  = '0px';
+}
+
+function hideStatsTooltip() {
+  const t = document.getElementById('stats-chart-tooltip');
+  if (t) { t.hidden = true; }
 }
 
 /* ============================================================
