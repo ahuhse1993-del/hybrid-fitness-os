@@ -1986,17 +1986,19 @@ def frontend_week_all():
 def frontend_plan():
     """
     Planansicht: Rennen, aktuelle Phase, Belastungskurve, Milestones.
-    Belastungskurve = Anzahl Non-Rest Sessions pro Woche aus training_plan.
+    Nutzt plan_weeks wenn vorhanden (Deload, Phase, target_run_km);
+    fällt auf Heuristik zurück wenn plan_weeks leer.
     """
     try:
         today = get_today()
+        monday_today = today - timedelta(days=today.weekday())
         conn = get_db()
         cur = conn.cursor()
 
-        # Aktiver Plan
         cur.execute("""
             SELECT id, name, goal_type, race_name, race_date, race_distance_km,
-                   total_weeks, current_week, status
+                   total_weeks, current_week, status,
+                   race_elevation_m, race_priority, target_time
             FROM plans WHERE status = 'active' ORDER BY created_at DESC LIMIT 1
         """)
         plan_row = cur.fetchone()
@@ -2005,51 +2007,80 @@ def frontend_plan():
             conn.close()
             return jsonify({"status": "ok", "has_plan": False})
 
-        plan_id = plan_row[0]
-        race_date = plan_row[4]
-        total_weeks = plan_row[6] or 16
-        current_week = plan_row[7] or 1
-
+        plan_id        = plan_row[0]
+        race_date      = plan_row[4]
+        elevation_m    = plan_row[9]
+        race_priority  = plan_row[10] or "A"
+        target_time    = plan_row[11]
         countdown_days = (race_date - today).days if race_date else None
 
-        # Belastungskurve: Sessions pro Woche (Non-Rest), gruppiert nach Wochenmondat
         cur.execute("""
-            SELECT week_date,
-                   COUNT(*) FILTER (WHERE session_type != 'Rest Day') AS sessions,
-                   ROUND(COALESCE(SUM(distance_km), 0)::numeric, 1)  AS total_km,
-                   MAX(phase) AS phase
-            FROM training_plan
-            WHERE plan_id = %s OR plan_id IS NULL
-            GROUP BY week_date
-            ORDER BY week_date
+            SELECT week_number, week_start, phase, is_deload, target_run_km, week_focus
+            FROM plan_weeks
+            WHERE plan_id = %s
+            ORDER BY week_number
         """, (plan_id,))
-        week_rows = cur.fetchall()
+        pw_rows = cur.fetchall()
 
-        # Wochenstruktur für Kurve
         weeks = []
-        for i, r in enumerate(week_rows):
-            weeks.append({
-                "week_date": str(r[0]),
-                "week_number": i + 1,
-                "sessions": int(r[1]) if r[1] else 0,
-                "total_km": float(r[2]) if r[2] else 0,
-                "phase": r[3] or "base",
-                "is_deload": False,  # Deloads: Wochen mit weniger Sessions als Nachbarwoche (heuristisch)
-                "is_current": False,
-            })
+        current_week = 1
+        total_weeks  = 16
 
-        # Deloads und aktuelle Woche markieren
-        monday_today = today - timedelta(days=today.weekday())
-        for i, w in enumerate(weeks):
-            if w["week_date"] == str(monday_today):
-                w["is_current"] = True
-            # Einfache Deload-Heuristik: < 70% der Vorwoche
-            if i >= 1 and weeks[i - 1]["total_km"] > 0:
-                ratio = w["total_km"] / weeks[i - 1]["total_km"]
-                if ratio < 0.75 and w["total_km"] > 0:
-                    w["is_deload"] = True
+        if pw_rows:
+            total_weeks = len(pw_rows)
+            for r in pw_rows:
+                wnum, wstart, phase, is_deload, km, focus = r
+                is_current = (wstart <= monday_today < wstart + timedelta(weeks=1))
+                if is_current:
+                    current_week = wnum
+                weeks.append({
+                    "week_date":   str(wstart),
+                    "week_number": wnum,
+                    "total_km":    float(km) if km else 0,
+                    "phase":       phase or "base",
+                    "is_deload":   bool(is_deload),
+                    "is_current":  is_current,
+                    "week_focus":  focus or "",
+                })
+        else:
+            cur.execute("""
+                SELECT week_date,
+                       ROUND(COALESCE(SUM(distance_km), 0)::numeric, 1) AS total_km,
+                       MAX(phase) AS phase
+                FROM training_plan
+                WHERE plan_id = %s
+                  AND session_type NOT IN ('Rest Day', 'Strength Training', 'Core', 'Mobility')
+                GROUP BY week_date
+                ORDER BY week_date
+            """, (plan_id,))
+            fb_rows = cur.fetchall()
+            total_weeks = max(len(fb_rows), plan_row[6] or 16)
+            prev_km = 0.0
+            for i, r in enumerate(fb_rows):
+                wdate, wkm, phase = r
+                wkm = float(wkm) if wkm else 0
+                is_deload = (prev_km > 0 and wkm > 0 and wkm / prev_km < 0.75)
+                if wkm > 0:
+                    prev_km = wkm
+                is_current = (str(wdate) == str(monday_today))
+                if is_current:
+                    current_week = i + 1
+                weeks.append({
+                    "week_date":   str(wdate),
+                    "week_number": i + 1,
+                    "total_km":    wkm,
+                    "phase":       phase or "base",
+                    "is_deload":   is_deload,
+                    "is_current":  is_current,
+                    "week_focus":  "",
+                })
+            if not any(w["is_current"] for w in weeks):
+                current_week = plan_row[7] or 1
 
-        # Milestones
+        current_phase = "base"
+        if weeks and 1 <= current_week <= len(weeks):
+            current_phase = weeks[current_week - 1]["phase"]
+
         cur.execute("""
             SELECT id, step_number, title, criterion, target_date,
                    status, evidence, notes, achieved_at
@@ -2086,17 +2117,20 @@ def frontend_plan():
             "status": "ok",
             "has_plan": True,
             "race": {
-                "name": plan_row[3],
-                "date": str(race_date) if race_date else None,
-                "distance_km": plan_row[5],
+                "name":           plan_row[3],
+                "date":           str(race_date) if race_date else None,
+                "distance_km":    plan_row[5],
+                "elevation_m":    elevation_m,
+                "priority":       race_priority,
+                "target_time":    target_time,
                 "countdown_days": countdown_days,
             },
             "block": {
                 "current_week": current_week,
-                "total_weeks": total_weeks,
-                "phase": weeks[current_week - 1]["phase"] if weeks and current_week <= len(weeks) else "base",
+                "total_weeks":  total_weeks,
+                "phase":        current_phase,
             },
-            "weeks": weeks,
+            "weeks":      weeks,
             "milestones": milestones,
         })
 

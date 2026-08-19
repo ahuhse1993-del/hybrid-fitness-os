@@ -2058,22 +2058,31 @@ def upsert_training_block(plan: dict, confirm_race_date_change: bool = False) ->
                 plan_id = active_plan_id
                 cur.execute(
                     """UPDATE plans SET name=%s, goal_type=%s, race_name=%s, race_date=%s,
-                           race_distance_km=%s
+                           race_distance_km=%s, race_elevation_m=%s,
+                           race_priority=%s, target_time=%s
                        WHERE id=%s""",
                     (
                         race.get("name") or race.get("race_name"), race.get("goal_type"),
                         race.get("name") or race.get("race_name"), race["race_date"],
-                        race.get("race_distance_km"), plan_id,
+                        race.get("race_distance_km"),
+                        race.get("race_elevation_m"),
+                        race.get("race_priority", "A"),
+                        race.get("target_time"),
+                        plan_id,
                     ),
                 )
             else:
                 cur.execute(
-                    """INSERT INTO plans (name, goal_type, race_name, race_date, race_distance_km, status)
-                       VALUES (%s, %s, %s, %s, %s, 'active') RETURNING id""",
+                    """INSERT INTO plans (name, goal_type, race_name, race_date, race_distance_km,
+                                           race_elevation_m, race_priority, target_time, status)
+                       VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 'active') RETURNING id""",
                     (
                         race.get("name") or race.get("race_name"), race.get("goal_type"),
                         race.get("name") or race.get("race_name"), race["race_date"],
                         race.get("race_distance_km"),
+                        race.get("race_elevation_m"),
+                        race.get("race_priority", "A"),
+                        race.get("target_time"),
                     ),
                 )
                 plan_id = cur.fetchone()[0]
@@ -2175,6 +2184,61 @@ def upsert_training_block(plan: dict, confirm_race_date_change: bool = False) ->
                             (new_hash, row_id),
                         )
 
+        # ─── plan_weeks: Wochenstruktur aus Sessions ableiten ────────────────────
+        import collections as _collections
+        import datetime as _dt
+
+        week_groups = _collections.defaultdict(list)
+        for s in sessions:
+            sdate = _dt.date.fromisoformat(s["date"])
+            wstart = sdate - _dt.timedelta(days=sdate.weekday())
+            week_groups[wstart].append(s)
+
+        sorted_weeks = sorted(week_groups.keys())
+
+        def _week_km(slist):
+            return sum(
+                (s.get("distance_km") or 0)
+                for s in slist
+                if s.get("session_type") not in ("Rest Day", "Strength Training", "Core", "Mobility")
+            )
+
+        with conn.cursor() as cur:
+            pw_id_map: dict = {}
+            prev_km = 0.0
+            for wnum, wstart in enumerate(sorted_weeks, start=1):
+                slist = week_groups[wstart]
+                wkm = _week_km(slist)
+                phases_in_week = [s.get("phase") or s.get("session_zone") for s in slist if s.get("phase") or s.get("session_zone")]
+                phase_val = phases_in_week[0] if phases_in_week else "base"
+                is_deload = (prev_km > 0 and wkm > 0 and wkm / prev_km < 0.75)
+                if wkm > 0:
+                    prev_km = wkm
+                cur.execute(
+                    """INSERT INTO plan_weeks (plan_id, week_number, week_start, phase, is_deload, target_run_km)
+                       VALUES (%s, %s, %s, %s, %s, %s)
+                       ON CONFLICT (plan_id, week_number) DO UPDATE SET
+                           week_start=EXCLUDED.week_start,
+                           phase=EXCLUDED.phase,
+                           is_deload=EXCLUDED.is_deload,
+                           target_run_km=EXCLUDED.target_run_km,
+                           updated_at=now()
+                       RETURNING id""",
+                    (plan_id, wnum, wstart, phase_val, is_deload, round(wkm, 1) if wkm else None),
+                )
+                pw_id = cur.fetchone()[0]
+                pw_id_map[wstart] = pw_id
+
+            for s in sessions:
+                sdate = _dt.date.fromisoformat(s["date"])
+                wstart = sdate - _dt.timedelta(days=sdate.weekday())
+                pw_id = pw_id_map.get(wstart)
+                if pw_id:
+                    cur.execute(
+                        "UPDATE training_plan SET week_id=%s WHERE external_id=%s AND plan_id=%s",
+                        (pw_id, s["external_id"], plan_id),
+                    )
+
         conn.commit()
         logger.info(
             "upsert_training_block committed: plan_id=%s created=%s updated=%s race_date_changed=%s routing=%s",
@@ -2185,6 +2249,150 @@ def upsert_training_block(plan: dict, confirm_race_date_change: bool = False) ->
             "race_date_changed": race_date_changed,
             "routing_summary": routing_summary,
             "warnings": routing_warnings,
+        }
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+
+@mcp.tool()
+def update_planned_workout(session_id: int | None = None, external_id: str | None = None,
+                           patch: dict = {}, reason: str = "") -> dict:
+    """
+    Partial update of a single planned session in CAIRN.
+
+    Provide either session_id (training_plan.id) or external_id.
+    patch: dict with only the fields you want to change. Allowed keys:
+        date (YYYY-MM-DD), session_type, session_zone, name, distance_km,
+        duration_min, notes, elevation_gain_m, km_factor, status,
+        sync_target, target, phase
+
+    Fields NOT in patch are left untouched.
+    If date changes and crosses a week boundary, week_id is recalculated.
+    Does NOT auto-push to Garmin — if the session has garmin_workout_id
+    and content-sensitive fields change, sync_status is set to 'dirty'.
+    reason: short explanation for the log (e.g. "moved long run due to weather").
+
+    Returns: id, external_id, changed_fields, sync_status_after.
+    """
+    if not session_id and not external_id:
+        return {"error": "session_id oder external_id erforderlich."}
+    if not patch:
+        return {"error": "patch darf nicht leer sein."}
+
+    ALLOWED = {
+        "date", "session_type", "session_zone", "name", "distance_km",
+        "duration_min", "notes", "elevation_gain_m", "km_factor", "status",
+        "sync_target", "target", "phase",
+    }
+    unknown = set(patch) - ALLOWED
+    if unknown:
+        return {"error": f"Unbekannte patch-Felder: {sorted(unknown)}. Erlaubt: {sorted(ALLOWED)}"}
+
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            if session_id:
+                cur.execute(
+                    "SELECT id, external_id, week_date, garmin_workout_id, sync_status FROM training_plan WHERE id=%s",
+                    (session_id,),
+                )
+            else:
+                cur.execute(
+                    "SELECT id, external_id, week_date, garmin_workout_id, sync_status FROM training_plan WHERE external_id=%s",
+                    (external_id,),
+                )
+            row = cur.fetchone()
+            if not row:
+                return {"error": f"Session nicht gefunden (session_id={session_id}, external_id={external_id!r})."}
+
+            row_id, ext_id, cur_week_date, garmin_id, cur_sync_status = row
+
+            COLUMN_MAP = {
+                "session_type": "session_type",
+                "session_zone": "session_zone",
+                "name": "name",
+                "distance_km": "distance_km",
+                "duration_min": "duration_min",
+                "notes": "notes",
+                "elevation_gain_m": "elevation_gain_m",
+                "km_factor": "km_factor",
+                "status": "status",
+                "sync_target": "sync_target",
+                "phase": "phase",
+            }
+
+            sets = []
+            vals = []
+            changed_fields = []
+
+            if "date" in patch:
+                try:
+                    new_date = datetime.date.fromisoformat(patch["date"])
+                except ValueError:
+                    return {"error": f"date {patch['date']!r} ist kein gültiges YYYY-MM-DD"}
+                new_week_date, new_dow = _week_date_and_dow(new_date)
+                sets += ["week_date=%s", "day_of_week=%s"]
+                vals += [new_week_date, new_dow]
+                changed_fields.append("date")
+                if new_week_date != cur_week_date:
+                    cur.execute(
+                        """SELECT id FROM plan_weeks
+                           WHERE week_start=%s AND plan_id=(
+                               SELECT plan_id FROM training_plan WHERE id=%s
+                           )""",
+                        (new_week_date, row_id),
+                    )
+                    pw = cur.fetchone()
+                    if pw:
+                        sets.append("week_id=%s")
+                        vals.append(pw[0])
+                        changed_fields.append("week_id")
+
+            if "target" in patch:
+                sets.append("target=%s")
+                vals.append(json.dumps(patch["target"]) if patch["target"] is not None else None)
+                changed_fields.append("target")
+
+            for key, col in COLUMN_MAP.items():
+                if key in patch:
+                    sets.append(f"{col}=%s")
+                    vals.append(patch[key])
+                    changed_fields.append(key)
+
+            GARMIN_SENSITIVE = {"date", "session_type", "distance_km", "duration_min", "notes",
+                                "session_zone", "name", "target", "elevation_gain_m"}
+            new_sync_status = cur_sync_status
+            if garmin_id and (set(changed_fields) & GARMIN_SENSITIVE):
+                sets.append("sync_status=%s")
+                vals.append("dirty")
+                new_sync_status = "dirty"
+                changed_fields.append("_sync_status→dirty")
+
+            if not sets:
+                return {"id": row_id, "external_id": ext_id, "changed_fields": [], "note": "Keine Änderungen."}
+
+            sets.append("updated_at=now()")
+            vals.append(row_id)
+            cur.execute(
+                f"UPDATE training_plan SET {', '.join(sets)} WHERE id=%s",
+                vals,
+            )
+            logger.info(
+                "update_planned_workout: id=%s ext=%s changed=%s reason=%r",
+                row_id, ext_id, changed_fields, reason,
+            )
+
+        conn.commit()
+        return {
+            "id": row_id,
+            "external_id": ext_id,
+            "changed_fields": changed_fields,
+            "sync_status_after": new_sync_status,
+            "needs_garmin_push": (garmin_id is not None and new_sync_status == "dirty"),
         }
     except Exception:
         conn.rollback()

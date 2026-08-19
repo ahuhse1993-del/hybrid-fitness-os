@@ -1181,18 +1181,23 @@ function renderPlan(data) {
   container.innerHTML = '';
 
   // Hero card (race info)
-  // race fields from /api/frontend/plan: {name, date, distance_km, countdown_days}
-  const distLabel = race.distance_km ? `${race.distance_km} km` : (race.distance || '—');
+  // race fields from /api/frontend/plan: {name, date, distance_km, elevation_m, priority, countdown_days}
+  const distLabel = race.distance_km ? `${race.distance_km} km` : '—';
+  const hmLabel   = race.elevation_m  ? `${Number(race.elevation_m).toLocaleString('de-CH')} HM` : '—';
+  const priorityBadge = `${race.priority || 'A'}-RENNEN`;
+  const raceDateLabel = race.date
+    ? new Date(race.date + 'T00:00:00').toLocaleDateString('de-CH', { day: 'numeric', month: 'long', year: 'numeric' })
+    : '';
   const heroCard = e('section', 'card hero', `
     <div class="hero-copy">
       <div>
-        <p class="eyebrow text-small">A-RENNEN</p>
+        <p class="eyebrow text-small">${priorityBadge}</p>
         <h2 id="race-title">${race.name || 'Trainingsplan'}</h2>
-        <p class="race-date">${race.date || ''}</p>
+        <p class="race-date">${raceDateLabel}</p>
       </div>
       <div class="hero-metrics">
         <div><span class="text-small">DISTANZ</span><strong>${distLabel}</strong></div>
-        <div><span class="text-small">PHASE</span><strong>${phase}</strong></div>
+        <div><span class="text-small">HÖHE</span><strong>${hmLabel}</strong></div>
         <div><span class="text-small">NOCH</span><strong>${race.countdown_days != null ? race.countdown_days + ' Tage' : '—'}</strong></div>
       </div>
     </div>
