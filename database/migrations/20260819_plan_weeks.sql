@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS plan_weeks (
     week_start      DATE    NOT NULL,
     phase           VARCHAR(20) NOT NULL DEFAULT 'base',
     is_deload       BOOLEAN NOT NULL DEFAULT FALSE,
+    is_peak         BOOLEAN NOT NULL DEFAULT FALSE,
     target_run_km   NUMERIC(6,1),
     week_focus      VARCHAR(200),
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -39,5 +40,8 @@ ALTER TABLE training_plan
 
 CREATE INDEX IF NOT EXISTS training_plan_week_id_idx
     ON training_plan (week_id);
+
+ALTER TABLE milestones
+  ADD COLUMN IF NOT EXISTS week_number INTEGER;
 
 COMMIT;

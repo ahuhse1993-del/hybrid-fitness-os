@@ -319,7 +319,8 @@ small, .text-small { font-size: .8rem; line-height: 1.5; }
 #cairn-plan-soft .load-bar { position: relative; align-self: end; display: block; width: 100%; height: var(--h); min-height: 10px; border-radius: 4px 4px 0 0; background: color-mix(in srgb, var(--forest) 44%, var(--paper)); }
 #cairn-plan-soft .load-week.done .load-bar { background: var(--forest); opacity: .72; }
 #cairn-plan-soft .load-week.current .load-bar { background: var(--coral); opacity: 1; }
-#cairn-plan-soft .load-week.deload .load-bar { background: color-mix(in srgb, var(--ink) 24%, var(--paper)); }
+#cairn-plan-soft .load-week.peak .load-bar { background: var(--forest); opacity: 1; }
+    #cairn-plan-soft .load-week.deload .load-bar { background: color-mix(in srgb, var(--ink) 24%, var(--paper)); }
 #cairn-plan-soft .load-value { position: absolute; left: 50%; top: -.1rem; transform: translate(-50%,-100%); white-space: nowrap; }
 #cairn-plan-soft .load-label { text-align: center; color: var(--muted-foreground); }
 #cairn-plan-soft .load-week.current .load-label { color: var(--ink); font-weight: 500; }
@@ -1166,13 +1167,14 @@ function renderPlan(data) {
     week_number: w.week_number,
     km: w.total_km || 0,
     is_deload: w.is_deload,
+    is_peak: w.is_peak || false,
   }));
   const milestones = data.milestones || [];
   // Build a synthetic plan object for buildProgressCard
   const plan = {
     race_date: race.date || '',
     days_until_race: race.countdown_days || null,
-    phase_focus: block.phase || '',
+    phase_focus: block.week_focus || block.phase || '',
   };
 
   document.getElementById('plan-week-pill').textContent = `WOCHE ${currentWeek} / ${totalWeeks}`;
@@ -1235,11 +1237,13 @@ function buildProgressCard(plan, currentWeek, totalWeeks, phase, weeklyLoad) {
     const weekData = weeklyLoad.find(w => (w.week_number || w.week) === i) || {};
     const km = weekData.km || weekData.planned_km || 0;
     const pct = Math.round((km / maxKm) * 96) + 4;
-    const isDone = i < currentWeek;
+    const isDone    = i < currentWeek;
     const isCurrent = i === currentWeek;
-    const isDeload = weekData.is_deload;
-    const classes = ['load-week', isDone ? 'done' : '', isCurrent ? 'current' : '', isDeload ? 'deload' : ''].filter(Boolean).join(' ');
-    const valueTag = (isCurrent || (i === totalWeeks)) && km ? `<span class="load-value text-small">${Math.round(km)}</span>` : '';
+    const isDeload  = weekData.is_deload;
+    const isPeak    = weekData.is_peak;
+    const classes = ['load-week', isDone?'done':'', isCurrent?'current':'', isDeload?'deload':'', isPeak?'peak':''].filter(Boolean).join(' ');
+    const showVal = (isCurrent || isPeak) && km;
+    const valueTag = showVal ? `<span class="load-value text-small">${Math.round(km)}</span>` : '';
     bars.push(`<span class="${classes}"><span class="load-bar" style="--h:${pct}%">${valueTag}</span><span class="load-label text-small">${i}</span></span>`);
   }
 
@@ -1255,6 +1259,7 @@ function buildProgressCard(plan, currentWeek, totalWeeks, phase, weeklyLoad) {
   const done = currentWeek - 1;
   const remaining = totalWeeks - currentWeek;
 
+  const deloadLabel = weeklyLoad.filter(w=>w.is_deload).map(w=>'W'+(w.week_number||w.week)).join(' / ') || '';
   return `
     <div class="section-head">
       <div><p class="eyebrow text-small">AKTUELLE PHASE</p><h2 id="phase-title">${phase}</h2></div>
@@ -1262,12 +1267,12 @@ function buildProgressCard(plan, currentWeek, totalWeeks, phase, weeklyLoad) {
     </div>
     <div class="phase-tabs text-small" aria-label="Trainingsphasen">${phaseTabs}</div>
     <div class="load-block">
-      <div class="load-head"><div><p class="eyebrow text-small">BELASTUNGSVERTEILUNG</p><h3>Wochenkilometer</h3></div><p class="text-small">DELOAD · W4 / W8 / W12</p></div>
+      <div class="load-head">
+        <div><p class="eyebrow text-small">BELASTUNGSVERTEILUNG</p><h3>Wochenkilometer</h3></div>
+        ${deloadLabel ? `<p class="text-small">DELOAD · ${deloadLabel}</p>` : ''}
+      </div>
       <div class="load-chart" role="img" aria-label="Geplante Wochenkilometer">${bars.join('')}</div>
     </div>
-    <div class="week-track" role="img" aria-label="Woche ${currentWeek} von ${totalWeeks}">${dots.join('')}</div>
-    <div class="track-labels text-small"><span>1</span><span>${Math.round(totalWeeks/4)}</span><span class="current-label">${currentWeek} · DU BIST HIER</span><span>${Math.round(totalWeeks*0.75)}</span><span>${totalWeeks}</span></div>
-    <div class="progress-foot text-small"><span>${done} WOCHE${done !== 1 ? 'N' : ''} ERLEDIGT</span><span>${remaining} WOCHE${remaining !== 1 ? 'N' : ''} + RACE</span></div>
   `;
 }
 

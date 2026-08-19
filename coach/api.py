@@ -1985,9 +1985,8 @@ def frontend_week_all():
 @app.route('/api/frontend/plan')
 def frontend_plan():
     """
-    Planansicht: Rennen, aktuelle Phase, Belastungskurve, Milestones.
-    Nutzt plan_weeks wenn vorhanden (Deload, Phase, target_run_km);
-    fällt auf Heuristik zurück wenn plan_weeks leer.
+    Planansicht: Race-Info, Phase, Belastungskurve (aus plan_weeks), Milestones.
+    Fallback auf Heuristik wenn plan_weeks leer.
     """
     try:
         today = get_today()
@@ -2002,23 +2001,21 @@ def frontend_plan():
             FROM plans WHERE status = 'active' ORDER BY created_at DESC LIMIT 1
         """)
         plan_row = cur.fetchone()
-
         if not plan_row:
             conn.close()
             return jsonify({"status": "ok", "has_plan": False})
 
-        plan_id        = plan_row[0]
-        race_date      = plan_row[4]
-        elevation_m    = plan_row[9]
-        race_priority  = plan_row[10] or "A"
-        target_time    = plan_row[11]
+        plan_id       = plan_row[0]
+        race_date     = plan_row[4]
+        elevation_m   = plan_row[9]
+        race_priority = plan_row[10] or "A"
+        target_time   = plan_row[11]
         countdown_days = (race_date - today).days if race_date else None
 
+        # plan_weeks (kanonisch)
         cur.execute("""
-            SELECT week_number, week_start, phase, is_deload, target_run_km, week_focus
-            FROM plan_weeks
-            WHERE plan_id = %s
-            ORDER BY week_number
+            SELECT week_number, week_start, phase, is_deload, is_peak, target_run_km, week_focus
+            FROM plan_weeks WHERE plan_id = %s ORDER BY week_number
         """, (plan_id,))
         pw_rows = cur.fetchall()
 
@@ -2029,7 +2026,7 @@ def frontend_plan():
         if pw_rows:
             total_weeks = len(pw_rows)
             for r in pw_rows:
-                wnum, wstart, phase, is_deload, km, focus = r
+                wnum, wstart, phase, is_deload, is_peak, km, focus = r
                 is_current = (wstart <= monday_today < wstart + timedelta(weeks=1))
                 if is_current:
                     current_week = wnum
@@ -2039,10 +2036,12 @@ def frontend_plan():
                     "total_km":    float(km) if km else 0,
                     "phase":       phase or "base",
                     "is_deload":   bool(is_deload),
+                    "is_peak":     bool(is_peak),
                     "is_current":  is_current,
                     "week_focus":  focus or "",
                 })
         else:
+            # Fallback aus training_plan
             cur.execute("""
                 SELECT week_date,
                        ROUND(COALESCE(SUM(distance_km), 0)::numeric, 1) AS total_km,
@@ -2050,16 +2049,18 @@ def frontend_plan():
                 FROM training_plan
                 WHERE plan_id = %s
                   AND session_type NOT IN ('Rest Day', 'Strength Training', 'Core', 'Mobility')
-                GROUP BY week_date
-                ORDER BY week_date
+                GROUP BY week_date ORDER BY week_date
             """, (plan_id,))
             fb_rows = cur.fetchall()
             total_weeks = max(len(fb_rows), plan_row[6] or 16)
             prev_km = 0.0
+            all_kms = [float(r[1]) if r[1] else 0 for r in fb_rows]
+            max_km = max(all_kms) if all_kms else 0
             for i, r in enumerate(fb_rows):
                 wdate, wkm, phase = r
                 wkm = float(wkm) if wkm else 0
                 is_deload = (prev_km > 0 and wkm > 0 and wkm / prev_km < 0.75)
+                is_peak   = (max_km > 0 and wkm == max_km)
                 if wkm > 0:
                     prev_km = wkm
                 is_current = (str(wdate) == str(monday_today))
@@ -2071,22 +2072,21 @@ def frontend_plan():
                     "total_km":    wkm,
                     "phase":       phase or "base",
                     "is_deload":   is_deload,
+                    "is_peak":     is_peak,
                     "is_current":  is_current,
                     "week_focus":  "",
                 })
             if not any(w["is_current"] for w in weeks):
                 current_week = plan_row[7] or 1
 
-        current_phase = "base"
-        if weeks and 1 <= current_week <= len(weeks):
-            current_phase = weeks[current_week - 1]["phase"]
+        current_phase  = weeks[current_week - 1]["phase"] if weeks and 1 <= current_week <= len(weeks) else "base"
+        current_focus  = weeks[current_week - 1]["week_focus"] if weeks and 1 <= current_week <= len(weeks) else ""
 
+        # Milestones
         cur.execute("""
             SELECT id, step_number, title, criterion, target_date,
-                   status, evidence, notes, achieved_at
-            FROM milestones
-            WHERE plan_id = %s
-            ORDER BY step_number
+                   status, evidence, notes, achieved_at, week_number
+            FROM milestones WHERE plan_id = %s ORDER BY step_number
         """, (plan_id,))
         milestone_rows = cur.fetchall()
 
@@ -2094,21 +2094,16 @@ def frontend_plan():
         next_set = False
         for r in milestone_rows:
             ms_status = r[5]
-            is_next = False
-            if ms_status == 'open' and not next_set:
-                is_next = True
+            is_next = (ms_status == 'open' and not next_set)
+            if is_next:
                 next_set = True
             milestones.append({
-                "id": r[0],
-                "step_number": r[1],
-                "title": r[2],
-                "criterion": r[3] or "",
-                "target_date": str(r[4]) if r[4] else None,
-                "status": ms_status,
-                "is_next": is_next,
-                "evidence": r[6] or "",
-                "notes": r[7] or "",
+                "id": r[0], "step_number": r[1], "title": r[2],
+                "criterion": r[3] or "", "target_date": str(r[4]) if r[4] else None,
+                "status": ms_status, "is_next": is_next,
+                "evidence": r[6] or "", "notes": r[7] or "",
                 "achieved_at": str(r[8]) if r[8] else None,
+                "week_number": r[9],
             })
 
         conn.close()
@@ -2129,6 +2124,7 @@ def frontend_plan():
                 "current_week": current_week,
                 "total_weeks":  total_weeks,
                 "phase":        current_phase,
+                "week_focus":   current_focus,
             },
             "weeks":      weeks,
             "milestones": milestones,

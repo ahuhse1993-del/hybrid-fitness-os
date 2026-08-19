@@ -2220,7 +2220,7 @@ def upsert_training_block(plan: dict, confirm_race_date_change: bool = False) ->
                        ON CONFLICT (plan_id, week_number) DO UPDATE SET
                            week_start=EXCLUDED.week_start,
                            phase=EXCLUDED.phase,
-                           is_deload=EXCLUDED.is_deload,
+                           is_deload=EXCLUDED.is_deload, is_peak=EXCLUDED.is_peak,
                            target_run_km=EXCLUDED.target_run_km,
                            updated_at=now()
                        RETURNING id""",
