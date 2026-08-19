@@ -886,7 +886,9 @@ def get_planned_workouts(days: int = 14, start_date: str | None = None) -> list[
                (week_date + (day_of_week - 1) * INTERVAL '1 day')::date AS session_date,
                session_type, session_zone, distance_km, duration_min,
                notes, phase, garmin_workout_id, workout_steps, plan_week,
-               elevation_gain_m
+               elevation_gain_m, external_id, sport,
+               km_factor, actual_distance_km, linked_garmin_activity_id,
+               sync_status, sync_target
         FROM training_plan
         WHERE (week_date + (day_of_week - 1) * INTERVAL '1 day')::date
               BETWEEN {range_start_sql} AND {range_start_sql} + (INTERVAL '1 day' * %s)
