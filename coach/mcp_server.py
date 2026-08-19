@@ -1727,6 +1727,108 @@ def upsert_planned_workout(
 
 
 @mcp.tool()
+def patch_planned_workout(session_id: int, patch: dict) -> dict:
+    """
+    Patch specific fields of an existing planned session by its database ID.
+
+    Use this when you know the session's numeric ID (visible in list_garmin_workouts
+    and get_planned_workouts) and want to update only certain fields without
+    touching the workout structure, Garmin state, or external_id.
+
+    Patchable fields:
+        elevation_gain_m (int)   — planned elevation gain in meters (CAIRN-only, never sent to Garmin)
+        notes            (str)   — session notes / terrain description
+        name             (str)   — display title
+        distance_km      (float) — planned distance
+        duration_min     (int)   — planned duration
+        session_zone     (str)   — intensity label, e.g. "Uphill RPE 7-8"
+
+    NOT patchable via this tool (use upsert_planned_workout for these):
+        session_type, date, sport, workout_steps, external_id,
+        garmin_workout_id, sync_status
+
+    Args:
+        session_id: The integer ID from training_plan (visible in list_garmin_workouts
+                    and get_planned_workouts output).
+        patch:      Dict containing only the fields to change, e.g.
+                    {"elevation_gain_m": 800}
+                    {"elevation_gain_m": 1200, "notes": "Bergtrail, technisch, ca. 1200 HM"}
+
+    Returns: id, fields_patched, rows_changed, garmin_dirty flag.
+    """
+    ALLOWED = {"elevation_gain_m", "notes", "name", "distance_km", "duration_min", "session_zone"}
+
+    unknown = set(patch.keys()) - ALLOWED
+    if unknown:
+        return {"error": f"Nicht erlaubte Felder: {sorted(unknown)}. Erlaubt: {sorted(ALLOWED)}"}
+
+    if not patch:
+        return {"error": "patch ist leer — nichts zu aendern."}
+
+    # Type coercions for safety
+    if "elevation_gain_m" in patch and patch["elevation_gain_m"] is not None:
+        patch["elevation_gain_m"] = int(patch["elevation_gain_m"])
+    if "distance_km" in patch and patch["distance_km"] is not None:
+        patch["distance_km"] = float(patch["distance_km"])
+    if "duration_min" in patch and patch["duration_min"] is not None:
+        patch["duration_min"] = int(patch["duration_min"])
+
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            # Verify session exists and get Garmin state
+            cur.execute(
+                "SELECT id, garmin_workout_id FROM training_plan WHERE id = %s",
+                (session_id,)
+            )
+            row = cur.fetchone()
+            if not row:
+                return {"error": f"Session {session_id} nicht gefunden."}
+
+            _, garmin_workout_id = row
+
+            # Build targeted UPDATE — only patch fields, nothing else
+            set_parts = [f"{k} = %s" for k in patch.keys()]
+            set_parts.append("updated_at = now()")
+            values = list(patch.values()) + [session_id]
+
+            cur.execute(
+                f"UPDATE training_plan SET {', '.join(set_parts)} WHERE id = %s",
+                values
+            )
+            changed = cur.rowcount
+
+            # Mark dirty if already on Garmin and a Garmin-visible field changed
+            garmin_visible = {"distance_km", "duration_min", "name"}
+            marked_dirty = False
+            if garmin_workout_id and any(f in patch for f in garmin_visible):
+                cur.execute(
+                    "UPDATE training_plan SET sync_status = 'dirty' "
+                    "WHERE id = %s AND sync_status = 'synced'",
+                    (session_id,)
+                )
+                marked_dirty = cur.rowcount > 0
+
+        conn.commit()
+        logger.info(
+            "patch_planned_workout committed: id=%s fields=%s dirty=%s",
+            session_id, list(patch.keys()), marked_dirty,
+        )
+        return {
+            "id": session_id,
+            "fields_patched": list(patch.keys()),
+            "rows_changed": changed,
+            "garmin_dirty": marked_dirty,
+        }
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+
+@mcp.tool()
 def upsert_training_block(plan: dict, confirm_race_date_change: bool = False) -> dict:
     """
     Save race + training block + all sessions atomically (single DB transaction —
