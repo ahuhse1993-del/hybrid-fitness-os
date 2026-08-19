@@ -197,6 +197,59 @@ def _hr_zone_gap_warnings(hr_zones: dict) -> list[str]:
     return warnings
 
 
+# ── Pace-Zonen-Validierung ───────────────────────────────────────────────────
+
+_PACE_ZONE_KEYS: frozenset[str] = frozenset({
+    "recovery_sec_km",
+    "easy_sec_km",
+    "steady_sec_km",
+    "tempo_sec_km",
+    "threshold_sec_km",
+    "vo2max_sec_km",
+    "sprint_sec_km",
+    "uphill_avg_sec_km",
+    "downhill_avg_sec_km",
+})
+
+
+def _validate_pace_zones(pace_zones: dict) -> list[str]:
+    """Validiert den Inhalt von athlete_profile.pace_zones.
+
+    Erlaubte Schlüssel: recovery_sec_km, easy_sec_km, steady_sec_km,
+    tempo_sec_km, threshold_sec_km, vo2max_sec_km, sprint_sec_km,
+    uphill_avg_sec_km, downhill_avg_sec_km.
+
+    Jeder Wert muss ein Integer > 0 sein (Einheit: Sekunden pro Kilometer).
+    Partielle Updates sind erlaubt — nicht alle Schlüssel müssen gesetzt sein.
+    Unbekannte Schlüssel werden mit einem Fehler abgelehnt.
+
+    Gibt eine leere Liste zurück wenn alles korrekt ist.
+    """
+    errors: list[str] = []
+
+    unknown = sorted(k for k in pace_zones if k not in _PACE_ZONE_KEYS)
+    if unknown:
+        errors.append(
+            f"Unbekannte pace_zones-Schlüssel: {unknown}. "
+            f"Erlaubt: {sorted(_PACE_ZONE_KEYS)}"
+        )
+
+    for key, val in pace_zones.items():
+        if key not in _PACE_ZONE_KEYS:
+            continue  # bereits oben gemeldet
+        if isinstance(val, bool) or not isinstance(val, int):
+            errors.append(
+                f"pace_zones.{key}: muss ein Integer (sec/km) sein, "
+                f"bekommen {type(val).__name__!r}"
+            )
+        elif val <= 0:
+            errors.append(
+                f"pace_zones.{key}: muss > 0 sein, bekommen {val}"
+            )
+
+    return errors
+
+
 @mcp.tool()
 def update_athlete_profile(patch: dict, expected_updated_at: str | None = None) -> dict:
     """
@@ -209,7 +262,21 @@ def update_athlete_profile(patch: dict, expected_updated_at: str | None = None) 
         patch: {"name": str, "age": int, "height_cm": number, "weight_kg": number,
                 "resting_hr": int, "max_hr": int, "lactate_threshold_hr": int,
                 "hr_zone_method": str, "hr_zones": {"z1":{"min":int,"max":int},...,"z5":{...}},
-                "pace_zones": dict|null, "preferred_surfaces": [str], "preferred_sports": [str],
+                "pace_zones": {
+                    Alle Werte in Sekunden pro Kilometer (Integer > 0).
+                    Partielle Updates erlaubt — nur geänderte Schlüssel übergeben.
+                    Erlaubte Schlüssel:
+                      "recovery_sec_km":   int,  -- sehr locker, aktive Erholung
+                      "easy_sec_km":       int,  -- lockerer Ausdauerlauf (Z1/Z2)
+                      "steady_sec_km":     int,  -- aerober Grundlagenbereich
+                      "tempo_sec_km":      int,  -- zügig, komfortabel hart
+                      "threshold_sec_km":  int,  -- Laktatschwelle
+                      "vo2max_sec_km":     int,  -- VO2max-Intervallbereich
+                      "sprint_sec_km":     int,  -- kurze Maximalsprints
+                      "uphill_avg_sec_km": int,  -- nur für interne Distanzschätzung, KEIN Garmin-Target
+                      "downhill_avg_sec_km": int -- nur für interne Distanzschätzung, KEIN Garmin-Target
+                } | null,
+                "preferred_surfaces": [str], "preferred_sports": [str],
                 "training_preferences": dict, "injury_notes": [str], "long_term_goals": [str]}
         expected_updated_at: Optional — ISO-Timestamp aus einem vorherigen
                 get_athlete_profile-Aufruf. Wenn gesetzt und das Profil wurde
@@ -243,6 +310,9 @@ def update_athlete_profile(patch: dict, expected_updated_at: str | None = None) 
         errors.extend(hr_errors)
         if not hr_errors:
             warnings.extend(_hr_zone_gap_warnings(patch["hr_zones"]))
+
+    if patch.get("pace_zones") is not None and isinstance(patch["pace_zones"], dict):
+        errors.extend(_validate_pace_zones(patch["pace_zones"]))
 
     if "resting_hr" in patch and "max_hr" in patch and patch["resting_hr"] and patch["max_hr"]:
         if patch["resting_hr"] >= patch["max_hr"]:
