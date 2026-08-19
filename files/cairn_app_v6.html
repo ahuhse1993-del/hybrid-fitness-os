@@ -113,13 +113,29 @@ small, .text-small { font-size: .8rem; line-height: 1.5; }
 #cairn-week-soft header { flex-shrink: 0; margin-bottom: .5rem; }
 #cairn-week-soft .top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.1rem; }
 #cairn-week-soft .brand-mark { display: block; width: clamp(8.5rem, 26vw, 12rem); height: auto; fill: currentColor; }
-#cairn-week-soft .week-switcher { display: flex; align-items: center; gap: .8rem; margin-bottom: 1rem; padding-bottom: .65rem; border-bottom: 1px solid var(--line); }
+#cairn-week-soft .week-switcher { display: flex; align-items: flex-end; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; padding-bottom: .65rem; border-bottom: 1px solid var(--line); }
 #cairn-week-soft .week-title h1 { margin: 0; letter-spacing: -.05em; font-weight: 500; }
 #cairn-week-soft .week-title p { margin: .1rem 0 0; color: var(--muted-foreground); }
 #cairn-week-soft .week-list { display: grid; gap: .55rem; }
 #cairn-week-soft .week-divider { display: flex; align-items: end; justify-content: space-between; gap: 1rem; margin: 1.4rem 0 .65rem; padding-top: 1rem; border-top: 1px solid var(--line); }
 #cairn-week-soft .week-divider h2 { margin: 0; font-weight: 500; letter-spacing: -.04em; }
 #cairn-week-soft .week-divider p { margin: 0; color: var(--muted-foreground); }
+#cairn-week-soft .week-divider-left { display: flex; flex-direction: column; gap: .15rem; }
+#cairn-week-soft .week-divider-right { display: flex; flex-direction: column; align-items: flex-end; gap: .35rem; flex-shrink: 0; }
+#cairn-week-soft .week-km-stats { display: flex; flex-direction: column; align-items: flex-end; gap: .35rem; flex-shrink: 0; }
+#cairn-week-soft .phase-badge { font-size: .72rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; padding: .2rem .55rem; border-radius: 99px; }
+#cairn-week-soft .phase-badge.phase-base       { background: color-mix(in srgb, var(--green,#29483e) 18%, var(--paper)); color: var(--green,#29483e); }
+#cairn-week-soft .phase-badge.phase-build      { background: color-mix(in srgb, var(--coral,#ff6b61) 16%, var(--paper)); color: var(--coral,#ff6b61); }
+#cairn-week-soft .phase-badge.phase-peak       { background: color-mix(in srgb, var(--coral,#ff6b61) 28%, var(--paper)); color: var(--coral,#ff6b61); }
+#cairn-week-soft .phase-badge.phase-taper      { background: color-mix(in srgb, var(--sand,#f5c97a) 30%, var(--paper)); color: color-mix(in srgb, var(--ink) 70%, var(--sand,#f5c97a)); }
+#cairn-week-soft .phase-badge.phase-deload     { background: color-mix(in srgb, var(--ink,#17201d) 8%, var(--paper)); color: var(--muted-foreground); }
+#cairn-week-soft .phase-badge.phase-race       { background: var(--coral,#ff6b61); color: #fff; }
+#cairn-week-soft .phase-badge.phase-transition { background: color-mix(in srgb, var(--ink,#17201d) 8%, var(--paper)); color: var(--muted-foreground); }
+#cairn-week-soft .week-km-line { font-size: .78rem; color: var(--muted-foreground); white-space: nowrap; }
+#cairn-week-soft .week-km-line strong { color: var(--ink); font-weight: 600; }
+#cairn-week-soft .week-km-bar { display: flex; height: 4px; border-radius: 99px; overflow: hidden; min-width: 60px; max-width: 90px; background: color-mix(in srgb, var(--ink) 8%, transparent); }
+#cairn-week-soft .week-km-bar .bar-run  { background: var(--green,#29483e); }
+#cairn-week-soft .week-km-bar .bar-bike { background: color-mix(in srgb, var(--green,#29483e) 45%, var(--sand,#f5c97a)); }
 #cairn-week-soft .week-card { position: relative; min-height: 88px; display: flex; align-items: center; gap: 0; overflow: hidden; color: var(--ink); }
 #cairn-week-soft .week-card.is-dark { --card: var(--forest); color: var(--forest-ink); }
 #cairn-week-soft .week-card.is-coral { --card: var(--coral); color: var(--coral-ink); }
@@ -562,6 +578,7 @@ small, .text-small { font-size: .8rem; line-height: 1.5; }
           <h1 id="wk-kw">KW —</h1>
           <p id="wk-range">Lade…</p>
         </div>
+        <div id="wk-km-stats" class="week-km-stats" style="display:none"></div>
       </div>
     </header>
     <div id="week-body"><p class="loading-msg">Trainingsplan wird geladen…</p></div>
@@ -876,6 +893,61 @@ async function loadWeek() {
   }
 }
 
+/* ── KW-Stats helpers ─────────────────────────────────────── */
+const PHASE_LABELS = {
+  base:'Base', build:'Build', peak:'Peak',
+  taper:'Taper', deload:'Deload', race:'Race', transition:'Transition'
+};
+
+function isCyclingSess(sess) {
+  return /cycl|bike|rennrad|velo\b/i.test(sess.session_type || '');
+}
+
+function weekKmStats(sessions) {
+  let plannedRun = 0, plannedBike = 0, actualRun = 0, actualBike = 0, phase = '';
+  for (const s of sessions || []) {
+    if (/rest|ruhetag/i.test(s.session_type || '')) continue;
+    if (!phase && s.phase) phase = s.phase.toLowerCase();
+    const p = parseFloat(s.planned_km) || 0;
+    const a = parseFloat(s.actual_km)  || 0;
+    if (isCyclingSess(s)) { plannedBike += p; actualBike += a; }
+    else                  { plannedRun  += p; actualRun  += a; }
+  }
+  const plannedTotal = Math.round((plannedRun + plannedBike / 4) * 10) / 10;
+  const actualTotal  = Math.round((actualRun  + actualBike  / 4) * 10) / 10;
+  return { plannedRun, plannedBike, plannedTotal, actualRun, actualBike, actualTotal, phase };
+}
+
+function renderKmStatsHtml(stats) {
+  const { plannedRun, plannedBike, plannedTotal, actualTotal, phase } = stats;
+  if (!plannedTotal) return '';
+
+  const phaseLabel = phase ? (PHASE_LABELS[phase] || phase) : '';
+  const phaseBadge = phaseLabel
+    ? `<span class="phase-badge phase-${phase}">${phaseLabel}</span>` : '';
+
+  const hasActual = actualTotal > 0;
+  const fmtKmN = n => Number.isInteger(n) ? `${n}` : `${n.toFixed(1)}`;
+
+  // Mini progress bar: run vs bike-equivalent stacked
+  let barHtml = '';
+  if (plannedTotal > 0) {
+    const runPct  = Math.round((plannedRun / plannedTotal) * 100);
+    const bikePct = 100 - runPct;
+    barHtml = `<div class="week-km-bar" title="Lauf ${fmtKmN(plannedRun)} km · Rad-Äquivalent ${fmtKmN(plannedBike / 4)} km">
+      <div class="bar-run"  style="width:${runPct}%"></div>
+      <div class="bar-bike" style="width:${bikePct}%"></div>
+    </div>`;
+  }
+
+  const kmLine = hasActual
+    ? `<span class="week-km-line"><strong>${fmtKmN(actualTotal)} km</strong> / ${fmtKmN(plannedTotal)} km</span>`
+    : `<span class="week-km-line"><strong>${fmtKmN(plannedTotal)} km</strong> geplant</span>`;
+
+  return `${phaseBadge}${kmLine}${barHtml}`;
+}
+/* ── end KW-Stats helpers ─────────────────────────────────── */
+
 function renderWeek(weeks) {
   if (!weeks || weeks.length === 0) {
     document.getElementById('week-body').innerHTML = '<p class="loading-msg">Kein Plan gefunden.</p>';
@@ -886,6 +958,15 @@ function renderWeek(weeks) {
   document.getElementById('wk-kw').textContent = `KW ${currentWeek.kw}`;
   document.getElementById('wk-range').textContent =
     `${currentWeek.monday}–${currentWeek.sunday}${currentWeek.is_current ? ' · diese Woche' : ''}`;
+
+  // KW-Stats for current week header
+  const curStats = weekKmStats(currentWeek.sessions);
+  const curStatsEl = document.getElementById('wk-km-stats');
+  const curStatsHtml = renderKmStatsHtml(curStats);
+  if (curStatsEl && curStatsHtml) {
+    curStatsEl.innerHTML = curStatsHtml;
+    curStatsEl.style.display = '';
+  }
 
   const container = document.getElementById('week-body');
   container.innerHTML = '';
@@ -899,10 +980,17 @@ function renderWeek(weeks) {
 
   sorted.forEach((week, idx) => {
     if (idx > 0) {
+      const stats   = weekKmStats(week.sessions);
+      const statsHtml = renderKmStatsHtml(stats);
       const div = document.createElement('div');
       div.className = 'week-divider';
       div.setAttribute('aria-labelledby', `kw-${week.kw}`);
-      div.innerHTML = `<h2 id="kw-${week.kw}">KW ${week.kw}</h2><p>${week.monday}–${week.sunday}</p>`;
+      div.innerHTML = `
+        <div class="week-divider-left">
+          <h2 id="kw-${week.kw}">KW ${week.kw}</h2>
+          <p>${week.monday}–${week.sunday}</p>
+        </div>
+        ${statsHtml ? `<div class="week-divider-right">${statsHtml}</div>` : ''}`;
       container.appendChild(div);
     }
 
