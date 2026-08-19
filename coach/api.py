@@ -1927,6 +1927,40 @@ def frontend_week_all():
             weeks_dict[monday_today_str]["is_current"] = True
             weeks_dict[monday_today_str]["is_past"] = False
 
+        # Fehlende Tage (DO, SA, etc.) als Rest Day auffüllen
+        for monday_str, week_data in weeks_dict.items():
+            monday_dt = date.fromisoformat(monday_str)
+            existing_dates = {s['date'] for s in week_data['sessions']}
+            for i in range(7):
+                d = monday_dt + timedelta(days=i)
+                d_str = str(d)
+                if d_str not in existing_dates:
+                    week_data['sessions'].append({
+                        "id": None,
+                        "date": d_str,
+                        "day_number": d.day,
+                        "day_short": DAY_SHORT[d.weekday()],
+                        "month_short": MONTH_SHORT[d.month],
+                        "is_today": d == today,
+                        "is_past": d < today,
+                        "session_type": "Rest Day",
+                        "session_zone": "",
+                        "planned_km": None,
+                        "planned_duration_min": None,
+                        "notes": "",
+                        "phase": "",
+                        "status": "rest",
+                        "sync_status": "",
+                        "garmin_workout_id": None,
+                        "steps": [],
+                        "actual_km": None,
+                        "actual_duration_min": None,
+                        "actual_avg_hr": None,
+                        "training_id": None,
+                    })
+            # Neu sortieren nach Datum
+            week_data['sessions'].sort(key=lambda s: s['date'])
+
         # Sortiert nach Datum zurückgeben
         result = [weeks_dict[k] for k in sorted(weeks_dict.keys())]
         return jsonify(result)

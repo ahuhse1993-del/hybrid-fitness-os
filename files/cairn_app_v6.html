@@ -23,7 +23,27 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 .view { display: none; }
-.view.active { display: block; }
+.view.active {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  overflow: hidden;
+}
+/* Shell füllt die View aus und scrollt intern */
+.view .shell {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  width: 100%;
+}
+/* Scrollbarer Inhaltsbereich pro View */
+#week-body, #plan-body, #sync-body, #analysis-body, #acts-body {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
 
 /* ── SHARED COMPONENTS ── */
 .card {
@@ -90,7 +110,9 @@ small, .text-small { font-size: .8rem; line-height: 1.5; }
 }
 #cairn-week-soft * { box-sizing: border-box; }
 #cairn-week-soft .shell { max-width: 820px; margin: 0 auto; }
-#cairn-week-soft header { margin-bottom: .5rem; }
+#cairn-week-soft header { flex-shrink: 0; margin-bottom: .5rem; }
+#cairn-week-soft .top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.1rem; }
+#cairn-week-soft .brand-mark { display: block; width: clamp(8.5rem, 26vw, 12rem); height: auto; fill: currentColor; }
 #cairn-week-soft .week-switcher { display: flex; align-items: center; gap: .8rem; margin-bottom: 1rem; padding-bottom: .65rem; border-bottom: 1px solid var(--line); }
 #cairn-week-soft .week-title h1 { margin: 0; letter-spacing: -.05em; font-weight: 500; }
 #cairn-week-soft .week-title p { margin: .1rem 0 0; color: var(--muted-foreground); }
@@ -129,7 +151,7 @@ small, .text-small { font-size: .8rem; line-height: 1.5; }
 #cairn-week-soft .today { display: inline-block; margin-bottom: .2rem; padding: .15rem .45rem; border-radius: 999px; background: var(--paper); color: var(--ink); }
 #cairn-week-soft .art { flex: 0 0 132px; align-self: stretch; display: grid; place-items: center; padding: .15rem .4rem; background: color-mix(in srgb, var(--paper) 55%, transparent); overflow: hidden; }
 #cairn-week-soft .art img { display: block; width: 100%; height: 76px; object-fit: contain; pointer-events: none; }
-#cairn-week-soft .nav { display: flex; align-items: center; justify-content: space-between; gap: .25rem; margin-top: .8rem; padding: .45rem; border: 1px solid var(--line); border-radius: 999px; background: var(--paper); }
+#cairn-week-soft .nav { display: flex; align-items: center; justify-content: space-between; gap: .25rem; flex-shrink: 0; margin-top: .5rem; padding: .45rem; border: 1px solid var(--line); border-radius: 999px; background: var(--paper); }
 #cairn-week-soft .nav button { flex: 1; }
 #cairn-week-soft .nav .active { background: var(--forest); color: var(--forest-ink); border-radius: 999px; }
 #cairn-week-soft .nav-item { display: inline-flex; align-items: center; gap: .35rem; }
@@ -231,7 +253,7 @@ small, .text-small { font-size: .8rem; line-height: 1.5; }
 #cairn-plan-soft .milestone-status { flex: 0 0 auto; padding-top: .2rem; text-align: right; text-transform: uppercase; letter-spacing: .03em; }
 #cairn-plan-soft .race-finish { margin: .8rem 0 0 17px; padding-top: .8rem; border-top: 1px solid color-mix(in srgb, var(--ink) 35%, transparent); }
 #cairn-plan-soft .race-finish strong { font-weight: 500; }
-#cairn-plan-soft .nav { display: flex; align-items: center; justify-content: space-between; gap: .25rem; margin-top: .8rem; padding: .45rem; border: 1px solid var(--line); border-radius: 999px; background: var(--paper); }
+#cairn-plan-soft .nav { display: flex; align-items: center; justify-content: space-between; gap: .25rem; flex-shrink: 0; margin-top: .5rem; padding: .45rem; border: 1px solid var(--line); border-radius: 999px; background: var(--paper); }
 #cairn-plan-soft .nav button { flex: 1; }
 #cairn-plan-soft .nav .active { background: var(--forest); color: var(--forest-ink); border-radius: 999px; }
 #cairn-plan-soft .nav-item { display: inline-flex; align-items: center; gap: .35rem; }
@@ -301,7 +323,7 @@ small, .text-small { font-size: .8rem; line-height: 1.5; }
 #cairn-sync-soft .change-copy p { margin: 0; }
 #cairn-sync-soft .change-status { margin-top: .25rem !important; text-transform: uppercase; letter-spacing: .03em; }
 #cairn-sync-soft .sync-ok { display: flex; align-items: center; gap: .55rem; margin-top: .7rem; padding-top: .75rem; border-top: 1px solid color-mix(in srgb, var(--ink) 30%, transparent); }
-#cairn-sync-soft .nav { display: flex; align-items: center; justify-content: space-between; gap: .25rem; margin-top: .8rem; padding: .45rem; border: 1px solid var(--line); border-radius: 999px; background: var(--paper); }
+#cairn-sync-soft .nav { display: flex; align-items: center; justify-content: space-between; gap: .25rem; flex-shrink: 0; margin-top: .5rem; padding: .45rem; border: 1px solid var(--line); border-radius: 999px; background: var(--paper); }
 #cairn-sync-soft .nav button { flex: 1; }
 #cairn-sync-soft .nav .active { background: var(--forest); color: var(--forest-ink); border-radius: 999px; }
 #cairn-sync-soft .nav-item { display: inline-flex; align-items: center; gap: .35rem; }
@@ -355,7 +377,7 @@ small, .text-small { font-size: .8rem; line-height: 1.5; }
 #cairn-activities-soft .metric-row span + span::before { content: "·"; margin-right: .45rem; }
 #cairn-activities-soft .activity-meta { margin: .5rem 0 0; text-transform: uppercase; letter-spacing: .03em; }
 #cairn-activities-soft .card-side { flex: 0 0 52px; align-self: stretch; display: flex; align-items: center; justify-content: center; padding: .5rem .25rem; }
-#cairn-activities-soft .nav { display: flex; align-items: center; justify-content: space-between; gap: .25rem; margin-top: .8rem; padding: .45rem; border: 1px solid var(--line); border-radius: 999px; background: var(--paper); }
+#cairn-activities-soft .nav { display: flex; align-items: center; justify-content: space-between; gap: .25rem; flex-shrink: 0; margin-top: .5rem; padding: .45rem; border: 1px solid var(--line); border-radius: 999px; background: var(--paper); }
 #cairn-activities-soft .nav button { flex: 1; }
 #cairn-activities-soft .nav .active { background: var(--forest); color: var(--forest-ink); border-radius: 999px; }
 #cairn-activities-soft .nav-item { display: inline-flex; align-items: center; gap: .35rem; }
@@ -443,7 +465,7 @@ small, .text-small { font-size: .8rem; line-height: 1.5; }
 #cairn-soft .gear-row { display: flex; align-items: end; justify-content: space-between; gap: 1rem; }
 #cairn-soft .gear-row h3, #cairn-soft .gear-row p { margin: .15rem 0; }
 #cairn-soft .gear-control { min-width: min(100%, 290px); }
-#cairn-soft .nav { display: flex; align-items: center; justify-content: space-between; gap: .25rem; margin-top: 1rem; padding: .5rem; border: 1px solid var(--line); border-radius: 999px; background: var(--paper); }
+#cairn-soft .nav { display: flex; align-items: center; justify-content: space-between; gap: .25rem; flex-shrink: 0; margin-top: .5rem; padding: .5rem; border: 1px solid var(--line); border-radius: 999px; background: var(--paper); }
 #cairn-soft .nav button { flex: 1; }
 #cairn-soft .nav .active { background: var(--green); color: var(--green-ink); border-radius: 999px; }
 #cairn-soft .nav-item { display: inline-flex; gap: .35rem; align-items: center; }
@@ -466,6 +488,7 @@ small, .text-small { font-size: .8rem; line-height: 1.5; }
 <div id="cairn-week-soft" class="view active">
   <div class="shell">
     <header>
+      <div class="top" id="week-brand"></div>
       <div class="week-switcher">
         <div class="week-title">
           <h1 id="wk-kw">KW —</h1>
@@ -744,6 +767,10 @@ function apiGet(path) {
    WEEK VIEW
    ============================================================ */
 async function loadWeek() {
+  // Logo einblenden
+  const brandEl = document.getElementById('week-brand');
+  if (brandEl && !brandEl.innerHTML.trim()) brandEl.innerHTML = BRAND_SVG;
+
   try {
     const data = await apiGet('/api/frontend/week/all');
     renderWeek(data);
@@ -851,17 +878,40 @@ function buildWeekCard(sess) {
   return article;
 }
 
+/* Expand Garmin repeat groups into flat step list */
+function flattenSteps(steps) {
+  const flat = [];
+  for (const step of (steps || [])) {
+    const t = (step.type || step.step_type || '').toLowerCase();
+    if (t === 'repeat' || t === 'repeatgroup' || t === 'repeat_group') {
+      const count = step.repeat_count || step.iterations || step.numberOfIterations || 1;
+      const sub = step.steps || step.workoutSteps || step.sub_steps || [];
+      for (let i = 0; i < count; i++) flat.push(...flattenSteps(sub));
+    } else {
+      flat.push(step);
+    }
+  }
+  return flat;
+}
+
 function buildWorkoutProfile(steps, sessionType) {
+  const flat = flattenSteps(steps);
+  if (!flat.length) return '';
   let html = '<div class="workout-profile" role="img" aria-label="Workout-Struktur">';
   const isHill = /hill/i.test(sessionType);
   const type = isHill ? 'hill' : 'interval';
-  steps.forEach(step => {
-    const stepType = (step.type || step.step_type || '').toLowerCase();
-    if (stepType === 'warmup') html += '<span class="phase warmup"><span class="sr-only">Warm-up</span></span>';
-    else if (stepType === 'cooldown') html += '<span class="phase cooldown"><span class="sr-only">Cooldown</span></span>';
-    else if (stepType === 'active' || stepType === 'interval') html += `<span class="phase active ${type}"><span class="sr-only">Aktiv</span></span>`;
-    else if (stepType === 'recovery' || stepType === 'rest') html += `<span class="phase recovery ${type}"><span class="sr-only">Recovery</span></span>`;
-    else html += '<span class="phase active"><span class="sr-only">Schritt</span></span>';
+  flat.forEach(step => {
+    const stepType = (step.type || step.step_type || step.stepType || '').toLowerCase();
+    if (stepType === 'warmup') {
+      html += '<span class="phase warmup"><span class="sr-only">Warm-up</span></span>';
+    } else if (stepType === 'cooldown') {
+      html += '<span class="phase cooldown"><span class="sr-only">Cooldown</span></span>';
+    } else if (stepType === 'active' || stepType === 'interval' || stepType === 'run') {
+      html += `<span class="phase active ${type}"><span class="sr-only">Aktiv</span></span>`;
+    } else if (stepType === 'recovery' || stepType === 'rest' || stepType === 'walk') {
+      html += `<span class="phase recovery ${type}"><span class="sr-only">Recovery</span></span>`;
+    }
+    // Ignore unknown step types (don't render garbage blocks)
   });
   html += '</div>';
   return html;
