@@ -2116,7 +2116,8 @@ def upsert_training_block(plan: dict, confirm_race_date_change: bool = False) ->
                 # Garmin-Batch-Engine (coach/garmin_batch.py) running/cycling immer
                 # korrekt unterscheiden kann, ohne dass jeder Aufrufer sport explizit
                 # mitgeben muss.
-                resolved_sport = s.get("sport_hint") or routing["garmin_sport"]
+                # sport: sport_hint hat Vorrang, sport als Alias, dann garmin_sport
+                resolved_sport = s.get("sport_hint") or s.get("sport") or routing["garmin_sport"]
 
                 # Vor dem Schreiben: bestehenden garmin_workout_id/content_hash
                 # merken, um danach zu erkennen ob eine bereits gepushte Session
@@ -2135,30 +2136,33 @@ def upsert_training_block(plan: dict, confirm_race_date_change: bool = False) ->
                 cur.execute(
                     """INSERT INTO training_plan
                            (external_id, week_date, day_of_week, session_type, session_zone,
-                            distance_km, duration_min, notes, plan_id,
+                            phase, distance_km, duration_min, notes, plan_id,
                             status, source, garmin_push_required, hevy_routine_key,
-                            sport, sync_target, name, target, elevation_gain_m)
-                       VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                            sport, sync_target, name, target, elevation_gain_m, km_factor)
+                       VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                        ON CONFLICT (external_id) DO UPDATE SET
                            week_date=EXCLUDED.week_date, day_of_week=EXCLUDED.day_of_week,
                            session_type=EXCLUDED.session_type, session_zone=EXCLUDED.session_zone,
+                           phase=EXCLUDED.phase,
                            distance_km=EXCLUDED.distance_km, duration_min=EXCLUDED.duration_min,
                            notes=EXCLUDED.notes, plan_id=EXCLUDED.plan_id,
                            source=EXCLUDED.source, garmin_push_required=EXCLUDED.garmin_push_required,
                            hevy_routine_key=EXCLUDED.hevy_routine_key,
                            sport=EXCLUDED.sport, sync_target=EXCLUDED.sync_target,
                            name=EXCLUDED.name, target=EXCLUDED.target,
-                           elevation_gain_m=EXCLUDED.elevation_gain_m, updated_at=now()
+                           elevation_gain_m=EXCLUDED.elevation_gain_m,
+                           km_factor=EXCLUDED.km_factor, updated_at=now()
                        RETURNING id, (xmax = 0) AS inserted""",
                     (
                         s["external_id"], week_date, day_of_week, s["session_type"],
-                        s.get("session_zone"), s.get("distance_km"), s.get("duration_min"),
+                        s.get("session_zone"), s.get("phase"),
+                        s.get("distance_km"), s.get("duration_min"),
                         s.get("notes"), plan_id,
                         s.get("status", "planned"), routing["source"],
                         routing["garmin_push_required"], hevy_routine_key,
                         resolved_sport, routing["sync_target"], s.get("name"),
                         json.dumps(s["target"]) if s.get("target") is not None else None,
-                        s.get("elevation_gain_m"),
+                        s.get("elevation_gain_m"), s.get("km_factor"),
                     ),
                 )
                 row_id, inserted = cur.fetchone()
@@ -2262,10 +2266,17 @@ def upsert_training_block(plan: dict, confirm_race_date_change: bool = False) ->
                         (pw_id, s["external_id"], plan_id),
                     )
 
+        # total_weeks aus tatsächlichen Wochen ableiten und in plans speichern
+        with conn.cursor() as cur:
+            cur.execute(
+                "UPDATE plans SET total_weeks=%s WHERE id=%s",
+                (len(sorted_weeks), plan_id),
+            )
+
         conn.commit()
         logger.info(
-            "upsert_training_block committed: plan_id=%s created=%s updated=%s race_date_changed=%s routing=%s",
-            plan_id, created, updated, race_date_changed, routing_summary,
+            "upsert_training_block committed: plan_id=%s created=%s updated=%s race_date_changed=%s routing=%s total_weeks=%s",
+            plan_id, created, updated, race_date_changed, routing_summary, len(sorted_weeks),
         )
         return {
             "plan_id": plan_id, "created": created, "updated": updated,
@@ -2417,6 +2428,88 @@ def update_planned_workout(session_id: int | None = None, external_id: str | Non
             "sync_status_after": new_sync_status,
             "needs_garmin_push": (garmin_id is not None and new_sync_status == "dirty"),
         }
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+
+@mcp.tool()
+def archive_plan_sessions(plan_id: int) -> dict:
+    """
+    Archiviert alle Sessions eines Plans (setzt status='archived').
+    Verwendet um einen alten Plan zu deaktivieren bevor ein neuer importiert wird.
+    Garmin-Workouts werden NICHT gelöscht — nur CAIRN-Status wird geändert.
+    Gibt zurück: plan_id, archived_count.
+    """
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """UPDATE training_plan SET status='archived', updated_at=now()
+                   WHERE plan_id=%s AND status NOT IN ('completed', 'archived')""",
+                (plan_id,),
+            )
+            archived = cur.rowcount
+        conn.commit()
+        logger.info("archive_plan_sessions: plan_id=%s archived=%s", plan_id, archived)
+        return {"plan_id": plan_id, "archived_count": archived}
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+@mcp.tool()
+def fix_session_phases_from_weeks(plan_id: int | None = None) -> dict:
+    """
+    Korrigiert session.phase für alle Sessions eines Plans anhand von plan_weeks.
+    Nützlich wenn upsert_training_block phase nicht korrekt gespeichert hat.
+
+    Logik: Für jede Woche in plan_weeks → alle training_plan-Einheiten in dieser
+    Woche (week_date = plan_weeks.week_start) erhalten plan_weeks.phase.
+
+    Returns: updated_count, skipped_count (Rest Days werden übersprungen).
+    """
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            if plan_id is None:
+                cur.execute("SELECT id FROM plans WHERE status='active' ORDER BY created_at DESC LIMIT 1")
+                row = cur.fetchone()
+                if not row:
+                    return {"error": "Kein aktiver Plan gefunden."}
+                plan_id = row[0]
+
+            cur.execute(
+                "SELECT week_start, phase FROM plan_weeks WHERE plan_id=%s ORDER BY week_number",
+                (plan_id,),
+            )
+            weeks = cur.fetchall()
+            if not weeks:
+                return {"error": f"plan_id={plan_id} hat keine plan_weeks-Einträge."}
+
+            updated = skipped = 0
+            for week_start, phase in weeks:
+                cur.execute(
+                    """UPDATE training_plan SET phase=%s, updated_at=now()
+                       WHERE plan_id=%s AND week_date=%s
+                         AND session_type NOT IN ('Rest Day')""",
+                    (phase, plan_id, week_start),
+                )
+                updated += cur.rowcount
+                cur.execute(
+                    "SELECT COUNT(*) FROM training_plan WHERE plan_id=%s AND week_date=%s AND session_type='Rest Day'",
+                    (plan_id, week_start),
+                )
+                skipped += cur.fetchone()[0]
+
+        conn.commit()
+        logger.info("fix_session_phases_from_weeks: plan_id=%s updated=%s skipped=%s", plan_id, updated, skipped)
+        return {"plan_id": plan_id, "updated_count": updated, "skipped_count": skipped}
     except Exception:
         conn.rollback()
         raise
