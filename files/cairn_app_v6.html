@@ -192,19 +192,29 @@ small, .text-small { font-size: .8rem; line-height: 1.5; }
 #session-sheet .sheet-section { margin-bottom: .9rem; }
 #session-sheet .sheet-section h3 { font-size: .72rem; text-transform: uppercase; letter-spacing: .05em; opacity: .5; margin: 0 0 .5rem; font-weight: 500; }
 #session-sheet .notes-box { padding: .75rem .9rem; border-radius: .9rem; background: var(--soft, #e9e8e2); line-height: 1.6; white-space: pre-wrap; }
-#session-sheet .step-list { display: grid; gap: .35rem; }
-#session-sheet .step-row { display: grid; grid-template-columns: 28px 1fr auto; align-items: center; gap: .5rem; padding: .55rem .75rem; border-radius: .75rem; }
-#session-sheet .step-row.warmup, #session-sheet .step-row.cooldown { background: color-mix(in srgb, var(--forest, #29483e) 12%, var(--paper)); }
-#session-sheet .step-row.active { background: color-mix(in srgb, var(--forest, #29483e) 22%, var(--paper)); }
-#session-sheet .step-row.recovery { background: color-mix(in srgb, var(--ink, #17201d) 7%, var(--paper)); }
-#session-sheet .step-row.repeat-group { background: color-mix(in srgb, var(--coral, #ff6b61) 10%, var(--paper)); }
-#session-sheet .step-icon { font-size: .9rem; text-align: center; }
-#session-sheet .step-label { font-weight: 500; font-size: .9rem; display: flex; flex-direction: column; gap: .1rem; }
+#session-sheet .step-list { display: grid; gap: .45rem; }
+#session-sheet .step-row { display: grid; grid-template-columns: 2.4rem 1fr auto; align-items: center; gap: .7rem; padding: .8rem 1rem; border-radius: 1rem; }
+#session-sheet .step-row.warmup  { background: color-mix(in srgb, var(--green, #29483e) 14%, var(--paper)); }
+#session-sheet .step-row.cooldown { background: color-mix(in srgb, var(--green, #29483e) 14%, var(--paper)); }
+#session-sheet .step-row.active  { background: color-mix(in srgb, var(--coral, #ff6b61) 16%, var(--paper)); }
+#session-sheet .step-row.recovery { background: color-mix(in srgb, var(--ink, #17201d) 6%, var(--paper)); }
+#session-sheet .step-row.repeat-group { background: transparent; border: 1.5px solid color-mix(in srgb, var(--ink, #17201d) 15%, transparent); padding: .6rem .9rem; }
+#session-sheet .step-icon { width: 2rem; height: 2rem; display: grid; place-items: center; border-radius: .6rem; flex-shrink: 0; }
+#session-sheet .step-row.warmup  .step-icon { background: color-mix(in srgb, var(--green, #29483e) 22%, transparent); color: var(--green, #29483e); }
+#session-sheet .step-row.cooldown .step-icon { background: color-mix(in srgb, var(--green, #29483e) 22%, transparent); color: var(--green, #29483e); }
+#session-sheet .step-row.active  .step-icon { background: color-mix(in srgb, var(--coral, #ff6b61) 22%, transparent); color: var(--coral, #ff6b61); }
+#session-sheet .step-row.recovery .step-icon { background: color-mix(in srgb, var(--ink, #17201d) 10%, transparent); opacity: .7; }
+#session-sheet .step-row.repeat-group .step-icon { opacity: .5; }
+#session-sheet .step-label { font-size: .92rem; display: flex; flex-direction: column; gap: .1rem; min-width: 0; }
 #session-sheet .step-label strong { font-weight: 500; }
-#session-sheet .step-label span { font-size: .78rem; opacity: .6; font-weight: 400; }
-#session-sheet .step-detail { font-size: .8rem; opacity: .6; text-align: right; }
-#session-sheet .repeat-badge { font-size: .72rem; text-transform: uppercase; letter-spacing: .04em; opacity: .6; padding: .1rem .4rem; border-radius: 99px; background: color-mix(in srgb, var(--coral, #ff6b61) 20%, transparent); }
-#session-sheet .step-children { padding-left: 1rem; display: grid; gap: .3rem; margin-top: .3rem; }
+#session-sheet .step-label span { font-size: .76rem; opacity: .6; font-weight: 400; }
+#session-sheet .step-detail { font-size: .8rem; font-weight: 600; padding: .3rem .65rem; border-radius: 99px; white-space: nowrap; letter-spacing: -.01em; }
+#session-sheet .step-row.warmup  .step-detail { background: color-mix(in srgb, var(--green, #29483e) 18%, transparent); color: var(--green, #29483e); }
+#session-sheet .step-row.cooldown .step-detail { background: color-mix(in srgb, var(--green, #29483e) 18%, transparent); color: var(--green, #29483e); }
+#session-sheet .step-row.active  .step-detail { background: color-mix(in srgb, var(--coral, #ff6b61) 20%, transparent); color: var(--coral, #ff6b61); }
+#session-sheet .step-row.recovery .step-detail { background: color-mix(in srgb, var(--ink, #17201d) 10%, transparent); opacity: .8; }
+#session-sheet .repeat-badge { font-size: .75rem; font-weight: 600; letter-spacing: .02em; padding: .2rem .55rem; border-radius: 99px; background: color-mix(in srgb, var(--ink, #17201d) 10%, transparent); }
+#session-sheet .step-children { padding-left: 1.1rem; display: grid; gap: .4rem; margin-top: .4rem; border-left: 2px solid color-mix(in srgb, var(--ink, #17201d) 12%, transparent); padding-top: .1rem; padding-bottom: .1rem; }
 @media (max-width: 390px) {
   #session-sheet .metrics-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
@@ -1631,12 +1641,19 @@ function openSessionSheet(key) {
   const dateStr = d ? d.toLocaleDateString('de-CH', { weekday: 'long', day: 'numeric', month: 'long' }) : '';
   document.getElementById('sheet-subtitle').textContent = dateStr;
 
+  // HM: DB-Wert oder Fallback aus Notizen (z.B. "800 HM" oder "800 hm")
+  let hmVal = sess.elevation_gain_m;
+  if (!hmVal && sess.notes) {
+    const m = sess.notes.match(/(\d{2,4})\s*(?:hm|höhenmeter)/i);
+    if (m) hmVal = parseInt(m[1]);
+  }
+
   // Metrics grid
   const metrics = [
     { label: 'Distanz',    val: fmtKm(sess.planned_km) },
     { label: 'Dauer',      val: fmtMin(sess.planned_duration_min) },
     { label: 'Zone',       val: sess.session_zone || null },
-    { label: 'Höhenmeter', val: sess.elevation_gain_m ? `${sess.elevation_gain_m} HM` : null },
+    { label: 'Höhenmeter', val: hmVal ? `${hmVal} HM` : null },
   ].filter(m => m.val);
 
   document.getElementById('sheet-metrics').innerHTML = metrics.map(m =>
@@ -1677,12 +1694,22 @@ function closeSessionSheet() {
   document.body.style.overflow = '';
 }
 
-/* Format a step's duration field */
+/* Format a step's duration — handles many field name variants */
 function fmtStepDuration(step) {
-  const type = (step.duration_type || step.durationType || '').toLowerCase();
-  const val  = step.duration_value || step.durationValue || 0;
-  if (type === 'lap.button' || type === 'lap_button') return 'bis Knopfdruck';
-  if (type === 'time') {
+  // Try every known field name for duration type
+  const type = (
+    step.duration_type || step.durationType ||
+    step.durationtype || step.type_duration || ''
+  ).toLowerCase().replace(/[\s_]/g, '');
+
+  // Try every known field name for the value
+  const val = step.duration_value ?? step.durationValue ??
+              step.duration_seconds ?? step.durationSeconds ??
+              step.duration ?? step.seconds ?? step.value ?? 0;
+
+  if (type === 'lapbutton' || type === 'lapbtn' || type === 'open') return 'bis Knopfdruck';
+
+  if (type === 'time' || type === 'seconds' || (!type && val > 0 && val < 7200)) {
     if (!val) return '';
     if (val >= 60) {
       const m = Math.floor(val / 60), s = val % 60;
@@ -1690,28 +1717,47 @@ function fmtStepDuration(step) {
     }
     return `${val} sek`;
   }
-  if (type === 'distance') {
+  if (type === 'distance' || type === 'meter' || type === 'km') {
     if (!val) return '';
-    return val >= 1000 ? `${(val / 1000).toFixed(1)} km` : `${val} m`;
+    return val >= 1000 ? `${(val / 1000).toFixed(val % 1000 === 0 ? 0 : 1)} km` : `${val} m`;
   }
-  if (val) return `${val}`;
+  // Fallback: if we have a numeric value, guess it's seconds
+  if (val && typeof val === 'number') {
+    if (val >= 60 && val < 7200) {
+      const m = Math.floor(val / 60), s = val % 60;
+      return s > 0 ? `${m}:${String(s).padStart(2,'0')} min` : `${m} min`;
+    }
+    if (val < 60) return `${val} sek`;
+    if (val >= 7200) return `${(val / 1000).toFixed(1)} km`; // likely meters
+  }
   return '';
 }
 
-/* Format a step's target (pace/HR zone) */
+/* Format a step's target (pace/HR zone) — handles many variants */
 function fmtStepTarget(step) {
-  const tType = (step.target_type || step.targetType || '').toLowerCase();
-  const tLow  = step.target_value_low  || step.targetValueLow;
-  const tHigh = step.target_value_high || step.targetValueHigh;
-  if (!tType || tType === 'no.target' || tType === 'open' || tType === 'no_target') return '';
-  if (tType === 'pace.zone' || tType === 'speed.zone')
+  const tType = (
+    step.target_type || step.targetType ||
+    step.target || step.zone_type || ''
+  ).toLowerCase().replace(/[\s._]/g, '');
+
+  const tLow  = step.target_value_low  ?? step.targetValueLow  ?? step.targetValueOne ?? step.target_low  ?? step.zone;
+  const tHigh = step.target_value_high ?? step.targetValueHigh ?? step.targetValueTwo ?? step.target_high;
+
+  // Description/notes on the step (e.g. "RPE 7-8") as direct fallback
+  const desc = step.description || step.name || '';
+
+  if (!tType || tType === 'notarget' || tType === 'open' || tType === 'none') return '';
+
+  if (tType === 'pacezone' || tType === 'speedzone' || tType === 'pace')
     return tLow ? `Pace Zone ${tLow}${tHigh && tHigh !== tLow ? '–' + tHigh : ''}` : '';
-  if (tType === 'heart.rate.zone')
+  if (tType === 'heartratezone' || tType === 'hrzone')
     return tLow ? `HF Zone ${tLow}${tHigh && tHigh !== tLow ? '–' + tHigh : ''}` : '';
-  if (tType === 'heart.rate' || tType === 'heart_rate')
+  if (tType === 'heartrate' || tType === 'hr')
     return tLow ? `${tLow}${tHigh && tHigh !== tLow ? '–' + tHigh : ''} bpm` : '';
-  if (tType === 'power.zone')
+  if (tType === 'powerzone' || tType === 'power')
     return tLow ? `Power Zone ${tLow}` : '';
+  if (tType === 'rpe' || tType === 'effort')
+    return tLow ? `RPE ${tLow}${tHigh && tHigh !== tLow ? '–' + tHigh : ''}` : desc;
   return '';
 }
 
