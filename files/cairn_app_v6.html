@@ -956,17 +956,17 @@ function renderKmStatsHtml(stats) {
     html += `<span class="phase-badge phase-${phase}">${phaseLabel}</span>`;
   }
 
-  // Km-Vergleich nur anzeigen wenn geplante km vorhanden
+  // Km-Vergleich immer anzeigen wenn geplante km vorhanden
   if (plannedTotal > 0) {
+    html += `<span class="wk-km-plan">${plannedTotal} km geplant</span>`;
     if (hasActual) {
       const delta = Math.round((actualTotal - plannedTotal) * 10) / 10;
       const sign  = delta >= 0 ? '+' : '';
       const cls   = delta >= 0 ? 'km-ok' : 'km-under';
-      html += `<span class="wk-km-plan">${plannedTotal} km geplant</span>`
-            + `<span class="wk-km-actual ${cls}">${actualTotal} km gemacht`
+      html += `<span class="wk-km-actual ${cls}">${actualTotal} km gemacht`
             + ` <span class="km-delta">(${sign}${delta})</span></span>`;
     } else {
-      html += `<span class="wk-km-plan">${plannedTotal} km geplant</span>`;
+      html += `<span class="wk-km-actual" style="opacity:.45">0 km gemacht</span>`;
     }
   }
 
