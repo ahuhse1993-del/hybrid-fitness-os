@@ -1616,8 +1616,8 @@ def cron_health_sync():
 # ─── FRONTEND V5 ROUTES ───────────────────────────────────────────────────────
 
 @app.route('/app')
-def cairn_app_v5():
-    return send_file(os.path.join(os.path.dirname(__file__), '..', 'files', 'cairn_app_v5.html'))
+def cairn_app():
+    return send_file(os.path.join(os.path.dirname(__file__), '..', 'files', 'cairn_app_v6.html'))
 
 @app.route('/static/assets/cairn/<path:filename>')
 def cairn_assets(filename):
@@ -1764,6 +1764,172 @@ def frontend_week():
             "range": {"start": str(monday_this), "end": str(sunday_next)},
             "sessions": sessions,
         })
+
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e), "trace": traceback.format_exc()}), 500
+
+
+# ─── FRONTEND API: Alle Wochen (für Week-View) ────────────────────────────────
+
+@app.route('/api/frontend/week/all')
+def frontend_week_all():
+    """
+    Alle Plan-Wochen für den Week-View der App.
+    Gibt ALLE Kalenderwochen des aktiven Plans zurück, groupiert nach Montag–Sonntag.
+    Jede Woche enthält sessions[] mit einer Karte pro Trainingstag.
+    """
+    try:
+        today = get_today()
+        conn = get_db()
+        cur = conn.cursor()
+
+        # Aktiven Plan laden (für current_week)
+        cur.execute("""
+            SELECT id, current_week, total_weeks
+            FROM plans WHERE status = 'active' ORDER BY created_at DESC LIMIT 1
+        """)
+        plan_row = cur.fetchone()
+        current_week_num = plan_row[1] if plan_row else 1
+
+        # Alle Sessions aus training_plan
+        cur.execute("""
+            SELECT id,
+                   (week_date + (day_of_week - 1) * INTERVAL '1 day')::date AS session_date,
+                   week_date,
+                   session_type, session_zone, distance_km, duration_min,
+                   notes, phase, garmin_workout_id, workout_steps,
+                   sync_status
+            FROM training_plan
+            ORDER BY week_date, day_of_week
+        """)
+        plan_rows = cur.fetchall()
+
+        if not plan_rows:
+            conn.close()
+            return jsonify([])
+
+        # Datumsbereich für Aktivitäten + Garmin-Logs
+        all_dates = [r[1] for r in plan_rows]
+        date_min, date_max = min(all_dates), max(all_dates)
+
+        # Absolvierte Trainings
+        cur.execute("""
+            SELECT date, type, distance_km, duration_minutes, heart_rate_avg, id
+            FROM trainings
+            WHERE date >= %s AND date <= %s
+        """, (date_min, date_max))
+        actual_by_date = {}
+        for r in cur.fetchall():
+            d = str(r[0])
+            actual_by_date.setdefault(d, []).append({
+                "type": r[1], "distance_km": float(r[2]) if r[2] else 0,
+                "duration_min": r[3], "avg_hr": r[4], "training_id": r[5],
+            })
+
+        # Garmin-Push-Status
+        cur.execute("""
+            SELECT workout_name, scheduled_date, garmin_workout_id, garmin_schedule_id,
+                   status, action, updated_at
+            FROM garmin_mcp_log
+            WHERE scheduled_date >= %s AND scheduled_date <= %s
+            ORDER BY updated_at DESC
+        """, (date_min, date_max))
+        garmin_by_date = {}
+        for r in cur.fetchall():
+            d = str(r[1]) if r[1] else None
+            if d and d not in garmin_by_date:
+                garmin_by_date[d] = {
+                    "garmin_workout_id": r[2], "garmin_schedule_id": r[3],
+                    "status": r[4], "action": r[5],
+                }
+
+        conn.close()
+
+        DAY_SHORT  = ['MO', 'DI', 'MI', 'DO', 'FR', 'SA', 'SO']
+        MONTH_SHORT = ['', 'JAN', 'FEB', 'MÄR', 'APR', 'MAI', 'JUN',
+                       'JUL', 'AUG', 'SEP', 'OKT', 'NOV', 'DEZ']
+
+        # Sessions aufbauen und nach Montag (week_date) gruppieren
+        weeks_dict = {}  # monday_str -> {meta, sessions[]}
+        for r in plan_rows:
+            session_date = r[1]
+            monday = r[2]          # week_date Montag
+            monday_str = str(monday)
+            d_str = str(session_date)
+
+            session_type  = r[3] or 'Rest Day'
+            garmin_info   = garmin_by_date.get(d_str, {})
+            actual        = actual_by_date.get(d_str, [{}])[0]
+            sync_status   = r[11] or ''
+
+            # Status ableiten
+            if actual.get("training_id"):
+                status = "completed"
+            elif garmin_info.get("status") == "failed":
+                status = "error"
+            elif garmin_info.get("status") == "pending":
+                status = "pending"
+            elif garmin_info.get("garmin_workout_id") or r[9]:
+                status = "pushed"
+            else:
+                status = "planned"
+
+            # Workout-Steps
+            steps = []
+            if r[10]:
+                try:
+                    steps = r[10] if isinstance(r[10], list) else json.loads(r[10])
+                except Exception:
+                    steps = []
+
+            session_obj = {
+                "id": r[0],
+                "date": d_str,
+                "day_number": session_date.day,
+                "day_short": DAY_SHORT[session_date.weekday()],
+                "month_short": MONTH_SHORT[session_date.month],
+                "is_today": session_date == today,
+                "is_past": session_date < today,
+                "session_type": session_type,
+                "session_zone": r[4] or "",
+                "planned_km": float(r[5]) if r[5] else None,
+                "planned_duration_min": r[6],
+                "notes": r[7] or "",
+                "phase": r[8] or "base",
+                "status": status,
+                "sync_status": sync_status,
+                "garmin_workout_id": garmin_info.get("garmin_workout_id") or r[9],
+                "steps": steps,
+                "actual_km": actual.get("distance_km"),
+                "actual_duration_min": actual.get("duration_min"),
+                "actual_avg_hr": actual.get("avg_hr"),
+                "training_id": actual.get("training_id"),
+            }
+
+            if monday_str not in weeks_dict:
+                sunday = monday + timedelta(days=6)
+                import calendar
+                kw = monday.isocalendar()[1]
+                weeks_dict[monday_str] = {
+                    "monday": monday.strftime("%d.%m.%Y"),
+                    "sunday": sunday.strftime("%d.%m.%Y"),
+                    "kw": kw,
+                    "is_current": False,
+                    "is_past": sunday < today,
+                    "sessions": [],
+                }
+            weeks_dict[monday_str]["sessions"].append(session_obj)
+
+        # is_current markieren: Woche, in der today liegt
+        monday_today = today - timedelta(days=today.weekday())
+        monday_today_str = str(monday_today)
+        if monday_today_str in weeks_dict:
+            weeks_dict[monday_today_str]["is_current"] = True
+            weeks_dict[monday_today_str]["is_past"] = False
+
+        # Sortiert nach Datum zurückgeben
+        result = [weeks_dict[k] for k in sorted(weeks_dict.keys())]
+        return jsonify(result)
 
     except Exception as e:
         return jsonify({"status": "error", "message": str(e), "trace": traceback.format_exc()}), 500
