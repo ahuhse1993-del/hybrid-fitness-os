@@ -101,6 +101,59 @@ def _backfill_missing_details(cur, client, training_id: int, garmin_id: str, act
     return added
 
 
+def _link_training_plan(cur, garmin_id: str, garmin_activity_id: int,
+                         distance_km: float | None) -> bool:
+    """
+    Matcht eine abgeschlossene Garmin-Aktivität mit einer geplanten Session in
+    training_plan, sofern garmin_workout_id übereinstimmt (= Workout wurde direkt
+    von der Uhr gestartet). Schreibt actual_distance_km + linked_garmin_activity_id.
+
+    Wird nur ausgeführt wenn linked_garmin_activity_id noch nicht gesetzt ist
+    (verhindert Überschreiben einer manuellen Backdoor-Verknüpfung).
+
+    Returns True wenn ein Match gefunden und geschrieben wurde.
+    """
+    if not garmin_id or distance_km is None:
+        return False
+
+    # Suche training_plan-Eintrag via garmin_workout_id
+    # garmin_workout_id ist die ID des auf Garmin gepushten Workout-Plans,
+    # die beim Watch-Start automatisch in der Aktivität verlinkt wird.
+    cur.execute(
+        """SELECT id, linked_garmin_activity_id
+           FROM training_plan
+           WHERE garmin_workout_id = %s
+           LIMIT 1""",
+        (garmin_id,),
+    )
+    row = cur.fetchone()
+    if not row:
+        return False
+
+    session_id, already_linked = row
+    if already_linked is not None:
+        # Bereits manuell gelinkt (Backdoor) — nicht überschreiben
+        logger.debug(
+            "training_plan id=%s bereits verknüpft mit activity=%s — Skip auto-link",
+            session_id, already_linked,
+        )
+        return False
+
+    cur.execute(
+        """UPDATE training_plan
+           SET actual_distance_km = %s,
+               linked_garmin_activity_id = %s,
+               updated_at = now()
+           WHERE id = %s""",
+        (distance_km, garmin_activity_id, session_id),
+    )
+    logger.info(
+        "Auto-Link: training_plan id=%s ← garmin_activity_id=%s actual_km=%.2f",
+        session_id, garmin_activity_id, distance_km,
+    )
+    return True
+
+
 def _garmin_sync(conn) -> dict:
     """Holt neue Garmin-Aktivitäten der letzten GARMIN_LOOKBACK_HOURS Stunden."""
     from coach.garmin_push import garmin_client  # Token-Cache aus garmin_session_cache
@@ -171,6 +224,22 @@ def _garmin_sync(conn) -> dict:
                 garmin_id,
             ))
             training_id = cur.fetchone()[0]
+
+            # Auto-Link: training_plan via garmin_workout_id matchen
+            # Die Garmin-Aktivität enthält die parentId / workoutId des geplanten
+            # Workouts wenn der Athlete ihn direkt von der Uhr gestartet hat.
+            # Garmin API gibt workoutId im Activity-Dict zurekt.
+            workout_id_raw = a.get("workoutId") or a.get("parentId")
+            if workout_id_raw:
+                linked = _link_training_plan(
+                    cur,
+                    str(workout_id_raw),
+                    int(garmin_id),
+                    distance_km if distance_km and distance_km > 0 else None,
+                )
+                if linked:
+                    logger.info("Auto-Link OK: training_plan via workoutId=%s", workout_id_raw)
+
             conn.commit()
             imported += 1
             logger.info("Importiert: %s | %s | %s → ID %s", date_str, activity_type, name, training_id)

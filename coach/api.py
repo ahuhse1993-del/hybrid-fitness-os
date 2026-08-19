@@ -1798,7 +1798,8 @@ def frontend_week_all():
                    week_date,
                    session_type, session_zone, distance_km, duration_min,
                    notes, phase, garmin_workout_id, workout_steps,
-                   sync_status, elevation_gain_m, sport
+                   sync_status, elevation_gain_m, sport,
+                   km_factor, actual_distance_km, linked_garmin_activity_id
             FROM training_plan
             ORDER BY week_date, day_of_week
         """)
@@ -1906,6 +1907,10 @@ def frontend_week_all():
                 "steps": steps,
                 "elevation_gain_m": int(r[12]) if r[12] else None,
                 "sport": r[13] or None,
+                "km_factor": float(r[14]) if r[14] else None,
+                "actual_distance_km": float(r[15]) if r[15] else None,
+                "linked_garmin_activity_id": r[16],
+                # actual_km aus trainings (Roh-Garmin-Daten, kein Faktor)
                 "actual_km": actual.get("distance_km"),
                 "actual_duration_min": actual.get("duration_min"),
                 "actual_avg_hr": actual.get("avg_hr"),

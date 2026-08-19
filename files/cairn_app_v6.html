@@ -131,6 +131,13 @@ small, .text-small { font-size: .8rem; line-height: 1.5; }
 #cairn-week-soft .phase-badge.phase-deload     { background: color-mix(in srgb, var(--ink,#17201d) 8%, var(--paper)); color: var(--muted-foreground); }
 #cairn-week-soft .phase-badge.phase-race       { background: var(--coral,#ff6b61); color: #fff; }
 #cairn-week-soft .phase-badge.phase-transition { background: color-mix(in srgb, var(--ink,#17201d) 8%, var(--paper)); color: var(--muted-foreground); }
+/* KW km-plan / km-actual labels */
+#cairn-week-soft .wk-km-plan  { font-size: .72rem; color: var(--muted-foreground); white-space: nowrap; }
+#cairn-week-soft .wk-km-actual{ font-size: .72rem; font-weight: 600; white-space: nowrap; }
+#cairn-week-soft .wk-km-actual.km-ok    { color: var(--green,#29483e); }
+#cairn-week-soft .wk-km-actual.km-under { color: var(--coral,#ff6b61); }
+#cairn-week-soft .km-delta { font-size: .68rem; font-weight: 400; opacity: .8; }
+/* legacy (unused but kept for compat) */
 #cairn-week-soft .week-km-line { font-size: .78rem; color: var(--muted-foreground); white-space: nowrap; }
 #cairn-week-soft .week-km-line strong { color: var(--ink); font-weight: 600; }
 #cairn-week-soft .week-km-bar { display: flex; height: 4px; border-radius: 99px; overflow: hidden; min-width: 60px; max-width: 90px; background: color-mix(in srgb, var(--ink) 8%, transparent); }
@@ -907,47 +914,62 @@ function isCyclingSess(sess) {
 }
 
 function weekKmStats(sessions) {
-  let plannedRun = 0, plannedBike = 0, actualRun = 0, actualBike = 0, phase = '';
+  // plannedTotal: Summe der geplanten km als Laufäquivalent.
+  //   planned_km ist bereits Laufäquivalent (ChatGPT hat km_factor angewendet).
+  // actualTotal: Summe der tatsächlichen km als Laufäquivalent.
+  //   actual_distance_km (raw) × km_factor → Laufäquivalent.
+  //   Fallback auf actual_km (aus trainings) wenn actual_distance_km fehlt —
+  //   für Laufsessions (km_factor = null) sind beide identisch.
+  let plannedTotal = 0, actualTotal = 0, phase = '';
+  let hasActual = false;
+
   for (const s of sessions || []) {
     if (/rest|ruhetag/i.test(s.session_type || '')) continue;
     if (!phase && s.phase) phase = s.phase.toLowerCase();
-    const p = parseFloat(s.planned_km) || 0;
-    const a = parseFloat(s.actual_km)  || 0;
-    if (isCyclingSess(s)) { plannedBike += p; actualBike += a; }
-    else                  { plannedRun  += p; actualRun  += a; }
+
+    // Geplant: planned_km ist bereits normalisiert (Laufäquivalent)
+    plannedTotal += parseFloat(s.planned_km) || 0;
+
+    // Tatsächlich: bevorzuge actual_distance_km × km_factor aus training_plan
+    const rawActual = s.actual_distance_km != null
+      ? parseFloat(s.actual_distance_km)
+      : (parseFloat(s.actual_km) || 0);
+    const factor = s.km_factor != null ? parseFloat(s.km_factor) : 1.0;
+    if (rawActual > 0) {
+      actualTotal += rawActual * factor;
+      hasActual = true;
+    }
   }
-  const plannedTotal = Math.round((plannedRun + plannedBike / 4) * 10) / 10;
-  const actualTotal  = Math.round((actualRun  + actualBike  / 4) * 10) / 10;
-  return { plannedRun, plannedBike, plannedTotal, actualRun, actualBike, actualTotal, phase };
+
+  plannedTotal = Math.round(plannedTotal * 10) / 10;
+  actualTotal  = Math.round(actualTotal  * 10) / 10;
+  return { plannedTotal, actualTotal, hasActual, phase };
 }
 
 function renderKmStatsHtml(stats) {
-  const { plannedRun, plannedBike, plannedTotal, actualTotal, phase } = stats;
-  if (!plannedTotal) return '';
-
+  const { phase, plannedTotal, actualTotal, hasActual } = stats;
   const phaseLabel = phase ? (PHASE_LABELS[phase] || phase) : '';
-  const phaseBadge = phaseLabel
-    ? `<span class="phase-badge phase-${phase}">${phaseLabel}</span>` : '';
 
-  const hasActual = actualTotal > 0;
-  const fmtKmN = n => Number.isInteger(n) ? `${n}` : `${n.toFixed(1)}`;
-
-  // Mini progress bar: run vs bike-equivalent stacked
-  let barHtml = '';
-  if (plannedTotal > 0) {
-    const runPct  = Math.round((plannedRun / plannedTotal) * 100);
-    const bikePct = 100 - runPct;
-    barHtml = `<div class="week-km-bar" title="Lauf ${fmtKmN(plannedRun)} km · Rad-Äquivalent ${fmtKmN(plannedBike / 4)} km">
-      <div class="bar-run"  style="width:${runPct}%"></div>
-      <div class="bar-bike" style="width:${bikePct}%"></div>
-    </div>`;
+  let html = '';
+  if (phaseLabel) {
+    html += `<span class="phase-badge phase-${phase}">${phaseLabel}</span>`;
   }
 
-  const kmLine = hasActual
-    ? `<span class="week-km-line"><strong>${fmtKmN(actualTotal)} km</strong> / ${fmtKmN(plannedTotal)} km</span>`
-    : `<span class="week-km-line"><strong>${fmtKmN(plannedTotal)} km</strong> geplant</span>`;
+  // Km-Vergleich nur anzeigen wenn geplante km vorhanden
+  if (plannedTotal > 0) {
+    if (hasActual) {
+      const delta = Math.round((actualTotal - plannedTotal) * 10) / 10;
+      const sign  = delta >= 0 ? '+' : '';
+      const cls   = delta >= 0 ? 'km-ok' : 'km-under';
+      html += `<span class="wk-km-plan">${plannedTotal} km geplant</span>`
+            + `<span class="wk-km-actual ${cls}">${actualTotal} km gemacht`
+            + ` <span class="km-delta">(${sign}${delta})</span></span>`;
+    } else {
+      html += `<span class="wk-km-plan">${plannedTotal} km geplant</span>`;
+    }
+  }
 
-  return `${phaseBadge}${kmLine}${barHtml}`;
+  return html;
 }
 /* ── end KW-Stats helpers ─────────────────────────────────── */
 

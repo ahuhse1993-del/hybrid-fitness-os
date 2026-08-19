@@ -1663,6 +1663,7 @@ def upsert_planned_workout(
     source: str | None = None,
     sync_target: str | None = None,
     elevation_gain_m: int | None = None,
+    km_factor: float | None = None,
 ) -> dict:
     """
     Save a single planned session in CAIRN. Idempotent via external_id
@@ -1690,10 +1691,23 @@ def upsert_planned_workout(
                       metadata — never sent to Garmin (garmin_push.py has no
                       concept of this field and workout_def is built explicitly
                       key-by-key, so it can never leak into a Garmin push).
+        km_factor:    Optional conversion factor for Cross-sessions (e.g. 0.25
+                      for Rennrad: 80 km ride → 20 km running-equivalent).
+                      NULL / omitted = no conversion (running, trail, hiking).
+                      Stored for later use when actual_distance_km comes back
+                      from Garmin, so running-equivalent can be computed as:
+                      actual_distance_km * km_factor.
+                      distance_km should already be in running-equivalent units
+                      when km_factor is set (i.e. ChatGPT applies the formula
+                      before calling this tool).
 
     Returns: training_plan id, sync_target (the actually applied value,
     post-validation), garmin_sport, created (bool).
     """
+    if km_factor is not None:
+        if not isinstance(km_factor, (int, float)) or km_factor <= 0 or km_factor > 1:
+            return {"error": "km_factor muss eine Zahl zwischen 0 (exkl.) und 1 (inkl.) sein, z.B. 0.25"}
+        km_factor = float(km_factor)
     if not external_id or not date or not session_type:
         return {"error": "external_id, date und session_type sind erforderlich."}
     try:
@@ -1732,7 +1746,7 @@ def upsert_planned_workout(
                 "external_id", "week_date", "day_of_week", "session_type", "sport",
                 "name", "distance_km", "duration_min", "notes", "workout_steps",
                 "target", "source", "garmin_push_required", "sync_target",
-                "elevation_gain_m",
+                "elevation_gain_m", "km_factor",
             ]
             values = [
                 external_id, week_date, day_of_week, session_type, sport,
@@ -1740,7 +1754,7 @@ def upsert_planned_workout(
                 json.dumps(structure) if structure is not None else None,
                 json.dumps(target) if target is not None else None,
                 resolved_source, routing["garmin_push_required"], routing["sync_target"],
-                elevation_gain_m,
+                elevation_gain_m, km_factor,
             ]
             if plan_id is not None:
                 columns.append("plan_id")
@@ -1788,6 +1802,90 @@ def upsert_planned_workout(
         return {
             "id": row_id, "created": bool(inserted),
             "sync_target": routing["sync_target"], "garmin_sport": routing["garmin_sport"],
+        }
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+@mcp.tool()
+def link_activity_to_session(
+    session_id: int,
+    garmin_activity_id: int,
+    actual_distance_km: float | None = None,
+) -> dict:
+    """
+    Backdoor: Manually link a completed Garmin activity to a planned session.
+
+    Use this when the athlete did NOT start the workout directly from the watch
+    (so there is no automatic garmin_workout_id match). ChatGPT calls this after
+    the user says "today's run was the planned interval session from Tuesday".
+
+    The sync job automatically matches via garmin_workout_id (watch-started
+    workouts). This tool is only needed for the fallback case.
+
+    Args:
+        session_id:           training_plan.id of the planned session.
+        garmin_activity_id:   Garmin activity ID of the completed workout
+                              (visible in Garmin Connect, returned by
+                              get_recent_activities as "activity_id").
+        actual_distance_km:   Actual distance in raw km (no factor applied).
+                              If omitted, the value is read from the trainings
+                              table if a matching garmin_id exists there.
+
+    Returns: session_id, garmin_activity_id, actual_distance_km written,
+             km_factor on the session, running_equivalent_km (if factor set).
+    """
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            # Hole Session inkl. km_factor
+            cur.execute(
+                "SELECT id, km_factor, actual_distance_km FROM training_plan WHERE id = %s",
+                (session_id,),
+            )
+            row = cur.fetchone()
+            if not row:
+                return {"error": f"Session {session_id} nicht gefunden."}
+            _, km_factor, existing_actual = row
+
+            # Falls actual_distance_km nicht angegeben, aus trainings lesen
+            dist_to_write = actual_distance_km
+            if dist_to_write is None:
+                cur.execute(
+                    "SELECT distance_km FROM trainings WHERE garmin_id = %s",
+                    (str(garmin_activity_id),),
+                )
+                t_row = cur.fetchone()
+                if t_row and t_row[0]:
+                    dist_to_write = float(t_row[0])
+
+            cur.execute(
+                """UPDATE training_plan
+                   SET linked_garmin_activity_id = %s,
+                       actual_distance_km = %s,
+                       updated_at = now()
+                   WHERE id = %s""",
+                (garmin_activity_id, dist_to_write, session_id),
+            )
+        conn.commit()
+
+        running_equiv = None
+        if dist_to_write is not None and km_factor is not None:
+            running_equiv = round(float(dist_to_write) * float(km_factor), 2)
+
+        logger.info(
+            "link_activity_to_session: session=%s activity=%s actual_km=%s equiv=%s",
+            session_id, garmin_activity_id, dist_to_write, running_equiv,
+        )
+        return {
+            "session_id": session_id,
+            "garmin_activity_id": garmin_activity_id,
+            "actual_distance_km": dist_to_write,
+            "km_factor": float(km_factor) if km_factor is not None else None,
+            "running_equivalent_km": running_equiv,
         }
     except Exception:
         conn.rollback()
