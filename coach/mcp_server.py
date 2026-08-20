@@ -2543,7 +2543,7 @@ def purge_all_sessions(confirm: bool = False) -> dict:
             cur.execute("DELETE FROM plan_weeks")
             deleted_plan_weeks = cur.rowcount
 
-            cur.execute("UPDATE plans SET status='archived', updated_at=now() WHERE status='active'")
+            cur.execute("UPDATE plans SET status='archived' WHERE status='active'")
             archived_plans = cur.rowcount
 
         conn.commit()
