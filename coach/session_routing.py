@@ -40,10 +40,20 @@ GARMIN_BLOCKED_TYPES = NEVER_GARMIN_TYPES
 # Schreibweisen muessen als Garmin-Push-faehig gelten, sonst faellt der
 # eigentliche Renntag auf cairn_only und wird nie automatisch gepusht.
 GARMIN_RUNNING_TYPES = frozenset({
+    # Basis-Typen
     "Easy Run", "Trail Run", "Recovery Run", "Long Run",
     "Tempo Session", "Interval Session", "Sprint Session", "Hill Session",
     "Race Day", "Race",
+    # Erweiterte Typen (ChatGPT-kompatibel)
+    "Interval Run", "Interval Training",
+    "Threshold Run", "Trail Threshold", "Uphill Threshold",
+    "Hill Technique", "Hill Run",
+    "Race Activation", "Activation Run",
+    "Fartlek", "Strides",
 })
+
+# Explizite Rad-Typen (garmin_sport=cycling)
+GARMIN_CYCLING_TYPES = frozenset({"Cycling", "Bike", "Road Bike", "MTB", "E-Bike"})
 
 # 'Cross Training' selbst ist NICHT automatisch Rad — siehe Docstring oben.
 GARMIN_ELIGIBLE_CROSS_TYPES = frozenset({"Cross Training"})
@@ -81,6 +91,12 @@ def classify_for_push(session_type: str, sport_hint: str | None = None) -> dict:
                 if is_strength else
                 f"{session_type!r} wird nie an Garmin gesendet (Mobility/Core/Rest Day)."
             ),
+        }
+
+    if session_type in GARMIN_CYCLING_TYPES:
+        return {
+            "sync_target": "garmin", "garmin_sport": "cycling", "garmin_push_required": True,
+            "source": None, "reason": f"{session_type!r} ist eine Radeinheit — Garmin-Push (cycling).",
         }
 
     if session_type in GARMIN_RUNNING_TYPES:

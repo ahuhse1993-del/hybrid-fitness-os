@@ -2133,13 +2133,18 @@ def upsert_training_block(plan: dict, confirm_race_date_change: bool = False) ->
                 # überschrieben — ein erneutes upsert_training_block darf einen bereits
                 # von sync_hevy_completions auf 'completed' gesetzten Status nicht
                 # stillschweigend auf 'planned' zurücksetzen.
+                # workout_steps: akzeptiert "workout_steps" oder "structure" als Schlüssel
+                raw_steps = s.get("workout_steps") or s.get("structure")
+                steps_json = json.dumps(raw_steps) if raw_steps is not None else None
+
                 cur.execute(
                     """INSERT INTO training_plan
                            (external_id, week_date, day_of_week, session_type, session_zone,
                             phase, distance_km, duration_min, notes, plan_id,
                             status, source, garmin_push_required, hevy_routine_key,
-                            sport, sync_target, name, target, elevation_gain_m, km_factor)
-                       VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                            sport, sync_target, name, target, elevation_gain_m, km_factor,
+                            workout_steps)
+                       VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                        ON CONFLICT (external_id) DO UPDATE SET
                            week_date=EXCLUDED.week_date, day_of_week=EXCLUDED.day_of_week,
                            session_type=EXCLUDED.session_type, session_zone=EXCLUDED.session_zone,
@@ -2151,7 +2156,9 @@ def upsert_training_block(plan: dict, confirm_race_date_change: bool = False) ->
                            sport=EXCLUDED.sport, sync_target=EXCLUDED.sync_target,
                            name=EXCLUDED.name, target=EXCLUDED.target,
                            elevation_gain_m=EXCLUDED.elevation_gain_m,
-                           km_factor=EXCLUDED.km_factor, updated_at=now()
+                           km_factor=EXCLUDED.km_factor,
+                           workout_steps=EXCLUDED.workout_steps,
+                           updated_at=now()
                        RETURNING id, (xmax = 0) AS inserted""",
                     (
                         s["external_id"], week_date, day_of_week, s["session_type"],
@@ -2163,6 +2170,7 @@ def upsert_training_block(plan: dict, confirm_race_date_change: bool = False) ->
                         resolved_sport, routing["sync_target"], s.get("name"),
                         json.dumps(s["target"]) if s.get("target") is not None else None,
                         s.get("elevation_gain_m"), s.get("km_factor"),
+                        steps_json,
                     ),
                 )
                 row_id, inserted = cur.fetchone()
