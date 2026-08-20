@@ -2016,8 +2016,20 @@ def frontend_plan():
 
         # plan_weeks (kanonisch)
         cur.execute("""
-            SELECT week_number, week_start, phase, is_deload, is_peak, target_run_km, week_focus
-            FROM plan_weeks WHERE plan_id = %s ORDER BY week_number
+            SELECT pw.week_number, pw.week_start, pw.phase, pw.is_deload, pw.is_peak,
+                   COALESCE(
+                       NULLIF(pw.target_run_km, 0),
+                       (SELECT ROUND(COALESCE(SUM(tp.distance_km * COALESCE(tp.km_factor, 1)), 0)::numeric, 1)
+                        FROM training_plan tp
+                        WHERE tp.plan_id = pw.plan_id
+                          AND tp.week_date = pw.week_start
+                          AND tp.session_type NOT IN ('Rest Day','Strength Training','Core','Mobility')
+                          AND tp.status != 'archived')
+                   ) AS km,
+                   pw.week_focus
+            FROM plan_weeks pw
+            WHERE pw.plan_id = %s
+            ORDER BY pw.week_number
         """, (plan_id,))
         pw_rows = cur.fetchall()
 

@@ -310,18 +310,18 @@ small, .text-small { font-size: .8rem; line-height: 1.5; }
 #cairn-plan-soft .phase-tabs { display: flex; align-items: center; justify-content: space-between; gap: .25rem; margin-bottom: 1rem; }
 #cairn-plan-soft .phase-tabs span { flex: 1; padding: .38rem .15rem; text-align: center; border-radius: 999px; }
 #cairn-plan-soft .phase-tabs .active { background: var(--forest); color: var(--forest-ink); }
-#cairn-plan-soft .load-block { margin: 1rem 0 .35rem; padding: .85rem 0 .75rem; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+#cairn-plan-soft .load-block { margin: 1rem 0 .35rem; padding: .85rem 0 1.8rem; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); overflow: visible; }
 #cairn-plan-soft .load-head { display: flex; align-items: end; justify-content: space-between; gap: 1rem; margin-bottom: .65rem; }
 #cairn-plan-soft .load-head h3, #cairn-plan-soft .load-head p { margin: 0; }
 #cairn-plan-soft .load-head h3 { font-weight: 500; letter-spacing: -.025em; }
-#cairn-plan-soft .load-chart { display: grid; grid-template-columns: repeat(16,minmax(0,1fr)); align-items: end; gap: 5px; height: 155px; padding-top: 1.4rem; box-sizing: border-box; }
+#cairn-plan-soft .load-chart { display: grid; grid-template-columns: repeat(16,minmax(0,1fr)); align-items: end; gap: 5px; height: 155px; overflow: visible; }
 #cairn-plan-soft .load-week { display: grid; grid-template-rows: 1fr auto; align-items: end; gap: .3rem; height: 100%; min-width: 0; }
 #cairn-plan-soft .load-bar { position: relative; align-self: end; display: block; width: 100%; height: var(--h); min-height: 10px; border-radius: 4px 4px 0 0; background: color-mix(in srgb, var(--forest) 44%, var(--paper)); }
 #cairn-plan-soft .load-week.done .load-bar { background: var(--forest); opacity: .72; }
 #cairn-plan-soft .load-week.current .load-bar { background: var(--coral); opacity: 1; }
 #cairn-plan-soft .load-week.peak .load-bar { background: var(--forest); opacity: 1; }
     #cairn-plan-soft .load-week.deload .load-bar { background: color-mix(in srgb, var(--ink) 24%, var(--paper)); }
-#cairn-plan-soft .load-value { position: absolute; left: 50%; top: -.1rem; transform: translate(-50%,-100%); white-space: nowrap; }
+#cairn-plan-soft .load-value { position: absolute; left: 50%; bottom: calc(100% + .15rem); transform: translateX(-50%); white-space: nowrap; pointer-events: none; }
 #cairn-plan-soft .load-label { text-align: center; color: var(--muted-foreground); }
 #cairn-plan-soft .load-week.current .load-label { color: var(--ink); font-weight: 500; }
 #cairn-plan-soft .week-track { position: relative; display: flex; align-items: center; justify-content: space-between; margin: 1.25rem .2rem .45rem; }
@@ -355,7 +355,7 @@ small, .text-small { font-size: .8rem; line-height: 1.5; }
   #cairn-plan-soft .focus { text-align: left; }
   #cairn-plan-soft .phase-tabs { gap: .1rem; }
   #cairn-plan-soft .phase-tabs span { padding-inline: .08rem; }
-  #cairn-plan-soft .load-chart { height: 132px; gap: 3px; padding-top: 1.2rem; box-sizing: border-box; }
+  #cairn-plan-soft .load-chart { height: 132px; gap: 3px; }
   #cairn-plan-soft .load-bar { border-radius: 3px 3px 0 0; }
   #cairn-plan-soft .milestone-status { display: none; }
   #cairn-plan-soft .nav-text { display: none; }
