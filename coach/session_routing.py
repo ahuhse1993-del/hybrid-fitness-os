@@ -41,19 +41,19 @@ GARMIN_BLOCKED_TYPES = NEVER_GARMIN_TYPES
 # eigentliche Renntag auf cairn_only und wird nie automatisch gepusht.
 GARMIN_RUNNING_TYPES = frozenset({
     # Basis-Typen
-    "Easy Run", "Trail Run", "Recovery Run", "Long Run",
-    "Tempo Session", "Interval Session", "Sprint Session", "Hill Session",
+    "Easy Run", "Trail Run", "Long Trail Run", "Recovery Run", "Long Run",
+    "Tempo Session", "Tempo Run", "Interval Session", "Sprint Session", "Hill Session",
     "Race Day", "Race",
     # Erweiterte Typen (ChatGPT-kompatibel)
     "Interval Run", "Interval Training",
     "Threshold Run", "Trail Threshold", "Uphill Threshold",
-    "Hill Technique", "Hill Run",
+    "Hill Technique", "Hill Run", "Hill Sprints",
     "Race Activation", "Activation Run",
-    "Fartlek", "Strides",
+    "Fartlek", "Strides", "Time Trial",
 })
 
 # Explizite Rad-Typen (garmin_sport=cycling)
-GARMIN_CYCLING_TYPES = frozenset({"Cycling", "Bike", "Road Bike", "MTB", "E-Bike"})
+GARMIN_CYCLING_TYPES = frozenset({"Cycling", "Bike", "Road Bike", "MTB", "E-Bike", "Rennrad", "Rennrad Endurance"})
 
 # 'Cross Training' selbst ist NICHT automatisch Rad — siehe Docstring oben.
 GARMIN_ELIGIBLE_CROSS_TYPES = frozenset({"Cross Training"})
