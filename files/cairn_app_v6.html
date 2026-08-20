@@ -747,12 +747,24 @@ const SESSION_ASSET = {
   'Long Trail Run': 'long_run',
   'Trail Run': 'trail_run',
   'Hill Session': 'hill_session',
+  'Hill Run': 'hill_session',
+  'Hill Technique': 'hill_session',
+  'Hill Sprints': 'hill_session',
+  'Uphill Threshold': 'hill_session',
   'Interval Session': 'interval_session',
   'Interval Run': 'interval_session',
+  'Interval Training': 'interval_session',
+  'Intervals': 'interval_session',
+  'Strides': 'interval_session',
   'Tempo Session': 'tempo_session',
   'Tempo Run': 'tempo_session',
+  'Threshold Run': 'tempo_session',
+  'Trail Threshold': 'tempo_session',
+  'Fartlek': 'tempo_session',
   'Sprint Session': 'sprint_session',
   'Time Trial': 'time_trial',
+  'Activation Run': 'easy_run',
+  'Race Activation': 'easy_run',
   'Strength Training': 'strength_training',
   'Upper Body': 'strength_training',
   'Lower Body': 'strength_training',
@@ -767,7 +779,10 @@ const SESSION_ASSET = {
 };
 
 const STRUCTURED_TYPES = new Set([
-  'Hill Session','Interval Session','Interval Run','Tempo Session','Tempo Run','Sprint Session','Time Trial'
+  'Hill Session','Hill Run','Hill Technique','Hill Sprints','Uphill Threshold',
+  'Interval Session','Interval Run','Interval Training','Intervals','Strides',
+  'Tempo Session','Tempo Run','Threshold Run','Trail Threshold','Fartlek',
+  'Sprint Session','Time Trial',
 ]);
 
 function getAssetKey(sessionType) {
@@ -1069,7 +1084,7 @@ function buildWeekCard(sess) {
 
   let sessionHTML = '';
   if (sess.is_today) sessionHTML += `<span class="today text-small">HEUTE</span>`;
-  sessionHTML += `<h2 id="day-${sess.date}">${sess.session_type || 'Session'}</h2>`;
+  sessionHTML += `<h2 id="day-${sess.date}">${sess.name || sess.session_type || 'Session'}</h2>`;
 
   // Meta row
   const metaParts = [];
@@ -1174,7 +1189,7 @@ function renderPlan(data) {
   const plan = {
     race_date: race.date || '',
     days_until_race: race.countdown_days || null,
-    phase_focus: block.week_focus || block.phase || '',
+    phase_focus: block.week_focus || (block.phase || '').toUpperCase() || '',
   };
 
   document.getElementById('plan-week-pill').textContent = `WOCHE ${currentWeek} / ${totalWeeks}`;
@@ -1271,7 +1286,7 @@ function buildProgressCard(plan, currentWeek, totalWeeks, phase, weeklyLoad) {
         <div><p class="eyebrow text-small">BELASTUNGSVERTEILUNG</p><h3>Wochenkilometer</h3></div>
         ${deloadLabel ? `<p class="text-small">DELOAD · ${deloadLabel}</p>` : ''}
       </div>
-      <div class="load-chart" role="img" aria-label="Geplante Wochenkilometer">${bars.join('')}</div>
+      <div class="load-chart" role="img" aria-label="Geplante Wochenkilometer" style="grid-template-columns:repeat(${totalWeeks},minmax(0,1fr))">${bars.join('')}</div>
     </div>
   `;
 }

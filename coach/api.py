@@ -1649,7 +1649,7 @@ def frontend_week():
             SELECT id,
                    (week_date + (day_of_week - 1) * INTERVAL '1 day')::date AS session_date,
                    session_type, session_zone, distance_km, duration_min,
-                   notes, phase, garmin_workout_id, workout_steps
+                   notes, phase, garmin_workout_id, workout_steps, name
             FROM training_plan
             WHERE week_date >= %s AND week_date <= %s
             ORDER BY week_date, day_of_week
@@ -1742,6 +1742,7 @@ def frontend_week():
                 "month_label": MONTH_DE[session_date.month],
                 "is_today": session_date == today,
                 "is_past": session_date < today,
+                "name": r[10] or "",
                 "session_type": session_type,
                 "session_zone": r[3] or "",
                 "km": float(r[4]) if r[4] else None,
@@ -1799,7 +1800,7 @@ def frontend_week_all():
                    session_type, session_zone, distance_km, duration_min,
                    notes, phase, garmin_workout_id, workout_steps,
                    sync_status, elevation_gain_m, sport,
-                   km_factor, actual_distance_km, linked_garmin_activity_id
+                   km_factor, actual_distance_km, linked_garmin_activity_id, name
             FROM training_plan
             ORDER BY week_date, day_of_week
         """)
@@ -1895,6 +1896,7 @@ def frontend_week_all():
                 "month_short": MONTH_SHORT[session_date.month],
                 "is_today": session_date == today,
                 "is_past": session_date < today,
+                "name": r[17] or "",
                 "session_type": session_type,
                 "session_zone": r[4] or "",
                 "planned_km": float(r[5]) if r[5] else None,
