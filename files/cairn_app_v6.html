@@ -314,7 +314,7 @@ small, .text-small { font-size: .8rem; line-height: 1.5; }
 #cairn-plan-soft .load-head { display: flex; align-items: end; justify-content: space-between; gap: 1rem; margin-bottom: .65rem; }
 #cairn-plan-soft .load-head h3, #cairn-plan-soft .load-head p { margin: 0; }
 #cairn-plan-soft .load-head h3 { font-weight: 500; letter-spacing: -.025em; }
-#cairn-plan-soft .load-chart { display: grid; grid-template-columns: repeat(16,minmax(0,1fr)); align-items: end; gap: 5px; height: 155px; }
+#cairn-plan-soft .load-chart { display: grid; grid-template-columns: repeat(16,minmax(0,1fr)); align-items: end; gap: 5px; height: 155px; padding-top: 1.4rem; box-sizing: border-box; }
 #cairn-plan-soft .load-week { display: grid; grid-template-rows: 1fr auto; align-items: end; gap: .3rem; height: 100%; min-width: 0; }
 #cairn-plan-soft .load-bar { position: relative; align-self: end; display: block; width: 100%; height: var(--h); min-height: 10px; border-radius: 4px 4px 0 0; background: color-mix(in srgb, var(--forest) 44%, var(--paper)); }
 #cairn-plan-soft .load-week.done .load-bar { background: var(--forest); opacity: .72; }
@@ -355,7 +355,7 @@ small, .text-small { font-size: .8rem; line-height: 1.5; }
   #cairn-plan-soft .focus { text-align: left; }
   #cairn-plan-soft .phase-tabs { gap: .1rem; }
   #cairn-plan-soft .phase-tabs span { padding-inline: .08rem; }
-  #cairn-plan-soft .load-chart { height: 132px; gap: 3px; }
+  #cairn-plan-soft .load-chart { height: 132px; gap: 3px; padding-top: 1.2rem; box-sizing: border-box; }
   #cairn-plan-soft .load-bar { border-radius: 3px 3px 0 0; }
   #cairn-plan-soft .milestone-status { display: none; }
   #cairn-plan-soft .nav-text { display: none; }
@@ -806,7 +806,7 @@ function weekCardColor(session) {
   const t = session.session_type || '';
   if (/long trail|long run/i.test(t)) return 'is-dark';
   if (/upper body|lower body|strength|ruhetag|rest|mobility|core/i.test(t)) return 'is-sand';
-  if (/interval|hill|tempo|sprint|time trial/i.test(t)) return 'is-coral';
+  if (/interval|hill|tempo|threshold|fartlek|strides|sprint|time trial|activation/i.test(t)) return 'is-coral';
   return 'is-soft';
 }
 
