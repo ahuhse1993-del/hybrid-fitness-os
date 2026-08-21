@@ -110,8 +110,8 @@ small, .text-small { font-size: .8rem; line-height: 1.5; }
 }
 #cairn-week-soft * { box-sizing: border-box; }
 #cairn-week-soft .shell { max-width: 820px; margin: 0 auto; }
-#cairn-week-soft header { flex-shrink: 0; margin-bottom: .5rem; }
-#cairn-week-soft .top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.1rem; }
+#cairn-week-soft header { flex-shrink: 0; }
+#cairn-week-soft .top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.1rem; position: sticky; top: 0; z-index: 10; background: var(--paper); }
 #cairn-week-soft .brand-mark { display: block; width: clamp(8.5rem, 26vw, 12rem); height: auto; fill: currentColor; }
 #cairn-week-soft .week-switcher { display: flex; align-items: flex-end; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; padding-bottom: .65rem; border-bottom: 1px solid var(--line); }
 #cairn-week-soft .week-title h1 { margin: 0; letter-spacing: -.05em; font-weight: 500; }
@@ -466,7 +466,9 @@ small, .text-small { font-size: .8rem; line-height: 1.5; }
 #cairn-activities-soft .date-copy strong { font-weight: 500; }
 #cairn-activities-soft .date-copy span { color: color-mix(in srgb, currentColor 72%, transparent); }
 #cairn-activities-soft .activity-copy { flex: 1; min-width: 0; padding: .3rem .9rem; display: flex; flex-direction: column; justify-content: center; }
-#cairn-activities-soft .activity-copy h3 { margin: 0 0 .4rem; font-weight: 500; letter-spacing: -.035em; }
+#cairn-activities-soft .activity-copy h3 { margin: 0 0 .4rem; font-weight: 500; letter-spacing: -.035em; display: flex; align-items: center; gap: .4rem; }
+#cairn-activities-soft .activity-type-icon { width: 1rem; height: 1rem; flex-shrink: 0; opacity: .7; }
+#cairn-activities-soft .card-side .activity-type-icon { width: 1.1rem; height: 1.1rem; opacity: .55; }
 #cairn-activities-soft .metric-row { display: flex; align-items: center; flex-wrap: wrap; gap: .25rem .45rem; }
 #cairn-activities-soft .metric-row span + span::before { content: "·"; margin-right: .45rem; }
 #cairn-activities-soft .activity-meta { margin: .5rem 0 0; text-transform: uppercase; letter-spacing: .03em; }
@@ -583,6 +585,8 @@ small, .text-small { font-size: .8rem; line-height: 1.5; }
   <div class="shell">
     <header>
       <div class="top" id="week-brand"></div>
+    </header>
+    <div id="week-body">
       <div class="week-switcher">
         <div class="week-title">
           <h1 id="wk-kw">KW —</h1>
@@ -590,8 +594,8 @@ small, .text-small { font-size: .8rem; line-height: 1.5; }
         </div>
         <div id="wk-km-stats" class="week-km-stats" style="display:none"></div>
       </div>
-    </header>
-    <div id="week-body"><p class="loading-msg">Trainingsplan wird geladen…</p></div>
+      <div id="week-days"><p class="loading-msg">Trainingsplan wird geladen…</p></div>
+    </div>
     <nav class="nav" aria-label="Hauptnavigation">
       <button class="btn active" type="button" onclick="navigate('week')"><span class="nav-item"><i data-lucide="calendar-days" aria-hidden="true"></i><span class="nav-text">Woche</span></span></button>
       <button class="btn btn-ghost" type="button" onclick="navigate('plan')"><span class="nav-item"><i data-lucide="list" aria-hidden="true"></i><span class="nav-text">Plan</span></span></button>
@@ -798,6 +802,24 @@ function activityCardColor(activity) {
   return 'is-soft';
 }
 
+function activityTypeIcon(activity) {
+  const t = (activity.session_type || activity.type || '').toLowerCase();
+  if (/strength|kraft|weight/i.test(t)) return 'dumbbell';
+  if (/cross|bike|rad|cycling|ride/i.test(t)) return 'bike';
+  if (/mobility|core/i.test(t)) return 'activity';
+  if (/run|lauf|trail|walk|hike|wander/i.test(t)) return 'footprints';
+  return 'zap';
+}
+
+// Krafttraining/Core/Mobility/Crosstraining verlinken nicht zur Analyse-View —
+// dafür gibt es keine sinnvolle Garmin-/Stream-basierte Analyse (siehe
+// coach/activity_data.py: Analyse-Pipeline ist auf Lauf-/Trail-Aktivitäten
+// mit Distanz-/HF-Stream ausgelegt).
+function activityLinksToAnalysis(activity) {
+  const t = (activity.session_type || activity.type || '').toLowerCase();
+  return !/strength|kraft|weight|cross|bike|rad|cycling|ride|mobility|core/i.test(t);
+}
+
 /* ============================================================
    APP STATE
    ============================================================ */
@@ -899,7 +921,7 @@ async function loadWeek() {
     renderWeek(data);
     state.weekLoaded = true;
   } catch (err) {
-    document.getElementById('week-body').innerHTML =
+    document.getElementById('week-days').innerHTML =
       `<p class="loading-msg">Trainingsplan konnte nicht geladen werden. (${err.message})</p>`;
   }
 }
@@ -979,7 +1001,7 @@ function renderKmStatsHtml(stats) {
 
 function renderWeek(weeks) {
   if (!weeks || weeks.length === 0) {
-    document.getElementById('week-body').innerHTML = '<p class="loading-msg">Kein Plan gefunden.</p>';
+    document.getElementById('week-days').innerHTML = '<p class="loading-msg">Kein Plan gefunden.</p>';
     return;
   }
 
@@ -997,7 +1019,7 @@ function renderWeek(weeks) {
     curStatsEl.style.display = '';
   }
 
-  const container = document.getElementById('week-body');
+  const container = document.getElementById('week-days');
   container.innerHTML = '';
 
   // Render current week first (no divider), then remaining
@@ -1464,6 +1486,8 @@ function renderActivities(data) {
 
   container.innerHTML = activities.map(act => {
     const color = activityCardColor(act);
+    const icon = activityTypeIcon(act);
+    const linksToAnalysis = activityLinksToAnalysis(act);
     const d = act.date ? new Date(act.date) : null;
     const dayNum = d ? d.getDate() : '—';
     const dayName = d ? d.toLocaleDateString('de-CH', { weekday: 'short' }).toUpperCase() : '';
@@ -1481,20 +1505,23 @@ function renderActivities(data) {
     const metaSub = act.shoe ? `${act.shoe.toUpperCase()} · ${metaLabel}` : metaLabel;
 
     const actId = act.training_id || act.id;
+    const cardSide = linksToAnalysis
+      ? `<button class="btn btn-ghost" type="button" onclick="navigate('analysis', ${actId})" aria-label="Analyse öffnen">
+          <i data-lucide="chevron-right" aria-hidden="true"></i>
+        </button>`
+      : `<i data-lucide="${icon}" class="activity-type-icon" aria-hidden="true"></i>`;
     return `<article class="card activity-card ${color}" aria-labelledby="act-${actId}">
       <div class="date-box">
         <span class="date-number">${dayNum}</span>
         <span class="date-copy"><strong>${dayName}</strong><span class="text-small">${monthShort}</span></span>
       </div>
       <div class="activity-copy">
-        <h3 id="act-${actId}">${act.name || act.session_type}</h3>
+        <h3 id="act-${actId}"><i data-lucide="${icon}" class="activity-type-icon" aria-hidden="true"></i>${act.name || act.session_type}</h3>
         <div class="metric-row">${metaParts.map(p => `<span>${p}</span>`).join('')}</div>
         <p class="activity-meta text-small">${metaSub}</p>
       </div>
-      <div class="card-side">
-        <button class="btn btn-ghost" type="button" onclick="navigate('analysis', ${actId})" aria-label="Analyse öffnen">
-          <i data-lucide="chevron-right" aria-hidden="true"></i>
-        </button>
+      <div class="card-side"${linksToAnalysis ? '' : ' style="pointer-events:none"'}>
+        ${cardSide}
       </div>
     </article>`;
   }).join('');
