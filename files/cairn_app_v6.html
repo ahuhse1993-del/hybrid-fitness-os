@@ -534,7 +534,10 @@ small, .text-small { font-size: .8rem; line-height: 1.5; }
 #cairn-soft .map { min-height: 270px; border-radius: 1.4rem; background: var(--paper); color: var(--green); padding: 0; overflow: hidden; position: relative; }
 #cairn-soft .map-leaflet { width: 100%; height: 100%; min-height: 270px; }
 #cairn-soft .map .loading-msg { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; margin: 0; }
-#cairn-soft .leaflet-control-attribution { display: none; }
+#cairn-soft .leaflet-control-attribution { font-size: .65rem; background: color-mix(in srgb, var(--paper) 80%, transparent); }
+#cairn-soft .analysis-route-line { stroke: var(--green); }
+#cairn-soft .analysis-marker-start { stroke: var(--ink); fill: var(--green); }
+#cairn-soft .analysis-marker-end { stroke: var(--ink); fill: var(--coral); }
 #cairn-soft .map svg { width: 100%; max-width: 260px; height: auto; }
 #cairn-soft .map-grid { stroke: var(--line); stroke-width: 1; }
 #cairn-soft .route { fill: none; stroke: currentColor; stroke-width: 6; stroke-linecap: round; stroke-linejoin: round; }
@@ -557,14 +560,13 @@ small, .text-small { font-size: .8rem; line-height: 1.5; }
 #cairn-soft .hr-fill { fill: color-mix(in srgb, var(--coral) 60%, transparent); }
 #cairn-soft .hr-line { fill: none; stroke: var(--coral); stroke-width: 2; }
 #cairn-soft .avg { stroke: currentColor; stroke-dasharray: 5 5; stroke-width: 1.5; opacity: .7; }
-#cairn-soft .trail-stats { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 1px; background: var(--line); margin-top: .7rem; }
+#cairn-soft .trail-stats { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 1px; background: var(--line); margin-top: .7rem; }
 #cairn-soft .trail-stat { background: var(--soft); color: var(--ink); padding: .9rem; }
 #cairn-soft .trail-stat span, #cairn-soft .trail-stat strong { display: block; }
 #cairn-soft .trail-stat strong { font-size: 1.35rem; font-weight: 500; }
 #cairn-soft .zone-row { display: grid; grid-template-columns: 50px minmax(0,1fr) 64px; align-items: center; gap: .8rem; margin: .65rem 0; }
 #cairn-soft .zone-track { height: 1.05rem; border-radius: 999px; background: color-mix(in srgb, var(--ink) 12%, transparent); overflow: hidden; }
 #cairn-soft .zone-fill { height: 100%; width: var(--w); border-radius: inherit; background: var(--green); }
-#cairn-soft .zone-row:nth-child(4) .zone-fill, #cairn-soft .zone-row:nth-child(5) .zone-fill, #cairn-soft .zone-row:nth-child(6) .zone-fill { background: var(--coral); }
 #cairn-soft .gear-row { display: flex; align-items: end; justify-content: space-between; gap: 1rem; }
 #cairn-soft .gear-row h3, #cairn-soft .gear-row p { margin: .15rem 0; }
 #cairn-soft .gear-control { min-width: min(100%, 290px); }
@@ -577,7 +579,6 @@ small, .text-small { font-size: .8rem; line-height: 1.5; }
   #cairn-soft .map { min-height: 210px; }
   #cairn-soft .map-leaflet { min-height: 210px; }
   #cairn-soft .signals { grid-template-columns: 1fr; }
-  #cairn-soft .trail-stats { grid-template-columns: repeat(2,minmax(0,1fr)); }
   #cairn-soft .gear-row { align-items: stretch; flex-direction: column; }
   #cairn-soft .gear-control { min-width: 100%; }
   #cairn-soft .nav-text { display: none; }
@@ -1628,7 +1629,7 @@ function renderAnalysis(data) {
   // Elevation chart (soft)
   const elevPts = streamPoints(analysisData.stream, 'altitude_m');
   if (elevPts.length > 1) {
-    html += buildElevationChart(elevPts, summary.elevation_gain_m);
+    html += buildElevationChart(elevPts, summary.elevation_gain_m, summary.elevation_loss_m, summary.distance_km);
   }
 
   // Pace chart (sand)
@@ -1711,13 +1712,22 @@ function renderAnalysisMap(route) {
   }
   mapEl.style.display = 'block';
   if (noteEl) noteEl.style.display = 'none';
+  // route.coordinates kommt aus coach/activity_data.py::build_route() als
+  // [lon, lat]-Paare (GeoJSON-Konvention) — deshalb hier vertauscht zu [lat, lon].
   const latlngs = route.coordinates.map(c => [c[1], c[0]]);
-  _analysisMapInstance = L.map(mapEl, { zoomControl: true, attributionControl: false }).setView(latlngs[Math.floor(latlngs.length / 2)], 13);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(_analysisMapInstance);
-  const line = L.polyline(latlngs, { color: 'var(--coral)', weight: 3 }).addTo(_analysisMapInstance);
-  L.circleMarker(latlngs[0], { radius: 5, color: 'var(--ink)', weight: 1.5, fillColor: 'var(--green)', fillOpacity: 1 }).addTo(_analysisMapInstance);
-  L.circleMarker(latlngs[latlngs.length - 1], { radius: 5, color: 'var(--ink)', weight: 1.5, fillColor: 'var(--coral)', fillOpacity: 1 }).addTo(_analysisMapInstance);
-  _analysisMapInstance.fitBounds(line.getBounds(), { padding: [20, 20] });
+  _analysisMapInstance = L.map(mapEl, { zoomControl: true, attributionControl: true }).setView(latlngs[Math.floor(latlngs.length / 2)], 13);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+    attribution: '© OpenStreetMap © CartoDB',
+    subdomains: 'abcd',
+    maxZoom: 19,
+  }).addTo(_analysisMapInstance);
+  // Farben laufen über CSS-Klassen statt der Leaflet-Optionen color/fillColor:
+  // Leaflet setzt diese als rohe SVG-Attribute (fill="...", stroke="..."), in
+  // denen CSS-Custom-Properties wie var(--green) nicht aufgelöst werden.
+  const line = L.polyline(latlngs, { className: 'analysis-route-line', weight: 3, opacity: 0.8 }).addTo(_analysisMapInstance);
+  L.circleMarker(latlngs[0], { radius: 5, weight: 1.5, className: 'analysis-marker-start', fillOpacity: 1 }).addTo(_analysisMapInstance);
+  L.circleMarker(latlngs[latlngs.length - 1], { radius: 5, weight: 1.5, className: 'analysis-marker-end', fillOpacity: 1 }).addTo(_analysisMapInstance);
+  _analysisMapInstance.fitBounds(line.getBounds(), { padding: [15, 15] });
 }
 
 function loadShoeOptions(activityId) {
@@ -1745,7 +1755,7 @@ function assignShoe(activityId, gearId) {
 }
 
 /* — Chart helpers — */
-function buildElevationChart(points, elevUp) {
+function buildElevationChart(points, elevUp, elevDown, distanceKm) {
   if (!points || !points.length) return '';
   const W = 760, H = 270, padX = 48, padY = 45, bottom = 218;
   const maxE = Math.max(...points.map(p => p[1] || p.y || 0));
@@ -1762,8 +1772,9 @@ function buildElevationChart(points, elevUp) {
   const line = `M${polyline}`;
   const lastX = pts[pts.length-1][0];
   const distLabel = points[points.length-1][0] ? Math.round(points[points.length-1][0]) : '';
+  const avgGradient = (elevUp && distanceKm) ? (elevUp / distanceKm / 10).toFixed(1) : null;
   return `<section class="card panel soft-card" aria-labelledby="soft-elev">
-    <div class="head"><div><p class="eyebrow text-small">TRAILPROFIL</p><h2 id="soft-elev">Höhenmeter</h2></div><span class="pill text-small">${elevUp ? elevUp + ' HM+' : '—'}</span></div>
+    <div class="head"><div><p class="eyebrow text-small">TRAILPROFIL</p><h2 id="soft-elev">Höhenmeter</h2></div><span class="pill text-small">${elevUp ? Math.round(elevUp) + ' HM+' : '—'}</span></div>
     <svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Höhenprofil">
       <line class="grid" x1="${padX}" y1="${padY}" x2="${W-16}" y2="${padY}"/>
       <line class="grid" x1="${padX}" y1="${(bottom+padY)/2}" x2="${W-16}" y2="${(bottom+padY)/2}"/>
@@ -1777,8 +1788,9 @@ function buildElevationChart(points, elevUp) {
       <text class="axis" x="${lastX-12}" y="${H-22}">${distLabel} KM</text>
     </svg>
     <div class="trail-stats">
-      <div class="trail-stat"><span class="text-small">MAX. HÖHE</span><strong>${Math.round(maxE)} m</strong></div>
-      <div class="trail-stat"><span class="text-small">MIN. HÖHE</span><strong>${Math.round(minE)} m</strong></div>
+      <div class="trail-stat"><span class="text-small">AUFSTIEG</span><strong>${elevUp != null ? Math.round(elevUp) + ' HM+' : '—'}</strong></div>
+      <div class="trail-stat"><span class="text-small">ABSTIEG</span><strong>${elevDown != null ? Math.round(elevDown) + ' HM−' : '—'}</strong></div>
+      <div class="trail-stat"><span class="text-small">Ø STEIGUNG</span><strong>${avgGradient != null ? avgGradient + '%' : '—'}</strong></div>
     </div>
   </section>`;
 }
