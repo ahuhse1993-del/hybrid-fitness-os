@@ -517,6 +517,7 @@ small, .text-small { font-size: .8rem; line-height: 1.5; }
 #cairn-soft h2, #cairn-soft h3 { font-weight: 500; }
 #cairn-soft .heading { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
 #cairn-soft .pill { border-radius: 999px; padding: .55rem .9rem; background: var(--green); color: var(--green-ink); white-space: nowrap; }
+#cairn-soft .head .pill { max-width: 45%; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 #cairn-soft .panel { margin-top: 1rem; }
 #cairn-soft .green-card { --card: var(--green); color: var(--green-ink); }
 #cairn-soft .coral-card { --card: var(--coral); color: var(--coral-ink); }
@@ -530,11 +531,15 @@ small, .text-small { font-size: .8rem; line-height: 1.5; }
 #cairn-soft .metric { padding-top: .65rem; border-top: 1px solid currentColor; }
 #cairn-soft .metric span, #cairn-soft .metric strong { display: block; }
 #cairn-soft .metric strong { font-size: clamp(1.25rem,4vw,1.9rem); font-weight: 500; letter-spacing: -.035em; }
-#cairn-soft .map { min-height: 270px; border-radius: 1.4rem; background: var(--paper); color: var(--green); padding: 1rem; display: grid; place-items: center; }
+#cairn-soft .map { min-height: 270px; border-radius: 1.4rem; background: var(--paper); color: var(--green); padding: 0; overflow: hidden; position: relative; }
+#cairn-soft .map-leaflet { width: 100%; height: 100%; min-height: 270px; }
+#cairn-soft .map .loading-msg { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; margin: 0; }
+#cairn-soft .leaflet-control-attribution { display: none; }
 #cairn-soft .map svg { width: 100%; max-width: 260px; height: auto; }
 #cairn-soft .map-grid { stroke: var(--line); stroke-width: 1; }
 #cairn-soft .route { fill: none; stroke: currentColor; stroke-width: 6; stroke-linecap: round; stroke-linejoin: round; }
 #cairn-soft .route-start { fill: var(--coral); stroke: currentColor; stroke-width: 3; }
+#cairn-soft .btn-primary { background: var(--paper); color: var(--ink); border-color: transparent; margin-top: .8rem; width: 100%; min-height: 2.6rem; }
 #cairn-soft .head { display: flex; align-items: end; justify-content: space-between; gap: 1rem; margin-bottom: .8rem; }
 #cairn-soft .head h2, #cairn-soft .head p { margin: 0; }
 #cairn-soft .analysis-title { margin: .2rem 0 .7rem; font-size: clamp(2rem,6vw,3.35rem); line-height: 1; letter-spacing: -.05em; }
@@ -570,6 +575,7 @@ small, .text-small { font-size: .8rem; line-height: 1.5; }
 @media (max-width: 680px) {
   #cairn-soft .hero { grid-template-columns: 1fr; }
   #cairn-soft .map { min-height: 210px; }
+  #cairn-soft .map-leaflet { min-height: 210px; }
   #cairn-soft .signals { grid-template-columns: 1fr; }
   #cairn-soft .trail-stats { grid-template-columns: repeat(2,minmax(0,1fr)); }
   #cairn-soft .gear-row { align-items: stretch; flex-direction: column; }
@@ -577,6 +583,8 @@ small, .text-small { font-size: .8rem; line-height: 1.5; }
   #cairn-soft .nav-text { display: none; }
 }
 </style>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 </head>
 <body>
 
@@ -827,23 +835,22 @@ function activityCardColor(activity) {
   return 'is-soft';
 }
 
-// Diese Session-Typen haben keine sinnvolle Garmin-/Stream-basierte Analyse
-// (siehe coach/activity_data.py: Analyse-Pipeline ist auf Lauf-/Trail-
-// Aktivitäten mit Distanz-/HF-Stream ausgelegt) — keine Navigation zur
-// Analyse-View für diese Karten.
-const NO_ANALYSIS = ['Strength Training', 'Upper Body CAIRN', 'Lower Body + Arms CAIRN',
-  'Full Body Light CAIRN', 'Cross Training', 'Mobility', 'Rest Day', 'Rest'];
-
-// Abgeschlossene Aktivitäten liefern rohe Garmin-/Hevy-Typen in
-// activity.session_type (z.B. "WeightTraining", "Ride" — aus
-// coach/jobs/sync_completed_activities.py::GARMIN_TYPE_MAP), nicht die
-// obigen "sauberen" Plan-Session-Typen. Gleiche Ausschlussliste, andere
-// Wertemenge — siehe SESSION_ASSET oben für dieselbe Unterscheidung.
-const NO_ANALYSIS_RAW_TYPES = ['WeightTraining', 'Ride'];
+// Nur diese Session-Typen haben eine sinnvolle Garmin-/Stream-basierte
+// Analyse (siehe coach/activity_data.py: Pipeline ist auf Lauf-/Trail-/Bike-
+// Aktivitäten mit Distanz-/HF-Stream ausgelegt) — nur für diese Karten
+// verlinkt der Activities-Tab zur Analyse-View. Enthält sowohl die
+// "sauberen" Plan-Session-Typen als auch ihre rohen Garmin-Pendants, da
+// activity.session_type je nach Herkunft (Plan vs. direkter Sync) beide
+// Wertemengen liefert — siehe SESSION_ASSET oben für dieselbe Unterscheidung.
+const ANALYSIS_TYPES = [
+  'Easy Run', 'Trail Run', 'Long Run', 'Interval Session', 'Tempo Session',
+  'Hill Session', 'Sprint Session', 'Time Trial', 'Recovery Run', 'Threshold Run',
+  'Cycling',
+  'Run', 'TrailRun', 'Threshold',
+];
 
 function activityLinksToAnalysis(activity) {
-  return !NO_ANALYSIS.includes(activity.session_type) &&
-    !NO_ANALYSIS_RAW_TYPES.includes(activity.session_type);
+  return ANALYSIS_TYPES.includes(activity.session_type);
 }
 
 /* ============================================================
@@ -1575,100 +1582,166 @@ async function loadAnalysis(id) {
 }
 
 function renderAnalysis(data) {
-  const act = data.activity || data;
-  const analysis = data.analysis || {};
-  const charts = data.charts || {};
+  const analysisData = data.analysis_data || {};
+  const summary = analysisData.summary || {};
+  const coachAnalysis = data.existing_coach_analysis || null;
+  const activityId = data.activity_id;
 
   // Update pill
-  const pillType = act.sport_type || act.session_type || 'TRAIL';
-  document.getElementById('analysis-pill').textContent = `${pillType.toUpperCase()} · ${act.source || 'GARMIN'}`;
+  const pillType = (summary.sport || 'activity').toUpperCase();
+  const source = summary.garmin_id ? 'GARMIN' : 'CAIRN';
+  document.getElementById('analysis-pill').textContent = `${pillType} · ${source}`;
 
   const container = document.getElementById('analysis-body');
   let html = '';
 
   // Hero card (green)
-  const d = act.date ? new Date(act.date) : null;
+  const d = summary.date ? new Date(summary.date + 'T12:00:00') : null;
   const dateStr = d ? d.toLocaleDateString('de-CH', { weekday: 'long', day:'2-digit', month:'long', year:'numeric' }).toUpperCase() : '';
   const metrics = [
-    { label: 'DISTANZ', val: fmtKm(act.distance_km) },
-    { label: 'ZEIT',    val: fmtDuration(act.duration_sec) || fmtMin(act.duration_min) },
-    { label: 'PACE',    val: act.avg_pace },
-    { label: 'AUFSTIEG', val: act.elevation_up ? `${act.elevation_up} HM+` : null },
-    { label: 'ABSTIEG',  val: act.elevation_down ? `${act.elevation_down} HM−` : null },
-    { label: 'Ø HF',    val: act.avg_hr ? `${act.avg_hr} bpm` : null },
+    { label: 'DISTANZ', val: fmtKm(summary.distance_km) },
+    { label: 'ZEIT',    val: fmtMin(summary.duration_min) },
+    { label: 'PACE',    val: summary.avg_pace_per_km ? `${summary.avg_pace_per_km} /km` : null },
+    { label: 'AUFSTIEG', val: summary.elevation_gain_m ? `${Math.round(summary.elevation_gain_m)} HM+` : null },
+    { label: 'ABSTIEG',  val: summary.elevation_loss_m ? `${Math.round(summary.elevation_loss_m)} HM−` : null },
+    { label: 'Ø HF',    val: summary.avg_hr ? `${summary.avg_hr} bpm` : null },
   ].filter(m => m.val);
 
   html += `<section class="card panel green-card" aria-labelledby="soft-hero">
     <div class="hero">
       <div>
         <p class="eyebrow text-small">${dateStr}</p>
-        <h2 class="hero-name" id="soft-hero">${act.name || act.session_type}</h2>
-        <p class="date">${(act.sport_type || 'TRAIL').toUpperCase()} · ${(act.source || 'GARMIN').toUpperCase()}</p>
+        <h2 class="hero-name" id="soft-hero">${summary.activity_name || pillType}</h2>
+        <p class="date">${pillType} · ${source}</p>
         <div class="metrics">${metrics.map(m => `<div class="metric"><span class="text-small">${m.label}</span><strong>${m.val}</strong></div>`).join('')}</div>
       </div>
       <div class="map" aria-label="Routenkarte">
-        <svg viewBox="0 0 260 260" role="img" aria-label="GPS-Route">
-          <path class="map-grid" d="M20 60H240M20 120H240M20 180H240M65 20V240M130 20V240M195 20V240"/>
-          <path class="route" d="M45 205C64 166 34 142 70 112C93 93 79 53 120 47C151 43 161 83 188 76C220 68 229 109 204 132C184 151 210 179 182 200C156 219 132 191 105 211C80 229 56 226 45 205"/>
-          <circle class="route-start" cx="45" cy="205" r="8"/>
-        </svg>
+        <div class="map-leaflet" id="analysis-map"></div>
+        <p class="loading-msg" id="analysis-map-note" style="display:none">Keine GPS-Daten verfügbar.</p>
       </div>
     </div>
   </section>`;
 
   // Coach analysis (coral)
-  if (analysis.summary || analysis.title) {
-    const signals = analysis.signals || [];
-    const signalHTML = signals.slice(0, 3).map(s =>
-      `<div><strong>${s.label}</strong><span class="text-small">${s.value}</span></div>`
-    ).join('');
-    html += `<section class="card panel coral-card" aria-labelledby="soft-analysis">
-      <p class="eyebrow text-small">COACH-ANALYSE</p>
-      <h2 class="analysis-title" id="soft-analysis">${analysis.title || 'Analyse'}</h2>
-      <p class="analysis-copy">${analysis.summary || ''}</p>
-      ${signalHTML ? `<div class="signals">${signalHTML}</div>` : ''}
-    </section>`;
-  }
+  html += buildCoachAnalysisCard(coachAnalysis);
 
   // Elevation chart (soft)
-  if (charts.elevation || act.elevation_points) {
-    html += buildElevationChart(charts.elevation || act.elevation_points, act.elevation_up);
+  const elevPts = streamPoints(analysisData.stream, 'altitude_m');
+  if (elevPts.length > 1) {
+    html += buildElevationChart(elevPts, summary.elevation_gain_m);
   }
 
   // Pace chart (sand)
-  if (charts.pace || act.pace_splits) {
-    html += buildPaceChart(charts.pace || act.pace_splits, act.avg_pace);
+  if (analysisData.km_splits && analysisData.km_splits.length) {
+    html += buildPaceChart(analysisData.km_splits, summary.avg_pace_per_km);
   }
 
   // HR chart (soft)
-  if (charts.hr || act.hr_points) {
-    html += buildHRChart(charts.hr || act.hr_points, act.avg_hr);
+  const hrPts = streamPoints(analysisData.stream, 'heart_rate');
+  if (hrPts.length > 1) {
+    html += buildHRChart(hrPts, summary.avg_hr);
   }
 
   // HR zones (coral)
-  if (data.hr_zones || act.hr_zones) {
-    html += buildHRZones(data.hr_zones || act.hr_zones, act.lthr);
+  if (analysisData.hr_zones && analysisData.hr_zones.zones && analysisData.hr_zones.zones.length) {
+    html += buildHRZones(analysisData.hr_zones.zones, analysisData.hr_zones.method);
   }
 
   // Gear (green)
   html += `<section class="card panel green-card" aria-labelledby="soft-gear">
-    <div class="gear-row">
-      <div>
-        <p class="eyebrow text-small">GEAR</p>
-        <h3 id="soft-gear">Schuh zuordnen</h3>
-        <p>${fmtKm(act.distance_km) || '—'} werden einmalig verbucht.</p>
-      </div>
-      <div class="gear-control">
-        <label class="form-label" for="soft-shoe">Laufschuh</label>
-        <select class="form-select" id="soft-shoe">
-          <option>${act.shoe || 'Noch nicht zugeordnet'}</option>
-        </select>
-      </div>
-    </div>
+    <p class="eyebrow text-small">GEAR</p>
+    <h3 id="soft-gear">Schuh zuordnen</h3>
+    <p id="shoe-km-label">${fmtKm(summary.distance_km) || '—'} werden zugeordnet.</p>
+    <select class="form-select" id="shoe-select">
+      <option value="">Schuh wählen...</option>
+    </select>
+    <button class="btn btn-primary" id="shoe-assign-btn" type="button">Zuordnen</button>
   </section>`;
 
   container.innerHTML = html;
   if (window.lucide) lucide.createIcons();
+
+  renderAnalysisMap(analysisData.route);
+  loadShoeOptions(activityId);
+}
+
+/* — Analysis data helpers — */
+function streamPoints(stream, fieldName) {
+  if (!stream || !stream.data || !stream.fields) return [];
+  const iDist = stream.fields.indexOf('distance_m');
+  const iVal = stream.fields.indexOf(fieldName);
+  if (iVal < 0 || iDist < 0) return [];
+  return stream.data
+    .filter(r => r[iVal] != null && r[iDist] != null)
+    .map(r => [r[iDist] / 1000, r[iVal]]);
+}
+
+function buildCoachAnalysisCard(analysis) {
+  if (!analysis) {
+    return `<section class="card panel coral-card" aria-labelledby="soft-analysis">
+      <p class="eyebrow text-small">COACH-ANALYSE</p>
+      <h2 class="analysis-title" id="soft-analysis">Noch keine Analyse</h2>
+      <p class="analysis-copy">Diese Aktivität wurde noch nicht vom Coach interpretiert.</p>
+    </section>`;
+  }
+  const findings = [
+    ...(analysis.positive_findings_json || []).map(f => `<li>+ ${f}</li>`),
+    ...(analysis.limitations_json || []).map(f => `<li>! ${f}</li>`),
+  ].join('');
+  const stale = analysis.is_fresh === false ? ' · veraltet' : '';
+  return `<section class="card panel coral-card" aria-labelledby="soft-analysis">
+    <p class="eyebrow text-small">COACH-ANALYSE${stale}</p>
+    <h2 class="analysis-title" id="soft-analysis">${analysis.verdict || 'Analyse'}</h2>
+    <p class="analysis-copy">${analysis.summary || ''}</p>
+    ${findings ? `<ul class="text-small" style="margin-top:.8rem;padding-left:1.1rem;line-height:1.6">${findings}</ul>` : ''}
+    ${analysis.coach_recommendation ? `<p class="analysis-copy" style="margin-top:.8rem"><strong>Nächste Schritte:</strong> ${analysis.coach_recommendation}</p>` : ''}
+  </section>`;
+}
+
+let _analysisMapInstance = null;
+function renderAnalysisMap(route) {
+  const mapEl = document.getElementById('analysis-map');
+  const noteEl = document.getElementById('analysis-map-note');
+  if (!mapEl) return;
+  if (_analysisMapInstance) { _analysisMapInstance.remove(); _analysisMapInstance = null; }
+  if (!route || !route.available || !route.coordinates || !route.coordinates.length) {
+    mapEl.style.display = 'none';
+    if (noteEl) noteEl.style.display = 'flex';
+    return;
+  }
+  mapEl.style.display = 'block';
+  if (noteEl) noteEl.style.display = 'none';
+  const latlngs = route.coordinates.map(c => [c[1], c[0]]);
+  _analysisMapInstance = L.map(mapEl, { zoomControl: true, attributionControl: false }).setView(latlngs[Math.floor(latlngs.length / 2)], 13);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(_analysisMapInstance);
+  const line = L.polyline(latlngs, { color: 'var(--coral)', weight: 3 }).addTo(_analysisMapInstance);
+  L.circleMarker(latlngs[0], { radius: 5, color: 'var(--ink)', weight: 1.5, fillColor: 'var(--green)', fillOpacity: 1 }).addTo(_analysisMapInstance);
+  L.circleMarker(latlngs[latlngs.length - 1], { radius: 5, color: 'var(--ink)', weight: 1.5, fillColor: 'var(--coral)', fillOpacity: 1 }).addTo(_analysisMapInstance);
+  _analysisMapInstance.fitBounds(line.getBounds(), { padding: [20, 20] });
+}
+
+function loadShoeOptions(activityId) {
+  const sel = document.getElementById('shoe-select');
+  const btn = document.getElementById('shoe-assign-btn');
+  if (!sel) return;
+  apiGet('/api/athlete/gear?active_only=true').then(res => {
+    const shoes = (res.gear || []).filter(g => ['running_shoe', 'trail_shoe', 'hiking_shoe'].includes(g.gear_type));
+    sel.innerHTML = '<option value="">Schuh wählen...</option>' +
+      shoes.map(g => `<option value="${g.id}">${g.nickname || g.model || g.brand} · ${g.total_distance_km} km</option>`).join('');
+  }).catch(() => {});
+  if (btn) btn.onclick = () => assignShoe(activityId, sel.value);
+}
+
+function assignShoe(activityId, gearId) {
+  const label = document.getElementById('shoe-km-label');
+  if (!gearId) { if (label) label.textContent = 'Bitte zuerst einen Schuh wählen.'; return; }
+  fetch(`/api/activities/${activityId}/gear`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ gear_id: parseInt(gearId, 10) }),
+  }).then(r => r.json()).then(res => {
+    if (res.status !== 'ok') { if (label) label.textContent = `Fehler: ${res.message}`; return; }
+    if (label) label.textContent = `Zugeordnet — ${res.gear.new_total_distance_km.toFixed(1)} km gesamt.`;
+  }).catch(() => { if (label) label.textContent = 'Zuordnung fehlgeschlagen.'; });
 }
 
 /* — Chart helpers — */
@@ -1713,14 +1786,14 @@ function buildElevationChart(points, elevUp) {
 function buildPaceChart(splits, avgPace) {
   if (!splits || !splits.length) return '';
   const W = 760, H = 230, padX = 45, padY = 45, bottom = 175;
-  const paces = splits.map(s => s.pace_sec || s[1] || 0).filter(Boolean);
+  const paces = splits.map(s => s.pace_seconds_per_km || s.pace_sec || s[1] || 0).filter(Boolean);
   const maxP = Math.max(...paces);
   const minP = Math.min(...paces);
   const range = maxP - minP || 1;
   const n = splits.length;
   const barW = Math.max(18, Math.floor((W - padX - 16) / n) - 4);
   const bars = splits.map((s, i) => {
-    const pace = s.pace_sec || s[1] || 0;
+    const pace = s.pace_seconds_per_km || s.pace_sec || s[1] || 0;
     const km = s.km || s.distance_km || (i + 1);
     const h = bottom - padY > 0 ? ((pace - minP) / range) * (bottom - padY - 10) + 10 : 20;
     const x = padX + i * ((W - padX - 16) / n) + 2;
@@ -1776,19 +1849,20 @@ function buildHRChart(points, avgHr) {
   </section>`;
 }
 
-function buildHRZones(zones, lthr) {
+function buildHRZones(zones, method) {
   if (!zones || !zones.length) return '';
-  const maxTime = Math.max(...zones.map(z => z.seconds || 0), 1);
+  const maxTime = Math.max(...zones.map(z => z.duration_s != null ? z.duration_s : (z.seconds || 0)), 1);
   const rows = zones.map((z, i) => {
-    const pct = Math.round(((z.seconds || 0) / maxTime) * 96) + 2;
-    const mins = Math.floor((z.seconds || 0) / 60);
-    const secs = (z.seconds || 0) % 60;
-    const timeStr = `${String(mins).padStart(2,'0')}:${String(secs).padStart(2,'0')}`;
-    return `<div class="zone-row"><strong>Z${i+1}</strong><div class="zone-track"><div class="zone-fill" style="--w:${pct}%"></div></div><span>${timeStr}</span></div>`;
+    const secs = z.duration_s != null ? z.duration_s : (z.seconds || 0);
+    const pct = Math.round((secs / maxTime) * 96) + 2;
+    const mins = Math.floor(secs / 60);
+    const rem = secs % 60;
+    const timeStr = `${String(mins).padStart(2,'0')}:${String(rem).padStart(2,'0')}`;
+    return `<div class="zone-row"><strong>Z${z.zone || (i+1)}</strong><div class="zone-track"><div class="zone-fill" style="--w:${pct}%"></div></div><span>${timeStr}</span></div>`;
   }).join('');
 
   return `<section class="card panel coral-card" aria-labelledby="soft-zones">
-    <div class="head"><div><p class="eyebrow text-small">ZEIT IN ZONE</p><h2 id="soft-zones">Herzfrequenzzonen</h2></div><span class="pill text-small">${lthr ? 'LTHR ' + lthr : 'HF-ZONEN'}</span></div>
+    <div class="head"><div><p class="eyebrow text-small">ZEIT IN ZONE</p><h2 id="soft-zones">Herzfrequenzzonen</h2></div><span class="pill text-small">${method ? method.toUpperCase() : 'HF-ZONEN'}</span></div>
     ${rows}
   </section>`;
 }
