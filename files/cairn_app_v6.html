@@ -455,7 +455,7 @@ small, .text-small { font-size: .8rem; line-height: 1.5; }
 #cairn-activities-soft .month-head span { padding-bottom: .55rem; color: var(--muted-foreground); }
 #cairn-activities-soft .month-nav { display: flex; align-items: center; gap: .35rem; padding-bottom: .55rem; }
 #cairn-activities-soft .activity-list { display: grid; gap: .6rem; }
-#cairn-activities-soft .activity-card { position: relative; min-height: 118px; display: flex; align-items: stretch; gap: 0; overflow: hidden; }
+#cairn-activities-soft .activity-card { position: relative; min-height: 118px; display: flex; align-items: center; gap: 0; overflow: hidden; }
 #cairn-activities-soft .is-coral { --card: var(--coral); color: var(--coral-ink); }
 #cairn-activities-soft .is-forest { --card: var(--forest); color: var(--forest-ink); }
 #cairn-activities-soft .is-soft { --card: var(--soft); color: var(--ink); }
@@ -466,12 +466,12 @@ small, .text-small { font-size: .8rem; line-height: 1.5; }
 #cairn-activities-soft .date-copy strong { font-weight: 500; }
 #cairn-activities-soft .date-copy span { color: color-mix(in srgb, currentColor 72%, transparent); }
 #cairn-activities-soft .activity-copy { flex: 1; min-width: 0; padding: .3rem .9rem; display: flex; flex-direction: column; justify-content: center; }
-#cairn-activities-soft .activity-copy h3 { margin: 0 0 .4rem; font-weight: 500; letter-spacing: -.035em; display: flex; align-items: center; gap: .4rem; }
-#cairn-activities-soft .activity-type-icon { width: 1rem; height: 1rem; flex-shrink: 0; opacity: .7; }
-#cairn-activities-soft .card-side .activity-type-icon { width: 1.1rem; height: 1.1rem; opacity: .55; }
+#cairn-activities-soft .activity-copy h3 { margin: 0 0 .4rem; font-weight: 500; letter-spacing: -.035em; }
 #cairn-activities-soft .metric-row { display: flex; align-items: center; flex-wrap: wrap; gap: .25rem .45rem; }
 #cairn-activities-soft .metric-row span + span::before { content: "·"; margin-right: .45rem; }
 #cairn-activities-soft .activity-meta { margin: .5rem 0 0; text-transform: uppercase; letter-spacing: .03em; }
+#cairn-activities-soft .art { flex: 0 0 132px; align-self: stretch; display: grid; place-items: center; padding: .15rem .4rem; background: color-mix(in srgb, var(--paper) 55%, transparent); overflow: hidden; }
+#cairn-activities-soft .art img { display: block; width: 100%; height: 76px; object-fit: contain; pointer-events: none; }
 #cairn-activities-soft .card-side { flex: 0 0 52px; align-self: stretch; display: flex; align-items: center; justify-content: center; padding: .5rem .25rem; }
 #cairn-activities-soft .nav { display: flex; align-items: center; justify-content: space-between; gap: .25rem; flex-shrink: 0; margin-top: .5rem; padding: .45rem; border: 1px solid var(--line); border-radius: 999px; background: var(--paper); }
 #cairn-activities-soft .nav button { flex: 1; }
@@ -483,6 +483,8 @@ small, .text-small { font-size: .8rem; line-height: 1.5; }
   #cairn-activities-soft .date-number { font-size: 2.05rem; }
   #cairn-activities-soft .date-copy span { display: none; }
   #cairn-activities-soft .activity-copy { padding-inline: .65rem; }
+  #cairn-activities-soft .art { flex-basis: 72px; padding: .1rem; }
+  #cairn-activities-soft .art img { height: 56px; }
   #cairn-activities-soft .card-side { flex-basis: 48px; }
   #cairn-activities-soft .nav-text { display: none; }
 }
@@ -670,8 +672,10 @@ small, .text-small { font-size: .8rem; line-height: 1.5; }
       </div>
       <span class="text-small" id="acts-count"></span>
     </div>
-    <section class="activity-list" id="acts-body" aria-label="Aktivitäten dieses Monats">
-      <p class="loading-msg">Aktivitäten werden geladen…</p>
+    <section id="acts-body" aria-label="Aktivitäten dieses Monats">
+      <div class="activity-list" id="acts-list">
+        <p class="loading-msg">Aktivitäten werden geladen…</p>
+      </div>
     </section>
     <nav class="nav" aria-label="Hauptnavigation">
       <button class="btn btn-ghost" type="button" onclick="navigate('week')"><span class="nav-item"><i data-lucide="calendar-days" aria-hidden="true"></i><span class="nav-text">Woche</span></span></button>
@@ -770,6 +774,19 @@ const SESSION_ASSET = {
   'Rest Day': 'rest_day',
   'Ruhetag': 'rest_day',
   'Race Day': 'race_day',
+  // Rohe Aktivitätstypen abgeschlossener Einheiten (trainings.type, aus
+  // coach/jobs/sync_completed_activities.py::GARMIN_TYPE_MAP bzw. Hevy-Sync) —
+  // andere Wertemenge als die geplanten session_type-Strings oben, da
+  // Activities-Tab/Sync-Karten direkt aus trainings.type lesen statt aus
+  // training_plan.session_type.
+  'Run': 'easy_run',
+  'TrailRun': 'trail_run',
+  'Ride': 'cross_training',
+  'WeightTraining': 'strength_training',
+  'Walk': 'easy_run',
+  'Hike': 'trail_run',
+  'Yoga': 'mobility',
+  'Cardio': 'cross_training',
 };
 
 const STRUCTURED_TYPES = new Set([
@@ -802,22 +819,23 @@ function activityCardColor(activity) {
   return 'is-soft';
 }
 
-function activityTypeIcon(activity) {
-  const t = (activity.session_type || activity.type || '').toLowerCase();
-  if (/strength|kraft|weight/i.test(t)) return 'dumbbell';
-  if (/cross|bike|rad|cycling|ride/i.test(t)) return 'bike';
-  if (/mobility|core/i.test(t)) return 'activity';
-  if (/run|lauf|trail|walk|hike|wander/i.test(t)) return 'footprints';
-  return 'zap';
-}
+// Diese Session-Typen haben keine sinnvolle Garmin-/Stream-basierte Analyse
+// (siehe coach/activity_data.py: Analyse-Pipeline ist auf Lauf-/Trail-
+// Aktivitäten mit Distanz-/HF-Stream ausgelegt) — keine Navigation zur
+// Analyse-View für diese Karten.
+const NO_ANALYSIS = ['Strength Training', 'Upper Body CAIRN', 'Lower Body + Arms CAIRN',
+  'Full Body Light CAIRN', 'Cross Training', 'Mobility', 'Rest Day', 'Rest'];
 
-// Krafttraining/Core/Mobility/Crosstraining verlinken nicht zur Analyse-View —
-// dafür gibt es keine sinnvolle Garmin-/Stream-basierte Analyse (siehe
-// coach/activity_data.py: Analyse-Pipeline ist auf Lauf-/Trail-Aktivitäten
-// mit Distanz-/HF-Stream ausgelegt).
+// Abgeschlossene Aktivitäten liefern rohe Garmin-/Hevy-Typen in
+// activity.session_type (z.B. "WeightTraining", "Ride" — aus
+// coach/jobs/sync_completed_activities.py::GARMIN_TYPE_MAP), nicht die
+// obigen "sauberen" Plan-Session-Typen. Gleiche Ausschlussliste, andere
+// Wertemenge — siehe SESSION_ASSET oben für dieselbe Unterscheidung.
+const NO_ANALYSIS_RAW_TYPES = ['WeightTraining', 'Ride'];
+
 function activityLinksToAnalysis(activity) {
-  const t = (activity.session_type || activity.type || '').toLowerCase();
-  return !/strength|kraft|weight|cross|bike|rad|cycling|ride|mobility|core/i.test(t);
+  return !NO_ANALYSIS.includes(activity.session_type) &&
+    !NO_ANALYSIS_RAW_TYPES.includes(activity.session_type);
 }
 
 /* ============================================================
@@ -1440,13 +1458,13 @@ async function loadActivities() {
 
   document.getElementById('acts-month-title').textContent = monthName(state.actYear, state.actMonth);
   document.getElementById('acts-count').textContent = '';
-  document.getElementById('acts-body').innerHTML = '<p class="loading-msg">Lade…</p>';
+  document.getElementById('acts-list').innerHTML = '<p class="loading-msg">Lade…</p>';
 
   try {
     const data = await apiGet(`/api/activities/month?year=${state.actYear}&month=${state.actMonth}`);
     renderActivities(data);
   } catch (err) {
-    document.getElementById('acts-body').innerHTML =
+    document.getElementById('acts-list').innerHTML =
       `<p class="loading-msg">Aktivitäten konnten nicht geladen werden. (${err.message})</p>`;
   }
 }
@@ -1478,7 +1496,7 @@ function renderActivities(data) {
   document.getElementById('acts-count').textContent =
     `${count} AKTIVITÄT${count !== 1 ? 'EN' : ''}`;
 
-  const container = document.getElementById('acts-body');
+  const container = document.getElementById('acts-list');
   if (!count) {
     container.innerHTML = '<p class="loading-msg" style="padding:2rem 0;text-align:center">Keine Aktivitäten in diesem Monat.</p>';
     return;
@@ -1486,7 +1504,6 @@ function renderActivities(data) {
 
   container.innerHTML = activities.map(act => {
     const color = activityCardColor(act);
-    const icon = activityTypeIcon(act);
     const linksToAnalysis = activityLinksToAnalysis(act);
     const d = act.date ? new Date(act.date) : null;
     const dayNum = d ? d.getDate() : '—';
@@ -1509,17 +1526,18 @@ function renderActivities(data) {
       ? `<button class="btn btn-ghost" type="button" onclick="navigate('analysis', ${actId})" aria-label="Analyse öffnen">
           <i data-lucide="chevron-right" aria-hidden="true"></i>
         </button>`
-      : `<i data-lucide="${icon}" class="activity-type-icon" aria-hidden="true"></i>`;
+      : '';
     return `<article class="card activity-card ${color}" aria-labelledby="act-${actId}">
       <div class="date-box">
         <span class="date-number">${dayNum}</span>
         <span class="date-copy"><strong>${dayName}</strong><span class="text-small">${monthShort}</span></span>
       </div>
       <div class="activity-copy">
-        <h3 id="act-${actId}"><i data-lucide="${icon}" class="activity-type-icon" aria-hidden="true"></i>${act.name || act.session_type}</h3>
+        <h3 id="act-${actId}">${act.name || act.session_type}</h3>
         <div class="metric-row">${metaParts.map(p => `<span>${p}</span>`).join('')}</div>
         <p class="activity-meta text-small">${metaSub}</p>
       </div>
+      <div class="art"><img src="${assetUrl(act.session_type)}" alt="${act.session_type || ''}" loading="lazy"></div>
       <div class="card-side"${linksToAnalysis ? '' : ' style="pointer-events:none"'}>
         ${cardSide}
       </div>
