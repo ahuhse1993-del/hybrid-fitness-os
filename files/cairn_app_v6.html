@@ -290,7 +290,7 @@ small, .text-small { font-size: .8rem; line-height: 1.5; }
 #cairn-plan-soft .title-row { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
 #cairn-plan-soft .title-row h1 { margin: 0; font-weight: 500; letter-spacing: -.055em; }
 #cairn-plan-soft .week-pill { flex: 0 0 auto; padding: .55rem .9rem; border-radius: 999px; background: var(--forest); color: var(--forest-ink); }
-#cairn-plan-soft .stack { display: grid; gap: .8rem; }
+#cairn-plan-soft .stack { display: grid; gap: .8rem; align-items: start; }
 #cairn-plan-soft .hero { --card: var(--coral); color: var(--coral-ink); display: flex; align-items: stretch; gap: 1rem; overflow: hidden; }
 #cairn-plan-soft .hero-copy { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; justify-content: space-between; gap: 1rem; }
 #cairn-plan-soft .eyebrow { margin: 0 0 .35rem; text-transform: uppercase; letter-spacing: .04em; }
@@ -310,17 +310,19 @@ small, .text-small { font-size: .8rem; line-height: 1.5; }
 #cairn-plan-soft .phase-tabs { display: flex; align-items: center; justify-content: space-between; gap: .25rem; margin-bottom: 1rem; }
 #cairn-plan-soft .phase-tabs span { flex: 1; padding: .38rem .15rem; text-align: center; border-radius: 999px; }
 #cairn-plan-soft .phase-tabs .active { background: var(--forest); color: var(--forest-ink); }
-#cairn-plan-soft .load-block { margin: 1rem 0 .35rem; padding: .85rem 0 .75rem; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+#cairn-plan-soft .load-block { margin: 1rem 0 .35rem; padding: .85rem 0 1.8rem; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
 #cairn-plan-soft .load-head { display: flex; align-items: end; justify-content: space-between; gap: 1rem; margin-bottom: .65rem; }
 #cairn-plan-soft .load-head h3, #cairn-plan-soft .load-head p { margin: 0; }
 #cairn-plan-soft .load-head h3 { font-weight: 500; letter-spacing: -.025em; }
 #cairn-plan-soft .load-chart { display: grid; grid-template-columns: repeat(16,minmax(0,1fr)); align-items: end; gap: 5px; height: 155px; }
-#cairn-plan-soft .load-week { display: grid; grid-template-rows: 1fr auto; align-items: end; gap: .3rem; height: 100%; min-width: 0; }
-#cairn-plan-soft .load-bar { position: relative; align-self: end; display: block; width: 100%; height: var(--h); min-height: 10px; border-radius: 4px 4px 0 0; background: color-mix(in srgb, var(--forest) 44%, var(--paper)); }
+#cairn-plan-soft .load-week { display: flex; flex-direction: column; justify-content: flex-end; align-items: stretch; height: 100%; min-width: 0; gap: .3rem; }
+#cairn-plan-soft .load-bar { position: relative; display: block; width: 100%; height: var(--h); min-height: 10px; border-radius: 4px 4px 0 0; background: color-mix(in srgb, var(--forest) 44%, var(--paper)); }
 #cairn-plan-soft .load-week.done .load-bar { background: var(--forest); opacity: .72; }
 #cairn-plan-soft .load-week.current .load-bar { background: var(--coral); opacity: 1; }
-#cairn-plan-soft .load-week.deload .load-bar { background: color-mix(in srgb, var(--ink) 24%, var(--paper)); }
-#cairn-plan-soft .load-value { position: absolute; left: 50%; top: -.1rem; transform: translate(-50%,-100%); white-space: nowrap; }
+#cairn-plan-soft .load-week.peak .load-bar { background: var(--forest); opacity: 1; }
+    #cairn-plan-soft .load-week.deload .load-bar { background: color-mix(in srgb, var(--ink) 24%, var(--paper)); }
+#cairn-plan-soft .load-value { position: absolute; left: 50%; top: 3px; transform: translateX(-50%); white-space: nowrap; pointer-events: none; font-size: .65rem; line-height: 1; color: var(--forest-ink); }
+#cairn-plan-soft .load-week.current .load-value { color: var(--coral-ink); }
 #cairn-plan-soft .load-label { text-align: center; color: var(--muted-foreground); }
 #cairn-plan-soft .load-week.current .load-label { color: var(--ink); font-weight: 500; }
 #cairn-plan-soft .week-track { position: relative; display: flex; align-items: center; justify-content: space-between; margin: 1.25rem .2rem .45rem; }
@@ -356,6 +358,7 @@ small, .text-small { font-size: .8rem; line-height: 1.5; }
   #cairn-plan-soft .phase-tabs span { padding-inline: .08rem; }
   #cairn-plan-soft .load-chart { height: 132px; gap: 3px; }
   #cairn-plan-soft .load-bar { border-radius: 3px 3px 0 0; }
+  #cairn-plan-soft .load-value { font-size: .6rem; }
   #cairn-plan-soft .milestone-status { display: none; }
   #cairn-plan-soft .nav-text { display: none; }
 }
@@ -746,18 +749,37 @@ const SESSION_ASSET = {
   'Long Trail Run': 'long_run',
   'Trail Run': 'trail_run',
   'Hill Session': 'hill_session',
+  'Hill Run': 'hill_session',
+  'Hill Technique': 'hill_session',
+  'Hill Sprints': 'hill_session',
+  'Uphill Threshold': 'hill_session',
   'Interval Session': 'interval_session',
   'Interval Run': 'interval_session',
+  'Interval Training': 'interval_session',
+  'Intervals': 'interval_session',
+  'Strides': 'interval_session',
   'Tempo Session': 'tempo_session',
   'Tempo Run': 'tempo_session',
+  'Threshold Run': 'tempo_session',
+  'Trail Threshold': 'tempo_session',
+  'Fartlek': 'tempo_session',
   'Sprint Session': 'sprint_session',
   'Time Trial': 'time_trial',
+  'Activation Run': 'easy_run',
+  'Race Activation': 'easy_run',
   'Strength Training': 'strength_training',
   'Upper Body': 'strength_training',
   'Lower Body': 'strength_training',
   'Upper Body CAIRN': 'strength_training',
   'Lower Body + Arms CAIRN': 'strength_training',
   'Full Body Light CAIRN': 'strength_training',
+  'Cycling': 'cross_training',
+  'Rennrad': 'cross_training',
+  'Rennrad Endurance': 'cross_training',
+  'Road Bike': 'cross_training',
+  'Bike': 'cross_training',
+  'MTB': 'cross_training',
+  'E-Bike': 'cross_training',
   'Cross Training': 'cross_training',
   'Mobility': 'mobility',
   'Rest Day': 'rest_day',
@@ -766,7 +788,10 @@ const SESSION_ASSET = {
 };
 
 const STRUCTURED_TYPES = new Set([
-  'Hill Session','Interval Session','Interval Run','Tempo Session','Tempo Run','Sprint Session','Time Trial'
+  'Hill Session','Hill Run','Hill Technique','Hill Sprints','Uphill Threshold',
+  'Interval Session','Interval Run','Interval Training','Intervals','Strides',
+  'Tempo Session','Tempo Run','Threshold Run','Trail Threshold','Fartlek',
+  'Sprint Session','Time Trial',
 ]);
 
 function getAssetKey(sessionType) {
@@ -783,7 +808,7 @@ function weekCardColor(session) {
   const t = session.session_type || '';
   if (/long trail|long run/i.test(t)) return 'is-dark';
   if (/upper body|lower body|strength|ruhetag|rest|mobility|core/i.test(t)) return 'is-sand';
-  if (/interval|hill|tempo|sprint|time trial/i.test(t)) return 'is-coral';
+  if (/interval|hill|tempo|threshold|fartlek|strides|sprint|time trial|activation/i.test(t)) return 'is-coral';
   return 'is-soft';
 }
 
@@ -1068,7 +1093,7 @@ function buildWeekCard(sess) {
 
   let sessionHTML = '';
   if (sess.is_today) sessionHTML += `<span class="today text-small">HEUTE</span>`;
-  sessionHTML += `<h2 id="day-${sess.date}">${sess.session_type || 'Session'}</h2>`;
+  sessionHTML += `<h2 id="day-${sess.date}">${sess.name || sess.session_type || 'Session'}</h2>`;
 
   // Meta row
   const metaParts = [];
@@ -1166,13 +1191,14 @@ function renderPlan(data) {
     week_number: w.week_number,
     km: w.total_km || 0,
     is_deload: w.is_deload,
+    is_peak: w.is_peak || false,
   }));
   const milestones = data.milestones || [];
   // Build a synthetic plan object for buildProgressCard
   const plan = {
     race_date: race.date || '',
     days_until_race: race.countdown_days || null,
-    phase_focus: block.phase || '',
+    phase_focus: block.week_focus || (block.phase || '').toUpperCase() || '',
   };
 
   document.getElementById('plan-week-pill').textContent = `WOCHE ${currentWeek} / ${totalWeeks}`;
@@ -1181,18 +1207,23 @@ function renderPlan(data) {
   container.innerHTML = '';
 
   // Hero card (race info)
-  // race fields from /api/frontend/plan: {name, date, distance_km, countdown_days}
-  const distLabel = race.distance_km ? `${race.distance_km} km` : (race.distance || '—');
+  // race fields from /api/frontend/plan: {name, date, distance_km, elevation_m, priority, countdown_days}
+  const distLabel = race.distance_km ? `${race.distance_km} km` : '—';
+  const hmLabel   = race.elevation_m  ? `${Number(race.elevation_m).toLocaleString('de-CH')} HM` : '—';
+  const priorityBadge = `${race.priority || 'A'}-RENNEN`;
+  const raceDateLabel = race.date
+    ? new Date(race.date + 'T00:00:00').toLocaleDateString('de-CH', { day: 'numeric', month: 'long', year: 'numeric' })
+    : '';
   const heroCard = e('section', 'card hero', `
     <div class="hero-copy">
       <div>
-        <p class="eyebrow text-small">A-RENNEN</p>
+        <p class="eyebrow text-small">${priorityBadge}</p>
         <h2 id="race-title">${race.name || 'Trainingsplan'}</h2>
-        <p class="race-date">${race.date || ''}</p>
+        <p class="race-date">${raceDateLabel}</p>
       </div>
       <div class="hero-metrics">
         <div><span class="text-small">DISTANZ</span><strong>${distLabel}</strong></div>
-        <div><span class="text-small">PHASE</span><strong>${phase}</strong></div>
+        <div><span class="text-small">HÖHE</span><strong>${hmLabel}</strong></div>
         <div><span class="text-small">NOCH</span><strong>${race.countdown_days != null ? race.countdown_days + ' Tage' : '—'}</strong></div>
       </div>
     </div>
@@ -1230,11 +1261,13 @@ function buildProgressCard(plan, currentWeek, totalWeeks, phase, weeklyLoad) {
     const weekData = weeklyLoad.find(w => (w.week_number || w.week) === i) || {};
     const km = weekData.km || weekData.planned_km || 0;
     const pct = Math.round((km / maxKm) * 96) + 4;
-    const isDone = i < currentWeek;
+    const isDone    = i < currentWeek;
     const isCurrent = i === currentWeek;
-    const isDeload = weekData.is_deload;
-    const classes = ['load-week', isDone ? 'done' : '', isCurrent ? 'current' : '', isDeload ? 'deload' : ''].filter(Boolean).join(' ');
-    const valueTag = (isCurrent || (i === totalWeeks)) && km ? `<span class="load-value text-small">${Math.round(km)}</span>` : '';
+    const isDeload  = weekData.is_deload;
+    const isPeak    = weekData.is_peak;
+    const classes = ['load-week', isDone?'done':'', isCurrent?'current':'', isDeload?'deload':'', isPeak?'peak':''].filter(Boolean).join(' ');
+    const showVal = (isCurrent || isPeak) && km;
+    const valueTag = showVal ? `<span class="load-value text-small">${Math.round(km)}</span>` : '';
     bars.push(`<span class="${classes}"><span class="load-bar" style="--h:${pct}%">${valueTag}</span><span class="load-label text-small">${i}</span></span>`);
   }
 
@@ -1250,6 +1283,7 @@ function buildProgressCard(plan, currentWeek, totalWeeks, phase, weeklyLoad) {
   const done = currentWeek - 1;
   const remaining = totalWeeks - currentWeek;
 
+  const deloadLabel = weeklyLoad.filter(w=>w.is_deload).map(w=>'W'+(w.week_number||w.week)).join(' / ') || '';
   return `
     <div class="section-head">
       <div><p class="eyebrow text-small">AKTUELLE PHASE</p><h2 id="phase-title">${phase}</h2></div>
@@ -1257,12 +1291,12 @@ function buildProgressCard(plan, currentWeek, totalWeeks, phase, weeklyLoad) {
     </div>
     <div class="phase-tabs text-small" aria-label="Trainingsphasen">${phaseTabs}</div>
     <div class="load-block">
-      <div class="load-head"><div><p class="eyebrow text-small">BELASTUNGSVERTEILUNG</p><h3>Wochenkilometer</h3></div><p class="text-small">DELOAD · W4 / W8 / W12</p></div>
-      <div class="load-chart" role="img" aria-label="Geplante Wochenkilometer">${bars.join('')}</div>
+      <div class="load-head">
+        <div><p class="eyebrow text-small">BELASTUNGSVERTEILUNG</p><h3>Wochenkilometer</h3></div>
+
+      </div>
+      <div class="load-chart" role="img" aria-label="Geplante Wochenkilometer" style="grid-template-columns:repeat(${totalWeeks},minmax(0,1fr))">${bars.join('')}</div>
     </div>
-    <div class="week-track" role="img" aria-label="Woche ${currentWeek} von ${totalWeeks}">${dots.join('')}</div>
-    <div class="track-labels text-small"><span>1</span><span>${Math.round(totalWeeks/4)}</span><span class="current-label">${currentWeek} · DU BIST HIER</span><span>${Math.round(totalWeeks*0.75)}</span><span>${totalWeeks}</span></div>
-    <div class="progress-foot text-small"><span>${done} WOCHE${done !== 1 ? 'N' : ''} ERLEDIGT</span><span>${remaining} WOCHE${remaining !== 1 ? 'N' : ''} + RACE</span></div>
   `;
 }
 
