@@ -566,6 +566,11 @@ small, .text-small { font-size: .8rem; line-height: 1.5; }
 #cairn-soft .trail-stat strong { font-size: 1.35rem; font-weight: 500; }
 #cairn-soft .zone-row { display: grid; grid-template-columns: 50px minmax(0,1fr) 64px 42px; align-items: center; gap: .8rem; margin: .65rem 0; }
 #cairn-soft .zone-pct { font-weight: 500; min-width: 38px; text-align: right; }
+#cairn-soft .pace-row { display: grid; grid-template-columns: 44px 1fr 52px; align-items: center; gap: .5rem; margin: .35rem 0; }
+#cairn-soft .pace-km { font-size: .7rem; color: var(--muted-foreground); }
+#cairn-soft .pace-track { height: .65rem; border-radius: 999px; background: color-mix(in srgb, var(--ink) 10%, transparent); }
+#cairn-soft .pace-fill { height: 100%; border-radius: inherit; background: var(--green); }
+#cairn-soft .pace-label { font-size: .85rem; font-weight: 500; text-align: right; font-variant-numeric: tabular-nums; }
 #cairn-soft .zone-track { height: 1.05rem; border-radius: 999px; background: color-mix(in srgb, var(--ink) 12%, transparent); overflow: hidden; }
 #cairn-soft .zone-fill { height: 100%; width: var(--w); border-radius: inherit; background: var(--green); }
 #cairn-soft .gear-row { display: flex; align-items: end; justify-content: space-between; gap: 1rem; }
@@ -1720,9 +1725,8 @@ function renderAnalysisMap(route) {
   // (dort bereits funktionstüchtig) — Standard-OSM-Tiles, dieselben Farben.
   _analysisMapInstance = L.map(mapEl, { zoomControl: true, attributionControl: false }).setView(latlngs[Math.floor(latlngs.length / 2)], 13);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(_analysisMapInstance);
-  const line = L.polyline(latlngs, { color: '#E8D84A', weight: 3 }).addTo(_analysisMapInstance);
-  L.circleMarker(latlngs[0], { radius: 5, color: '#1A1918', weight: 1.5, fillColor: '#4a9a59', fillOpacity: 1 }).addTo(_analysisMapInstance);
-  L.circleMarker(latlngs[latlngs.length - 1], { radius: 5, color: '#1A1918', weight: 1.5, fillColor: '#C4547A', fillOpacity: 1 }).addTo(_analysisMapInstance);
+  const line = L.polyline(latlngs, { color: '#29483e', weight: 3, opacity: 0.9 }).addTo(_analysisMapInstance);
+  L.circleMarker(latlngs[0], { radius: 6, fillColor: '#29483e', color: '#fff', weight: 2, fillOpacity: 1 }).addTo(_analysisMapInstance);
   _analysisMapInstance.fitBounds(line.getBounds(), { padding: [20, 20] });
   // invalidateSize() + erneutes fitBounds() verzögert: container hat direkt
   // nach dem innerHTML-Swap noch keine finalen Layout-Maße, das erste
@@ -1807,58 +1811,25 @@ function fmtPace(seconds) {
 }
 
 function buildPaceChart(splits, avgPace) {
-  if (!splits || !splits.length) return '';
-  const W = 760, H = 230, padX = 45, padY = 45, bottom = 175;
-  const paces = splits.map(s => s.pace_seconds_per_km || s.pace_sec || s[1] || 0).filter(Boolean);
-  const maxP = Math.max(...paces);
-  const minP = Math.min(...paces);
+  const valid = (splits || []).filter(s => s.pace_seconds_per_km || s.pace_sec || s[1]);
+  if (!valid.length) return '';
+  const paces = valid.map(s => s.pace_seconds_per_km || s.pace_sec || s[1] || 0);
+  const fastest = Math.min(...paces);
 
-  // Y-Achse: 3-5 Pace-Labels (30s- oder 60s-Schritte je nach Spreizung).
-  // Kleinerer Pace-Wert (schneller) = oben im Chart.
-  let step = (maxP - minP) > 120 ? 60 : 30;
-  let axisMin = Math.floor(minP / step) * step;
-  let axisMax = Math.ceil(maxP / step) * step;
-  if (axisMax === axisMin) axisMax = axisMin + step;
-  let axisValues = [];
-  for (let v = axisMin; v <= axisMax + 0.01; v += step) axisValues.push(v);
-  while (axisValues.length > 5) {
-    step *= 2;
-    axisMin = Math.floor(minP / step) * step;
-    axisMax = Math.ceil(maxP / step) * step;
-    axisValues = [];
-    for (let v = axisMin; v <= axisMax + 0.01; v += step) axisValues.push(v);
-  }
-  const axisRange = (axisMax - axisMin) || 1;
-  const yForPace = pace => padY + ((pace - axisMin) / axisRange) * (bottom - padY);
-
-  const n = splits.length;
-  const barW = Math.max(18, Math.floor((W - padX - 16) / n) - 4);
-  const bars = splits.map((s, i) => {
+  const rows = valid.map((s, i) => {
     const pace = s.pace_seconds_per_km || s.pace_sec || s[1] || 0;
-    const y = yForPace(pace);
-    const h = Math.max(4, bottom - y);
-    const x = padX + i * ((W - padX - 16) / n) + 2;
-    const isHot = pace > (maxP * 0.9);
-    const hotCls = isHot ? ' hot' : '';
-    return `<rect class="pace-bar${hotCls}" x="${Math.round(x)}" y="${Math.round(y)}" width="${barW}" height="${Math.round(h)}" rx="5"/>`;
+    const km = s.km || s.distance_km || (i + 1);
+    const width = fastest > 0 ? Math.round((fastest / pace) * 100) : 0;
+    return `<div class="pace-row">
+      <span class="pace-km">KM ${km}</span>
+      <div class="pace-track"><div class="pace-fill" style="width:${width}%"></div></div>
+      <span class="pace-label">${fmtPace(pace)}</span>
+    </div>`;
   }).join('');
 
-  const gridLines = axisValues.map(v =>
-    `<line class="grid" x1="${padX}" y1="${Math.round(yForPace(v))}" x2="${W-16}" y2="${Math.round(yForPace(v))}"/>`
-  ).join('');
-  const axisLabels = axisValues.map(v =>
-    `<text class="axis" x="5" y="${Math.round(yForPace(v))+4}">${fmtPace(v)}</text>`
-  ).join('');
-
   return `<section class="card panel sand-card" aria-labelledby="soft-pace">
-    <div class="head"><div><p class="eyebrow text-small">GESCHWINDIGKEIT</p><h2 id="soft-pace">Pace pro Kilometer</h2></div><span class="pill text-small">Ø ${avgPace || '—'}</span></div>
-    <svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Pace-Balken">
-      ${gridLines}
-      ${bars}
-      ${axisLabels}
-      <text class="axis" x="${padX}" y="${H-14}">1</text>
-      <text class="axis" x="${W-30}" y="${H-14}">${n} KM</text>
-    </svg>
+    <div class="head"><div><p class="eyebrow text-small">GESCHWINDIGKEIT</p><h2 id="soft-pace">Pace pro Kilometer</h2></div><span class="pill text-small">Ø ${avgPace ? avgPace + ' /km' : '—'}</span></div>
+    ${rows}
   </section>`;
 }
 
