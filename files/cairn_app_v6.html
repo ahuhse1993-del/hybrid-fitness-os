@@ -534,10 +534,10 @@ small, .text-small { font-size: .8rem; line-height: 1.5; }
 #cairn-soft .map { min-height: 270px; border-radius: 1.4rem; background: var(--paper); color: var(--green); padding: 0; overflow: hidden; position: relative; }
 #cairn-soft .map-leaflet { width: 100%; height: 100%; min-height: 270px; }
 #cairn-soft .map .loading-msg { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; margin: 0; }
-#cairn-soft .leaflet-control-attribution { font-size: .65rem; background: color-mix(in srgb, var(--paper) 80%, transparent); }
-#cairn-soft .analysis-route-line { stroke: var(--green); }
-#cairn-soft .analysis-marker-start { stroke: var(--ink); fill: var(--green); }
-#cairn-soft .analysis-marker-end { stroke: var(--ink); fill: var(--coral); }
+#cairn-soft .leaflet-control-attribution { display: none; }
+#cairn-soft .leaflet-container { background: #1A1918; }
+#cairn-soft .leaflet-tile-pane { filter: grayscale(100%) brightness(0.45) contrast(1.1); }
+#cairn-soft .leaflet-control-zoom a { background: #1A1918; color: #E8D84A; border-color: #333; }
 #cairn-soft .map svg { width: 100%; max-width: 260px; height: auto; }
 #cairn-soft .map-grid { stroke: var(--line); stroke-width: 1; }
 #cairn-soft .route { fill: none; stroke: currentColor; stroke-width: 6; stroke-linecap: round; stroke-linejoin: round; }
@@ -564,7 +564,8 @@ small, .text-small { font-size: .8rem; line-height: 1.5; }
 #cairn-soft .trail-stat { background: var(--soft); color: var(--ink); padding: .9rem; }
 #cairn-soft .trail-stat span, #cairn-soft .trail-stat strong { display: block; }
 #cairn-soft .trail-stat strong { font-size: 1.35rem; font-weight: 500; }
-#cairn-soft .zone-row { display: grid; grid-template-columns: 50px minmax(0,1fr) 64px; align-items: center; gap: .8rem; margin: .65rem 0; }
+#cairn-soft .zone-row { display: grid; grid-template-columns: 50px minmax(0,1fr) 64px 42px; align-items: center; gap: .8rem; margin: .65rem 0; }
+#cairn-soft .zone-pct { font-weight: 500; min-width: 38px; text-align: right; }
 #cairn-soft .zone-track { height: 1.05rem; border-radius: 999px; background: color-mix(in srgb, var(--ink) 12%, transparent); overflow: hidden; }
 #cairn-soft .zone-fill { height: 100%; width: var(--w); border-radius: inherit; background: var(--green); }
 #cairn-soft .gear-row { display: flex; align-items: end; justify-content: space-between; gap: 1rem; }
@@ -1715,19 +1716,23 @@ function renderAnalysisMap(route) {
   // route.coordinates kommt aus coach/activity_data.py::build_route() als
   // [lon, lat]-Paare (GeoJSON-Konvention) — deshalb hier vertauscht zu [lat, lon].
   const latlngs = route.coordinates.map(c => [c[1], c[0]]);
-  _analysisMapInstance = L.map(mapEl, { zoomControl: true, attributionControl: true }).setView(latlngs[Math.floor(latlngs.length / 2)], 13);
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-    attribution: '© OpenStreetMap © CartoDB',
-    subdomains: 'abcd',
-    maxZoom: 19,
-  }).addTo(_analysisMapInstance);
-  // Farben laufen über CSS-Klassen statt der Leaflet-Optionen color/fillColor:
-  // Leaflet setzt diese als rohe SVG-Attribute (fill="...", stroke="..."), in
-  // denen CSS-Custom-Properties wie var(--green) nicht aufgelöst werden.
-  const line = L.polyline(latlngs, { className: 'analysis-route-line', weight: 3, opacity: 0.8 }).addTo(_analysisMapInstance);
-  L.circleMarker(latlngs[0], { radius: 5, weight: 1.5, className: 'analysis-marker-start', fillOpacity: 1 }).addTo(_analysisMapInstance);
-  L.circleMarker(latlngs[latlngs.length - 1], { radius: 5, weight: 1.5, className: 'analysis-marker-end', fillOpacity: 1 }).addTo(_analysisMapInstance);
-  _analysisMapInstance.fitBounds(line.getBounds(), { padding: [15, 15] });
+  // Karten-Init 1:1 aus files/cairn_activity_analysis.html::renderRoute() übernommen
+  // (dort bereits funktionstüchtig) — Standard-OSM-Tiles, dieselben Farben.
+  _analysisMapInstance = L.map(mapEl, { zoomControl: true, attributionControl: false }).setView(latlngs[Math.floor(latlngs.length / 2)], 13);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(_analysisMapInstance);
+  const line = L.polyline(latlngs, { color: '#E8D84A', weight: 3 }).addTo(_analysisMapInstance);
+  L.circleMarker(latlngs[0], { radius: 5, color: '#1A1918', weight: 1.5, fillColor: '#4a9a59', fillOpacity: 1 }).addTo(_analysisMapInstance);
+  L.circleMarker(latlngs[latlngs.length - 1], { radius: 5, color: '#1A1918', weight: 1.5, fillColor: '#C4547A', fillOpacity: 1 }).addTo(_analysisMapInstance);
+  _analysisMapInstance.fitBounds(line.getBounds(), { padding: [20, 20] });
+  // invalidateSize() + erneutes fitBounds() verzögert: container hat direkt
+  // nach dem innerHTML-Swap noch keine finalen Layout-Maße, das erste
+  // fitBounds() oben rechnet dadurch mit einer falschen Containergröße
+  // (sichtbar an einem viel zu weit rausgezoomten Ergebnis).
+  setTimeout(() => {
+    if (!_analysisMapInstance) return;
+    _analysisMapInstance.invalidateSize();
+    _analysisMapInstance.fitBounds(line.getBounds(), { padding: [20, 20] });
+  }, 150);
 }
 
 function loadShoeOptions(activityId) {
@@ -1795,34 +1800,62 @@ function buildElevationChart(points, elevUp, elevDown, distanceKm) {
   </section>`;
 }
 
+function fmtPace(seconds) {
+  const m = Math.floor(seconds / 60);
+  const s = String(Math.round(seconds % 60)).padStart(2, '0');
+  return m + ':' + s;
+}
+
 function buildPaceChart(splits, avgPace) {
   if (!splits || !splits.length) return '';
   const W = 760, H = 230, padX = 45, padY = 45, bottom = 175;
   const paces = splits.map(s => s.pace_seconds_per_km || s.pace_sec || s[1] || 0).filter(Boolean);
   const maxP = Math.max(...paces);
   const minP = Math.min(...paces);
-  const range = maxP - minP || 1;
+
+  // Y-Achse: 3-5 Pace-Labels (30s- oder 60s-Schritte je nach Spreizung).
+  // Kleinerer Pace-Wert (schneller) = oben im Chart.
+  let step = (maxP - minP) > 120 ? 60 : 30;
+  let axisMin = Math.floor(minP / step) * step;
+  let axisMax = Math.ceil(maxP / step) * step;
+  if (axisMax === axisMin) axisMax = axisMin + step;
+  let axisValues = [];
+  for (let v = axisMin; v <= axisMax + 0.01; v += step) axisValues.push(v);
+  while (axisValues.length > 5) {
+    step *= 2;
+    axisMin = Math.floor(minP / step) * step;
+    axisMax = Math.ceil(maxP / step) * step;
+    axisValues = [];
+    for (let v = axisMin; v <= axisMax + 0.01; v += step) axisValues.push(v);
+  }
+  const axisRange = (axisMax - axisMin) || 1;
+  const yForPace = pace => padY + ((pace - axisMin) / axisRange) * (bottom - padY);
+
   const n = splits.length;
   const barW = Math.max(18, Math.floor((W - padX - 16) / n) - 4);
   const bars = splits.map((s, i) => {
     const pace = s.pace_seconds_per_km || s.pace_sec || s[1] || 0;
-    const km = s.km || s.distance_km || (i + 1);
-    const h = bottom - padY > 0 ? ((pace - minP) / range) * (bottom - padY - 10) + 10 : 20;
+    const y = yForPace(pace);
+    const h = Math.max(4, bottom - y);
     const x = padX + i * ((W - padX - 16) / n) + 2;
     const isHot = pace > (maxP * 0.9);
     const hotCls = isHot ? ' hot' : '';
-    return `<rect class="pace-bar${hotCls}" x="${Math.round(x)}" y="${Math.round(bottom - h)}" width="${barW}" height="${Math.round(h)}" rx="5"/>`;
+    return `<rect class="pace-bar${hotCls}" x="${Math.round(x)}" y="${Math.round(y)}" width="${barW}" height="${Math.round(h)}" rx="5"/>`;
   }).join('');
+
+  const gridLines = axisValues.map(v =>
+    `<line class="grid" x1="${padX}" y1="${Math.round(yForPace(v))}" x2="${W-16}" y2="${Math.round(yForPace(v))}"/>`
+  ).join('');
+  const axisLabels = axisValues.map(v =>
+    `<text class="axis" x="5" y="${Math.round(yForPace(v))+4}">${fmtPace(v)}</text>`
+  ).join('');
 
   return `<section class="card panel sand-card" aria-labelledby="soft-pace">
     <div class="head"><div><p class="eyebrow text-small">GESCHWINDIGKEIT</p><h2 id="soft-pace">Pace pro Kilometer</h2></div><span class="pill text-small">Ø ${avgPace || '—'}</span></div>
     <svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Pace-Balken">
-      <line class="grid" x1="${padX}" y1="${padY}" x2="${W-16}" y2="${padY}"/>
-      <line class="grid" x1="${padX}" y1="${(bottom+padY)/2}" x2="${W-16}" y2="${(bottom+padY)/2}"/>
-      <line class="grid" x1="${padX}" y1="${bottom}" x2="${W-16}" y2="${bottom}"/>
+      ${gridLines}
       ${bars}
-      <text class="axis" x="5" y="${padY+4}">schnell</text>
-      <text class="axis" x="5" y="${bottom+4}">langsam</text>
+      ${axisLabels}
       <text class="axis" x="${padX}" y="${H-14}">1</text>
       <text class="axis" x="${W-30}" y="${H-14}">${n} KM</text>
     </svg>
@@ -1864,13 +1897,15 @@ function buildHRChart(points, avgHr) {
 function buildHRZones(zones, method) {
   if (!zones || !zones.length) return '';
   const maxTime = Math.max(...zones.map(z => z.duration_s != null ? z.duration_s : (z.seconds || 0)), 1);
+  const totalTime = zones.reduce((sum, z) => sum + (z.duration_s != null ? z.duration_s : (z.seconds || 0)), 0) || 1;
   const rows = zones.map((z, i) => {
     const secs = z.duration_s != null ? z.duration_s : (z.seconds || 0);
     const pct = Math.round((secs / maxTime) * 96) + 2;
     const mins = Math.floor(secs / 60);
     const rem = secs % 60;
     const timeStr = `${String(mins).padStart(2,'0')}:${String(rem).padStart(2,'0')}`;
-    return `<div class="zone-row"><strong>Z${z.zone || (i+1)}</strong><div class="zone-track"><div class="zone-fill" style="--w:${pct}%"></div></div><span>${timeStr}</span></div>`;
+    const sharePct = z.percentage != null ? Math.round(z.percentage) : Math.round((secs / totalTime) * 100);
+    return `<div class="zone-row"><strong>Z${z.zone || (i+1)}</strong><div class="zone-track"><div class="zone-fill" style="--w:${pct}%"></div></div><span>${timeStr}</span><span class="zone-pct">${sharePct}%</span></div>`;
   }).join('');
 
   return `<section class="card panel coral-card" aria-labelledby="soft-zones">
