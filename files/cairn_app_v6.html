@@ -535,10 +535,11 @@ small, .text-small { font-size: .8rem; line-height: 1.5; }
 #cairn-soft .map-leaflet { width: 100%; height: 100%; min-height: 270px; }
 #cairn-soft .map .loading-msg { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; margin: 0; }
 #cairn-soft .leaflet-control-attribution { display: none; }
-#cairn-soft .leaflet-container { background: #1A1918; }
-#cairn-soft .leaflet-tile-pane { filter: grayscale(100%) brightness(0.45) contrast(1.1); }
-#cairn-soft .leaflet-control-zoom a { background: #1A1918; color: #E8D84A; border-color: #333; }
-#cairn-soft .map svg { width: 100%; max-width: 260px; height: auto; }
+#cairn-soft .leaflet-container { background: #E5E2DA; }
+#cairn-soft .leaflet-tile-pane { filter: grayscale(100%) brightness(1.55) contrast(0.75); }
+#cairn-soft .leaflet-control-zoom a { background: #fff; color: #1A1918; border-color: #ddd; }
+#cairn-soft .analysis-route-line { stroke: var(--coral); }
+#cairn-soft .analysis-marker-start { stroke: #fff; fill: var(--coral); }
 #cairn-soft .map-grid { stroke: var(--line); stroke-width: 1; }
 #cairn-soft .route { fill: none; stroke: currentColor; stroke-width: 6; stroke-linecap: round; stroke-linejoin: round; }
 #cairn-soft .route-start { fill: var(--coral); stroke: currentColor; stroke-width: 3; }
@@ -1725,9 +1726,11 @@ function renderAnalysisMap(route) {
   // (dort bereits funktionstüchtig) — Standard-OSM-Tiles, dieselben Farben.
   _analysisMapInstance = L.map(mapEl, { zoomControl: true, attributionControl: false }).setView(latlngs[Math.floor(latlngs.length / 2)], 13);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(_analysisMapInstance);
-  const line = L.polyline(latlngs, { color: '#FF4500', weight: 5, opacity: 0.9 }).addTo(_analysisMapInstance);
+  // Farbe über CSS-Klasse (nicht color/fillColor): Leaflet setzt diese Optionen
+  // als rohe SVG-Attribute, in denen var(--coral) nicht auflöst.
+  const line = L.polyline(latlngs, { className: 'analysis-route-line', weight: 5, opacity: 0.9 }).addTo(_analysisMapInstance);
   line.bringToFront();
-  L.circleMarker(latlngs[0], { radius: 6, fillColor: '#29483e', color: '#fff', weight: 2, fillOpacity: 1 }).addTo(_analysisMapInstance);
+  L.circleMarker(latlngs[0], { radius: 6, weight: 2, className: 'analysis-marker-start', fillOpacity: 1 }).addTo(_analysisMapInstance);
   _analysisMapInstance.fitBounds(line.getBounds(), { padding: [20, 20] });
   // invalidateSize() + erneutes fitBounds() verzögert: container hat direkt
   // nach dem innerHTML-Swap noch keine finalen Layout-Maße, das erste
