@@ -1725,7 +1725,8 @@ function renderAnalysisMap(route) {
   // (dort bereits funktionstüchtig) — Standard-OSM-Tiles, dieselben Farben.
   _analysisMapInstance = L.map(mapEl, { zoomControl: true, attributionControl: false }).setView(latlngs[Math.floor(latlngs.length / 2)], 13);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(_analysisMapInstance);
-  const line = L.polyline(latlngs, { color: '#29483e', weight: 3, opacity: 0.9 }).addTo(_analysisMapInstance);
+  const line = L.polyline(latlngs, { color: '#FF4500', weight: 5, opacity: 0.9 }).addTo(_analysisMapInstance);
+  line.bringToFront();
   L.circleMarker(latlngs[0], { radius: 6, fillColor: '#29483e', color: '#fff', weight: 2, fillOpacity: 1 }).addTo(_analysisMapInstance);
   _analysisMapInstance.fitBounds(line.getBounds(), { padding: [20, 20] });
   // invalidateSize() + erneutes fitBounds() verzögert: container hat direkt
