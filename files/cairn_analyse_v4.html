@@ -934,7 +934,8 @@ function calcMaxGrade(points) {
 
 function drawRoute(map,points){
   var ll=points.map(function(p){return [p.lat,p.lon];});
-  L.polyline(ll,{color:'#E8D84A',weight:2.5,opacity:.85,lineJoin:'round'}).addTo(map);
+  var routeLine=L.polyline(ll,{color:'#FF4500',weight:5,opacity:.85,lineJoin:'round'}).addTo(map);
+  routeLine.bringToFront();
   var dotIcon=function(color){return L.divIcon({className:'',html:'<div style="width:8px;height:8px;background:'+color+';border:1.5px solid #1A1918;border-radius:50%"></div>',iconSize:[8,8],iconAnchor:[4,4]})};
   L.marker(ll[0],{icon:dotIcon('#E8D84A')}).addTo(map);
   L.marker(ll[ll.length-1],{icon:dotIcon('#9E9B95')}).addTo(map);
