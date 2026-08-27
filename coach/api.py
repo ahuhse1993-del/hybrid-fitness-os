@@ -484,6 +484,37 @@ def health_today():
     except Exception as e:
         return jsonify({"status": "error", "message": str(e), "trace": traceback.format_exc()}), 500
 
+@app.route('/api/plan/recent-changes', methods=['GET'])
+def plan_recent_changes():
+    """Zuletzt angefasste training_plan-Zeilen (ORDER BY updated_at DESC) —
+    zeigt WAS zuletzt geändert wurde und WANN, kein Vorher/Nachher-Diff
+    (dafür gibt es kein Audit-Log für training_plan, anders als bei
+    athlete_profile)."""
+    try:
+        limit = request.args.get('limit', default=5, type=int)
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT id, (week_date + (day_of_week - 1) * INTERVAL '1 day')::date AS session_date,
+                   session_type, notes, updated_at
+            FROM training_plan
+            ORDER BY updated_at DESC
+            LIMIT %s
+        """, (limit,))
+        rows = cur.fetchall()
+        conn.close()
+
+        changes = [{
+            "id": r[0],
+            "session_date": str(r[1]) if r[1] else None,
+            "session_type": r[2],
+            "notes": r[3],
+            "updated_at": r[4].isoformat() if r[4] else None,
+        } for r in rows]
+        return jsonify({"status": "ok", "changes": changes})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e), "trace": traceback.format_exc()}), 500
+
 # ─── ATHLETE PROFILE (Schicht 1 — editierbar) ───
 @app.route('/api/athlete/profile', methods=['GET'])
 def get_athlete_profile():

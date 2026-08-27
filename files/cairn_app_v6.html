@@ -390,6 +390,7 @@ small, .text-small { font-size: .8rem; line-height: 1.5; }
 #cairn-sync-soft .stack { display: grid; gap: .8rem; }
 #cairn-sync-soft .uploads { --card: var(--coral); color: var(--coral-ink); }
 #cairn-sync-soft .health { --card: var(--soft); color: var(--ink); }
+#cairn-sync-soft .changes { --card: var(--sand); color: var(--ink); }
 #cairn-sync-soft .section-title { margin: 0 0 .65rem; text-transform: uppercase; letter-spacing: .04em; }
 #cairn-sync-soft .activity-list { display: grid; }
 #cairn-sync-soft .activity-row { display: flex; align-items: center; min-height: 92px; gap: .8rem; padding: .55rem 0; border-bottom: 1px solid color-mix(in srgb, currentColor 28%, transparent); }
@@ -1358,14 +1359,15 @@ async function loadSync() {
 
   document.getElementById('sync-stack').innerHTML = '<p class="loading-msg">Wird geladen…</p>';
 
-  const [statusData, uploadsData, healthData] = await Promise.all([
+  const [statusData, uploadsData, healthData, changesData] = await Promise.all([
     apiGet('/api/frontend/sync').catch(() => null),
     apiGet('/api/activities/recent?limit=5').catch(() => null),
     apiGet('/api/health/today').catch(() => null),
+    apiGet('/api/plan/recent-changes?limit=5').catch(() => null),
   ]);
 
   renderSyncStatus(statusData);
-  renderSync(uploadsData, healthData);
+  renderSync(uploadsData, healthData, changesData);
 }
 
 function renderSyncStatus(statusData) {
@@ -1385,7 +1387,7 @@ function renderSyncStatus(statusData) {
   if (label) label.textContent = live ? 'LIVE' : 'OFFLINE';
 }
 
-function renderSync(uploadsData, healthData) {
+function renderSync(uploadsData, healthData, changesData) {
   const container = document.getElementById('sync-stack');
   container.innerHTML = '';
 
@@ -1432,6 +1434,35 @@ function renderSync(uploadsData, healthData) {
     ${healthInner}
   `);
   container.appendChild(healthCard);
+
+  // Letzte Plananpassungen — /api/plan/recent-changes?limit=5
+  // Zeigt WAS zuletzt angefasst wurde und WANN, kein Vorher/Nachher-Diff
+  // (kein Audit-Log für training_plan vorhanden).
+  const changes = (changesData && changesData.changes) || [];
+  const changeRows = changes.map(ch => {
+    const updated = ch.updated_at ? new Date(ch.updated_at) : null;
+    const updatedLabel = updated
+      ? updated.toLocaleDateString('de-CH', { day: 'numeric', month: 'short' }) + ' · ' +
+        updated.toLocaleTimeString('de-CH', { hour: '2-digit', minute: '2-digit' })
+      : '—';
+    const sessionDate = ch.session_date ? new Date(ch.session_date + 'T12:00:00') : null;
+    const sessionLabel = sessionDate
+      ? sessionDate.toLocaleDateString('de-CH', { weekday: 'short', day: 'numeric', month: 'short' })
+      : '';
+    return `<div class="activity-row">
+      <span class="activity-date text-small">${updatedLabel}</span>
+      <div class="activity-copy">
+        <h2>${ch.session_type || '—'}</h2>
+        <p class="text-small">Session vom ${sessionLabel}</p>
+      </div>
+    </div>`;
+  }).join('') || '<p class="text-small" style="padding:.5rem 0;opacity:.7">Keine aktuellen Plananpassungen</p>';
+
+  const changesCard = e('section', 'card changes', `
+    <p class="section-title text-small">LETZTE PLANANPASSUNGEN</p>
+    <div class="activity-list">${changeRows}</div>
+  `);
+  container.appendChild(changesCard);
 
   if (window.lucide) lucide.createIcons();
 }
