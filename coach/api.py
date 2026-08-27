@@ -1518,6 +1518,30 @@ def save_coach_analysis_for_frontend(activity_id):
         return jsonify({"status": "error", "message": str(e), "trace": traceback.format_exc()}), 500
 
 
+@app.route('/api/activity/<int:training_id>/save-analysis', methods=['POST'])
+def save_activity_analysis_for_frontend(training_id):
+    """Vereinfachter Speicher-Endpoint (coach_text + title) — ruft intern
+    dasselbe Speichern wie /api/activities/<id>/coach-analysis auf
+    (Tabelle activity_analyses), damit der Text auf der Analyse-Seite
+    erscheint statt in einer eigenen, vom Frontend ungelesenen Tabelle zu landen."""
+    try:
+        from coach.mcp_server import save_activity_analysis
+        data = request.get_json(force=True) or {}
+        coach_text = data.get('coach_text')
+        if not coach_text:
+            return jsonify({"status": "error", "message": "coach_text erforderlich"}), 400
+        result = save_activity_analysis(
+            activity_id=training_id,
+            coach_text=coach_text,
+            title=data.get('title'),
+        )
+        if "error" in result:
+            return jsonify({"status": "error", "message": result["error"]}), 400
+        return jsonify({"status": "ok", **result})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e), "trace": traceback.format_exc()}), 500
+
+
 @app.route('/api/strava/webhook', methods=['GET', 'POST'])
 def strava_webhook():
     if request.method == 'GET':

@@ -3176,6 +3176,30 @@ def save_activity_coach_analysis(
 
 
 @mcp.tool()
+def save_activity_analysis(activity_id: int, coach_text: str, title: str | None = None) -> dict:
+    """
+    Speichert eine Coach-Analyse zu einer Aktivität. Nach dem Speichern
+    erscheint der Text auf der Analyse-Seite.
+
+    Vereinfachter Wrapper um save_activity_coach_analysis: holt den aktuell
+    gültigen source_data_hash selbst (statt ihn vom Aufrufer zu verlangen)
+    und legt coach_text/title in dessen summary/verdict-Feldern ab —
+    dieselbe Tabelle (activity_analyses), die die Analyse-Seite bereits
+    über existing_coach_analysis liest. Für die vollständige, strukturierte
+    Analyse (positive_findings, limitations, ...) weiterhin
+    save_activity_coach_analysis direkt verwenden.
+    """
+    current = get_activity_analysis_data(activity_id=activity_id, include_stream=False)
+    if "error" in current:
+        return current
+    return save_activity_coach_analysis(
+        activity_id=activity_id,
+        source_data_hash=current["source_data_hash"],
+        analysis={"verdict": title, "summary": coach_text},
+    )
+
+
+@mcp.tool()
 def sync_completed_activities(source: str = "both") -> dict:
     """
     Syncs completed workout sessions from Garmin and/or Hevy into the CAIRN database.
