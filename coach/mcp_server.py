@@ -952,6 +952,594 @@ def get_hevy_routines() -> list[dict]:
     return _fetchall("SELECT title, exercises FROM cairn_routines ORDER BY title")
 
 
+# ── Hevy Routinen: volle Struktur (hevy_routines/-exercises/-sets) ─────────
+# Bewusst NICHT "get_hevy_routines" genannt — der Name ist oben bereits als
+# MCP-Tool vergeben (liest die alte, einfache cairn_routines-Tabelle mit nur
+# title+Übungsnamen). Ein zweites "get_hevy_routines" hätte das bestehende
+# Tool beim Modul-Import stillschweigend überschrieben. Hier daher
+# "list_hevy_routines" — passt auch zum bestehenden list_garmin_workouts.
+
+_HEVY_EXERCISE_TYPE_SUPPORTS = {
+    # Aus einem echten, lesenden Call gegen /v1/exercise_templates ermittelt
+    # (2026-08-27, 457 Templates) — die im Auftrag vorgegebene Liste
+    # (weight_reps/duration/distance_duration/weight_distance/bodyweight_reps)
+    # deckte nur 3 von 10 real vorkommenden type-Werten ab.
+    "weight_reps":           {"weight": True,  "reps": True,  "duration": False, "distance": False},
+    "bodyweight_weighted":   {"weight": True,  "reps": True,  "duration": False, "distance": False},
+    "bodyweight_assisted":   {"weight": True,  "reps": True,  "duration": False, "distance": False},
+    "reps_only":             {"weight": False, "reps": True,  "duration": False, "distance": False},
+    "duration":              {"weight": False, "reps": False, "duration": True,  "distance": False},
+    "weight_duration":       {"weight": True,  "reps": False, "duration": True,  "distance": False},
+    "distance_duration":     {"weight": False, "reps": False, "duration": True,  "distance": True},
+    "short_distance_weight": {"weight": True,  "reps": False, "duration": False, "distance": True},
+    "floors_duration":       {"weight": False, "reps": False, "duration": True,  "distance": False},
+    "steps_duration":        {"weight": False, "reps": False, "duration": True,  "distance": False},
+}
+
+
+def _hevy_supports_for_type(exercise_type: str | None) -> dict:
+    supports = _HEVY_EXERCISE_TYPE_SUPPORTS.get(exercise_type or "")
+    if supports is None:
+        return {"supports_weight": None, "supports_reps": None, "supports_duration": None, "supports_distance": None}
+    return {
+        "supports_weight": supports["weight"], "supports_reps": supports["reps"],
+        "supports_duration": supports["duration"], "supports_distance": supports["distance"],
+    }
+
+
+@mcp.tool()
+def sync_hevy_routines(include_all_folders: bool = False) -> dict:
+    """
+    Synct Routinen von Hevy → CAIRN DB (hevy_routines/hevy_routine_exercises/
+    hevy_routine_sets). Macht einen echten, LESENDEN Hevy-API-Call (GET) —
+    keine Schreiboperation gegen Hevy.
+
+    Args:
+        include_all_folders: False (Standard) = nur der CAIRN-Ordner
+            (HEVY_CAIRN_FOLDER_ID). True = alle Routinen aus Hevy.
+
+    Idempotent: eine Routine wird nur neu geschrieben, wenn sich ihr
+    hevy_updated_at seit dem letzten Sync geändert hat. Routinen, die lokal
+    als 'active' markiert sind aber in diesem Sync (innerhalb desselben
+    Ordner-Filters) nicht mehr auftauchen, werden auf 'archived' gesetzt —
+    sie bleiben in Hevy selbst unangetastet.
+
+    Returns: {created, updated, unchanged, archived, failed}
+    """
+    from coach.hevy_client import HEVY_CAIRN_FOLDER_ID as _CAIRN_FOLDER
+    from coach.hevy_client import get_all_routines
+
+    folder_filter = None if include_all_folders else _CAIRN_FOLDER
+    try:
+        remote_routines = get_all_routines(folder_id=folder_filter)
+    except Exception as exc:
+        return {"error": f"Hevy-API-Fehler: {type(exc).__name__}: {exc}"}
+
+    created = updated = unchanged = failed = 0
+    seen_ids: list[str] = []
+
+    conn = get_connection()
+    try:
+        for r in remote_routines:
+            hevy_id = r.get("id")
+            if not hevy_id:
+                failed += 1
+                continue
+            seen_ids.append(hevy_id)
+            remote_updated_at = r.get("updated_at")
+            folder_id_str = str(r.get("folder_id")) if r.get("folder_id") is not None else None
+
+            try:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        "SELECT id, hevy_updated_at FROM hevy_routines WHERE hevy_routine_id = %s",
+                        (hevy_id,),
+                    )
+                    existing = cur.fetchone()
+
+                    if existing and existing[1] is not None and remote_updated_at is not None \
+                            and existing[1].isoformat()[:19] == str(remote_updated_at)[:19]:
+                        unchanged += 1
+                        continue
+
+                    is_new = existing is None
+                    cur.execute(
+                        """INSERT INTO hevy_routines
+                               (hevy_routine_id, title, folder_id, status, hevy_updated_at,
+                                last_synced_at, raw_json)
+                           VALUES (%s, %s, %s, 'active', %s, now(), %s)
+                           ON CONFLICT (hevy_routine_id) DO UPDATE SET
+                               title = EXCLUDED.title, folder_id = EXCLUDED.folder_id,
+                               status = 'active', hevy_updated_at = EXCLUDED.hevy_updated_at,
+                               last_synced_at = now(), raw_json = EXCLUDED.raw_json, updated_at = now()
+                           RETURNING id""",
+                        (hevy_id, r.get("title") or "", folder_id_str, remote_updated_at, json.dumps(r)),
+                    )
+                    routine_row_id = cur.fetchone()[0]
+
+                    cur.execute("DELETE FROM hevy_routine_exercises WHERE routine_id = %s", (routine_row_id,))
+                    for ex in r.get("exercises", []):
+                        cur.execute(
+                            """INSERT INTO hevy_routine_exercises
+                                   (routine_id, exercise_template_id, exercise_name, order_index,
+                                    superset_id, rest_seconds, notes)
+                               VALUES (%s, %s, %s, %s, %s, %s, %s)
+                               RETURNING id""",
+                            (
+                                routine_row_id, ex.get("exercise_template_id"), ex.get("title"),
+                                ex.get("index", 0), ex.get("superset_id"), ex.get("rest_seconds"),
+                                ex.get("notes"),
+                            ),
+                        )
+                        routine_exercise_id = cur.fetchone()[0]
+                        for s in ex.get("sets", []):
+                            cur.execute(
+                                """INSERT INTO hevy_routine_sets
+                                       (routine_exercise_id, set_index, set_type, weight_kg, reps,
+                                        duration_seconds, distance_meters)
+                                   VALUES (%s, %s, %s, %s, %s, %s, %s)""",
+                                (
+                                    routine_exercise_id, s.get("index", 0), s.get("type") or "normal",
+                                    s.get("weight_kg"), s.get("reps"), s.get("duration_seconds"),
+                                    s.get("distance_meters"),
+                                ),
+                            )
+                conn.commit()
+                created += 1 if is_new else 0
+                updated += 0 if is_new else 1
+            except Exception as exc:
+                conn.rollback()
+                failed += 1
+                logger.warning("sync_hevy_routines: Routine %s fehlgeschlagen: %s", hevy_id, exc)
+
+        archived = 0
+        with conn.cursor() as cur:
+            if folder_filter is not None:
+                cur.execute(
+                    "SELECT hevy_routine_id FROM hevy_routines WHERE status = 'active' AND folder_id = %s",
+                    (folder_filter,),
+                )
+            else:
+                cur.execute("SELECT hevy_routine_id FROM hevy_routines WHERE status = 'active'")
+            locally_active = {row[0] for row in cur.fetchall()}
+            for hid in locally_active - set(seen_ids):
+                cur.execute(
+                    "UPDATE hevy_routines SET status = 'archived', updated_at = now() WHERE hevy_routine_id = %s",
+                    (hid,),
+                )
+                archived += 1
+        conn.commit()
+    finally:
+        conn.close()
+
+    return {"created": created, "updated": updated, "unchanged": unchanged, "archived": archived, "failed": failed}
+
+
+@mcp.tool()
+def list_hevy_routines(status: str = "active", folder_id: str | None = None) -> list[dict]:
+    """
+    Liest Routinen aus der CAIRN DB (schnell, kein Hevy-Call) — volle Struktur
+    inkl. Übungen und Sätzen, wie zuletzt von sync_hevy_routines geschrieben.
+
+    Args:
+        status: 'active' (Standard), 'archived', oder 'all'.
+        folder_id: Optional auf einen Hevy-Ordner filtern.
+    """
+    where = ["1=1"]
+    params: list = []
+    if status != "all":
+        where.append("hr.status = %s")
+        params.append(status)
+    if folder_id is not None:
+        where.append("hr.folder_id = %s")
+        params.append(str(folder_id))
+
+    routines = _fetchall(
+        f"""SELECT hr.id, hr.hevy_routine_id, hr.title, hr.folder_id, hr.status,
+                   hr.hevy_updated_at, hr.last_synced_at
+            FROM hevy_routines hr WHERE {' AND '.join(where)} ORDER BY hr.title""",
+        tuple(params),
+    )
+    if not routines:
+        return []
+
+    routine_ids = [r["id"] for r in routines]
+    exercises = _fetchall(
+        """SELECT id, routine_id, exercise_template_id, exercise_name, order_index,
+                  superset_id, rest_seconds, notes
+           FROM hevy_routine_exercises WHERE routine_id = ANY(%s) ORDER BY routine_id, order_index""",
+        (routine_ids,),
+    )
+    exercise_ids = [e["id"] for e in exercises]
+    sets = _fetchall(
+        """SELECT routine_exercise_id, set_index, set_type, weight_kg, reps,
+                  duration_seconds, distance_meters, rpe
+           FROM hevy_routine_sets WHERE routine_exercise_id = ANY(%s) ORDER BY routine_exercise_id, set_index""",
+        (exercise_ids,) if exercise_ids else ([],),
+    )
+
+    sets_by_exercise: dict[int, list[dict]] = {}
+    for s in sets:
+        sets_by_exercise.setdefault(s.pop("routine_exercise_id"), []).append(s)
+
+    exercises_by_routine: dict[int, list[dict]] = {}
+    for e in exercises:
+        rid = e.pop("routine_id")
+        e["sets"] = sets_by_exercise.get(e["id"], [])
+        exercises_by_routine.setdefault(rid, []).append(e)
+
+    for r in routines:
+        r["exercises"] = exercises_by_routine.get(r["id"], [])
+    return routines
+
+
+@mcp.tool()
+def list_hevy_exercise_templates(
+    search: str | None = None,
+    muscle_group: str | None = None,
+    equipment: str | None = None,
+    include_custom: bool = True,
+    limit: int = 50,
+    offset: int = 0,
+    force_sync: bool = False,
+) -> dict:
+    """
+    Gibt Exercise Templates zurück — aus dem lokalen Cache (hevy_exercise_templates).
+    Wenn der Cache leer ist oder force_sync=True: erst live von Hevy holen und cachen.
+
+    Hevy's eigene API unterstützt KEINEN Server-seitigen search-Filter (geprüft:
+    ignoriert den Parameter) — search/muscle_group/equipment werden hier gegen
+    den lokalen Cache gefiltert, nicht an Hevy weitergereicht.
+
+    Returns: {total, items: [{exercise_template_id, title, exercise_type,
+              primary_muscle_group, secondary_muscle_groups, equipment, is_custom}]}
+    """
+    cache_count = _fetchone("SELECT COUNT(*) AS n FROM hevy_exercise_templates")
+    if force_sync or not cache_count or cache_count["n"] == 0:
+        from coach.hevy_client import get_all_exercise_templates
+        try:
+            templates = get_all_exercise_templates()
+        except Exception as exc:
+            return {"error": f"Hevy-API-Fehler: {type(exc).__name__}: {exc}"}
+        conn = get_connection()
+        try:
+            with conn.cursor() as cur:
+                for t in templates:
+                    cur.execute(
+                        """INSERT INTO hevy_exercise_templates
+                               (exercise_template_id, title, exercise_type, primary_muscle_group,
+                                secondary_muscle_groups, equipment, is_custom, last_synced_at, raw_json)
+                           VALUES (%s, %s, %s, %s, %s, %s, %s, now(), %s)
+                           ON CONFLICT (exercise_template_id) DO UPDATE SET
+                               title = EXCLUDED.title, exercise_type = EXCLUDED.exercise_type,
+                               primary_muscle_group = EXCLUDED.primary_muscle_group,
+                               secondary_muscle_groups = EXCLUDED.secondary_muscle_groups,
+                               equipment = EXCLUDED.equipment, is_custom = EXCLUDED.is_custom,
+                               last_synced_at = now(), raw_json = EXCLUDED.raw_json, updated_at = now()""",
+                        (
+                            t.get("id"), t.get("title") or "", t.get("type"), t.get("primary_muscle_group"),
+                            json.dumps(t.get("secondary_muscle_groups") or []), t.get("equipment"),
+                            bool(t.get("is_custom")), json.dumps(t),
+                        ),
+                    )
+            conn.commit()
+        finally:
+            conn.close()
+
+    where = ["1=1"]
+    params: list = []
+    if search:
+        where.append("title ILIKE %s")
+        params.append(f"%{search}%")
+    if muscle_group:
+        where.append("primary_muscle_group = %s")
+        params.append(muscle_group)
+    if equipment:
+        where.append("equipment = %s")
+        params.append(equipment)
+    if not include_custom:
+        where.append("is_custom = FALSE")
+
+    total_row = _fetchone(f"SELECT COUNT(*) AS n FROM hevy_exercise_templates WHERE {' AND '.join(where)}", tuple(params))
+    rows = _fetchall(
+        f"""SELECT exercise_template_id, title, exercise_type, primary_muscle_group,
+                   secondary_muscle_groups, equipment, is_custom
+            FROM hevy_exercise_templates WHERE {' AND '.join(where)}
+            ORDER BY title LIMIT %s OFFSET %s""",
+        (*params, limit, offset),
+    )
+    return {"total": total_row["n"] if total_row else 0, "items": rows}
+
+
+@mcp.tool()
+def get_hevy_exercise_template(exercise_template_id: str) -> dict:
+    """
+    Einzelnes Exercise Template — erst aus dem lokalen Cache, sonst live von
+    Hevy (und dabei gecacht). Ergänzt supports_weight/supports_reps/
+    supports_duration/supports_distance basierend auf exercise_type.
+    """
+    row = _fetchone(
+        """SELECT exercise_template_id, title, exercise_type, primary_muscle_group,
+                  secondary_muscle_groups, equipment, is_custom
+           FROM hevy_exercise_templates WHERE exercise_template_id = %s""",
+        (exercise_template_id,),
+    )
+    if not row:
+        from coach.hevy_client import get_exercise_template
+        try:
+            t = get_exercise_template(exercise_template_id)
+        except Exception as exc:
+            return {"error": f"Hevy-API-Fehler: {type(exc).__name__}: {exc}"}
+        conn = get_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """INSERT INTO hevy_exercise_templates
+                           (exercise_template_id, title, exercise_type, primary_muscle_group,
+                            secondary_muscle_groups, equipment, is_custom, last_synced_at, raw_json)
+                       VALUES (%s, %s, %s, %s, %s, %s, %s, now(), %s)
+                       ON CONFLICT (exercise_template_id) DO UPDATE SET
+                           title = EXCLUDED.title, exercise_type = EXCLUDED.exercise_type,
+                           primary_muscle_group = EXCLUDED.primary_muscle_group,
+                           secondary_muscle_groups = EXCLUDED.secondary_muscle_groups,
+                           equipment = EXCLUDED.equipment, is_custom = EXCLUDED.is_custom,
+                           last_synced_at = now(), raw_json = EXCLUDED.raw_json, updated_at = now()""",
+                    (
+                        t.get("id"), t.get("title") or "", t.get("type"), t.get("primary_muscle_group"),
+                        json.dumps(t.get("secondary_muscle_groups") or []), t.get("equipment"),
+                        bool(t.get("is_custom")), json.dumps(t),
+                    ),
+                )
+            conn.commit()
+        finally:
+            conn.close()
+        row = {
+            "exercise_template_id": t.get("id"), "title": t.get("title"), "exercise_type": t.get("type"),
+            "primary_muscle_group": t.get("primary_muscle_group"),
+            "secondary_muscle_groups": t.get("secondary_muscle_groups") or [],
+            "equipment": t.get("equipment"), "is_custom": bool(t.get("is_custom")),
+        }
+
+    row.update(_hevy_supports_for_type(row.get("exercise_type")))
+    return row
+
+
+@mcp.tool()
+def preview_hevy_routine(routine: dict) -> dict:
+    """
+    Validiert eine Routine OHNE zu schreiben — weder gegen Hevy noch gegen CAIRN.
+
+    Erwartetes routine-Format:
+      {"hevy_routine_id": str | None, "title": str,
+       "exercises": [{"exercise_template_id": str, "order_index": int,
+                       "rest_seconds": int | None, "notes": str | None,
+                       "sets": [{"set_index": int, "set_type": str,
+                                 "weight_kg": float | None, "reps": int | None,
+                                 "duration_seconds": int | None, "distance_meters": float | None}]}]}
+
+    Prüft: title vorhanden, exercises nicht leer, jede exercise_template_id
+    ist ein bekannter Hevy-Code (im lokalen Cache, sonst live gegen Hevy
+    geprüft), sets nicht leer pro Übung, Set-Felder passen zum exercise_type
+    (via supports_*), order_index eindeutig+aufsteigend. Bei angegebener
+    hevy_routine_id: existiert die Routine in CAIRN, und ein Diff wird berechnet.
+
+    Hinweis: exercise_template_id ist bei Hevy KEIN UUID, sondern ein kurzer
+    alphanumerischer Code (z.B. "EAC7D9C5") — es wird entsprechend nicht auf
+    UUID-Format geprüft, sondern auf Existenz im Template-Katalog.
+    """
+    errors: list[str] = []
+    warnings: list[str] = []
+
+    title = (routine.get("title") or "").strip()
+    if not title:
+        errors.append("title fehlt oder ist leer.")
+
+    exercises = routine.get("exercises") or []
+    if not exercises:
+        errors.append("exercises ist leer.")
+
+    known_templates: dict[str, dict] = {}
+    for row in _fetchall("SELECT exercise_template_id, title, exercise_type FROM hevy_exercise_templates"):
+        known_templates[row["exercise_template_id"]] = row
+
+    normalized_exercises = []
+    seen_order_indexes: list[int] = []
+    for i, ex in enumerate(exercises):
+        template_id = ex.get("exercise_template_id")
+        if not template_id:
+            errors.append(f"Übung #{i}: exercise_template_id fehlt.")
+            continue
+
+        template = known_templates.get(template_id)
+        if not template:
+            from coach.hevy_client import get_exercise_template
+            try:
+                t = get_exercise_template(template_id)
+                template = {"exercise_template_id": t.get("id"), "title": t.get("title"), "exercise_type": t.get("type")}
+            except Exception:
+                errors.append(f"Übung #{i}: exercise_template_id {template_id!r} existiert nicht bei Hevy.")
+                continue
+
+        oi = ex.get("order_index")
+        if oi is None:
+            errors.append(f"Übung #{i} ({template['title']}): order_index fehlt.")
+        else:
+            seen_order_indexes.append(oi)
+
+        sets = ex.get("sets") or []
+        if not sets:
+            errors.append(f"Übung #{i} ({template['title']}): sets ist leer.")
+
+        supports = _hevy_supports_for_type(template.get("exercise_type"))
+        for j, s in enumerate(sets):
+            if supports["supports_weight"] is False and s.get("weight_kg") is not None:
+                warnings.append(f"Übung #{i} Satz #{j}: weight_kg gesetzt, aber {template['exercise_type']} unterstützt kein Gewicht.")
+            if supports["supports_reps"] is False and s.get("reps") is not None:
+                warnings.append(f"Übung #{i} Satz #{j}: reps gesetzt, aber {template['exercise_type']} unterstützt keine Wiederholungen.")
+            if supports["supports_duration"] is False and s.get("duration_seconds") is not None:
+                warnings.append(f"Übung #{i} Satz #{j}: duration_seconds gesetzt, aber {template['exercise_type']} unterstützt keine Dauer.")
+            if supports["supports_distance"] is False and s.get("distance_meters") is not None:
+                warnings.append(f"Übung #{i} Satz #{j}: distance_meters gesetzt, aber {template['exercise_type']} unterstützt keine Distanz.")
+
+        normalized_exercises.append({
+            "exercise_template_id": template_id, "exercise_name": template.get("title"),
+            "order_index": oi, "rest_seconds": ex.get("rest_seconds"), "notes": ex.get("notes"),
+            "sets": sets,
+        })
+
+    if seen_order_indexes != sorted(set(seen_order_indexes)) or len(seen_order_indexes) != len(set(seen_order_indexes)):
+        errors.append("order_index ist nicht eindeutig aufsteigend über alle Übungen.")
+
+    hevy_routine_id = routine.get("hevy_routine_id")
+    action = "create"
+    diff: dict = {}
+    if hevy_routine_id:
+        action = "update"
+        existing = _fetchone(
+            "SELECT id, title, folder_id FROM hevy_routines WHERE hevy_routine_id = %s", (hevy_routine_id,)
+        )
+        if not existing:
+            errors.append(f"hevy_routine_id {hevy_routine_id!r} existiert nicht in der CAIRN DB — sync_hevy_routines zuerst ausführen oder ohne hevy_routine_id als neue Routine anlegen.")
+        else:
+            diff["title"] = {"old": existing["title"], "new": title} if existing["title"] != title else None
+            diff["exercise_count"] = {"old": None, "new": len(normalized_exercises)}
+            diff = {k: v for k, v in diff.items() if v is not None}
+
+    return {
+        "valid": len(errors) == 0,
+        "action": action,
+        "errors": errors,
+        "warnings": warnings,
+        "routine_preview": {"hevy_routine_id": hevy_routine_id, "title": title, "exercises": normalized_exercises},
+        "diff": diff,
+    }
+
+
+@mcp.tool()
+def upsert_hevy_routine(routine: dict) -> dict:
+    """
+    Erstellt (kein hevy_routine_id) oder updated (mit hevy_routine_id) eine
+    Routine in Hevy, dann sync nach CAIRN. SCHREIBT gegen die Hevy-API
+    (POST/PUT) — WRITE-OPERATION, nur nach expliziter Freigabe verwenden.
+
+    PFLICHT: Vorher preview_hevy_routine aufrufen und valid=True prüfen.
+    Akzeptiert nur exercise_template_id-Werte aus dem Hevy-Katalog, keine
+    Freinamen.
+
+    Ablauf: Validierung (dieselben Checks wie preview) → POST/PUT gegen Hevy
+    → NUR bei Hevy-Erfolg CAIRN via sync_hevy_routines aktualisieren. Ein
+    Hevy-Fehler wird direkt zurückgegeben, ohne dass CAIRN geschrieben wird.
+    """
+    check = preview_hevy_routine(routine)
+    if not check["valid"]:
+        return {"error": "Routine ist nicht valide — zuerst preview_hevy_routine beheben.", "errors": check["errors"]}
+
+    from coach.hevy_client import HEVY_CAIRN_FOLDER_ID as _CAIRN_FOLDER
+    from coach.hevy_client import create_routine, update_routine
+
+    folder_id = routine.get("folder_id")
+    if folder_id is None and not routine.get("hevy_routine_id"):
+        # Neue Routine ohne explizites folder_id -> Standardablage im CAIRN-Ordner.
+        folder_id = _CAIRN_FOLDER
+
+    def _to_hevy_set(s: dict) -> dict:
+        # Hevys Schreib-Schema (POST/PUT) weicht vom Lese-Schema (GET) ab:
+        # "index" im Set-Objekt wird beim Schreiben von Hevy mit 400
+        # "Unrecognized key(s)" abgelehnt (per echtem Testschreiben verifiziert,
+        # 2026-08-27) — Hevy vergibt den Index beim Anlegen selbst anhand der
+        # Reihenfolge im Array. set_type/set_index sind unsere eigenen
+        # hevy_routine_sets-Spaltennamen, nicht Hevys.
+        return {
+            "type": s.get("type", s.get("set_type") or "normal"),
+            "weight_kg": s.get("weight_kg"),
+            "reps": s.get("reps"),
+            "duration_seconds": s.get("duration_seconds"),
+            "distance_meters": s.get("distance_meters"),
+        }
+
+    hevy_payload = {
+        "routine": {
+            "title": routine.get("title"),
+            "folder_id": int(folder_id) if folder_id is not None else None,
+            "exercises": [
+                {
+                    "exercise_template_id": ex["exercise_template_id"],
+                    "superset_id": ex.get("superset_id"),
+                    "rest_seconds": ex.get("rest_seconds"),
+                    "notes": ex.get("notes"),
+                    "sets": [_to_hevy_set(s) for s in (ex.get("sets") or [])],
+                }
+                for ex in check["routine_preview"]["exercises"]
+            ],
+        }
+    }
+
+    hevy_routine_id = routine.get("hevy_routine_id")
+    try:
+        if hevy_routine_id:
+            result = update_routine(hevy_routine_id, hevy_payload)
+            action = "update"
+        else:
+            result = create_routine(hevy_payload)
+            action = "create"
+    except Exception as exc:
+        return {"error": f"Hevy-API-Fehler beim Schreiben: {type(exc).__name__}: {exc}", "cairn_written": False}
+
+    # POST /v1/routines wrapt die Antwort als LISTE ({"routine": [{...}]}) —
+    # anders als GET /v1/routines/{id} ({"routine": {...}}, dict). Per echtem
+    # Testschreiben verifiziert (2026-08-27). PUT ungetestet, daher defensiv
+    # für beide Formen.
+    routine_result = result.get("routine", result)
+    if isinstance(routine_result, list):
+        routine_result = routine_result[0] if routine_result else {}
+    new_hevy_id = routine_result.get("id", hevy_routine_id)
+    sync_result = sync_hevy_routines(include_all_folders=True)
+
+    return {
+        "action": action, "hevy_routine_id": new_hevy_id,
+        "synced_to_cairn": "error" not in sync_result, "routine": result,
+    }
+
+
+@mcp.tool()
+def archive_hevy_routine(hevy_routine_id: str, confirm_archive: bool = False) -> dict:
+    """
+    Markiert eine Routine in CAIRN als 'archived'.
+
+    WICHTIG: Hevy hat keinen Archive/Delete-Endpoint für Routinen. Diese
+    Operation ändert NUR den CAIRN-Status — die Routine bleibt in Hevy
+    bestehen und muss dort manuell gelöscht werden.
+
+    confirm_archive=True ist Pflicht (Sicherheitscheck). hevy_routine_id ist
+    Pflicht (kein Archivieren nur per Titel, da Titel bei Hevy nicht eindeutig
+    sind — z.B. existieren zwei Routinen mit identischem Titel im CAIRN-Ordner).
+    """
+    if not confirm_archive:
+        return {"error": "confirm_archive=True erforderlich, um eine Routine zu archivieren."}
+    if not hevy_routine_id:
+        return {"error": "hevy_routine_id erforderlich."}
+
+    existing = _fetchone("SELECT id FROM hevy_routines WHERE hevy_routine_id = %s", (hevy_routine_id,))
+    if not existing:
+        return {"error": f"hevy_routine_id {hevy_routine_id!r} nicht in der CAIRN DB gefunden."}
+
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "UPDATE hevy_routines SET status = 'archived', updated_at = now() WHERE hevy_routine_id = %s",
+                (hevy_routine_id,),
+            )
+        conn.commit()
+    finally:
+        conn.close()
+
+    return {
+        "archived": True, "hevy_routine_id": hevy_routine_id,
+        "warning": "Routine still exists in Hevy — delete manually.",
+    }
+
+
 @mcp.tool()
 def list_garmin_workouts(start_date: str, end_date: str) -> list[dict]:
     """
