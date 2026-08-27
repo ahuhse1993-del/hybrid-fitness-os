@@ -644,8 +644,10 @@ small, .text-small { font-size: .8rem; line-height: 1.5; }
         <span class="live-pill"><span class="status-dot" aria-hidden="true"></span><span>LIVE</span></span>
       </div>
     </header>
-    <div class="stack" id="sync-body">
-      <p class="loading-msg">Verbindungen werden geprüft…</p>
+    <div id="sync-body">
+      <div class="stack" id="sync-stack">
+        <p class="loading-msg">Verbindungen werden geprüft…</p>
+      </div>
     </div>
     <nav class="nav" aria-label="Hauptnavigation">
       <button class="btn btn-ghost" type="button" onclick="navigate('week')"><span class="nav-item"><i data-lucide="calendar-days" aria-hidden="true"></i><span class="nav-text">Woche</span></span></button>
@@ -1354,7 +1356,7 @@ async function loadSync() {
   const brandEl = document.getElementById('sync-brand');
   if (brandEl && !brandEl.innerHTML.trim()) brandEl.innerHTML = BRAND_SVG;
 
-  document.getElementById('sync-body').innerHTML = '<p class="loading-msg">Wird geladen…</p>';
+  document.getElementById('sync-stack').innerHTML = '<p class="loading-msg">Wird geladen…</p>';
 
   const [statusData, uploadsData, healthData] = await Promise.all([
     apiGet('/api/frontend/sync').catch(() => null),
@@ -1384,7 +1386,7 @@ function renderSyncStatus(statusData) {
 }
 
 function renderSync(uploadsData, healthData) {
-  const container = document.getElementById('sync-body');
+  const container = document.getElementById('sync-stack');
   container.innerHTML = '';
 
   // Letzte Uploads — /api/activities/recent?limit=5, {training_id, date, type, name, distance_km, duration_min}
