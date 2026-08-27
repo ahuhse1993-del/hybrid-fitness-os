@@ -1,6 +1,6 @@
 from flask import Flask, jsonify, request, send_file, send_from_directory
 from flask_cors import CORS
-import os, psycopg2, json, time, traceback
+import os, psycopg2, json, time, traceback, logging
 from datetime import date, timedelta, datetime
 from dotenv import load_dotenv
 
@@ -1636,6 +1636,25 @@ def cron_health_sync():
 
     except Exception as e:
         return jsonify({"status": "error", "message": str(e), "trace": traceback.format_exc()}), 500
+
+@app.route('/api/cron/sync-completed', methods=['POST'])
+def cron_sync_completed():
+    """Für externe Cron-Dienste (z.B. cron-job.org). Ruft
+    coach.jobs.sync_completed_activities.run_sync() direkt im Railway-Prozess
+    auf — kein GitHub-Actions-Umweg wie bei /api/sync und /api/cron/health-sync."""
+    cron_secret = os.getenv("CRON_SECRET")
+    if cron_secret:
+        if request.headers.get("X-Cron-Secret") != cron_secret:
+            return jsonify({"status": "error", "message": "Unauthorized"}), 401
+    else:
+        logging.warning("CRON_SECRET nicht gesetzt — /api/cron/sync-completed läuft ungeschützt.")
+
+    try:
+        from coach.jobs.sync_completed_activities import run_sync
+        result = run_sync()
+        return jsonify({"status": "ok", "result": result})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 # ─── FRONTEND V5 ROUTES ───────────────────────────────────────────────────────
 
