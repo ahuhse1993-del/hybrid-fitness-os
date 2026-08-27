@@ -453,6 +453,37 @@ def dashboard():
     except Exception as e:
         return jsonify({"status": "error", "message": str(e), "trace": traceback.format_exc()}), 500
 
+@app.route('/api/health/today', methods=['GET'])
+def health_today():
+    """Heutiger daily_logs-Eintrag, strikt — kein Fallback auf gestern
+    (anders als /api/dashboard). has_data=False wenn für heute noch keine
+    Zeile existiert."""
+    try:
+        today = get_today()
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT sleep_duration_h, sleep_score, hrv_last_night, body_battery_charged
+            FROM daily_logs WHERE date = %s
+        """, (today,))
+        row = cur.fetchone()
+        conn.close()
+
+        if not row:
+            return jsonify({"status": "ok", "has_data": False})
+
+        return jsonify({
+            "status": "ok",
+            "has_data": True,
+            "date": str(today),
+            "sleep_duration_h": float(row[0]) if row[0] is not None else None,
+            "sleep_score": row[1],
+            "hrv_last_night": row[2],
+            "body_battery_charged": row[3],
+        })
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e), "trace": traceback.format_exc()}), 500
+
 # ─── ATHLETE PROFILE (Schicht 1 — editierbar) ───
 @app.route('/api/athlete/profile', methods=['GET'])
 def get_athlete_profile():

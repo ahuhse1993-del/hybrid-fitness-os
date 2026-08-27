@@ -388,16 +388,9 @@ small, .text-small { font-size: .8rem; line-height: 1.5; }
 #cairn-sync-soft .live-pill { display: inline-flex; align-items: center; gap: .45rem; padding: .5rem .8rem; border-radius: 999px; background: var(--soft); }
 #cairn-sync-soft .status-dot { flex: 0 0 10px; width: 10px; height: 10px; border-radius: 50%; background: var(--success); }
 #cairn-sync-soft .stack { display: grid; gap: .8rem; }
-#cairn-sync-soft .connections { --card: var(--soft); color: var(--ink); }
-#cairn-sync-soft .activities { --card: var(--coral); color: var(--coral-ink); }
-#cairn-sync-soft .changes { --card: var(--sand); color: var(--ink); }
+#cairn-sync-soft .uploads { --card: var(--coral); color: var(--coral-ink); }
+#cairn-sync-soft .health { --card: var(--soft); color: var(--ink); }
 #cairn-sync-soft .section-title { margin: 0 0 .65rem; text-transform: uppercase; letter-spacing: .04em; }
-#cairn-sync-soft .connection-list { display: grid; }
-#cairn-sync-soft .connection-row { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: .75rem 0; border-bottom: 1px solid color-mix(in srgb, currentColor 24%, transparent); }
-#cairn-sync-soft .connection-row strong { font-weight: 500; }
-#cairn-sync-soft .connection-status { display: inline-flex; align-items: center; gap: .5rem; white-space: nowrap; }
-#cairn-sync-soft .sync-meta { display: grid; gap: .2rem; margin-top: .8rem; }
-#cairn-sync-soft .sync-meta p { margin: 0; }
 #cairn-sync-soft .activity-list { display: grid; }
 #cairn-sync-soft .activity-row { display: flex; align-items: center; min-height: 92px; gap: .8rem; padding: .55rem 0; border-bottom: 1px solid color-mix(in srgb, currentColor 28%, transparent); }
 #cairn-sync-soft .activity-row:last-child { border-bottom: 0; }
@@ -407,16 +400,10 @@ small, .text-small { font-size: .8rem; line-height: 1.5; }
 #cairn-sync-soft .activity-copy p { margin: 0; }
 #cairn-sync-soft .activity-art { flex: 0 0 118px; align-self: stretch; display: grid; place-items: center; padding: .15rem; background: color-mix(in srgb, var(--paper) 56%, transparent); overflow: hidden; border-radius: .75rem; }
 #cairn-sync-soft .activity-art img { display: block; width: 100%; height: 78px; object-fit: contain; }
-#cairn-sync-soft .change-list { position: relative; display: grid; }
-#cairn-sync-soft .change-list::before { content: ""; position: absolute; left: 16px; top: 18px; bottom: 18px; width: 1px; background: color-mix(in srgb, var(--ink) 46%, transparent); }
-#cairn-sync-soft .change-row { position: relative; display: flex; align-items: flex-start; gap: .75rem; padding: .62rem 0; }
-#cairn-sync-soft .change-node { position: relative; z-index: 1; flex: 0 0 33px; display: grid; place-items: center; width: 33px; height: 33px; border-radius: 50%; background: var(--sand); border: 2px solid var(--ink); }
-#cairn-sync-soft .change-time { flex: 0 0 118px; padding-top: .35rem; }
-#cairn-sync-soft .change-copy { flex: 1; min-width: 0; }
-#cairn-sync-soft .change-copy h2 { margin: 0 0 .12rem; font-weight: 500; letter-spacing: -.025em; }
-#cairn-sync-soft .change-copy p { margin: 0; }
-#cairn-sync-soft .change-status { margin-top: .25rem !important; text-transform: uppercase; letter-spacing: .03em; }
-#cairn-sync-soft .sync-ok { display: flex; align-items: center; gap: .55rem; margin-top: .7rem; padding-top: .75rem; border-top: 1px solid color-mix(in srgb, var(--ink) 30%, transparent); }
+#cairn-sync-soft .health-metrics { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: .8rem; }
+#cairn-sync-soft .health-metric { padding-top: .65rem; border-top: 1px solid currentColor; }
+#cairn-sync-soft .health-metric span, #cairn-sync-soft .health-metric strong { display: block; }
+#cairn-sync-soft .health-metric strong { font-size: clamp(1.25rem,4vw,1.9rem); font-weight: 500; letter-spacing: -.035em; }
 #cairn-sync-soft .nav { display: flex; align-items: center; justify-content: space-between; gap: .25rem; flex-shrink: 0; margin-top: .5rem; padding: .45rem; border: 1px solid var(--line); border-radius: 999px; background: var(--paper); }
 #cairn-sync-soft .nav button { flex: 1; }
 #cairn-sync-soft .nav .active { background: var(--forest); color: var(--forest-ink); border-radius: 999px; }
@@ -424,7 +411,6 @@ small, .text-small { font-size: .8rem; line-height: 1.5; }
 @media (max-width: 560px) {
   #cairn-sync-soft .activity-date { flex-basis: 62px; }
   #cairn-sync-soft .activity-art { flex-basis: 86px; }
-  #cairn-sync-soft .change-time { flex-basis: 78px; }
   #cairn-sync-soft .nav-text { display: none; }
 }
 
@@ -1368,97 +1354,82 @@ async function loadSync() {
   const brandEl = document.getElementById('sync-brand');
   if (brandEl && !brandEl.innerHTML.trim()) brandEl.innerHTML = BRAND_SVG;
 
-  try {
-    const data = await apiGet('/api/frontend/sync');
-    renderSync(data);
-  } catch (err) {
-    document.getElementById('sync-body').innerHTML =
-      `<p class="loading-msg">Sync-Status konnte nicht geladen werden. (${err.message})</p>`;
-  }
+  document.getElementById('sync-body').innerHTML = '<p class="loading-msg">Wird geladen…</p>';
+
+  const [statusData, uploadsData, healthData] = await Promise.all([
+    apiGet('/api/frontend/sync').catch(() => null),
+    apiGet('/api/activities/recent?limit=5').catch(() => null),
+    apiGet('/api/health/today').catch(() => null),
+  ]);
+
+  renderSyncStatus(statusData);
+  renderSync(uploadsData, healthData);
 }
 
-function renderSync(data) {
-  // /api/frontend/sync returns:
-  // connections: {mcp: {connected, last_check, ...}, garmin: {...}, database: {...}}
-  // activities: [{date, date_label, session_type, title, km, duration_min}]
-  // changes: [{when, workout_name, description, status, status_label, has_error, error_hint}]
-  const connObj = data.connections || {};
-  const connections = Object.entries(connObj).map(([key, c]) => ({
-    name: { mcp: 'MCP Server', garmin: 'Garmin Connect', database: 'Datenbank' }[key] || key,
-    connected: c.connected !== false,
-    detail: c.last_check || c.status || '',
-  }));
-  const activities = data.activities || [];
-  const changes = data.changes || [];
+function renderSyncStatus(statusData) {
+  // LIVE = Aufruf selbst erfolgreich (Datenbank hat geantwortet) UND
+  // connections.garmin.status === 'connected' (letzter erfolgreicher
+  // Garmin-Push existiert). Kein Live-Ping gegen Garmin — zu langsam für
+  // jeden Seitenaufruf, siehe coach/api.py::frontend_sync().
+  const pill = document.querySelector('#cairn-sync-soft .live-pill');
+  if (!pill) return;
+  const dot = pill.querySelector('.status-dot');
+  const label = pill.querySelector('span:last-child');
+  const dbReachable = !!statusData;
+  const garminReachable = !!(statusData && statusData.connections && statusData.connections.garmin
+    && statusData.connections.garmin.status === 'connected');
+  const live = dbReachable && garminReachable;
+  if (dot) dot.style.background = live ? 'var(--success)' : 'var(--coral)';
+  if (label) label.textContent = live ? 'LIVE' : 'OFFLINE';
+}
 
+function renderSync(uploadsData, healthData) {
   const container = document.getElementById('sync-body');
   container.innerHTML = '';
 
-  // Connections card
-  const connRows = connections.map(c => `
-    <div class="connection-row">
-      <strong>${c.name}</strong>
-      <span class="connection-status">
-        <span class="status-dot" style="${c.connected ? '' : 'background:var(--coral)'}" aria-hidden="true"></span>
-        <span>${c.connected ? 'Verbunden' : 'Getrennt'}</span>
-      </span>
-    </div>
-  `).join('');
-
-  const connCard = e('section', 'card connections', `
-    <p class="section-title text-small">VERBINDUNGEN</p>
-    <div class="connection-list">${connRows}</div>
-  `);
-  container.appendChild(connCard);
-
-  // Recent activities card
-  // Fields: {date, date_label, session_type, title, km, duration_min}
+  // Letzte Uploads — /api/activities/recent?limit=5, {training_id, date, type, name, distance_km, duration_min}
+  const activities = (uploadsData && uploadsData.activities) || [];
   const actRows = activities.map(act => {
-    const label = act.date_label || (act.date ? new Date(act.date).toLocaleDateString('de-CH', { weekday: 'short', day: 'numeric', month: 'short' }).toUpperCase() : '');
-    const metaParts = [fmtKm(act.km || act.distance_km), fmtMin(act.duration_min)].filter(Boolean);
+    const d = act.date ? new Date(act.date + 'T12:00:00') : null;
+    const label = d ? d.toLocaleDateString('de-CH', { weekday: 'short', day: 'numeric', month: 'short' }).toUpperCase() : '';
+    const metaParts = [fmtKm(act.distance_km), fmtMin(act.duration_min)].filter(Boolean);
     return `<div class="activity-row">
       <span class="activity-date text-small">${label}</span>
       <div class="activity-copy">
-        <h2>${act.title || act.session_type || '—'}</h2>
+        <h2>${act.name || act.type || '—'}</h2>
         <p class="text-small">${metaParts.join(' · ')}</p>
       </div>
       <div class="activity-art">
-        <img src="${assetUrl(act.session_type)}" alt="${act.session_type || ''}" loading="lazy">
+        <img src="${assetUrl(act.type)}" alt="${act.type || ''}" loading="lazy">
       </div>
     </div>`;
   }).join('') || '<p class="text-small" style="padding:.5rem 0;opacity:.7">Keine aktuellen Aktivitäten</p>';
 
-  const actCard = e('section', 'card activities', `
+  const uploadsCard = e('section', 'card uploads', `
     <p class="section-title text-small">LETZTE UPLOADS</p>
     <div class="activity-list">${actRows}</div>
   `);
-  container.appendChild(actCard);
+  container.appendChild(uploadsCard);
 
-  // Changes card
-  // Fields: {when, workout_name, description, status, status_label, has_error, error_hint}
-  const changeRows = changes.map(ch => {
-    const icon = ch.has_error ? 'alert-circle' : 'git-commit-horizontal';
-    const statusText = ch.status_label || ch.status || 'OK';
-    const errHint = ch.has_error && ch.error_hint ? `<p class="change-error text-small">${ch.error_hint}</p>` : '';
-    return `<div class="change-row">
-      <span class="change-node" aria-hidden="true"><i data-lucide="${icon}"></i></span>
-      <span class="change-time text-small">${ch.when || ''}</span>
-      <div class="change-copy">
-        <h2>${ch.workout_name || '—'}</h2>
-        <p>${ch.description || ''}</p>
-        <p class="change-status text-small">${statusText}</p>
-        ${errHint}
-      </div>
-    </div>`;
-  }).join('') || '<p class="text-small" style="padding:.5rem 0;opacity:.7">Keine aktuellen Änderungen</p>';
+  // Gesundheit heute — /api/health/today
+  let healthInner;
+  if (healthData && healthData.has_data) {
+    const metrics = [
+      { label: 'SCHLAF', val: healthData.sleep_duration_h != null ? healthData.sleep_duration_h.toLocaleString('de-CH', { maximumFractionDigits: 1 }) + ' h' : null },
+      { label: 'SLEEP SCORE', val: healthData.sleep_score },
+      { label: 'HRV', val: healthData.hrv_last_night != null ? healthData.hrv_last_night + ' ms' : null },
+      { label: 'BODY BATTERY', val: healthData.body_battery_charged },
+    ];
+    healthInner = `<div class="health-metrics">${metrics.map(m => `<div class="health-metric"><span class="text-small">${m.label}</span><strong>${m.val ?? '—'}</strong></div>`).join('')}</div>`;
+  } else {
+    healthInner = '<p class="text-small" style="padding:.5rem 0;opacity:.7">Noch keine Gesundheitsdaten</p>';
+  }
 
-  const allOk = connections.every(c => c.connected);
-  const changesCard = e('section', 'card changes', `
-    <p class="section-title text-small">LETZTE ÄNDERUNGEN</p>
-    <div class="change-list">${changeRows}</div>
-    ${allOk ? '<div class="sync-ok text-small"><i data-lucide="check-circle" aria-hidden="true"></i><span>Alles synchronisiert</span></div>' : ''}
+  const healthCard = e('section', 'card health', `
+    <p class="section-title text-small">GESUNDHEIT HEUTE</p>
+    ${healthInner}
   `);
-  container.appendChild(changesCard);
+  container.appendChild(healthCard);
 
   if (window.lucide) lucide.createIcons();
 }
