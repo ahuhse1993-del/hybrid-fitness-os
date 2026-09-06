@@ -116,9 +116,12 @@ def get_athlete_profile() -> dict:
     Always call this first to understand the athlete before suggesting workouts or plan changes.
 
     athlete_profile includes (SELECT * — new fields appear automatically):
-    HR-Zonen (hr_zones jsonb, bevorzugt gegenüber den alten hr_z1_min..hr_z5_max
-    Spalten, die aus Rückwärtskompatibilität weiterbestehen), pace_zones,
-    preferred_surfaces/sports, training_preferences, injury_notes,
+    HR-Zonen Laufen (hr_zones jsonb, flach z1..z5, bevorzugt gegenüber den alten
+    hr_z1_min..hr_z5_max Spalten, die aus Rückwärtskompatibilität weiterbestehen),
+    HR-Zonen Rad (hr_zones_cycling jsonb, Z1..Z5C — eigene Spalte, NICHT Teil von
+    hr_zones, da dessen z1..z5-Format vom update_athlete_profile-Validator fix
+    vorgegeben ist), power_zones jsonb (aktuell leerer Platzhalter bis FTP-Test),
+    pace_zones, preferred_surfaces/sports, training_preferences, injury_notes,
     long_term_goals_json. Zusätzlich gear_summary: aktive Gear-Gegenstände
     aus athlete_gear (siehe list_athlete_gear für Details je Gegenstand).
     """

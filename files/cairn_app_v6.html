@@ -39,7 +39,7 @@ body {
   width: 100%;
 }
 /* Scrollbarer Inhaltsbereich pro View */
-#week-body, #plan-body, #sync-body, #analysis-body, #acts-body {
+#week-body, #plan-body, #sync-body, #analysis-body, #acts-body, #profile-body {
   flex: 1;
   overflow-y: auto;
   min-height: 0;
@@ -476,6 +476,54 @@ small, .text-small { font-size: .8rem; line-height: 1.5; }
   #cairn-activities-soft .nav-text { display: none; }
 }
 
+/* ── PROFILE VIEW ── */
+#cairn-profile-soft {
+  color-scheme: light dark;
+  --paper: light-dark(#f5f4ef, #151b18);
+  --ink: light-dark(#17201d, #f5f4ef);
+  --forest: light-dark(#29483e, #b8ddcf);
+  --forest-ink: light-dark(#f8f7f1, #173028);
+  --coral: light-dark(#ff6b61, #b84d47);
+  --coral-ink: light-dark(#18211e, #fff5f3);
+  --soft: light-dark(#e9e8e2, #29302d);
+  --sand: light-dark(#d8d4c8, #4f4b43);
+  --line: light-dark(#b9bbb4, #53605b);
+  background: var(--paper);
+  color: var(--ink);
+  padding: clamp(.75rem, 3vw, 1.5rem);
+}
+#cairn-profile-soft * { box-sizing: border-box; }
+#cairn-profile-soft .shell { max-width: 820px; margin: 0 auto; }
+#cairn-profile-soft .top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.1rem; }
+#cairn-profile-soft .brand-mark { display: block; width: clamp(8.5rem,26vw,12rem); height: auto; fill: currentColor; }
+#cairn-profile-soft .title-row { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
+#cairn-profile-soft .title-row h1 { margin: 0; font-weight: 500; letter-spacing: -.055em; }
+#cairn-profile-soft .stack { display: grid; gap: .8rem; }
+#cairn-profile-soft .stats { --card: var(--coral); color: var(--coral-ink); }
+#cairn-profile-soft .plan-card { --card: var(--soft); color: var(--ink); }
+#cairn-profile-soft .hrz-running { --card: var(--sand); color: var(--ink); }
+#cairn-profile-soft .hrz-cycling { --card: var(--soft); color: var(--ink); }
+#cairn-profile-soft .power-card { --card: var(--forest); color: var(--forest-ink); }
+#cairn-profile-soft .section-title { margin: 0 0 .65rem; text-transform: uppercase; letter-spacing: .04em; }
+#cairn-profile-soft .profile-metrics { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: .8rem; }
+#cairn-profile-soft .profile-metric { padding-top: .65rem; border-top: 1px solid currentColor; }
+#cairn-profile-soft .profile-metric span, #cairn-profile-soft .profile-metric strong { display: block; }
+#cairn-profile-soft .profile-metric strong { font-size: clamp(1.15rem,3.6vw,1.6rem); font-weight: 500; letter-spacing: -.035em; }
+#cairn-profile-soft .plan-card h2 { margin: 0 0 .2rem; font-weight: 500; letter-spacing: -.035em; }
+#cairn-profile-soft .plan-card p { margin: 0; }
+#cairn-profile-soft .hrz-row { display: grid; grid-template-columns: 48px 1fr auto; align-items: center; gap: .7rem; padding: .5rem 0; border-bottom: 1px solid color-mix(in srgb, currentColor 22%, transparent); }
+#cairn-profile-soft .hrz-row:last-child { border-bottom: 0; }
+#cairn-profile-soft .hrz-zone { font-weight: 500; letter-spacing: -.02em; }
+#cairn-profile-soft .hrz-range { font-variant-numeric: tabular-nums; }
+#cairn-profile-soft .hrz-label { text-align: right; opacity: .75; }
+#cairn-profile-soft .nav { display: flex; align-items: center; justify-content: space-between; gap: .25rem; flex-shrink: 0; margin-top: .5rem; padding: .45rem; border: 1px solid var(--line); border-radius: 999px; background: var(--paper); }
+#cairn-profile-soft .nav button { flex: 1; }
+#cairn-profile-soft .nav .active { background: var(--forest); color: var(--forest-ink); border-radius: 999px; }
+#cairn-profile-soft .nav-item { display: inline-flex; align-items: center; gap: .35rem; }
+@media (max-width: 560px) {
+  #cairn-profile-soft .nav-text { display: none; }
+}
+
 /* ── ANALYSIS VIEW ── */
 #cairn-soft {
   color-scheme: light dark;
@@ -605,6 +653,7 @@ small, .text-small { font-size: .8rem; line-height: 1.5; }
       <button class="btn btn-ghost" type="button" onclick="navigate('plan')"><span class="nav-item"><i data-lucide="list" aria-hidden="true"></i><span class="nav-text">Plan</span></span></button>
       <button class="btn btn-ghost" type="button" onclick="navigate('sync')"><span class="nav-item"><i data-lucide="refresh-cw" aria-hidden="true"></i><span class="nav-text">Sync</span></span></button>
       <button class="btn btn-ghost" type="button" onclick="navigate('activities')"><span class="nav-item"><i data-lucide="activity" aria-hidden="true"></i><span class="nav-text">Aktivitäten</span></span></button>
+      <button class="btn btn-ghost" type="button" onclick="navigate('profile')"><span class="nav-item"><i data-lucide="user" aria-hidden="true"></i><span class="nav-text">Profil</span></span></button>
     </nav>
   </div>
 </div>
@@ -629,6 +678,7 @@ small, .text-small { font-size: .8rem; line-height: 1.5; }
       <button class="btn active" type="button" onclick="navigate('plan')"><span class="nav-item"><i data-lucide="list" aria-hidden="true"></i><span class="nav-text">Plan</span></span></button>
       <button class="btn btn-ghost" type="button" onclick="navigate('sync')"><span class="nav-item"><i data-lucide="refresh-cw" aria-hidden="true"></i><span class="nav-text">Sync</span></span></button>
       <button class="btn btn-ghost" type="button" onclick="navigate('activities')"><span class="nav-item"><i data-lucide="activity" aria-hidden="true"></i><span class="nav-text">Aktivitäten</span></span></button>
+      <button class="btn btn-ghost" type="button" onclick="navigate('profile')"><span class="nav-item"><i data-lucide="user" aria-hidden="true"></i><span class="nav-text">Profil</span></span></button>
     </nav>
   </div>
 </div>
@@ -655,6 +705,7 @@ small, .text-small { font-size: .8rem; line-height: 1.5; }
       <button class="btn btn-ghost" type="button" onclick="navigate('plan')"><span class="nav-item"><i data-lucide="list" aria-hidden="true"></i><span class="nav-text">Plan</span></span></button>
       <button class="btn active" type="button" onclick="navigate('sync')"><span class="nav-item"><i data-lucide="refresh-cw" aria-hidden="true"></i><span class="nav-text">Sync</span></span></button>
       <button class="btn btn-ghost" type="button" onclick="navigate('activities')"><span class="nav-item"><i data-lucide="activity" aria-hidden="true"></i><span class="nav-text">Aktivitäten</span></span></button>
+      <button class="btn btn-ghost" type="button" onclick="navigate('profile')"><span class="nav-item"><i data-lucide="user" aria-hidden="true"></i><span class="nav-text">Profil</span></span></button>
     </nav>
   </div>
 </div>
@@ -686,6 +737,7 @@ small, .text-small { font-size: .8rem; line-height: 1.5; }
       <button class="btn btn-ghost" type="button" onclick="navigate('plan')"><span class="nav-item"><i data-lucide="list" aria-hidden="true"></i><span class="nav-text">Plan</span></span></button>
       <button class="btn btn-ghost" type="button" onclick="navigate('sync')"><span class="nav-item"><i data-lucide="refresh-cw" aria-hidden="true"></i><span class="nav-text">Sync</span></span></button>
       <button class="btn active" type="button" onclick="navigate('activities')"><span class="nav-item"><i data-lucide="activity" aria-hidden="true"></i><span class="nav-text">Aktivitäten</span></span></button>
+      <button class="btn btn-ghost" type="button" onclick="navigate('profile')"><span class="nav-item"><i data-lucide="user" aria-hidden="true"></i><span class="nav-text">Profil</span></span></button>
     </nav>
   </div>
 </div>
@@ -711,6 +763,33 @@ small, .text-small { font-size: .8rem; line-height: 1.5; }
       <button class="btn btn-ghost" type="button" onclick="navigate('plan')"><span class="nav-item"><i data-lucide="list" aria-hidden="true"></i><span class="nav-text">Plan</span></span></button>
       <button class="btn btn-ghost" type="button" onclick="navigate('sync')"><span class="nav-item"><i data-lucide="refresh-cw" aria-hidden="true"></i><span class="nav-text">Sync</span></span></button>
       <button class="btn active" type="button" onclick="navigate('activities')"><span class="nav-item"><i data-lucide="activity" aria-hidden="true"></i><span class="nav-text">Aktivitäten</span></span></button>
+      <button class="btn btn-ghost" type="button" onclick="navigate('profile')"><span class="nav-item"><i data-lucide="user" aria-hidden="true"></i><span class="nav-text">Profil</span></span></button>
+    </nav>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- VIEW: PROFILE                                                 -->
+<!-- ============================================================ -->
+<div id="cairn-profile-soft" class="view">
+  <div class="shell">
+    <header>
+      <div class="top" id="profile-brand"></div>
+      <div class="title-row">
+        <h1>Profil</h1>
+      </div>
+    </header>
+    <div id="profile-body">
+      <div class="stack" id="profile-stack">
+        <p class="loading-msg">Profil wird geladen…</p>
+      </div>
+    </div>
+    <nav class="nav" aria-label="Hauptnavigation">
+      <button class="btn btn-ghost" type="button" onclick="navigate('week')"><span class="nav-item"><i data-lucide="calendar-days" aria-hidden="true"></i><span class="nav-text">Woche</span></span></button>
+      <button class="btn btn-ghost" type="button" onclick="navigate('plan')"><span class="nav-item"><i data-lucide="list" aria-hidden="true"></i><span class="nav-text">Plan</span></span></button>
+      <button class="btn btn-ghost" type="button" onclick="navigate('sync')"><span class="nav-item"><i data-lucide="refresh-cw" aria-hidden="true"></i><span class="nav-text">Sync</span></span></button>
+      <button class="btn btn-ghost" type="button" onclick="navigate('activities')"><span class="nav-item"><i data-lucide="activity" aria-hidden="true"></i><span class="nav-text">Aktivitäten</span></span></button>
+      <button class="btn active" type="button" onclick="navigate('profile')"><span class="nav-item"><i data-lucide="user" aria-hidden="true"></i><span class="nav-text">Profil</span></span></button>
     </nav>
   </div>
 </div>
@@ -859,6 +938,7 @@ const state = {
   activityId: null,
   weekLoaded: false,
   planLoaded: false,
+  profileLoaded: false,
 };
 
 /* ============================================================
@@ -870,6 +950,7 @@ const VIEW_IDS = {
   sync: 'cairn-sync-soft',
   activities: 'cairn-activities-soft',
   analysis: 'cairn-soft',
+  profile: 'cairn-profile-soft',
 };
 
 function navigate(view, id) {
@@ -886,6 +967,7 @@ function navigate(view, id) {
     case 'sync':       loadSync(); break;
     case 'activities': loadActivities(); break;
     case 'analysis':   if (state.activityId) loadAnalysis(state.activityId); break;
+    case 'profile':    if (!state.profileLoaded) loadProfile(); break;
   }
 
   if (window.lucide) lucide.createIcons();
@@ -1463,6 +1545,101 @@ function renderSync(uploadsData, healthData, changesData) {
     <div class="activity-list">${changeRows}</div>
   `);
   container.appendChild(changesCard);
+
+  if (window.lucide) lucide.createIcons();
+}
+
+/* ============================================================
+   PROFILE VIEW
+   ============================================================ */
+const HRZ_ROWS_RUNNING = ['z1', 'z2', 'z3', 'z4', 'z5'];
+const HRZ_ROWS_CYCLING = ['Z1', 'Z2', 'Z3', 'Z4', 'Z5A', 'Z5B', 'Z5C'];
+
+async function loadProfile() {
+  const brandEl = document.getElementById('profile-brand');
+  if (brandEl && !brandEl.innerHTML.trim()) brandEl.innerHTML = BRAND_SVG;
+
+  try {
+    const data = await apiGet('/api/frontend/profile');
+    renderProfile(data);
+    state.profileLoaded = true;
+  } catch (err) {
+    document.getElementById('profile-stack').innerHTML =
+      `<p class="loading-msg">Profil konnte nicht geladen werden. (${err.message})</p>`;
+  }
+}
+
+function hrzRange(zone) {
+  if (!zone || zone.min == null || zone.max == null) return '—';
+  return `${zone.min}–${zone.max} bpm`;
+}
+
+function renderHrzTable(zones, order) {
+  const rows = order.map(key => {
+    const zone = zones[key] || {};
+    return `<div class="hrz-row">
+      <span class="hrz-zone">${key.toUpperCase()}</span>
+      <span class="hrz-range">${hrzRange(zone)}</span>
+      <span class="hrz-label text-small">${zone.label || ''}</span>
+    </div>`;
+  }).join('');
+  return rows || '<p class="text-small" style="padding:.5rem 0;opacity:.7">Keine Zonen hinterlegt</p>';
+}
+
+function renderProfile(data) {
+  const container = document.getElementById('profile-stack');
+  container.innerHTML = '';
+
+  const profile = (data && data.profile) || {};
+  const plan = data && data.active_plan;
+
+  const statsMetrics = [
+    { label: 'NAME', val: profile.name || null },
+    { label: 'ALTER', val: profile.age != null ? profile.age + ' Jahre' : null },
+    { label: 'GEWICHT', val: profile.weight_kg != null ? profile.weight_kg.toLocaleString('de-CH', { maximumFractionDigits: 1 }) + ' kg' : null },
+    { label: 'VO2MAX', val: profile.vo2max != null ? Math.round(profile.vo2max) : null },
+  ];
+  const statsCard = e('section', 'card stats', `
+    <p class="section-title text-small">ATHLET</p>
+    <div class="profile-metrics">${statsMetrics.map(m => `<div class="profile-metric"><span class="text-small">${m.label}</span><strong>${m.val ?? '—'}</strong></div>`).join('')}</div>
+  `);
+  container.appendChild(statsCard);
+
+  let planInner;
+  if (plan) {
+    const raceDate = plan.race_date ? new Date(plan.race_date + 'T12:00:00') : null;
+    const raceDateLabel = raceDate ? raceDate.toLocaleDateString('de-CH', { day: 'numeric', month: 'long', year: 'numeric' }) : '—';
+    planInner = `<h2>${plan.race_name || 'Aktiver Plan'}</h2><p class="text-small">Zieldatum: ${raceDateLabel}</p>`;
+  } else {
+    planInner = '<p class="text-small" style="opacity:.7">Kein aktiver Plan</p>';
+  }
+  const planCard = e('section', 'card plan-card', `
+    <p class="section-title text-small">AKTIVER PLAN</p>
+    ${planInner}
+  `);
+  container.appendChild(planCard);
+
+  const hrzRunningCard = e('section', 'card hrz-running', `
+    <p class="section-title text-small">HR-ZONEN LAUFEN</p>
+    ${renderHrzTable(profile.hr_zones_running || {}, HRZ_ROWS_RUNNING)}
+  `);
+  container.appendChild(hrzRunningCard);
+
+  const hrzCyclingCard = e('section', 'card hrz-cycling', `
+    <p class="section-title text-small">HR-ZONEN RENNRAD</p>
+    ${renderHrzTable(profile.hr_zones_cycling || {}, HRZ_ROWS_CYCLING)}
+  `);
+  container.appendChild(hrzCyclingCard);
+
+  const powerZonesCycling = (profile.power_zones && profile.power_zones.cycling) || {};
+  const hasPowerZones = Object.keys(powerZonesCycling).length > 0;
+  const powerCard = e('section', 'card power-card', `
+    <p class="section-title text-small">POWER-ZONEN</p>
+    ${hasPowerZones
+      ? renderHrzTable(powerZonesCycling, Object.keys(powerZonesCycling))
+      : '<p class="text-small" style="opacity:.8">FTP-Test ausstehend</p>'}
+  `);
+  container.appendChild(powerCard);
 
   if (window.lucide) lucide.createIcons();
 }

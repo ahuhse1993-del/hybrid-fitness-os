@@ -625,6 +625,59 @@ def save_athlete_profile():
     except Exception as e:
         return jsonify({"status": "error", "message": str(e), "trace": traceback.format_exc()}), 500
 
+# ─── FRONTEND: Profil-Tab (read-only) ───
+# Eigener Endpoint statt /api/athlete/profile wiederzuverwenden: dessen POST
+# schreibt nur in die alten hr_z1_min..hr_z5_max-Spalten (Editier-Formular in
+# cairn_home_mobile.html) — wuerde GET hier stattdessen aus hr_zones/hr_zones_cycling
+# lesen, liefen GET und POST auf zwei verschiedenen Datenquellen auseinander.
+@app.route('/api/frontend/profile', methods=['GET'])
+def frontend_profile():
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT name, age, weight_kg, hr_zones, hr_zones_cycling, power_zones
+            FROM athlete_profile ORDER BY id DESC LIMIT 1
+        """)
+        row = cur.fetchone()
+
+        cur.execute("""
+            SELECT race_name, race_date, goal_type, status
+            FROM plans WHERE status = 'active' ORDER BY created_at DESC LIMIT 1
+        """)
+        plan_row = cur.fetchone()
+
+        cur.execute("""
+            SELECT vo2max_estimate FROM trainings
+            WHERE vo2max_estimate IS NOT NULL ORDER BY date DESC LIMIT 1
+        """)
+        vo2max_row = cur.fetchone()
+        conn.close()
+
+        if not row:
+            return jsonify({"status": "ok", "has_profile": False, "profile": None})
+
+        profile = {
+            "name": row[0] or None,
+            "age": row[1],
+            "weight_kg": float(row[2]) if row[2] is not None else None,
+            "vo2max": float(vo2max_row[0]) if vo2max_row and vo2max_row[0] is not None else None,
+            "hr_zones_running": row[3] or {},
+            "hr_zones_cycling": row[4] or {},
+            "power_zones": row[5] or {},
+        }
+        plan = None
+        if plan_row:
+            plan = {
+                "race_name": plan_row[0],
+                "race_date": plan_row[1].isoformat() if plan_row[1] else None,
+                "goal_type": plan_row[2],
+                "status": plan_row[3],
+            }
+        return jsonify({"status": "ok", "has_profile": True, "profile": profile, "active_plan": plan})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e), "trace": traceback.format_exc()}), 500
+
 # ─── COACH CONTEXT (Schicht 2 — read-only, nur Coach schreibt) ───
 @app.route('/api/athlete/context', methods=['GET'])
 def get_athlete_context():
