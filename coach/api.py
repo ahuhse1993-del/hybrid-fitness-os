@@ -636,7 +636,7 @@ def frontend_profile():
         conn = get_db()
         cur = conn.cursor()
         cur.execute("""
-            SELECT name, age, weight_kg, hr_zones, hr_zones_cycling, power_zones
+            SELECT name, age, weight_kg, hr_zones, hr_zones_cycling, power_zones, vo2max
             FROM athlete_profile ORDER BY id DESC LIMIT 1
         """)
         row = cur.fetchone()
@@ -647,6 +647,8 @@ def frontend_profile():
         """)
         plan_row = cur.fetchone()
 
+        # Garmin-Schaetzwert (aktuell fuer keine Aktivitaet befuellt) hat Vorrang
+        # vor dem manuell gepflegten athlete_profile.vo2max, sobald er existiert.
         cur.execute("""
             SELECT vo2max_estimate FROM trainings
             WHERE vo2max_estimate IS NOT NULL ORDER BY date DESC LIMIT 1
@@ -657,11 +659,17 @@ def frontend_profile():
         if not row:
             return jsonify({"status": "ok", "has_profile": False, "profile": None})
 
+        vo2max = None
+        if vo2max_row and vo2max_row[0] is not None:
+            vo2max = float(vo2max_row[0])
+        elif row[6] is not None:
+            vo2max = float(row[6])
+
         profile = {
             "name": row[0] or None,
             "age": row[1],
             "weight_kg": float(row[2]) if row[2] is not None else None,
-            "vo2max": float(vo2max_row[0]) if vo2max_row and vo2max_row[0] is not None else None,
+            "vo2max": vo2max,
             "hr_zones_running": row[3] or {},
             "hr_zones_cycling": row[4] or {},
             "power_zones": row[5] or {},
