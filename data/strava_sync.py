@@ -9,6 +9,14 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+# Nur Cycling- und Running-Typen importieren — Krafttraining etc. läuft
+# ausschließlich über Hevy/CAIRN (siehe coach/session_routing.py), Strava
+# soll hier keine zweite Quelle dafür werden.
+STRAVA_ALLOWED_TYPES = [
+    'Ride', 'VirtualRide', 'MountainBikeRide', 'GravelRide', 'EBikeRide',
+    'Run', 'TrailRun', 'VirtualRun'
+]
+
 
 def get_valid_access_token():
     """
@@ -120,9 +128,13 @@ def sync_strava_to_db(days_back=30):
                 skipped += 1
                 continue
 
+            sport_type = activity.get('sport_type') or activity.get('type', '')
+            if sport_type not in STRAVA_ALLOWED_TYPES:
+                skipped += 1
+                continue
+
             date = activity.get('start_date_local', '')[:10]
             name = activity.get('name', '')
-            sport_type = activity.get('sport_type', '')
             duration = round(activity.get('moving_time', 0) / 60)
             distance = round(activity.get('distance', 0) / 1000, 2)
             heart_rate = activity.get('average_heartrate')
