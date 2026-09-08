@@ -4,7 +4,7 @@ Knowledge-File für den CAIRN-GPT. Tool-Schemas (Namen, Parameter, Return-Types)
 
 ## 1. CAIRN in 3 Sätzen
 
-CAIRN ist Alexanders persönliches Trainingssystem: ein Postgres-Backend auf Railway verbindet Trainingsplan, Garmin (Cardio/strukturierte Workouts), Hevy (Kraft-Routinen) und Aktivitäts-Analysen in einer Datenbank. ChatGPT greift per MCP (Bearer-Auth) auf alle Tools zu — Schreiboperationen gegen Garmin/Hevy laufen immer über ein preview-Tool zur Validierung, CAIRN-eigene Schreiboperationen sind idempotent (external_id/upsert). Railway: `https://web-production-297f2.up.railway.app` · Analyse-Ansicht: `https://web-production-297f2.up.railway.app/analyse?id=<training_id>`.
+CAIRN ist Alexanders persönliches Trainingssystem: ein Postgres-Backend auf Railway verbindet Trainingsplan, Garmin (Cardio/strukturierte Workouts), Hevy (Kraft-Routinen) und Aktivitäts-Analysen in einer Datenbank. ChatGPT greift per MCP (Bearer-Auth) auf alle Tools zu — Schreiboperationen gegen Garmin/Hevy laufen immer über ein preview-Tool zur Validierung, CAIRN-eigene Schreiboperationen sind idempotent (external_id/upsert). Railway: `https://web-production-297f2.up.railway.app` · Analyse-Ansicht: `https://web-production-297f2.up.railway.app/activities/<training_id>/analysis` (= `frontend_url`, siehe Regel unten).
 
 ## 2. VERBINDLICHE REGELN
 
@@ -16,8 +16,8 @@ CAIRN ist Alexanders persönliches Trainingssystem: ein Postgres-Backend auf Rai
 - **Race-Date-Änderung an aktivem Plan:** `upsert_training_block` lehnt ohne `confirm_race_date_change=True` ab — nie stillschweigend überschreiben.
 - **Keine Credentials ausgeben.** Nie loggen, nie in Tool-Antworten wiederholen.
 - **Nach `save_activity_analysis` / `save_activity_coach_analysis` immer den Analyselink zurückgeben:**
-  `https://web-production-297f2.up.railway.app/analyse?id=<training_id>`
-  (nicht das `frontend_url`-Feld aus der Tool-Antwort übernehmen — das zeigt auf eine andere, ältere Analyse-Seite.)
+  das `frontend_url`-Feld aus der Tool-Antwort (`https://web-production-297f2.up.railway.app/activities/<training_id>/analysis`).
+  **Nicht** `/analyse?id=<id>` verwenden — das ist die veraltete `cairn_analyse_v4.html`-Seite (alte, einfachere `splits`-Tabellen-Pipeline über `/api/activity/<id>/analyse`, kein Rad/Power-Support). `frontend_url` zeigt auf die aktiv gepflegte Seite (`cairn_activity_analysis.html` über `/api/activities/<id>/full-analysis`) mit vollem Stream/Trail/Zonen-Datensatz inkl. Rad-Power-Block (siehe Abschnitt 5).
 
 ## 3. WORKFLOWS
 
@@ -87,7 +87,14 @@ CAIRN ist Alexanders persönliches Trainingssystem: ein Postgres-Backend auf Rai
 | floors_duration | | | ✓ | |
 | steps_duration | | | ✓ | |
 
-## 5. FEHLERBEHANDLUNG
+## 5. RAD-SPEZIFIKA (nicht im Schema)
+
+- **`hr_zones` hat bei Rad-Aktivitäten eine andere Form als bei Lauf.** In `prepare_activity_analysis`/`get_activity_analysis_data`: Lauf liefert eine berechnete Zeit-in-Zone-Auswertung (`{method, zones: [{zone, min_bpm, max_bpm, duration_s, percentage}], unclassified_duration_s}`). Rad-Aktivitäten (`trainings.type` in `Ride`, `MountainBikeRide`, `GravelRide`, `EBikeRide`, `VirtualRide`) liefern stattdessen nur die Zonen**definition** aus `athlete_profile.hr_zones_cycling` (flach: `{Z1: {min, max, label}, ...}`, keine Zeiten/Prozente — Grund: die Zeit-in-Zone-Berechnung würde sonst fälschlich gegen Lauf-Zonengrenzen rechnen). Bei Rad kommen zusätzlich `power_zones` (Z1–Z7, aus `athlete_profile.power_zones`) und `ftp_w` in der Antwort dazu — beide Felder fehlen bei Nicht-Rad-Aktivitäten komplett (kein `null`, kein Key).
+- **FTP:** `athlete_profile.cycling_ftp_w` / `cycling_ftp_wkg` (Stand 2026-09-08: 191 W / 2.56 W/kg, Test: MyWhoosh Ramp Test). Kurzreferenz auch über `get_athlete_profile` → `zone_routing.cycling` (bündelt hr_zones_cycling/power_zones/ftp_w/ftp_tested_at, ersetzt aber nicht die Rohdaten im Profil).
+- **Normalized Power / TSS / Intensity Factor:** `trainings.normalized_power_w`, `tss_estimate`, `intensity_factor` existieren als Spalten, werden aber nicht aus dem Aktivitäts-Stream berechnet — nur befüllt, wenn Strava sie direkt liefert (`weighted_average_watts` → NP, daraus IF=NP/FTP und TSS beim Strava-Sync berechnet) oder manuell gesetzt. Bei reinen Garmin-Aktivitäten bleiben sie meist `null`, bis Garmin selbst NP liefert.
+- **Aktivitätsquelle:** `trainings.source` unterscheidet `'garmin'` (Default) und `'strava'`. Ein automatischer Strava-Sync (GitHub Actions, per Strava-Webhook oder manuell ausgelöst) importiert Rad-/Lauf-Aktivitäten (`Ride/VirtualRide/MountainBikeRide/GravelRide/EBikeRide/Run/TrailRun/VirtualRun`), die **nicht** bereits über Garmin reinkamen (Dedup über `external_id`/`strava_id`) — z.B. wenn eine Garmin-Aufzeichnung fehlschlägt. Kein MCP-Tool triggert das manuell, reiner Hintergrundprozess — nicht Teil des ChatGPT-Workflows, aber erklärt, falls `source='strava'` in Daten auftaucht.
+
+## 6. FEHLERBEHANDLUNG
 
 - **504 / Timeout bei Garmin-Batch:** Batch zu groß — weniger IDs pro Call. `push_sessions_to_garmin` macht das per `chunk_size=7` automatisch, `remaining_ids` weiterverarbeiten.
 - **Garmin Auth-Fehler:** meist Rate-Limit nach vielen Logins in kurzer Zeit. Kurz warten, erneut versuchen — Session-Cache greift beim nächsten Call meist wieder.
