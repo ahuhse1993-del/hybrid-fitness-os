@@ -1848,11 +1848,12 @@ function renderAnalysis(data) {
     html += buildHRZones(analysisData.hr_zones.zones, analysisData.hr_zones.method);
   }
 
-  if (isCycling) {
-    // Leistung in Zone: echte Zeit-in-Zone-Berechnung bevorzugt (braucht
-    // einen Power-Stream — aktuell hat keine Rad-Aktivitaet das, da kein
-    // Powermeter angebunden ist), sonst die statische Zonentabelle als
-    // Referenz.
+  // Power-Zonen-Block nur wenn diese Aktivität selbst echte Leistungsdaten
+  // hat (avg_power/normalized_power) — die statische Z1-Z7-Referenztabelle
+  // ist bewusst KEIN Fallback fuer Aktivitaeten ohne Powermeter-Daten.
+  if (isCycling && (summary.avg_power || summary.normalized_power)) {
+    // Echte Zeit-in-Zone-Berechnung bevorzugt (braucht einen Power-Stream),
+    // sonst die statische Zonentabelle als Referenz.
     if (analysisData.power_zone_time && analysisData.power_zone_time.zones && analysisData.power_zone_time.zones.length) {
       html += buildPowerZoneTime(analysisData.power_zone_time.zones, analysisData.power_zone_time.method);
     } else if (analysisData.power_zones) {

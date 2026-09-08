@@ -274,7 +274,11 @@ function renderAll(res) {
     document.getElementById('pace-card').style.display = 'none';
     document.getElementById('power-card').style.display = '';
     renderPowerBlock(s, d.ftp_w);
-    renderPowerZones(d.power_zone_time, d.power_zones);
+    // Power-Zonen-Block nur wenn diese Aktivität selbst echte Leistungsdaten
+    // hat — die statische Z1-Z7-Referenztabelle ist bewusst KEIN Fallback
+    // fuer Aktivitaeten ohne Powermeter-Daten.
+    var hasActivityPower = !!(s.avg_power || s.normalized_power);
+    renderPowerZones(hasActivityPower ? d.power_zone_time : null, hasActivityPower ? d.power_zones : null);
   } else {
     renderPaceChart(d.km_splits || []);
   }
