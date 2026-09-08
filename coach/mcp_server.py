@@ -120,10 +120,13 @@ def get_athlete_profile() -> dict:
     hr_z1_min..hr_z5_max Spalten, die aus Rückwärtskompatibilität weiterbestehen),
     HR-Zonen Rad (hr_zones_cycling jsonb, Z1..Z5C — eigene Spalte, NICHT Teil von
     hr_zones, da dessen z1..z5-Format vom update_athlete_profile-Validator fix
-    vorgegeben ist), power_zones jsonb (aktuell leerer Platzhalter bis FTP-Test),
+    vorgegeben ist), power_zones jsonb (Rad-Leistungszonen Z1-Z7, siehe
+    cycling_ftp_w/cycling_ftp_wkg fuer den zugrunde liegenden FTP-Test),
     pace_zones, preferred_surfaces/sports, training_preferences, injury_notes,
     long_term_goals_json. Zusätzlich gear_summary: aktive Gear-Gegenstände
     aus athlete_gear (siehe list_athlete_gear für Details je Gegenstand).
+    zone_routing bündelt die sport-spezifischen Zonen (cycling/running) für
+    einfaches Nachschlagen, ohne die athlete_profile-Rohdaten zu duplizieren.
     """
     profile = _fetchone("SELECT * FROM athlete_profile ORDER BY id DESC LIMIT 1")
     plan = _fetchone(
@@ -136,11 +139,32 @@ def get_athlete_profile() -> dict:
         "SELECT id, gear_type, nickname, brand, model, active, target_distance_km "
         "FROM athlete_gear WHERE active = true ORDER BY gear_type, id"
     )
+
+    zone_routing = {
+        "cycling": {
+            "hr_zones": (profile or {}).get("hr_zones_cycling"),
+            "power_zones": (profile or {}).get("power_zones"),
+            "ftp_w": (profile or {}).get("cycling_ftp_w"),
+            "ftp_wkg": (profile or {}).get("cycling_ftp_wkg"),
+            "ftp_tested_at": str((profile or {}).get("cycling_ftp_tested_at") or ""),
+            "ftp_test_type": (profile or {}).get("cycling_ftp_test_type"),
+            "note": "Für Rennrad-Aktivitäten (trainings.type in Ride/MountainBikeRide/...): "
+                    "HR aus hr_zones, Leistung aus power_zones verwenden",
+        },
+        "running": {
+            "hr_zones": (profile or {}).get("hr_zones"),
+            "lthr": (profile or {}).get("lactate_threshold_hr"),
+            "note": "Für Lauf-Aktivitäten (trainings.type in Run/TrailRun/...): "
+                    "HR aus hr_zones, Tempo aus Pace-Zonen verwenden",
+        },
+    }
+
     return {
         "athlete_profile": profile,
         "current_plan": plan,
         "coach_context": context,
         "gear_summary": gear_summary,
+        "zone_routing": zone_routing,
     }
 
 
@@ -1888,6 +1912,16 @@ def bulk_delete_garmin_workouts(garmin_workout_ids: list[int]) -> dict:
     return {"deleted": deleted, "failed": failed, "db_rows_cleared": db_rows_cleared}
 
 
+# trainings.type kommt aus dem Strava-Import (siehe coach/api.py::strava_webhook)
+# und nutzt Stravas Taxonomie, nicht "cycling"/"running" — es gibt keine
+# trainings.sport-Spalte. Beobachtete Rad-Werte: Ride, MountainBikeRide;
+# GravelRide/EBikeRide/VirtualRide ergaenzt fuer Robustheit (Stravas Cycling-
+# Familie), auch wenn bisher nicht importiert.
+_CYCLING_ACTIVITY_TYPES = frozenset({
+    "Ride", "MountainBikeRide", "GravelRide", "EBikeRide", "VirtualRide",
+})
+
+
 @mcp.tool()
 def get_activity_analysis_data(
     activity_id: int | None = None,
@@ -1911,6 +1945,9 @@ def get_activity_analysis_data(
 
     Gibt zurück: summary, native_laps, km_splits, stream, route,
     trail_metrics, trail_segments, hr_zones, recovery_context, data_quality.
+    Bei Rad-Aktivitäten (trainings.type in Ride/MountainBikeRide/...) sind
+    hr_zones die Rad-HF-Zonendefinitionen (statt einer Lauf-basierten
+    Zeit-in-Zone-Berechnung) und power_zones + ftp_w zusätzlich enthalten.
     Fehlende Werte sind null — nichts wird erfunden. Wenn Detaildaten fehlen,
     zuerst sync_activity_details aufrufen.
     """
@@ -2070,7 +2107,7 @@ def get_activity_analysis_data(
             summary=summary, native_laps=native_laps, km_splits=km_splits, trail_metrics=trail_metrics,
         )
 
-        return {
+        result = {
             "summary": summary,
             "native_laps": native_laps,
             "km_splits": km_splits,
@@ -2084,6 +2121,24 @@ def get_activity_analysis_data(
             "data_quality": data_quality,
             "source_data_hash": source_data_hash,
         }
+
+        # Sport-spezifisches Zonen-Routing: hr_zones oben ist eine berechnete
+        # Zeit-in-Zone-Auswertung auf Basis von build_hr_zones(), die immer
+        # die Lauf-HF-Zonen (athlete_profile.hr_zones) verwendet. Fuer Rad-
+        # Aktivitaeten ist das falsch (falsche Zonengrenzen) — dort die
+        # Rad-Zonendefinitionen liefern statt einer irrefuehrenden Berechnung.
+        profile = _fetchone(
+            "SELECT hr_zones_cycling, power_zones, cycling_ftp_w, hr_zones "
+            "FROM athlete_profile ORDER BY id DESC LIMIT 1"
+        ) or {}
+        if training.get("type") in _CYCLING_ACTIVITY_TYPES:
+            result["hr_zones"] = profile.get("hr_zones_cycling")
+            result["power_zones"] = profile.get("power_zones")
+            result["ftp_w"] = profile.get("cycling_ftp_w")
+        else:
+            result["hr_zones"] = hr_zones
+
+        return result
     finally:
         conn.close()
 
