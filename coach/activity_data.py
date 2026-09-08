@@ -55,7 +55,10 @@ def build_summary(conn, training: dict) -> dict:
     max_cadence/max_power werden, wenn möglich, zusätzlich aus activity_stream
     abgeleitet (dort real vorhanden, aber nie zuvor ausgewertet) — max_power
     faellt auf die persistierte trainings.max_power_w-Spalte zurueck, wenn
-    kein Stream vorhanden ist. normalized_power/tss_estimate/intensity_factor
+    kein Stream vorhanden ist. avg_cadence faellt auf den Mittelwert aus
+    splits.cadence_avg zurueck, wenn trainings.avg_cadence leer ist (bei
+    Laufaktivitaeten haeufig der Fall, obwohl Garmin die Daten pro Lap
+    liefert). normalized_power/tss_estimate/intensity_factor
     kommen aus trainings.normalized_power_w/tss_estimate/intensity_factor
     (Rad-Leistungsmetriken, aktuell nur manuell/extern befuellt — kein
     Sync-Pfad berechnet sie automatisch).
@@ -74,6 +77,11 @@ def build_summary(conn, training: dict) -> dict:
             (tid,),
         )
         max_cad_row = cur.fetchone()
+        cur.execute(
+            "SELECT AVG(cadence_avg) FROM splits WHERE training_id = %s AND cadence_avg IS NOT NULL",
+            (tid,),
+        )
+        splits_avg_cadence_row = cur.fetchone()
         cur.execute(
             "SELECT g.id, g.gear_type, g.nickname, u.distance_km FROM activity_gear_usage u "
             "JOIN athlete_gear g ON g.id = u.gear_id WHERE u.training_id = %s",
@@ -94,6 +102,9 @@ def build_summary(conn, training: dict) -> dict:
     moving_s = first_lap[1] if first_lap else None
     max_cadence = max_cad_row[0] if max_cad_row else None
     max_power = max_cad_row[1] if max_cad_row else None
+    splits_avg_cadence = (
+        round(splits_avg_cadence_row[0]) if splits_avg_cadence_row and splits_avg_cadence_row[0] is not None else None
+    )
 
     dist = training.get("distance_km")
     dur = training.get("duration_minutes")
@@ -116,7 +127,7 @@ def build_summary(conn, training: dict) -> dict:
         "avg_pace_per_km": f"{avg_pace_s // 60}:{str(avg_pace_s % 60).zfill(2)}" if avg_pace_s else None,
         "avg_hr": training.get("heart_rate_avg"),
         "max_hr": training.get("max_hr"),
-        "avg_cadence": training.get("avg_cadence"),
+        "avg_cadence": training.get("avg_cadence") if training.get("avg_cadence") is not None else splits_avg_cadence,
         "max_cadence": max_cadence,
         "avg_power": training.get("avg_power"),
         "max_power": max_power if max_power is not None else training.get("max_power_w"),
@@ -530,9 +541,46 @@ def build_data_quality(
     }
 
 
-# ── HR-Zonen (zeitgewichtet, aus athlete_profile) ───────────────────────────
+# ── HR-/Leistungs-Zonen (zeitgewichtet, aus athlete_profile) ────────────────
 
-def _zone_bounds_from_profile(profile: dict) -> tuple[list[tuple[int, int, int]], str] | None:
+def _time_weighted_zones(
+    pts: list[tuple[float, float]], bounds: list[tuple[int, int, int, str | None]]
+) -> tuple[dict[int, float], float, float] | None:
+    """
+    Gemeinsamer Kern fuer build_hr_zones/build_power_zones: gewichtet jeden
+    Stream-Punkt mit der Zeit bis zum naechsten Punkt (nicht einfache
+    Punktanzahl), da Messabstaende unterschiedlich sein koennen (Pausen,
+    Auto-Pause, variable Sendefrequenz). pts = [(elapsed_s, value), ...]
+    sortiert, bereits auf value IS NOT NULL gefiltert. bounds = [(zone, lo,
+    hi, label), ...]. Gibt (zone_seconds, unclassified_seconds, total_seconds)
+    zurueck, oder None bei <2 Punkten oder total<=0.
+    """
+    if len(pts) < 2:
+        return None
+    zone_seconds = {z: 0.0 for z, _, _, _ in bounds}
+    unclassified = 0.0
+    for (t1, v1), (t2, _) in zip(pts, pts[1:]):
+        dt = max(0.0, t2 - t1)
+        # Grosse Luecken (Pause/Signalverlust) nicht als kontinuierliche Zeit
+        # in einer Zone zaehlen.
+        if dt > 120:
+            continue
+        matched = False
+        for z, lo, hi, _ in bounds:
+            if lo <= v1 <= hi:
+                zone_seconds[z] += dt
+                matched = True
+                break
+        if not matched:
+            unclassified += dt
+
+    total = sum(zone_seconds.values()) + unclassified
+    if total <= 0:
+        return None
+    return zone_seconds, unclassified, total
+
+
+def _zone_bounds_from_profile(profile: dict) -> tuple[list[tuple[int, int, int, str | None]], str] | None:
     """Bevorzugt das neue hr_zones-jsonb-Schema, faellt auf die alten
     hr_z1_min..hr_z5_max-Spalten zurueck. None wenn beides fehlt."""
     if profile.get("hr_zones"):
@@ -543,7 +591,7 @@ def _zone_bounds_from_profile(profile: dict) -> tuple[list[tuple[int, int, int]]
                 z = zones_raw.get(f"z{i}")
                 if not z:
                     return None
-                bounds.append((i, int(z["min"]), int(z["max"])))
+                bounds.append((i, int(z["min"]), int(z["max"]), None))
             return bounds, profile.get("hr_zone_method") or "profile_hr_zones"
         except (KeyError, TypeError, ValueError):
             pass
@@ -553,25 +601,60 @@ def _zone_bounds_from_profile(profile: dict) -> tuple[list[tuple[int, int, int]]
     if not all(profile.get(k) is not None for k in keys):
         return None
     bounds = [
-        (1, profile["hr_z1_min"], profile["hr_z1_max"]),
-        (2, profile["hr_z2_min"], profile["hr_z2_max"]),
-        (3, profile["hr_z3_min"], profile["hr_z3_max"]),
-        (4, profile["hr_z4_min"], profile["hr_z4_max"]),
-        (5, profile["hr_z5_min"], profile["hr_z5_max"]),
+        (1, profile["hr_z1_min"], profile["hr_z1_max"], None),
+        (2, profile["hr_z2_min"], profile["hr_z2_max"], None),
+        (3, profile["hr_z3_min"], profile["hr_z3_max"], None),
+        (4, profile["hr_z4_min"], profile["hr_z4_max"], None),
+        (5, profile["hr_z5_min"], profile["hr_z5_max"], None),
     ]
     return bounds, "legacy_hr_z_columns"
 
 
-def build_hr_zones(conn, training_id: int) -> dict | None:
+def _cycling_zone_bounds_from_profile(profile: dict) -> tuple[list[tuple[int, int, int, str | None]], str] | None:
+    """Rad-HF-Zonen aus athlete_profile.hr_zones_cycling (eigene Spalte,
+    Z1..Z5 mit min/max/label -- siehe get_athlete_profile-Docstring in
+    mcp_server.py). None wenn nicht gesetzt."""
+    raw = profile.get("hr_zones_cycling")
+    if not raw:
+        return None
+    try:
+        keys = sorted(raw.keys())
+        bounds = [(i, int(raw[k]["min"]), int(raw[k]["max"]), raw[k].get("label"))
+                  for i, k in enumerate(keys, start=1)]
+        if not bounds:
+            return None
+        return bounds, "profile_hr_zones_cycling"
+    except (KeyError, TypeError, ValueError):
+        return None
+
+
+def _power_zone_bounds_from_profile(profile: dict) -> tuple[list[tuple[int, int, int, str | None]], str] | None:
+    """Rad-Leistungszonen aus athlete_profile.power_zones (Z1..Z7 mit
+    watt_min/watt_max/label). None wenn nicht gesetzt."""
+    raw = profile.get("power_zones")
+    if not raw:
+        return None
+    try:
+        keys = sorted(raw.keys())
+        bounds = [(i, int(raw[k]["watt_min"]), int(raw[k]["watt_max"]), raw[k].get("label"))
+                  for i, k in enumerate(keys, start=1)]
+        if not bounds:
+            return None
+        return bounds, "profile_power_zones"
+    except (KeyError, TypeError, ValueError):
+        return None
+
+
+def build_hr_zones(conn, training_id: int, is_cycling: bool = False) -> dict | None:
     """
-    Zeitgewichtete Zeit-in-Zone-Berechnung: gewichtet jeden Stream-Punkt mit
-    der Zeit bis zum naechsten Punkt (nicht einfache Punktanzahl), da
-    Messabstaende unterschiedlich sein koennen (Pausen, Auto-Pause, variable
-    Sendefrequenz).
+    Zeitgewichtete HF-Zeit-in-Zone-Berechnung. is_cycling=True nutzt die
+    Rad-HF-Zonen (athlete_profile.hr_zones_cycling) statt der Lauf-Zonen --
+    sonst wuerden Rad-Aktivitaeten faelschlich gegen Lauf-Zonengrenzen
+    klassifiziert.
     """
     with conn.cursor() as cur:
         cur.execute(
-            "SELECT id, updated_at, hr_zones, hr_zone_method, "
+            "SELECT id, updated_at, hr_zones, hr_zone_method, hr_zones_cycling, "
             "hr_z1_min, hr_z1_max, hr_z2_min, hr_z2_max, hr_z3_min, hr_z3_max, "
             "hr_z4_min, hr_z4_max, hr_z5_min, hr_z5_max "
             "FROM athlete_profile ORDER BY id DESC LIMIT 1"
@@ -582,7 +665,8 @@ def build_hr_zones(conn, training_id: int) -> dict | None:
         cols = [d[0] for d in cur.description]
         profile = dict(zip(cols, row))
 
-    resolved = _zone_bounds_from_profile(profile)
+    resolved = (_cycling_zone_bounds_from_profile(profile) if is_cycling
+                else _zone_bounds_from_profile(profile))
     if resolved is None:
         return None
     bounds, method = resolved
@@ -596,41 +680,75 @@ def build_hr_zones(conn, training_id: int) -> dict | None:
         )
         pts = cur.fetchall()
 
-    if len(pts) < 2:
+    breakdown = _time_weighted_zones(pts, bounds)
+    if breakdown is None:
         return None
-
-    zone_seconds = {z: 0.0 for z, _, _ in bounds}
-    unclassified = 0.0
-    for (t1, hr1), (t2, _) in zip(pts, pts[1:]):
-        dt = max(0.0, t2 - t1)
-        # Grosse Luecken (Pause/Signalverlust) nicht als kontinuierliche Zeit
-        # in einer Zone zaehlen.
-        if dt > 120:
-            continue
-        matched = False
-        for z, lo, hi in bounds:
-            if lo <= hr1 <= hi:
-                zone_seconds[z] += dt
-                matched = True
-                break
-        if not matched:
-            unclassified += dt
-
-    total = sum(zone_seconds.values()) + unclassified
-    if total <= 0:
-        return None
+    zone_seconds, unclassified, total = breakdown
 
     zones_out = []
-    for z, lo, hi in bounds:
+    for z, lo, hi, label in bounds:
         secs = zone_seconds[z]
         zones_out.append({
-            "zone": z, "min_bpm": lo, "max_bpm": hi,
+            "zone": z, "label": label, "min_bpm": lo, "max_bpm": hi,
             "duration_s": round(secs), "percentage": round(secs / total * 100, 1),
         })
 
     return {
         "method": method,
         "profile_updated_at": profile["updated_at"].isoformat() if profile.get("updated_at") else None,
+        "zones": zones_out,
+        "unclassified_duration_s": round(unclassified),
+    }
+
+
+def build_power_zones(conn, training_id: int) -> dict | None:
+    """
+    Zeitgewichtete Leistungs-Zeit-in-Zone-Berechnung, analog build_hr_zones,
+    aber gegen athlete_profile.power_zones. Braucht einen echten Power-
+    Stream (activity_stream.power) -- Stand 2026-09: keine synchronisierte
+    Rad-Aktivitaet hat das (kein Powermeter angebunden, nur HF-Stream),
+    daher liefert das aktuell praktisch ueberall None. Bewusst KEIN Fallback
+    auf trainings.avg_power/normalized_power_w als Einzelwert -- ein
+    Durchschnittswert waere keine echte Zeit-in-Zone-Verteilung, nur eine
+    Naeherung, die den "nichts erfinden"-Grundsatz dieser Datei verletzen
+    wuerde.
+    """
+    with conn.cursor() as cur:
+        cur.execute("SELECT power_zones FROM athlete_profile ORDER BY id DESC LIMIT 1")
+        row = cur.fetchone()
+        if not row:
+            return None
+        profile = {"power_zones": row[0]}
+
+    resolved = _power_zone_bounds_from_profile(profile)
+    if resolved is None:
+        return None
+    bounds, method = resolved
+
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT elapsed_s, power FROM activity_stream "
+            "WHERE training_id = %s AND power IS NOT NULL AND elapsed_s IS NOT NULL "
+            "ORDER BY elapsed_s",
+            (training_id,),
+        )
+        pts = cur.fetchall()
+
+    breakdown = _time_weighted_zones(pts, bounds)
+    if breakdown is None:
+        return None
+    zone_seconds, unclassified, total = breakdown
+
+    zones_out = []
+    for z, lo, hi, label in bounds:
+        secs = zone_seconds[z]
+        zones_out.append({
+            "zone": z, "label": label, "watt_min": lo, "watt_max": hi,
+            "duration_s": round(secs), "percentage": round(secs / total * 100, 1),
+        })
+
+    return {
+        "method": method,
         "zones": zones_out,
         "unclassified_duration_s": round(unclassified),
     }

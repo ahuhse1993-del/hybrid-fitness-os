@@ -1800,6 +1800,7 @@ function renderAnalysis(data) {
     { label: 'AUFSTIEG', val: summary.elevation_gain_m ? `${Math.round(summary.elevation_gain_m)} HM+` : null },
     { label: 'ABSTIEG',  val: summary.elevation_loss_m ? `${Math.round(summary.elevation_loss_m)} HM−` : null },
     { label: 'Ø HF',    val: summary.avg_hr ? `${summary.avg_hr} bpm` : null },
+    { label: 'Ø KADENZ', val: summary.avg_cadence ? `${summary.avg_cadence} ${isCycling ? 'rpm' : 'spm'}` : null },
   ].filter(m => m.val);
 
   html += `<section class="card panel green-card" aria-labelledby="soft-hero">
@@ -1840,19 +1841,23 @@ function renderAnalysis(data) {
     html += buildHRChart(hrPts, summary.avg_hr);
   }
 
+  // HR zones (coral) — hr_zones ist jetzt fuer Rad UND Lauf eine echte
+  // Zeit-in-Zone-Berechnung (Rad gegen hr_zones_cycling, Lauf gegen
+  // hr_zones), gleiche Form, ein Renderer.
+  if (analysisData.hr_zones && analysisData.hr_zones.zones && analysisData.hr_zones.zones.length) {
+    html += buildHRZones(analysisData.hr_zones.zones, analysisData.hr_zones.method);
+  }
+
   if (isCycling) {
-    // Rad: hr_zones ist hier keine Zeit-in-Zone-Berechnung (die gaebe es nur
-    // gegen Lauf-Zonen), sondern die Zonendefinition aus hr_zones_cycling —
-    // andere Form, eigener Renderer.
-    if (analysisData.hr_zones) {
-      html += buildCyclingHRZoneDefs(analysisData.hr_zones);
-    }
-    if (analysisData.power_zones) {
+    // Leistung in Zone: echte Zeit-in-Zone-Berechnung bevorzugt (braucht
+    // einen Power-Stream — aktuell hat keine Rad-Aktivitaet das, da kein
+    // Powermeter angebunden ist), sonst die statische Zonentabelle als
+    // Referenz.
+    if (analysisData.power_zone_time && analysisData.power_zone_time.zones && analysisData.power_zone_time.zones.length) {
+      html += buildPowerZoneTime(analysisData.power_zone_time.zones, analysisData.power_zone_time.method);
+    } else if (analysisData.power_zones) {
       html += buildPowerZones(analysisData.power_zones);
     }
-  } else if (analysisData.hr_zones && analysisData.hr_zones.zones && analysisData.hr_zones.zones.length) {
-    // HR zones (coral)
-    html += buildHRZones(analysisData.hr_zones.zones, analysisData.hr_zones.method);
   }
 
   // Gear (green)
@@ -2098,11 +2103,33 @@ function buildHRZones(zones, method) {
     const rem = secs % 60;
     const timeStr = `${String(mins).padStart(2,'0')}:${String(rem).padStart(2,'0')}`;
     const sharePct = z.percentage != null ? Math.round(z.percentage) : Math.round((secs / totalTime) * 100);
-    return `<div class="zone-row"><strong>Z${z.zone || (i+1)}</strong><div class="zone-track"><div class="zone-fill" style="--w:${pct}%"></div></div><span>${timeStr}</span><span class="zone-pct">${sharePct}%</span></div>`;
+    const zoneLabel = `Z${z.zone || (i+1)}${z.label ? ' ' + z.label : ''}`;
+    return `<div class="zone-row"><strong>${zoneLabel}</strong><div class="zone-track"><div class="zone-fill" style="--w:${pct}%"></div></div><span>${timeStr}</span><span class="zone-pct">${sharePct}%</span></div>`;
   }).join('');
 
   return `<section class="card panel coral-card" aria-labelledby="soft-zones">
     <div class="head"><div><p class="eyebrow text-small">ZEIT IN ZONE</p><h2 id="soft-zones">Herzfrequenzzonen</h2></div><span class="pill text-small">${method ? method.toUpperCase() : 'HF-ZONEN'}</span></div>
+    ${rows}
+  </section>`;
+}
+
+function buildPowerZoneTime(zones, method) {
+  if (!zones || !zones.length) return '';
+  const maxTime = Math.max(...zones.map(z => z.duration_s || 0), 1);
+  const totalTime = zones.reduce((sum, z) => sum + (z.duration_s || 0), 0) || 1;
+  const rows = zones.map((z, i) => {
+    const secs = z.duration_s || 0;
+    const pct = Math.round((secs / maxTime) * 96) + 2;
+    const mins = Math.floor(secs / 60);
+    const rem = secs % 60;
+    const timeStr = `${String(mins).padStart(2,'0')}:${String(rem).padStart(2,'0')}`;
+    const sharePct = z.percentage != null ? Math.round(z.percentage) : Math.round((secs / totalTime) * 100);
+    const zoneLabel = `Z${z.zone || (i+1)}${z.label ? ' ' + z.label : ''}`;
+    return `<div class="zone-row"><strong>${zoneLabel}</strong><div class="zone-track"><div class="zone-fill" style="--w:${pct}%"></div></div><span>${timeStr}</span><span class="zone-pct">${sharePct}%</span></div>`;
+  }).join('');
+
+  return `<section class="card panel coral-card" aria-labelledby="soft-power-zone-time">
+    <div class="head"><div><p class="eyebrow text-small">LEISTUNG IN ZONE</p><h2 id="soft-power-zone-time">Wattzonen</h2></div><span class="pill text-small">${method === 'profile_power_zones' ? 'POWER-ZONEN' : (method || 'WATT')}</span></div>
     ${rows}
   </section>`;
 }
@@ -2140,20 +2167,6 @@ function buildPowerZones(powerZones) {
   }).join('');
   return `<section class="card panel coral-card" aria-labelledby="soft-power-zones">
     <div class="head"><div><p class="eyebrow text-small">LEISTUNGSZONEN</p><h2 id="soft-power-zones">Power-Zonen</h2></div></div>
-    ${rows}
-  </section>`;
-}
-
-function buildCyclingHRZoneDefs(hrZones) {
-  const keys = Object.keys(hrZones || {}).sort();
-  if (!keys.length) return '';
-  const rows = keys.map(z => {
-    const zone = hrZones[z] || {};
-    const range = zone.max >= 999 ? `${zone.min}+ bpm` : `${zone.min}–${zone.max} bpm`;
-    return `<div class="zone-row"><strong>${z}</strong><span>${zone.label || ''}</span><span class="zone-pct">${range}</span></div>`;
-  }).join('');
-  return `<section class="card panel coral-card" aria-labelledby="soft-hr-zone-defs">
-    <div class="head"><div><p class="eyebrow text-small">HERZFREQUENZZONEN</p><h2 id="soft-hr-zone-defs">HF-Zonen (Rad)</h2></div></div>
     ${rows}
   </section>`;
 }

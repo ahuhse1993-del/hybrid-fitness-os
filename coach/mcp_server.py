@@ -42,6 +42,7 @@ from coach.activity_data import (
     build_data_quality,
     build_hr_zones,
     build_native_laps,
+    build_power_zones,
     build_recovery_context,
     build_route,
     build_summary,
@@ -1936,11 +1937,14 @@ def get_activity_analysis_data(
 
     Gibt zurück: summary, native_laps, km_splits, stream, route,
     trail_metrics, trail_segments, hr_zones, recovery_context, data_quality.
-    Bei Rad-Aktivitäten (trainings.type in Ride/MountainBikeRide/...) sind
-    hr_zones die Rad-HF-Zonendefinitionen (statt einer Lauf-basierten
-    Zeit-in-Zone-Berechnung) und power_zones + ftp_w zusätzlich enthalten.
-    Fehlende Werte sind null — nichts wird erfunden. Wenn Detaildaten fehlen,
-    zuerst sync_activity_details aufrufen.
+    Bei Rad-Aktivitäten (trainings.type in Ride/MountainBikeRide/...) ist
+    hr_zones eine echte Zeit-in-Zone-Berechnung gegen die Rad-HF-Zonen
+    (athlete_profile.hr_zones_cycling), nicht gegen die Lauf-Zonen. Zusätzlich
+    enthalten: power_zones (statische Zonendefinitionen Z1-Z7), ftp_w und
+    power_zone_time (echte Zeit-in-Zone-Berechnung für Leistung — null, so
+    lange kein Power-Stream vorhanden ist, kein Fallback auf einen
+    Durchschnittswert). Fehlende Werte sind null — nichts wird erfunden.
+    Wenn Detaildaten fehlen, zuerst sync_activity_details aufrufen.
     """
     if activity_id:
         training = _fetchone(
@@ -1977,7 +1981,8 @@ def get_activity_analysis_data(
         trail_metrics, trail_segments = build_trail_metrics_and_segments(conn, tid)
         summary = build_summary(conn, training)
         recovery_context = build_recovery_context(conn, training["date"]) if training.get("date") else None
-        hr_zones = build_hr_zones(conn, tid)
+        is_cycling = training.get("type") in CYCLING_ACTIVITY_TYPES
+        hr_zones = build_hr_zones(conn, tid, is_cycling=is_cycling)
 
         # Stream-basierte Werte haben Vorrang vor evtl. veralteten trainings-
         # Spalten (elevation_gain_m/loss_m dort oft NULL bei Altimporten).
@@ -2115,21 +2120,21 @@ def get_activity_analysis_data(
             "source_data_hash": source_data_hash,
         }
 
-        # Sport-spezifisches Zonen-Routing: hr_zones oben ist eine berechnete
-        # Zeit-in-Zone-Auswertung auf Basis von build_hr_zones(), die immer
-        # die Lauf-HF-Zonen (athlete_profile.hr_zones) verwendet. Fuer Rad-
-        # Aktivitaeten ist das falsch (falsche Zonengrenzen) — dort die
-        # Rad-Zonendefinitionen liefern statt einer irrefuehrenden Berechnung.
-        profile = _fetchone(
-            "SELECT hr_zones_cycling, power_zones, cycling_ftp_w, hr_zones "
-            "FROM athlete_profile ORDER BY id DESC LIMIT 1"
-        ) or {}
-        if training.get("type") in CYCLING_ACTIVITY_TYPES:
-            result["hr_zones"] = profile.get("hr_zones_cycling")
+        # Sport-spezifisches Zonen-Routing: hr_zones oben ist bereits per
+        # is_cycling gegen die richtigen Zonengrenzen berechnet (Rad-HF-Zonen
+        # bzw. Lauf-HF-Zonen), inkl. echter Zeit-in-Zone-Prozente/-Sekunden.
+        # Fuer Rad zusaetzlich: power_zones (statische Zonendefinitionen,
+        # Z1-Z7 mit Watt-Grenzen -- fuer die Referenztabelle im Frontend) und
+        # power_zone_time (echte Zeit-in-Zone-Berechnung analog hr_zones,
+        # None solange kein Power-Stream vorhanden ist -- kein Fallback auf
+        # einen Einzelwert, siehe build_power_zones-Docstring).
+        if is_cycling:
+            profile = _fetchone(
+                "SELECT power_zones, cycling_ftp_w FROM athlete_profile ORDER BY id DESC LIMIT 1"
+            ) or {}
             result["power_zones"] = profile.get("power_zones")
             result["ftp_w"] = profile.get("cycling_ftp_w")
-        else:
-            result["hr_zones"] = hr_zones
+            result["power_zone_time"] = build_power_zones(conn, tid)
 
         return result
     finally:

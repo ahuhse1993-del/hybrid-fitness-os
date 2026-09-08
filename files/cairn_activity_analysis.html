@@ -127,6 +127,7 @@ body{background:var(--bg);font-family:"DM Sans",sans-serif;color:var(--black);fo
       <div class="hs"><div class="hsl" id="hero-pace-label">Pace &oslash;</div><div class="hsv" id="hero-pace">&mdash;</div></div>
       <div class="hs"><div class="hsl">HF &oslash;</div><div class="hsv" id="hero-hr">&mdash;</div></div>
       <div class="hs"><div class="hsl">Aufstieg</div><div class="hsv" id="hero-elev">&mdash;</div></div>
+      <div class="hs" id="hero-cadence-hs" style="display:none"><div class="hsl" id="hero-cadence-label">Kadenz &oslash;</div><div class="hsv" id="hero-cadence">&mdash;</div></div>
     </div>
   </div>
 
@@ -170,7 +171,7 @@ body{background:var(--bg);font-family:"DM Sans",sans-serif;color:var(--black);fo
     </div>
   </div>
 
-  <div class="sec" id="power-zones-sec" style="display:none"><span class="secl">Power-Zonen</span><div class="secln"></div></div>
+  <div class="sec" id="power-zones-sec" style="display:none"><span class="secl" id="power-zones-heading">Power-Zonen</span><div class="secln"></div></div>
   <div class="card" id="power-zones-card" style="display:none">
     <div id="power-zone-rows"></div>
   </div>
@@ -256,9 +257,15 @@ function renderAll(res) {
   }
   document.getElementById('hero-hr').innerHTML = s.avg_hr != null ? s.avg_hr + ' bpm' : '&mdash;';
   document.getElementById('hero-elev').innerHTML = s.elevation_gain_m != null ? '+' + Math.round(s.elevation_gain_m) + ' m' : '&mdash;';
+  if (s.avg_cadence) {
+    document.getElementById('hero-cadence').innerHTML = s.avg_cadence + (isCycling ? ' rpm' : ' spm');
+    document.getElementById('hero-cadence-hs').style.display = '';
+  } else {
+    document.getElementById('hero-cadence-hs').style.display = 'none';
+  }
 
   renderCoachAnalysis(res.existing_coach_analysis);
-  renderHrZones(d.hr_zones, isCycling);
+  renderHrZones(d.hr_zones);
   renderRoute(d.route);
   renderElevation(d.stream, s.distance_km);
   renderTrail(d.trail_metrics, d.trail_segments);
@@ -267,7 +274,7 @@ function renderAll(res) {
     document.getElementById('pace-card').style.display = 'none';
     document.getElementById('power-card').style.display = '';
     renderPowerBlock(s, d.ftp_w);
-    renderPowerZones(d.power_zones);
+    renderPowerZones(d.power_zone_time, d.power_zones);
   } else {
     renderPaceChart(d.km_splits || []);
   }
@@ -299,15 +306,31 @@ function renderPowerBlock(s, ftpW) {
   }).join('') + '</div>';
 }
 
-function renderPowerZones(powerZones) {
+function renderPowerZones(powerZoneTime, powerZonesStatic) {
   var sec = document.getElementById('power-zones-sec');
   var card = document.getElementById('power-zones-card');
   var rows = document.getElementById('power-zone-rows');
-  var keys = powerZones ? Object.keys(powerZones).sort() : [];
+  var heading = document.getElementById('power-zones-heading');
+
+  // Echte Zeit-in-Zone-Berechnung bevorzugt (braucht einen Power-Stream —
+  // aktuell hat keine Rad-Aktivitaet das, kein Powermeter angebunden),
+  // sonst die statische Zonentabelle als Referenz.
+  if (powerZoneTime && powerZoneTime.zones && powerZoneTime.zones.length) {
+    heading.textContent = 'Wattzonen';
+    sec.style.display = ''; card.style.display = '';
+    rows.innerHTML = powerZoneTime.zones.slice().reverse().map(function(z){
+      var label = 'Z' + z.zone + (z.label ? ' ' + z.label : '');
+      return '<div class="zr"><span class="zl">'+label+'</span><div class="zb"><div class="zf" style="width:'+z.percentage+'%"></div></div><span class="zp">'+z.percentage.toFixed(0)+'%</span></div>';
+    }).join('');
+    return;
+  }
+
+  var keys = powerZonesStatic ? Object.keys(powerZonesStatic).sort() : [];
   if (!keys.length) { sec.style.display = 'none'; card.style.display = 'none'; return; }
+  heading.textContent = 'Power-Zonen';
   sec.style.display = ''; card.style.display = '';
   rows.innerHTML = keys.map(function(z){
-    var zone = powerZones[z] || {};
+    var zone = powerZonesStatic[z] || {};
     var range = zone.watt_max >= 9999 ? (zone.watt_min + '+ W') : (zone.watt_min + '&ndash;' + zone.watt_max + ' W');
     return '<div class="zr"><span class="zl">'+z+'</span><span class="mono" style="font-size:9px;flex:1;padding:0 8px">'+(zone.label||'')+'</span><span class="zp">'+range+'</span></div>';
   }).join('');
@@ -330,24 +353,14 @@ function renderCoachAnalysis(a) {
   }
 }
 
-function renderHrZones(zones, isCycling) {
+function renderHrZones(zones) {
+  // hr_zones ist jetzt fuer Rad UND Lauf eine echte Zeit-in-Zone-Berechnung
+  // (Rad gegen hr_zones_cycling, Lauf gegen hr_zones) — gleiche Form.
   var el = document.getElementById('hz-rows');
-  if (!zones) { el.innerHTML = '<div class="mono" style="font-size:9px;color:#9E9B95">nicht verfügbar</div>'; return; }
-  if (isCycling) {
-    // Rad: zones ist hr_zones_cycling — eine Zonendefinition (Z1..Z5 mit
-    // min/max/label), keine Zeit-in-Zone-Berechnung wie beim Lauf.
-    var keys = Object.keys(zones).sort();
-    if (!keys.length) { el.innerHTML = '<div class="mono" style="font-size:9px;color:#9E9B95">nicht verfügbar</div>'; return; }
-    el.innerHTML = keys.map(function(z){
-      var zone = zones[z] || {};
-      var range = zone.max >= 999 ? (zone.min + '+') : (zone.min + '–' + zone.max);
-      return '<div class="zr"><span class="zl">'+z+'</span><span class="zp">'+range+'</span></div>';
-    }).join('');
-    return;
-  }
-  if (!zones.zones || !zones.zones.length) { el.innerHTML = '<div class="mono" style="font-size:9px;color:#9E9B95">nicht verfügbar</div>'; return; }
+  if (!zones || !zones.zones || !zones.zones.length) { el.innerHTML = '<div class="mono" style="font-size:9px;color:#9E9B95">nicht verfügbar</div>'; return; }
   var rows = zones.zones.slice().reverse().map(function(z){
-    return '<div class="zr"><span class="zl">Z'+z.zone+'</span><div class="zb"><div class="zf" style="width:'+z.percentage+'%"></div></div><span class="zp">'+z.percentage.toFixed(0)+'%</span></div>';
+    var label = 'Z' + z.zone + (z.label ? ' ' + z.label : '');
+    return '<div class="zr"><span class="zl">'+label+'</span><div class="zb"><div class="zf" style="width:'+z.percentage+'%"></div></div><span class="zp">'+z.percentage.toFixed(0)+'%</span></div>';
   });
   el.innerHTML = rows.join('');
 }
