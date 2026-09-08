@@ -1190,7 +1190,7 @@ function buildWeekCard(sess) {
   if (clickable) {
     article.setAttribute('tabindex', '0');
     article.setAttribute('role', 'button');
-    article.setAttribute('aria-label', `Details zu ${sess.session_type || 'Session'}`);
+    article.setAttribute('aria-label', `Details zu ${sess.name || sess.session_type || 'Session'}`);
     article.onclick = () => openSessionSheet(storeKey);
     article.onkeydown = (ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); openSessionSheet(storeKey); } };
   }
@@ -1207,7 +1207,7 @@ function buildWeekCard(sess) {
 
   let sessionHTML = '';
   if (sess.is_today) sessionHTML += `<span class="today text-small">HEUTE</span>`;
-  sessionHTML += `<h2 id="day-${sess.date}">${sess.session_type || 'Session'}</h2>`;
+  sessionHTML += `<h2 id="day-${sess.date}">${sess.name || sess.session_type || 'Session'}</h2>`;
 
   // Meta row
   const metaParts = [];
