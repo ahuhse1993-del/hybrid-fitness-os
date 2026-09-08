@@ -1696,6 +1696,26 @@ def strava_webhook():
                 method="POST"
             )
             urllib.request.urlopen(req, timeout=5)
+
+            # Strava-Sync separat anstossen — deckt Strava-only-Aktivitaeten
+            # (z.B. reines Rennrad ohne Garmin) ab, die der Garmin-Dispatch
+            # oben nicht importiert. Eigenes try/except, damit ein Fehler
+            # hier nicht den ganzen Webhook-Request auf 5xx kippt (Strava
+            # deaktiviert Webhooks nach wiederholten Fehlantworten).
+            try:
+                req2 = urllib.request.Request(
+                    "https://api.github.com/repos/ahuhse1993-del/hybrid-fitness-os/actions/workflows/strava_sync.yml/dispatches",
+                    data=json.dumps({"ref": "main", "inputs": {"days_back": "3"}}).encode(),
+                    headers={
+                        "Authorization": f"Bearer {github_token}",
+                        "Accept": "application/vnd.github.v3+json",
+                        "Content-Type": "application/json"
+                    },
+                    method="POST"
+                )
+                urllib.request.urlopen(req2, timeout=5)
+            except Exception as e:
+                logging.warning(f"Strava-Sync-Dispatch fehlgeschlagen: {e}")
         return jsonify({"status": "ok"})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500

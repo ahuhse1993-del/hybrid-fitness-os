@@ -27,3 +27,25 @@ tokens = response.json()
 print(f"\nStrava Antwort: {tokens}")
 print(f"\n✅ Neuer Access Token: {tokens.get('access_token')}")
 print(f"✅ Refresh Token: {tokens.get('refresh_token')}")
+
+db_url = os.getenv("RAILWAY_DATABASE_URL") or os.getenv("DATABASE_URL")
+if db_url and tokens.get("access_token") and tokens.get("refresh_token"):
+    import psycopg2
+    conn = psycopg2.connect(db_url)
+    cur = conn.cursor()
+    cur.execute("""
+        INSERT INTO strava_tokens (id, access_token, refresh_token, expires_at, athlete_id)
+        VALUES (1, %s, %s, %s, %s)
+        ON CONFLICT (id) DO UPDATE SET
+            access_token=EXCLUDED.access_token,
+            refresh_token=EXCLUDED.refresh_token,
+            expires_at=EXCLUDED.expires_at,
+            athlete_id=EXCLUDED.athlete_id,
+            updated_at=NOW()
+    """, [tokens["access_token"], tokens["refresh_token"],
+          tokens["expires_at"], tokens.get("athlete", {}).get("id")])
+    conn.commit()
+    conn.close()
+    print("✅ Refresh Token dauerhaft in CAIRN DB gespeichert")
+elif not db_url:
+    print("⚠️ RAILWAY_DATABASE_URL/DATABASE_URL nicht gesetzt — Token nur oben ausgegeben, nicht gespeichert.")
