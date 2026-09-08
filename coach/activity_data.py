@@ -27,10 +27,18 @@ def _dictify(cur) -> list[dict]:
 
 
 _SPORT_MAP = {
-    "Run": "running", "TrailRun": "trail_running", "Ride": "cycling",
+    "Run": "running", "TrailRun": "trail_running",
+    "Ride": "cycling", "MountainBikeRide": "cycling", "GravelRide": "cycling",
+    "EBikeRide": "cycling", "VirtualRide": "cycling",
     "WeightTraining": "strength_training", "Swim": "swimming",
     "Walk": "walking", "Hike": "hiking", "Yoga": "yoga", "Cardio": "cardio",
 }
+
+# Einzige Quelle fuer "welche trainings.type-Werte sind Rad" — von
+# _SPORT_MAP abgeleitet statt eine zweite Liste zu pflegen (siehe
+# get_activity_analysis_data in mcp_server.py, das dies fuer sport-
+# spezifisches Zonen-Routing importiert).
+CYCLING_ACTIVITY_TYPES = frozenset(k for k, v in _SPORT_MAP.items() if v == "cycling")
 
 
 def _f(v):
@@ -42,11 +50,15 @@ def _f(v):
 def build_summary(conn, training: dict) -> dict:
     """
     Aktivitätskopf. Nicht in der DB vorhandene Felder (sub_sport, device_name,
-    normalized_power, calories, temperature) bleiben bewusst null — nichts
-    davon wird aktuell irgendwo importiert/gespeichert, daher "nicht
-    verfügbar" statt erfunden. max_cadence/max_power werden, wenn möglich,
-    zusätzlich aus activity_stream abgeleitet (dort real vorhanden, aber nie
-    zuvor ausgewertet).
+    calories, temperature) bleiben bewusst null — nichts davon wird aktuell
+    irgendwo importiert/gespeichert, daher "nicht verfügbar" statt erfunden.
+    max_cadence/max_power werden, wenn möglich, zusätzlich aus activity_stream
+    abgeleitet (dort real vorhanden, aber nie zuvor ausgewertet) — max_power
+    faellt auf die persistierte trainings.max_power_w-Spalte zurueck, wenn
+    kein Stream vorhanden ist. normalized_power/tss_estimate/intensity_factor
+    kommen aus trainings.normalized_power_w/tss_estimate/intensity_factor
+    (Rad-Leistungsmetriken, aktuell nur manuell/extern befuellt — kein
+    Sync-Pfad berechnet sie automatisch).
     """
     tid = training["id"]
 
@@ -107,8 +119,10 @@ def build_summary(conn, training: dict) -> dict:
         "avg_cadence": training.get("avg_cadence"),
         "max_cadence": max_cadence,
         "avg_power": training.get("avg_power"),
-        "max_power": max_power,
-        "normalized_power": None,
+        "max_power": max_power if max_power is not None else training.get("max_power_w"),
+        "normalized_power": training.get("normalized_power_w"),
+        "tss_estimate": _f(training.get("tss_estimate")),
+        "intensity_factor": _f(training.get("intensity_factor")),
         "elevation_gain_m": _f(training.get("elevation_gain_m")),
         "elevation_loss_m": _f(training.get("elevation_loss_m")),
         "min_elevation_m": None,

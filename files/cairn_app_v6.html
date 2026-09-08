@@ -922,6 +922,9 @@ const ANALYSIS_TYPES = [
   'Hill Session', 'Sprint Session', 'Time Trial', 'Recovery Run', 'Threshold Run',
   'Cycling',
   'Run', 'TrailRun', 'Threshold',
+  // Rad — rohe Strava/Garmin-Typen (siehe coach/activity_data.py::CYCLING_ACTIVITY_TYPES,
+  // dieselbe Liste wird backend-seitig fuers Zonen-Routing genutzt)
+  'Ride', 'MountainBikeRide', 'GravelRide', 'EBikeRide', 'VirtualRide',
 ];
 
 function activityLinksToAnalysis(activity) {
@@ -1783,13 +1786,17 @@ function renderAnalysis(data) {
   const container = document.getElementById('analysis-body');
   let html = '';
 
+  const isCycling = summary.sport === 'cycling';
+
   // Hero card (green)
   const d = summary.date ? new Date(summary.date + 'T12:00:00') : null;
   const dateStr = d ? d.toLocaleDateString('de-CH', { weekday: 'long', day:'2-digit', month:'long', year:'numeric' }).toUpperCase() : '';
   const metrics = [
     { label: 'DISTANZ', val: fmtKm(summary.distance_km) },
     { label: 'ZEIT',    val: fmtMin(summary.duration_min) },
-    { label: 'PACE',    val: summary.avg_pace_per_km ? `${summary.avg_pace_per_km} /km` : null },
+    isCycling
+      ? { label: 'Ø WATT', val: summary.avg_power ? `${summary.avg_power} W` : null }
+      : { label: 'PACE',    val: summary.avg_pace_per_km ? `${summary.avg_pace_per_km} /km` : null },
     { label: 'AUFSTIEG', val: summary.elevation_gain_m ? `${Math.round(summary.elevation_gain_m)} HM+` : null },
     { label: 'ABSTIEG',  val: summary.elevation_loss_m ? `${Math.round(summary.elevation_loss_m)} HM−` : null },
     { label: 'Ø HF',    val: summary.avg_hr ? `${summary.avg_hr} bpm` : null },
@@ -1819,8 +1826,11 @@ function renderAnalysis(data) {
     html += buildElevationChart(elevPts, summary.elevation_gain_m, summary.elevation_loss_m, summary.distance_km);
   }
 
-  // Pace chart (sand)
-  if (analysisData.km_splits && analysisData.km_splits.length) {
+  if (isCycling) {
+    // Watt-Block statt Pace-Block — Rad hat keine sinnvolle Pace.
+    html += buildPowerBlock(summary, analysisData.ftp_w);
+  } else if (analysisData.km_splits && analysisData.km_splits.length) {
+    // Pace chart (sand)
     html += buildPaceChart(analysisData.km_splits, summary.avg_pace_per_km);
   }
 
@@ -1830,8 +1840,18 @@ function renderAnalysis(data) {
     html += buildHRChart(hrPts, summary.avg_hr);
   }
 
-  // HR zones (coral)
-  if (analysisData.hr_zones && analysisData.hr_zones.zones && analysisData.hr_zones.zones.length) {
+  if (isCycling) {
+    // Rad: hr_zones ist hier keine Zeit-in-Zone-Berechnung (die gaebe es nur
+    // gegen Lauf-Zonen), sondern die Zonendefinition aus hr_zones_cycling —
+    // andere Form, eigener Renderer.
+    if (analysisData.hr_zones) {
+      html += buildCyclingHRZoneDefs(analysisData.hr_zones);
+    }
+    if (analysisData.power_zones) {
+      html += buildPowerZones(analysisData.power_zones);
+    }
+  } else if (analysisData.hr_zones && analysisData.hr_zones.zones && analysisData.hr_zones.zones.length) {
+    // HR zones (coral)
     html += buildHRZones(analysisData.hr_zones.zones, analysisData.hr_zones.method);
   }
 
@@ -2083,6 +2103,57 @@ function buildHRZones(zones, method) {
 
   return `<section class="card panel coral-card" aria-labelledby="soft-zones">
     <div class="head"><div><p class="eyebrow text-small">ZEIT IN ZONE</p><h2 id="soft-zones">Herzfrequenzzonen</h2></div><span class="pill text-small">${method ? method.toUpperCase() : 'HF-ZONEN'}</span></div>
+    ${rows}
+  </section>`;
+}
+
+function buildPowerBlock(summary, ftpW) {
+  const avgP = summary.avg_power, maxP = summary.max_power, np = summary.normalized_power;
+  if (!avgP && !maxP && !np) {
+    return `<section class="card panel sand-card" aria-labelledby="soft-power">
+      <p class="eyebrow text-small">LEISTUNG</p><h2 id="soft-power">Watt</h2>
+      <p class="loading-msg">Leistungsdaten folgen nach Garmin-Sync.</p>
+    </section>`;
+  }
+  const ifValue = summary.intensity_factor != null ? summary.intensity_factor
+    : (np && ftpW ? np / ftpW : null);
+  const stats = [
+    { label: 'Ø WATT', val: avgP ? `${avgP} W` : null },
+    { label: 'NP', val: np ? `${np} W` : null },
+    { label: 'MAX WATT', val: maxP ? `${maxP} W` : null },
+    { label: 'IF', val: ifValue != null ? ifValue.toFixed(2) : null },
+  ].filter(s => s.val);
+
+  return `<section class="card panel sand-card" aria-labelledby="soft-power">
+    <div class="head"><div><p class="eyebrow text-small">LEISTUNG</p><h2 id="soft-power">Watt</h2></div>${ftpW ? `<span class="pill text-small">FTP ${ftpW} W</span>` : ''}</div>
+    <div class="metrics">${stats.map(s => `<div class="metric"><span class="text-small">${s.label}</span><strong>${s.val}</strong></div>`).join('')}</div>
+  </section>`;
+}
+
+function buildPowerZones(powerZones) {
+  const keys = Object.keys(powerZones || {}).sort();
+  if (!keys.length) return '';
+  const rows = keys.map(z => {
+    const zone = powerZones[z] || {};
+    const range = zone.watt_max >= 9999 ? `${zone.watt_min}+ W` : `${zone.watt_min}–${zone.watt_max} W`;
+    return `<div class="zone-row"><strong>${z}</strong><span>${zone.label || ''}</span><span class="zone-pct">${range}</span></div>`;
+  }).join('');
+  return `<section class="card panel coral-card" aria-labelledby="soft-power-zones">
+    <div class="head"><div><p class="eyebrow text-small">LEISTUNGSZONEN</p><h2 id="soft-power-zones">Power-Zonen</h2></div></div>
+    ${rows}
+  </section>`;
+}
+
+function buildCyclingHRZoneDefs(hrZones) {
+  const keys = Object.keys(hrZones || {}).sort();
+  if (!keys.length) return '';
+  const rows = keys.map(z => {
+    const zone = hrZones[z] || {};
+    const range = zone.max >= 999 ? `${zone.min}+ bpm` : `${zone.min}–${zone.max} bpm`;
+    return `<div class="zone-row"><strong>${z}</strong><span>${zone.label || ''}</span><span class="zone-pct">${range}</span></div>`;
+  }).join('');
+  return `<section class="card panel coral-card" aria-labelledby="soft-hr-zone-defs">
+    <div class="head"><div><p class="eyebrow text-small">HERZFREQUENZZONEN</p><h2 id="soft-hr-zone-defs">HF-Zonen (Rad)</h2></div></div>
     ${rows}
   </section>`;
 }

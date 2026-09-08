@@ -124,7 +124,7 @@ body{background:var(--bg);font-family:"DM Sans",sans-serif;color:var(--black);fo
     </div>
     <div class="hgrid">
       <div class="hs"><div class="hsl">Zeit</div><div class="hsv" id="hero-time">&mdash;</div></div>
-      <div class="hs"><div class="hsl">Pace &oslash;</div><div class="hsv" id="hero-pace">&mdash;</div></div>
+      <div class="hs"><div class="hsl" id="hero-pace-label">Pace &oslash;</div><div class="hsv" id="hero-pace">&mdash;</div></div>
       <div class="hs"><div class="hsl">HF &oslash;</div><div class="hsv" id="hero-hr">&mdash;</div></div>
       <div class="hs"><div class="hsl">Aufstieg</div><div class="hsv" id="hero-elev">&mdash;</div></div>
     </div>
@@ -151,11 +151,15 @@ body{background:var(--bg);font-family:"DM Sans",sans-serif;color:var(--black);fo
     <div style="margin-top:16px" id="trail-segments"></div>
   </div>
 
-  <div class="sec"><span class="secl">Pace &amp; Herzfrequenz</span><div class="secln"></div></div>
+  <div class="sec"><span class="secl" id="pace-hr-heading">Pace &amp; Herzfrequenz</span><div class="secln"></div></div>
   <div style="display:grid;grid-template-columns:1fr;gap:2px;margin-bottom:2px">
-    <div class="card" style="padding-bottom:20px">
+    <div class="card" style="padding-bottom:20px" id="pace-card">
       <div class="mono" style="font-size:9px;color:#6B6860;text-transform:uppercase;letter-spacing:.09em;margin-bottom:4px">Pace pro km</div>
       <div id="pace-chart" style="margin-top:8px"></div>
+    </div>
+    <div class="card" style="padding-bottom:20px;display:none" id="power-card">
+      <div class="mono" style="font-size:9px;color:#6B6860;text-transform:uppercase;letter-spacing:.09em;margin-bottom:4px">Leistung</div>
+      <div id="power-stats" style="margin-top:8px"></div>
     </div>
     <div style="background:#E8E4DC;padding:12px">
       <div style="display:flex;gap:20px;margin-bottom:6px">
@@ -164,6 +168,11 @@ body{background:var(--bg);font-family:"DM Sans",sans-serif;color:var(--black);fo
       </div>
       <div id="hf-chart" style="height:180px"></div>
     </div>
+  </div>
+
+  <div class="sec" id="power-zones-sec" style="display:none"><span class="secl">Power-Zonen</span><div class="secln"></div></div>
+  <div class="card" id="power-zones-card" style="display:none">
+    <div id="power-zone-rows"></div>
   </div>
 
   <div class="sec"><span class="secl">Erholung</span><div class="secln"></div></div>
@@ -231,28 +240,77 @@ function loadAnalysis() {
 function renderAll(res) {
   var d = res.analysis_data;
   var s = d.summary;
+  var isCycling = s.sport === 'cycling';
 
   setEl('an-type', (s.sport || '&mdash;').toUpperCase());
   setEl('an-title', s.activity_name || s.sport || 'Aktivit&auml;t');
   setEl('hero-km', s.distance_km != null ? s.distance_km.toFixed(2) : '&mdash;');
   setEl('hero-name', s.activity_name || '');
   setEl('hero-time', fmtMin(s.duration_min));
-  document.getElementById('hero-pace').innerHTML = s.avg_pace_per_km ? s.avg_pace_per_km + ' /km' : '&mdash;';
+  if (isCycling) {
+    setEl('hero-pace-label', 'Watt ø');
+    document.getElementById('hero-pace').innerHTML = s.avg_power ? s.avg_power + ' W' : '&mdash;';
+  } else {
+    setEl('hero-pace-label', 'Pace ø');
+    document.getElementById('hero-pace').innerHTML = s.avg_pace_per_km ? s.avg_pace_per_km + ' /km' : '&mdash;';
+  }
   document.getElementById('hero-hr').innerHTML = s.avg_hr != null ? s.avg_hr + ' bpm' : '&mdash;';
   document.getElementById('hero-elev').innerHTML = s.elevation_gain_m != null ? '+' + Math.round(s.elevation_gain_m) + ' m' : '&mdash;';
 
   renderCoachAnalysis(res.existing_coach_analysis);
-  renderHrZones(d.hr_zones);
+  renderHrZones(d.hr_zones, isCycling);
   renderRoute(d.route);
   renderElevation(d.stream, s.distance_km);
   renderTrail(d.trail_metrics, d.trail_segments);
-  renderPaceChart(d.km_splits || []);
+  if (isCycling) {
+    setEl('pace-hr-heading', 'Leistung & Herzfrequenz');
+    document.getElementById('pace-card').style.display = 'none';
+    document.getElementById('power-card').style.display = '';
+    renderPowerBlock(s, d.ftp_w);
+    renderPowerZones(d.power_zones);
+  } else {
+    renderPaceChart(d.km_splits || []);
+  }
   renderHrChart(d.stream, s);
   renderNativeLaps(d.native_laps || []);
   renderKmSplits(d.km_splits, d.km_splits_note);
   renderRecovery(d.recovery_context);
   renderQuality(d.data_quality);
   loadGear(s.gear);
+}
+
+function renderPowerBlock(s, ftpW) {
+  var el = document.getElementById('power-stats');
+  if (!s.avg_power && !s.max_power && !s.normalized_power) {
+    el.innerHTML = '<div class="mono" style="font-size:9px;color:#9E9B95">Leistungsdaten folgen nach Garmin-Sync.</div>';
+    return;
+  }
+  var ifValue = s.intensity_factor != null ? s.intensity_factor
+    : (s.normalized_power && ftpW ? s.normalized_power / ftpW : null);
+  var stats = [
+    ['&Oslash; Watt', s.avg_power ? s.avg_power + ' W' : null],
+    ['NP', s.normalized_power ? s.normalized_power + ' W' : null],
+    ['Max Watt', s.max_power ? s.max_power + ' W' : null],
+    ['IF', ifValue != null ? ifValue.toFixed(2) : null],
+    ['FTP', ftpW ? ftpW + ' W' : null],
+  ].filter(function(p){ return p[1]; });
+  el.innerHTML = '<div style="display:flex;gap:20px;flex-wrap:wrap">' + stats.map(function(p){
+    return '<div><div class="hsl">'+p[0]+'</div><div class="hsv">'+p[1]+'</div></div>';
+  }).join('') + '</div>';
+}
+
+function renderPowerZones(powerZones) {
+  var sec = document.getElementById('power-zones-sec');
+  var card = document.getElementById('power-zones-card');
+  var rows = document.getElementById('power-zone-rows');
+  var keys = powerZones ? Object.keys(powerZones).sort() : [];
+  if (!keys.length) { sec.style.display = 'none'; card.style.display = 'none'; return; }
+  sec.style.display = ''; card.style.display = '';
+  rows.innerHTML = keys.map(function(z){
+    var zone = powerZones[z] || {};
+    var range = zone.watt_max >= 9999 ? (zone.watt_min + '+ W') : (zone.watt_min + '&ndash;' + zone.watt_max + ' W');
+    return '<div class="zr"><span class="zl">'+z+'</span><span class="mono" style="font-size:9px;flex:1;padding:0 8px">'+(zone.label||'')+'</span><span class="zp">'+range+'</span></div>';
+  }).join('');
 }
 
 function renderCoachAnalysis(a) {
@@ -272,9 +330,22 @@ function renderCoachAnalysis(a) {
   }
 }
 
-function renderHrZones(zones) {
+function renderHrZones(zones, isCycling) {
   var el = document.getElementById('hz-rows');
-  if (!zones || !zones.zones || !zones.zones.length) { el.innerHTML = '<div class="mono" style="font-size:9px;color:#9E9B95">nicht verfügbar</div>'; return; }
+  if (!zones) { el.innerHTML = '<div class="mono" style="font-size:9px;color:#9E9B95">nicht verfügbar</div>'; return; }
+  if (isCycling) {
+    // Rad: zones ist hr_zones_cycling — eine Zonendefinition (Z1..Z5 mit
+    // min/max/label), keine Zeit-in-Zone-Berechnung wie beim Lauf.
+    var keys = Object.keys(zones).sort();
+    if (!keys.length) { el.innerHTML = '<div class="mono" style="font-size:9px;color:#9E9B95">nicht verfügbar</div>'; return; }
+    el.innerHTML = keys.map(function(z){
+      var zone = zones[z] || {};
+      var range = zone.max >= 999 ? (zone.min + '+') : (zone.min + '–' + zone.max);
+      return '<div class="zr"><span class="zl">'+z+'</span><span class="zp">'+range+'</span></div>';
+    }).join('');
+    return;
+  }
+  if (!zones.zones || !zones.zones.length) { el.innerHTML = '<div class="mono" style="font-size:9px;color:#9E9B95">nicht verfügbar</div>'; return; }
   var rows = zones.zones.slice().reverse().map(function(z){
     return '<div class="zr"><span class="zl">Z'+z.zone+'</span><div class="zb"><div class="zf" style="width:'+z.percentage+'%"></div></div><span class="zp">'+z.percentage.toFixed(0)+'%</span></div>';
   });

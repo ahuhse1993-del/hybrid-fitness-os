@@ -38,6 +38,7 @@ from coach.garmin_push import (
 from coach.session_routing import classify_for_push, resolve_sync_target, split_training_block
 from coach.sync_utils import compute_content_hash
 from coach.activity_data import (
+    CYCLING_ACTIVITY_TYPES,
     build_data_quality,
     build_hr_zones,
     build_native_laps,
@@ -1912,16 +1913,6 @@ def bulk_delete_garmin_workouts(garmin_workout_ids: list[int]) -> dict:
     return {"deleted": deleted, "failed": failed, "db_rows_cleared": db_rows_cleared}
 
 
-# trainings.type kommt aus dem Strava-Import (siehe coach/api.py::strava_webhook)
-# und nutzt Stravas Taxonomie, nicht "cycling"/"running" — es gibt keine
-# trainings.sport-Spalte. Beobachtete Rad-Werte: Ride, MountainBikeRide;
-# GravelRide/EBikeRide/VirtualRide ergaenzt fuer Robustheit (Stravas Cycling-
-# Familie), auch wenn bisher nicht importiert.
-_CYCLING_ACTIVITY_TYPES = frozenset({
-    "Ride", "MountainBikeRide", "GravelRide", "EBikeRide", "VirtualRide",
-})
-
-
 @mcp.tool()
 def get_activity_analysis_data(
     activity_id: int | None = None,
@@ -1956,7 +1947,8 @@ def get_activity_analysis_data(
             "SELECT id, date, type, notes, distance_km, duration_minutes, "
             "heart_rate_avg, garmin_id, elevation_gain_m, elevation_loss_m, "
             "max_hr, avg_cadence, training_load, aerobic_effect, anaerobic_effect, "
-            "vo2max_estimate, avg_power "
+            "vo2max_estimate, avg_power, normalized_power_w, max_power_w, "
+            "tss_estimate, intensity_factor "
             "FROM trainings WHERE id = %s",
             (activity_id,)
         )
@@ -1965,7 +1957,8 @@ def get_activity_analysis_data(
             "SELECT id, date, type, notes, distance_km, duration_minutes, "
             "heart_rate_avg, garmin_id, elevation_gain_m, elevation_loss_m, "
             "max_hr, avg_cadence, training_load, aerobic_effect, anaerobic_effect, "
-            "vo2max_estimate, avg_power "
+            "vo2max_estimate, avg_power, normalized_power_w, max_power_w, "
+            "tss_estimate, intensity_factor "
             "FROM trainings WHERE garmin_id = %s",
             (str(garmin_id),)
         )
@@ -2131,7 +2124,7 @@ def get_activity_analysis_data(
             "SELECT hr_zones_cycling, power_zones, cycling_ftp_w, hr_zones "
             "FROM athlete_profile ORDER BY id DESC LIMIT 1"
         ) or {}
-        if training.get("type") in _CYCLING_ACTIVITY_TYPES:
+        if training.get("type") in CYCLING_ACTIVITY_TYPES:
             result["hr_zones"] = profile.get("hr_zones_cycling")
             result["power_zones"] = profile.get("power_zones")
             result["ftp_w"] = profile.get("cycling_ftp_w")
