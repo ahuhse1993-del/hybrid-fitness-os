@@ -119,56 +119,62 @@ small, .text-small { font-size: .8rem; line-height: 1.5; }
 #cairn-week-soft * { box-sizing: border-box; }
 #cairn-week-soft .shell { max-width: 820px; margin: 0 auto; }
 #cairn-week-soft header { flex-shrink: 0; }
-#cairn-week-soft .top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.1rem; position: sticky; top: 0; z-index: 10; background: var(--paper); }
-#cairn-week-soft .brand-mark { display: block; width: clamp(8.5rem, 26vw, 12rem); height: auto; fill: currentColor; }
+#cairn-week-soft .top { display: flex; align-items: center; justify-content: space-between; margin-bottom: .3rem; position: sticky; top: 0; z-index: 10; background: var(--paper); }
+#cairn-week-soft .brand-mark { display: block; width: clamp(5.5rem, 16vw, 7rem); height: auto; fill: currentColor; }
 
-#cairn-week-soft .week-switcher { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: .6rem; }
-#cairn-week-soft .week-title h1 { margin: 0; letter-spacing: -.05em; font-weight: 500; }
-#cairn-week-soft .wk-today-btn { flex-shrink: 0; padding: .4rem .9rem; border-radius: 999px; border: 1px solid var(--line); background: var(--paper); color: var(--ink); font-size: .82rem; cursor: pointer; }
+#cairn-week-soft .week-switcher { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: .15rem; }
+#cairn-week-soft .week-title h1 { margin: 0; font-size: 1.3rem; letter-spacing: -.04em; font-weight: 500; }
+#cairn-week-soft .wk-today-btn { flex-shrink: 0; padding: .25rem .65rem; border-radius: 999px; border: 1px solid var(--line); background: var(--paper); color: var(--ink); font-size: .72rem; cursor: pointer; }
 #cairn-week-soft .wk-today-btn.is-current { opacity: .5; pointer-events: none; }
 
-#cairn-week-soft .week-nav-row { display: flex; align-items: center; justify-content: space-between; gap: .75rem; margin-bottom: 1rem; padding-bottom: .65rem; border-bottom: 1px solid var(--line); }
-#cairn-week-soft .wk-nav-arrow { flex-shrink: 0; width: 2rem; height: 2rem; display: grid; place-items: center; border-radius: 50%; border: none; background: transparent; color: var(--ink); font-size: 1.2rem; line-height: 1; cursor: pointer; }
+#cairn-week-soft .week-nav-row { display: flex; align-items: center; justify-content: space-between; gap: .75rem; margin-bottom: .3rem; padding-bottom: .25rem; border-bottom: 1px solid var(--line); }
+#cairn-week-soft .wk-nav-arrow { flex-shrink: 0; width: 1.5rem; height: 1.5rem; display: grid; place-items: center; border-radius: 50%; border: none; background: transparent; color: var(--ink); font-size: 1rem; line-height: 1; cursor: pointer; }
 #cairn-week-soft .wk-nav-arrow:disabled { opacity: .3; cursor: default; }
-#cairn-week-soft .wk-range-label { color: var(--muted-foreground); text-align: center; flex: 1; }
+#cairn-week-soft .wk-range-label { font-size: .76rem; color: var(--muted-foreground); text-align: center; flex: 1; }
 
-#cairn-week-soft .week-goals-box { border: 1px solid var(--line); border-radius: 1rem; padding: .85rem 1rem; margin-bottom: 1.1rem; }
-#cairn-week-soft .goals-label { font-size: .72rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted-foreground); margin-bottom: .6rem; }
-#cairn-week-soft .goals-row { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: .5rem; }
-#cairn-week-soft .goal-cell { display: flex; flex-direction: column; gap: .15rem; min-width: 0; }
-#cairn-week-soft .goal-cell strong { font-weight: 500; letter-spacing: -.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-#cairn-week-soft .goal-cell span { font-size: .74rem; color: var(--muted-foreground); }
+#cairn-week-soft .week-goals-box { border: 1px solid var(--line); border-radius: .6rem; padding: 4px 10px 2px; margin-bottom: .35rem; }
+#cairn-week-soft .week-goals-title { font-size: 10px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted-foreground); opacity: .8; margin-bottom: 2px; }
+#cairn-week-soft .week-goals { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; padding: 6px 0 4px; }
+#cairn-week-soft .week-goals-item { text-align: center; padding: 0 4px; min-width: 0; border-right: 1px solid var(--line); }
+#cairn-week-soft .week-goals-item:last-child { border-right: none; }
+#cairn-week-soft .week-goals-val { display: block; font-size: 14px; font-weight: 700; letter-spacing: -.02em; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#cairn-week-soft .week-goals-label { display: block; font-size: 10px; color: var(--muted-foreground); opacity: .8; margin-top: 1px; }
 
-#cairn-week-soft .week-days { display: grid; gap: .3rem; }
-#cairn-week-soft .day-row { display: flex; align-items: stretch; gap: .7rem; padding: .35rem 0; }
-#cairn-week-soft .day-col { flex: 0 0 32px; display: flex; flex-direction: column; align-items: center; padding-top: .3rem; }
-#cairn-week-soft .day-dow { font-size: .68rem; letter-spacing: .03em; color: var(--muted-foreground); }
-#cairn-week-soft .day-num { font-size: 1.1rem; font-weight: 500; letter-spacing: -.02em; }
+/* Entwurf-Modus: Confirm-Bar für noch nicht gespeicherte Verschiebungen */
+#cairn-week-soft .confirm-bar { display: flex; align-items: center; justify-content: space-between; padding: 6px 10px; margin-bottom: 4px; background: color-mix(in srgb, var(--coral) 8%, var(--paper)); border: 1px solid color-mix(in srgb, var(--coral) 24%, transparent); border-radius: .6rem; }
+#cairn-week-soft .confirm-bar[hidden] { display: none; }
+#cairn-week-soft .confirm-discard { font-size: .76rem; color: var(--muted-foreground); background: none; border: none; padding: .3rem .5rem; cursor: pointer; }
+#cairn-week-soft .confirm-label { font-size: .72rem; color: var(--muted-foreground); }
+#cairn-week-soft .confirm-save { background: var(--coral); color: var(--coral-ink); border: none; border-radius: .5rem; padding: .35rem .9rem; font-size: .76rem; font-weight: 600; cursor: pointer; }
+#cairn-week-soft .confirm-save:disabled { opacity: .6; cursor: default; }
+
+#cairn-week-soft .week-days { display: grid; gap: 2px; padding-bottom: calc(env(safe-area-inset-bottom) + 60px); }
+#cairn-week-soft .day-row { display: flex; align-items: stretch; gap: .5rem; padding: 2px 0; }
+#cairn-week-soft .day-col { flex: 0 0 28px; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+#cairn-week-soft .day-dow { font-size: .62rem; letter-spacing: .02em; color: var(--muted-foreground); line-height: 1.15; }
+#cairn-week-soft .day-num { font-size: 1rem; font-weight: 500; letter-spacing: -.02em; line-height: 1.15; }
 #cairn-week-soft .day-num.is-today { color: var(--coral); }
 #cairn-week-soft .day-num.is-dimmed { opacity: .4; }
-#cairn-week-soft .day-sessions { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: .4rem; border-radius: .6rem; transition: background .15s, border-color .15s; }
+#cairn-week-soft .day-sessions { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 3px; border-radius: .5rem; transition: background .15s, border-color .15s; }
 
-#cairn-week-soft .sess-tile { position: relative; display: flex; align-items: stretch; gap: 0; min-height: 44px; border-radius: .5rem; background: light-dark(#ffffff, #1e2522); box-shadow: 0 1px 3px rgb(0 0 0 / .08); cursor: pointer; overflow: hidden; transition: transform .15s, box-shadow .15s, opacity .15s; }
+#cairn-week-soft .sess-tile { position: relative; display: flex; align-items: stretch; gap: 0; min-height: 38px; border-radius: .5rem; background: light-dark(#ffffff, #1e2522); box-shadow: 0 1px 3px rgb(0 0 0 / .08); cursor: pointer; overflow: hidden; transition: box-shadow .15s, opacity .15s; }
 #cairn-week-soft .sess-tile.is-standalone { opacity: .75; }
+#cairn-week-soft .sess-tile.pending { background: color-mix(in srgb, var(--coral) 6%, light-dark(#ffffff, #1e2522)); }
 #cairn-week-soft .sess-bar { flex: 0 0 4px; align-self: stretch; background: var(--bar-color, var(--bar-stone)); }
-#cairn-week-soft .sess-body { flex: 1 1 auto; min-width: 0; padding: .4rem .65rem; align-self: center; }
-#cairn-week-soft .sess-name { font-weight: 700; font-size: .86rem; letter-spacing: -.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#cairn-week-soft .sess-body { flex: 1 1 auto; min-width: 0; padding: 5px 10px; align-self: center; }
+#cairn-week-soft .sess-name { font-weight: 700; font-size: .8rem; letter-spacing: -.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #cairn-week-soft .sess-check { color: var(--forest); font-weight: 700; }
-#cairn-week-soft .sess-meta { font-size: .72rem; color: var(--muted-foreground); margin-top: .1rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-#cairn-week-soft .sess-overflow { flex: 0 0 auto; align-self: stretch; padding: 0 .7rem; border: none; background: transparent; color: var(--muted-foreground); font-size: 1rem; letter-spacing: .1em; cursor: pointer; }
+#cairn-week-soft .sess-meta { font-size: .68rem; color: var(--muted-foreground); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#cairn-week-soft .sess-overflow { flex: 0 0 auto; align-self: stretch; padding: 0 .5rem; border: none; background: transparent; color: var(--muted-foreground); font-size: .9rem; letter-spacing: .1em; cursor: pointer; }
 
-/* Drag & drop states (Pointer Events) */
-#cairn-week-soft .sess-tile.is-dragging {
-  transform: rotate(-2deg) scale(1.03);
-  box-shadow: 0 8px 24px rgb(0 0 0 / .18);
-  opacity: .95;
-  z-index: 100;
-  position: relative;
-}
+/* Draggable Tiles: kein Text markieren / kein iOS-Callout während Long-Press */
+#cairn-week-soft [data-draggable="true"] { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; touch-action: none; }
+
+/* Drag & drop states (Pointer Events, Ghost-Klon statt CSS-Transform auf dem Original) */
 #cairn-week-soft .day-row.drop-target .day-sessions {
   background: color-mix(in srgb, var(--bar-sage) 12%, transparent);
   border: 2px dashed var(--bar-sage);
-  min-height: 44px;
+  min-height: 38px;
   justify-content: center;
 }
 #cairn-week-soft .day-row.drop-target .day-sessions::after {
@@ -176,7 +182,7 @@ small, .text-small { font-size: .8rem; line-height: 1.5; }
   display: block;
   text-align: center;
   color: var(--bar-sage);
-  font-size: 18px;
+  font-size: 16px;
 }
 
 /* ── SESSION DETAIL BOTTOM-SHEET ── */
@@ -250,9 +256,6 @@ small, .text-small { font-size: .8rem; line-height: 1.5; }
 #cairn-week-soft .nav-item { display: inline-flex; align-items: center; gap: .35rem; }
 @media (max-width: 560px) {
   #cairn-week-soft .nav-text { display: none; }
-}
-@media (max-width: 390px) {
-  #cairn-week-soft .goals-row { grid-template-columns: repeat(2, minmax(0,1fr)); row-gap: .6rem; }
 }
 
 /* ── PLAN VIEW ── */
@@ -640,6 +643,11 @@ small, .text-small { font-size: .8rem; line-height: 1.5; }
         <button class="wk-nav-arrow" id="wk-next" type="button" aria-label="Nächste Woche" onclick="navigateWeek(1)">›</button>
       </div>
       <div class="week-goals-box" id="week-goals-box" style="display:none"></div>
+      <div class="confirm-bar" id="confirm-bar" hidden>
+        <button class="confirm-discard" id="btn-discard" type="button" onclick="discardPendingMoves()">Verwerfen</button>
+        <span class="confirm-label" id="confirm-label">0 Änderungen</span>
+        <button class="confirm-save" id="btn-confirm" type="button" onclick="confirmPendingMoves()">Bestätigen</button>
+      </div>
       <div id="week-days" class="week-days"><p class="loading-msg">Trainingsplan wird geladen…</p></div>
     </div>
     <nav class="nav" aria-label="Hauptnavigation">
@@ -959,6 +967,7 @@ const VIEW_IDS = {
 };
 
 function navigate(view, id) {
+  if (state.view === 'week' && view !== 'week' && !confirmDiscardIfPending()) return;
   if (id !== undefined) state.activityId = id;
   state.view = view;
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
@@ -1121,16 +1130,116 @@ function renderWeekGoals(week) {
   }
   const hFmt = fmtMin(stats.totalDurationMin) || '0 min';
   box.innerHTML = `
-    <div class="goals-label">Ziele Woche</div>
-    <div class="goals-row">
-      <div class="goal-cell"><strong>${stats.plannedTotal ? stats.plannedTotal.toLocaleString('de-CH') : 0} km</strong><span>Laufen</span></div>
-      <div class="goal-cell"><strong>${hFmt}</strong><span>Training</span></div>
-      <div class="goal-cell"><strong>${stats.kraftDone}/${stats.kraftTotal}</strong><span>Kraft</span></div>
-      <div class="goal-cell"><strong>${stats.elevationSum ? stats.elevationSum + ' m' : '–'}</strong><span>HM</span></div>
+    <div class="week-goals-title">Ziele Woche</div>
+    <div class="week-goals">
+      <div class="week-goals-item"><span class="week-goals-val">${stats.plannedTotal ? stats.plannedTotal.toLocaleString('de-CH') : 0} km</span><span class="week-goals-label">Laufen</span></div>
+      <div class="week-goals-item"><span class="week-goals-val">${hFmt}</span><span class="week-goals-label">Training</span></div>
+      <div class="week-goals-item"><span class="week-goals-val">${stats.kraftDone}/${stats.kraftTotal}</span><span class="week-goals-label">Kraft</span></div>
+      <div class="week-goals-item"><span class="week-goals-val">${stats.elevationSum ? stats.elevationSum + ' m' : '–'}</span><span class="week-goals-label">HM</span></div>
     </div>`;
   box.style.display = '';
 }
 /* ── end KW-Stats helpers ─────────────────────────────────── */
+
+/* ── Datumslogik: die aktuelle Woche wird IMMER aus new Date() berechnet
+   (ISO-8601, Montag als Wochenstart) — nie aus einem is_current-Flag aus
+   den Backend-Daten, das bei Lücken im Plan (z.B. Trainingspause) für
+   keine einzige Woche gesetzt sein kann. ─────────────────────────────── */
+function getISOWeekStart(date = new Date()) {
+  const d = new Date(date);
+  const day = d.getDay() || 7; // Mo=1 ... So=7
+  d.setDate(d.getDate() - day + 1);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+function formatMondayLabel(d) {
+  return `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.${d.getFullYear()}`;
+}
+
+function isoWeekNumber(d) {
+  const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  const dayNum = date.getUTCDay() || 7;
+  date.setUTCDate(date.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
+  return Math.ceil((((date - yearStart) / 86400000) + 1) / 7);
+}
+
+function todayDateStr() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/* ── Entwurf-Modus: Drag&Drop-Verschiebungen werden erst lokal angezeigt
+   und erst mit "Bestätigen" an den Server geschickt. ─────────────────── */
+const _pendingMoves = new Map(); // sessionId (string) -> { oldDate, newDate }
+
+function pendingMove(sessionId, newDate) {
+  const tile = document.querySelector(`[data-session-id="${sessionId}"]`);
+  const oldDate = tile?.closest('.day-row')?.dataset.date;
+  if (!oldDate || oldDate === newDate) return;
+  const existing = _pendingMoves.get(sessionId);
+  _pendingMoves.set(sessionId, { oldDate: existing ? existing.oldDate : oldDate, newDate });
+  renderCurrentWeek();
+  showConfirmBar(true);
+}
+
+function showConfirmBar(show) {
+  const bar = document.getElementById('confirm-bar');
+  if (!bar) return;
+  bar.hidden = !show;
+  if (show) {
+    document.getElementById('confirm-label').textContent =
+      `${_pendingMoves.size} Änderung${_pendingMoves.size > 1 ? 'en' : ''}`;
+  }
+}
+
+function confirmDiscardIfPending() {
+  if (_pendingMoves.size === 0) return true;
+  if (!confirm('Du hast unbestätigte Änderungen. Verwerfen und fortfahren?')) return false;
+  _pendingMoves.clear();
+  showConfirmBar(false);
+  return true;
+}
+
+async function confirmPendingMoves() {
+  const btn = document.getElementById('btn-confirm');
+  const label = btn.textContent;
+  btn.textContent = '…'; btn.disabled = true;
+
+  const errors = [];
+  for (const [sessionId, { newDate }] of _pendingMoves) {
+    try {
+      const res = await fetch(`/api/plan/session/${sessionId}/move`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ new_date: newDate })
+      });
+      const data = await res.json();
+      if (data.status !== 'ok') errors.push(`Session ${sessionId}: ${data.message || 'Fehler'}`);
+      if (data.garmin_warning) console.warn('[CAIRN] Garmin-Verschiebung:', data.garmin_warning);
+    } catch (e) {
+      errors.push(`Session ${sessionId}: Netzwerkfehler`);
+    }
+  }
+
+  if (errors.length) {
+    alert('Fehler beim Speichern:\n' + errors.join('\n'));
+    btn.textContent = label; btn.disabled = false;
+    return;
+  }
+
+  _pendingMoves.clear();
+  showConfirmBar(false);
+  btn.textContent = label; btn.disabled = false;
+  await loadWeek();
+}
+
+function discardPendingMoves() {
+  _pendingMoves.clear();
+  showConfirmBar(false);
+  loadWeek(); // gespeicherte Woche zurückladen
+}
 
 function renderWeek(weeks) {
   if (!weeks || weeks.length === 0) {
@@ -1138,60 +1247,76 @@ function renderWeek(weeks) {
     return;
   }
   state.weeksData = weeks;
-  if (!state.currentMonday || !weeks.some(w => w.monday === state.currentMonday)) {
-    const cur = weeks.find(w => w.is_current) || weeks[0];
-    state.currentMonday = cur.monday;
+  if (!state.currentMonday) {
+    state.currentMonday = formatMondayLabel(getISOWeekStart(new Date()));
   }
   renderCurrentWeek();
 }
 
 function navigateWeek(delta) {
-  const idx = state.weeksData.findIndex(w => w.monday === state.currentMonday);
-  const newIdx = idx + delta;
-  if (newIdx < 0 || newIdx >= state.weeksData.length) return;
-  state.currentMonday = state.weeksData[newIdx].monday;
+  if (!confirmDiscardIfPending()) return;
+  const [md, mm, my] = state.currentMonday.split('.').map(Number);
+  state.currentMonday = formatMondayLabel(new Date(my, mm - 1, md + delta * 7));
   renderCurrentWeek();
 }
 
 function jumpToToday() {
-  const cur = state.weeksData.find(w => w.is_current);
-  if (cur) { state.currentMonday = cur.monday; renderCurrentWeek(); }
+  if (!confirmDiscardIfPending()) return;
+  state.currentMonday = formatMondayLabel(getISOWeekStart(new Date()));
+  renderCurrentWeek();
 }
 
 const DOW_SHORT = ['MO', 'DI', 'MI', 'DO', 'FR', 'SA', 'SO'];
 
 function renderCurrentWeek() {
-  const week = state.weeksData.find(w => w.monday === state.currentMonday);
-  if (!week) return;
+  const todayMonday = formatMondayLabel(getISOWeekStart(new Date()));
+  let week = state.weeksData.find(w => w.monday === state.currentMonday);
+  if (!week) {
+    // Keine Plan-Daten für diese Kalenderwoche (z.B. Lücke im Plan) —
+    // trotzdem eine leere Woche anzeigen statt stehen zu bleiben.
+    const [md, mm, my] = state.currentMonday.split('.').map(Number);
+    const mondayDate = new Date(my, mm - 1, md);
+    week = {
+      monday: state.currentMonday,
+      sunday: formatMondayLabel(new Date(my, mm - 1, md + 6)),
+      kw: isoWeekNumber(mondayDate),
+      sessions: [],
+    };
+  }
 
   document.getElementById('wk-kw').textContent = `KW ${week.kw}`;
   document.getElementById('wk-range').textContent = `${week.monday} – ${week.sunday}`;
 
-  const idx = state.weeksData.findIndex(w => w.monday === state.currentMonday);
-  const prevBtn = document.getElementById('wk-prev');
-  const nextBtn = document.getElementById('wk-next');
-  if (prevBtn) prevBtn.disabled = idx <= 0;
-  if (nextBtn) nextBtn.disabled = idx >= state.weeksData.length - 1;
   const todayBtn = document.getElementById('wk-today-btn');
-  if (todayBtn) todayBtn.classList.toggle('is-current', !!week.is_current);
+  if (todayBtn) todayBtn.classList.toggle('is-current', state.currentMonday === todayMonday);
 
   renderWeekGoals(week);
 
   const container = document.getElementById('week-days');
   container.innerHTML = '';
 
+  // Pending (noch nicht bestätigte) Verschiebungen lokal anwenden, bevor
+  // nach Datum gruppiert wird — der Server wird dabei nicht angefasst.
   const sessionsByDate = {};
   (week.sessions || []).forEach(sess => {
-    (sessionsByDate[sess.date] = sessionsByDate[sess.date] || []).push(sess);
+    let d = sess.date;
+    let pending = false;
+    if (sess.id != null && _pendingMoves.has(String(sess.id))) {
+      d = _pendingMoves.get(String(sess.id)).newDate;
+      pending = true;
+    }
+    const entry = pending ? Object.assign({}, sess, { _pending: true }) : sess;
+    (sessionsByDate[d] = sessionsByDate[d] || []).push(entry);
   });
 
   const [md, mm, my] = week.monday.split('.').map(Number);
+  const todayStr = todayDateStr();
 
   for (let i = 0; i < 7; i++) {
     const d = new Date(my, mm - 1, md + i);
     const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     const rawForDay = sessionsByDate[dateStr] || [];
-    const isToday = rawForDay.some(s => s.is_today);
+    const isToday = dateStr === todayStr;
     const daySessions = rawForDay.filter(s => !isRestSess(s));
     container.appendChild(buildDayRow(dateStr, daySessions, d.getDate(), DOW_SHORT[i], isToday));
   }
@@ -1255,7 +1380,9 @@ function buildSessTile(sess) {
   const draggable = !isMatched && !isStandalone;
 
   const tile = document.createElement('div');
-  tile.className = 'sess-tile' + (isStandalone ? ' is-standalone' : '');
+  tile.className = 'sess-tile'
+    + (isStandalone ? ' is-standalone' : '')
+    + (sess._pending ? ' pending' : '');
   tile.style.setProperty('--bar-color', sessionColor(sess.session_type || sess.type));
   if (sess.id != null) tile.dataset.sessionId = sess.id;
   if (draggable) tile.dataset.draggable = 'true';
@@ -1285,66 +1412,91 @@ function buildSessTile(sess) {
   return tile;
 }
 
-/* ── Drag & drop (Pointer Events, kein HTML5 Drag) ──────────── */
+/* ── Drag & drop (Pointer Events, iOS-Safari-optimiert: Ghost-Klon statt
+   CSS-Transform auf dem Original, kein HTML5 Drag). Ein Drop legt die
+   Verschiebung nur als Entwurf an (pendingMove) — erst "Bestätigen"
+   schreibt sie an den Server. ─────────────────────────────────────── */
 function initDragDrop(gridEl) {
   if (!gridEl) return;
-  let dragId = null, dragEl = null, timer = null;
+  let dragId = null, dragEl = null, cloneEl = null, timer = null;
+  let startX = 0, startY = 0, offsetX = 0, offsetY = 0;
 
   gridEl.addEventListener('pointerdown', e => {
-    const tile = e.target.closest('[data-session-id][data-draggable]');
+    const tile = e.target.closest('[data-draggable="true"]');
     if (!tile) return;
+    startX = e.clientX; startY = e.clientY;
+
     timer = setTimeout(() => {
       dragId = tile.dataset.sessionId;
       dragEl = tile;
+
+      const rect = tile.getBoundingClientRect();
+      offsetX = e.clientX - rect.left;
+      offsetY = e.clientY - rect.top;
+
+      cloneEl = tile.cloneNode(true);
+      cloneEl.style.cssText = `
+        position:fixed;left:${rect.left}px;top:${rect.top}px;
+        width:${rect.width}px;pointer-events:none;z-index:9999;
+        box-shadow:0 12px 32px rgba(0,0,0,.22);
+        transform:rotate(-2deg) scale(1.04);
+        transition:transform .15s,box-shadow .15s;
+        -webkit-user-select:none;user-select:none;
+      `;
+      document.body.appendChild(cloneEl);
+
+      tile.style.opacity = '0.35';
       tile.setPointerCapture(e.pointerId);
-      tile.classList.add('is-dragging');
-    }, 400);
-  });
+
+      navigator.vibrate?.(30); // haptisches Feedback wenn verfügbar
+    }, 380);
+  }, { passive: false });
 
   gridEl.addEventListener('pointermove', e => {
-    if (!dragId) { clearTimeout(timer); return; }
-    gridEl.querySelectorAll('.day-row').forEach(r => r.classList.remove('drop-target'));
-    const row = document.elementFromPoint(e.clientX, e.clientY)?.closest('.day-row');
-    if (row) row.classList.add('drop-target');
-  });
+    if (!dragId && timer) {
+      if (Math.abs(e.clientX - startX) > 6 || Math.abs(e.clientY - startY) > 6) {
+        clearTimeout(timer); timer = null;
+      }
+      return;
+    }
+    if (!dragId || !cloneEl) return;
+    e.preventDefault();
 
-  gridEl.addEventListener('pointerup', async e => {
+    cloneEl.style.left = (e.clientX - offsetX) + 'px';
+    cloneEl.style.top  = (e.clientY - offsetY) + 'px';
+
+    cloneEl.style.display = 'none';
+    const elUnder = document.elementFromPoint(e.clientX, e.clientY);
+    cloneEl.style.display = '';
+    gridEl.querySelectorAll('.day-row').forEach(r => r.classList.remove('drop-target'));
+    elUnder?.closest('.day-row')?.classList.add('drop-target');
+  }, { passive: false });
+
+  gridEl.addEventListener('pointerup', e => {
     clearTimeout(timer);
     if (!dragId) return;
-    dragEl?.classList.remove('is-dragging');
-    const row = document.elementFromPoint(e.clientX, e.clientY)?.closest('.day-row');
+
+    cloneEl?.remove(); cloneEl = null;
+    dragEl && (dragEl.style.opacity = '');
     gridEl.querySelectorAll('.day-row').forEach(r => r.classList.remove('drop-target'));
-    if (row?.dataset.date) {
-      await moveSession(dragId, row.dataset.date);
+
+    const elUnder = document.elementFromPoint(e.clientX, e.clientY);
+    const targetRow = elUnder?.closest('.day-row');
+
+    if (targetRow?.dataset.date && targetRow.dataset.date !== dragEl?.closest('.day-row')?.dataset.date) {
+      pendingMove(dragId, targetRow.dataset.date);
     }
+
     dragId = null; dragEl = null;
   });
 
   gridEl.addEventListener('pointercancel', () => {
     clearTimeout(timer);
-    dragEl?.classList.remove('is-dragging');
+    cloneEl?.remove(); cloneEl = null;
+    dragEl && (dragEl.style.opacity = '');
     gridEl.querySelectorAll('.day-row').forEach(r => r.classList.remove('drop-target'));
     dragId = null; dragEl = null;
   });
-}
-
-async function moveSession(sessionId, newDate) {
-  try {
-    const res = await fetch(`/api/plan/session/${sessionId}/move`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ new_date: newDate })
-    });
-    const data = await res.json();
-    if (data.status === 'ok') {
-      if (data.garmin_warning) console.warn('[CAIRN] Garmin-Verschiebung:', data.garmin_warning);
-      await loadWeek();
-    } else {
-      console.warn('[CAIRN] Verschieben fehlgeschlagen:', data.message);
-    }
-  } catch (err) {
-    console.warn('[CAIRN] Verschieben fehlgeschlagen:', err.message);
-  }
 }
 
 /* ============================================================
