@@ -1954,6 +1954,10 @@ async function loadShoesCard() {
   }
 }
 
+function gearDisplayName(g) {
+  return g.nickname || [g.brand, g.model].filter(Boolean).join(' ') || 'Schuh';
+}
+
 function renderShoesList(shoes) {
   const list = document.getElementById('shoes-list');
   if (!list) return;
@@ -1964,7 +1968,7 @@ function renderShoesList(shoes) {
   list.innerHTML = shoes.map(g => `
     <div class="shoe-row">
       <div class="shoe-info">
-        <strong>${g.nickname || g.model || g.brand || 'Schuh'}</strong>
+        <strong>${gearDisplayName(g)}</strong>
         <span class="text-small">${GEAR_TYPE_LABELS[g.gear_type] || g.gear_type} · ${g.total_distance_km} km</span>
       </div>
       <button class="btn btn-ghost-sm" type="button" onclick="retireShoe(${g.id})">Stilllegen</button>
@@ -2345,7 +2349,7 @@ function loadShoeOptions(activityId) {
   apiGet('/api/athlete/gear?active_only=true').then(res => {
     const shoes = (res.gear || []).filter(g => ['running_shoe', 'trail_shoe', 'hiking_shoe'].includes(g.gear_type));
     sel.innerHTML = '<option value="">Schuh wählen...</option>' +
-      shoes.map(g => `<option value="${g.id}">${g.nickname || g.model || g.brand} · ${g.total_distance_km} km</option>`).join('');
+      shoes.map(g => `<option value="${g.id}">${gearDisplayName(g)} · ${g.total_distance_km} km</option>`).join('');
   }).catch(() => {});
   if (btn) btn.onclick = () => assignShoe(activityId, sel.value);
 }
