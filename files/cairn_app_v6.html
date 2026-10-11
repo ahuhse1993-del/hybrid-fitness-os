@@ -1535,12 +1535,13 @@ function renderPlan(data) {
   const currentWeek = block.current_week || 1;
   const totalWeeks = block.total_weeks || 16;
   const phase = (block.phase || 'BASE').toUpperCase();
-  // weeks array: [{week_number, total_km, is_deload, is_current, phase, ...}]
+  // weeks array: [{week_number, total_km, is_deload, is_peak, is_current, phase, ...}]
   const weeklyLoad = (data.weeks || []).map(w => ({
     week: w.week_number,
     week_number: w.week_number,
     km: w.total_km || 0,
     is_deload: w.is_deload,
+    is_peak: w.is_peak,
     phase: w.phase || '',
   }));
   const milestones = data.milestones || [];
@@ -1616,8 +1617,9 @@ function buildProgressCard(plan, currentWeek, totalWeeks, phase, weeklyLoad) {
     const isDone = i < currentWeek;
     const isCurrent = i === currentWeek;
     const isDeload = weekData.is_deload;
+    const isPeak = !!weekData.is_peak || (km > 0 && km === maxKm);
     const classes = ['load-week', isDone ? 'done' : '', isCurrent ? 'current' : '', isDeload ? 'deload' : ''].filter(Boolean).join(' ');
-    const valueTag = (isCurrent || (i === totalWeeks)) && km ? `<span class="load-value text-small">${Math.round(km)}</span>` : '';
+    const valueTag = (isCurrent || i === totalWeeks || isPeak) && km ? `<span class="load-value text-small">${Math.round(km)}</span>` : '';
     bars.push(`<span class="${classes}"><span class="load-bar" style="--h:${pct}%">${valueTag}</span><span class="load-label text-small">${i}</span></span>`);
   }
 
