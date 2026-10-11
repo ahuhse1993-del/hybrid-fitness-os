@@ -2362,7 +2362,11 @@ function assignShoe(activityId, gearId) {
     body: JSON.stringify({ gear_id: parseInt(gearId, 10) }),
   }).then(r => r.json()).then(res => {
     if (res.status !== 'ok') { if (label) label.textContent = `Fehler: ${res.message}`; return; }
-    if (label) label.textContent = `Zugeordnet — ${res.gear.new_total_distance_km.toFixed(1)} km gesamt.`;
+    if (!label) return;
+    const totalLabel = `${res.gear.new_total_distance_km.toFixed(1)} km gesamt.`;
+    label.textContent = res.pre_cutoff
+      ? `Zugeordnet (keine km addiert, Aktivität vor heute) — ${totalLabel}`
+      : `Zugeordnet — ${totalLabel}`;
   }).catch(() => { if (label) label.textContent = 'Zuordnung fehlgeschlagen.'; });
 }
 

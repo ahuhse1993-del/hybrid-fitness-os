@@ -634,9 +634,9 @@ def retire_athlete_gear(gear_id: int, retired_date: str | None = None) -> dict:
 
 def _resolve_training_id(activity_id: int | None, garmin_id: str | None) -> dict | None:
     if activity_id:
-        return _fetchone("SELECT id, distance_km FROM trainings WHERE id = %s", (activity_id,))
+        return _fetchone("SELECT id, distance_km, date FROM trainings WHERE id = %s", (activity_id,))
     if garmin_id:
-        return _fetchone("SELECT id, distance_km FROM trainings WHERE garmin_id = %s", (str(garmin_id),))
+        return _fetchone("SELECT id, distance_km, date FROM trainings WHERE garmin_id = %s", (str(garmin_id),))
     return None
 
 
@@ -659,8 +659,16 @@ def assign_activity_gear(
     Andere Gear-Typen (Uhr, Weste, ...) werden zusätzlich zugeordnet, nie ersetzt.
 
     Args:
-        distance_km: None (Standard) = Distanz der Aktivität übernehmen.
-                     Explizit angeben, wenn nur ein Teil der Strecke zählt.
+        distance_km: None (Standard) = Distanz der Aktivität übernehmen — ausser
+                     bei Aktivitäten vor heute: deren km werden NICHT addiert
+                     (siehe pre_cutoff unten), weil ein neu angelegtes Gear-Item
+                     seine initial_distance_km typischerweise bereits als
+                     Summe aller bisherigen Aktivitäten bis zum Anlegen-Datum
+                     erhält (z.B. importierter Strava-Kilometerstand) — sie
+                     nochmal draufzuzählen würde doppelt zählen.
+                     Explizit angeben, um das zu übersteuern (z.B. 0 für eine
+                     reine Dokumentations-Zuordnung ohne km-Effekt, oder einen
+                     echten Wert um eine Altaktivität bewusst nachzutragen).
     """
     training = _resolve_training_id(activity_id, garmin_id)
     if not training:
@@ -673,18 +681,34 @@ def assign_activity_gear(
         return {"error": f"Gear id={gear_id} nicht gefunden."}
 
     tid = training["id"]
-    resolved_distance = float(distance_km) if distance_km is not None else \
-        (float(training["distance_km"]) if training["distance_km"] is not None else 0.0)
+    activity_distance = float(training["distance_km"]) if training["distance_km"] is not None else 0.0
+    pre_cutoff = (
+        distance_km is None
+        and training["date"] is not None
+        and datetime.date.fromisoformat(str(training["date"])) < datetime.date.today()
+    )
+    if distance_km is not None:
+        resolved_distance = float(distance_km)
+    elif pre_cutoff:
+        resolved_distance = 0.0
+    else:
+        resolved_distance = activity_distance
 
     conn = get_connection()
     try:
         with conn.cursor() as cur:
             def _current_total(gid: int) -> float:
+                # initial_distance_km + Summe der zugeordneten Aktivitäten — dieselbe
+                # Rechnung wie _gear_row_out(), sonst zeigt diese Antwort hier einen
+                # anderen (zu niedrigen) Gesamtwert als list_athlete_gear().
                 cur.execute(
-                    "SELECT COALESCE(SUM(distance_km),0) FROM activity_gear_usage WHERE gear_id = %s",
+                    "SELECT g.initial_distance_km, COALESCE(SUM(u.distance_km),0) "
+                    "FROM athlete_gear g LEFT JOIN activity_gear_usage u ON u.gear_id = g.id "
+                    "WHERE g.id = %s GROUP BY g.id",
                     (gid,),
                 )
-                return float(cur.fetchone()[0])
+                row = cur.fetchone()
+                return float(row[0] or 0) + float(row[1] or 0) if row else 0.0
 
             cur.execute(
                 "SELECT id, distance_km FROM activity_gear_usage WHERE training_id = %s AND gear_id = %s",
@@ -696,8 +720,10 @@ def assign_activity_gear(
                 gear_full = _fetchone_gear(gear_id)
                 return {
                     "assigned": True, "idempotent": True, "distance_added_km": 0,
-                    "activity_id": tid, "activity_distance_km": resolved_distance,
-                    "gear": gear_full, "replaced_gear": None, "warnings": [],
+                    "activity_id": tid, "activity_distance_km": round(activity_distance, 2),
+                    "pre_cutoff": pre_cutoff,
+                    "gear": gear_full, "replaced_gear": None,
+                    "warnings": ["Aktivität vor heute — keine km addiert (vermutlich schon in initial_distance_km enthalten)."] if pre_cutoff else [],
                 }
 
             replaced_gear = None
@@ -744,7 +770,9 @@ def assign_activity_gear(
     gear_full = _fetchone_gear(gear_id)
     return {
         "assigned": True, "idempotent": False,
-        "activity_id": tid, "activity_distance_km": round(resolved_distance, 2),
+        "activity_id": tid, "activity_distance_km": round(activity_distance, 2),
+        "distance_added_km": round(resolved_distance, 2),
+        "pre_cutoff": pre_cutoff,
         "gear": {
             "id": gear_id, "nickname": gear["nickname"],
             "previous_total_distance_km": round(previous_total, 2),
@@ -754,7 +782,7 @@ def assign_activity_gear(
                 if gear["target_distance_km"] is not None else None,
         },
         "replaced_gear": replaced_gear,
-        "warnings": [],
+        "warnings": ["Aktivität vor heute — keine km addiert (vermutlich schon in initial_distance_km enthalten)."] if pre_cutoff else [],
     }
 
 
