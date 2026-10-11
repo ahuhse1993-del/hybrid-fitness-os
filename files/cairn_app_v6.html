@@ -104,6 +104,14 @@ small, .text-small { font-size: .8rem; line-height: 1.5; }
   --sand: light-dark(#d8d4c8, #4f4b43);
   --line: light-dark(#b9bbb4, #53605b);
   --muted-foreground: light-dark(rgb(23 32 29 / 50%), rgb(245 244 239 / 50%));
+  /* Session-color tokens for the day-row tile accent bar — reuses --coral/--forest,
+     extends the token system for the colors that have no existing equivalent. */
+  --bar-sage: light-dark(#8fa69a, #76897e);
+  --bar-coral: var(--coral);
+  --bar-forest: var(--forest);
+  --bar-olive: light-dark(#8a845f, #a39c6e);
+  --bar-sand: light-dark(#d6c29a, #a08a5c);
+  --bar-stone: light-dark(#d9d5ca, #46423a);
   background: var(--paper);
   color: var(--ink);
   padding: clamp(.75rem, 3vw, 1.5rem);
@@ -113,70 +121,63 @@ small, .text-small { font-size: .8rem; line-height: 1.5; }
 #cairn-week-soft header { flex-shrink: 0; }
 #cairn-week-soft .top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.1rem; position: sticky; top: 0; z-index: 10; background: var(--paper); }
 #cairn-week-soft .brand-mark { display: block; width: clamp(8.5rem, 26vw, 12rem); height: auto; fill: currentColor; }
-#cairn-week-soft .week-switcher { display: flex; align-items: flex-end; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; padding-bottom: .65rem; border-bottom: 1px solid var(--line); }
-#cairn-week-soft .week-title h1 { margin: 0; letter-spacing: -.05em; font-weight: 500; }
-#cairn-week-soft .week-title p { margin: .1rem 0 0; color: var(--muted-foreground); }
-#cairn-week-soft .week-list { display: grid; gap: .55rem; }
-#cairn-week-soft .week-divider { display: flex; align-items: end; justify-content: space-between; gap: 1rem; margin: 1.4rem 0 .65rem; padding-top: 1rem; border-top: 1px solid var(--line); }
-#cairn-week-soft .week-divider h2 { margin: 0; font-weight: 500; letter-spacing: -.04em; }
-#cairn-week-soft .week-divider p { margin: 0; color: var(--muted-foreground); }
-#cairn-week-soft .week-divider-left { display: flex; flex-direction: column; gap: .15rem; }
-#cairn-week-soft .week-divider-right { display: flex; flex-direction: column; align-items: flex-end; gap: .35rem; flex-shrink: 0; }
-#cairn-week-soft .week-km-stats { display: flex; flex-direction: column; align-items: flex-end; gap: .35rem; flex-shrink: 0; }
-#cairn-week-soft .phase-badge { font-size: .72rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; padding: .2rem .55rem; border-radius: 99px; }
-#cairn-week-soft .phase-badge.phase-base       { background: color-mix(in srgb, var(--green,#29483e) 18%, var(--paper)); color: var(--green,#29483e); }
-#cairn-week-soft .phase-badge.phase-build      { background: color-mix(in srgb, var(--coral,#ff6b61) 16%, var(--paper)); color: var(--coral,#ff6b61); }
-#cairn-week-soft .phase-badge.phase-peak       { background: color-mix(in srgb, var(--coral,#ff6b61) 28%, var(--paper)); color: var(--coral,#ff6b61); }
-#cairn-week-soft .phase-badge.phase-taper      { background: color-mix(in srgb, var(--sand,#f5c97a) 30%, var(--paper)); color: color-mix(in srgb, var(--ink) 70%, var(--sand,#f5c97a)); }
-#cairn-week-soft .phase-badge.phase-deload     { background: color-mix(in srgb, var(--ink,#17201d) 8%, var(--paper)); color: var(--muted-foreground); }
-#cairn-week-soft .phase-badge.phase-race       { background: var(--coral,#ff6b61); color: #fff; }
-#cairn-week-soft .phase-badge.phase-transition { background: color-mix(in srgb, var(--ink,#17201d) 8%, var(--paper)); color: var(--muted-foreground); }
-/* KW km-plan / km-actual labels */
-#cairn-week-soft .wk-km-plan  { font-size: .72rem; color: var(--muted-foreground); white-space: nowrap; }
-#cairn-week-soft .wk-km-actual{ font-size: .72rem; font-weight: 600; white-space: nowrap; }
-#cairn-week-soft .wk-km-actual.km-ok    { color: var(--green,#29483e); }
-#cairn-week-soft .wk-km-actual.km-under { color: var(--coral,#ff6b61); }
-#cairn-week-soft .km-delta { font-size: .68rem; font-weight: 400; opacity: .8; }
-/* legacy (unused but kept for compat) */
-#cairn-week-soft .week-km-line { font-size: .78rem; color: var(--muted-foreground); white-space: nowrap; }
-#cairn-week-soft .week-km-line strong { color: var(--ink); font-weight: 600; }
-#cairn-week-soft .week-km-bar { display: flex; height: 4px; border-radius: 99px; overflow: hidden; min-width: 60px; max-width: 90px; background: color-mix(in srgb, var(--ink) 8%, transparent); }
-#cairn-week-soft .week-km-bar .bar-run  { background: var(--green,#29483e); }
-#cairn-week-soft .week-km-bar .bar-bike { background: color-mix(in srgb, var(--green,#29483e) 45%, var(--sand,#f5c97a)); }
 
-#cairn-week-soft .week-card { position: relative; min-height: 88px; display: flex; align-items: center; gap: 0; overflow: hidden; color: var(--ink); }
-#cairn-week-soft .week-card.is-dark { --card: var(--forest); color: var(--forest-ink); }
-#cairn-week-soft .week-card.is-coral { --card: var(--coral); color: var(--coral-ink); }
-#cairn-week-soft .week-card.is-sand { --card: var(--sand); color: var(--ink); }
-#cairn-week-soft .week-card.is-soft { --card: var(--soft); color: var(--ink); }
-#cairn-week-soft .week-card.is-past { --card: color-mix(in srgb, var(--soft) 72%, var(--paper)); color: color-mix(in srgb, var(--ink) 56%, var(--paper)); }
-#cairn-week-soft .week-card.is-past .art { background: color-mix(in srgb, var(--soft) 58%, var(--paper)); }
-#cairn-week-soft .week-card.is-past .art img { filter: grayscale(1); opacity: .34; }
-#cairn-week-soft .day { align-self: stretch; display: flex; align-items: center; flex: 0 0 104px; gap: .55rem; padding-right: .9rem; border-right: 1px solid color-mix(in srgb, currentColor 38%, transparent); }
-#cairn-week-soft .day-number { min-width: 2.2rem; font-size: 2.35rem; line-height: 1; letter-spacing: -.08em; font-weight: 500; }
-#cairn-week-soft .day-name { display: grid; gap: .12rem; }
-#cairn-week-soft .day-name strong { font-weight: 500; }
-#cairn-week-soft .day-name span { color: color-mix(in srgb, currentColor 72%, transparent); }
-#cairn-week-soft .session { flex: 1 1 auto; min-width: 0; padding: .25rem .8rem; }
-#cairn-week-soft .session h2 { margin: 0 0 .18rem; font-weight: 500; letter-spacing: -.035em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-#cairn-week-soft .session-meta { display: flex; align-items: center; gap: .4rem; flex-wrap: wrap; }
-#cairn-week-soft .session-meta span + span::before { content: "·"; margin-right: .4rem; }
-#cairn-week-soft .workout-profile { display: flex; align-items: end; gap: 3px; width: min(100%, 310px); height: 22px; margin-top: .35rem; }
-#cairn-week-soft .phase { display: block; min-width: 3px; border-radius: 2px 2px 0 0; background: currentColor; }
-#cairn-week-soft .phase.warmup, #cairn-week-soft .phase.cooldown { height: 9px; opacity: .34; }
-#cairn-week-soft .phase.active { height: 21px; opacity: .82; }
-#cairn-week-soft .phase.recovery { height: 6px; opacity: .28; }
-#cairn-week-soft .phase.warmup { flex: 10; }
-#cairn-week-soft .phase.cooldown { flex: 10; }
-#cairn-week-soft .phase.active.interval { flex: 2; }
-#cairn-week-soft .phase.recovery.interval { flex: 2; }
-#cairn-week-soft .phase.active.hill { flex: 3; }
-#cairn-week-soft .phase.recovery.hill { flex: 2; }
-#cairn-week-soft .today { display: inline-block; margin-bottom: .2rem; padding: .15rem .45rem; border-radius: 999px; background: var(--paper); color: var(--ink); }
-#cairn-week-soft .art { flex: 0 0 132px; align-self: stretch; display: grid; place-items: center; padding: .15rem .4rem; background: color-mix(in srgb, var(--paper) 55%, transparent); overflow: hidden; }
-#cairn-week-soft .art img { display: block; width: 100%; height: 76px; object-fit: contain; pointer-events: none; }
-#cairn-week-soft .week-card { cursor: pointer; }
-#cairn-week-soft .week-card:active { opacity: .88; }
+#cairn-week-soft .week-switcher { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: .6rem; }
+#cairn-week-soft .week-title h1 { margin: 0; letter-spacing: -.05em; font-weight: 500; }
+#cairn-week-soft .wk-today-btn { flex-shrink: 0; padding: .4rem .9rem; border-radius: 999px; border: 1px solid var(--line); background: var(--paper); color: var(--ink); font-size: .82rem; cursor: pointer; }
+#cairn-week-soft .wk-today-btn.is-current { opacity: .5; pointer-events: none; }
+
+#cairn-week-soft .week-nav-row { display: flex; align-items: center; justify-content: space-between; gap: .75rem; margin-bottom: 1rem; padding-bottom: .65rem; border-bottom: 1px solid var(--line); }
+#cairn-week-soft .wk-nav-arrow { flex-shrink: 0; width: 2rem; height: 2rem; display: grid; place-items: center; border-radius: 50%; border: none; background: transparent; color: var(--ink); font-size: 1.2rem; line-height: 1; cursor: pointer; }
+#cairn-week-soft .wk-nav-arrow:disabled { opacity: .3; cursor: default; }
+#cairn-week-soft .wk-range-label { color: var(--muted-foreground); text-align: center; flex: 1; }
+
+#cairn-week-soft .week-goals-box { border: 1px solid var(--line); border-radius: 1rem; padding: .85rem 1rem; margin-bottom: 1.1rem; }
+#cairn-week-soft .goals-label { font-size: .72rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted-foreground); margin-bottom: .6rem; }
+#cairn-week-soft .goals-row { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: .5rem; }
+#cairn-week-soft .goal-cell { display: flex; flex-direction: column; gap: .15rem; min-width: 0; }
+#cairn-week-soft .goal-cell strong { font-weight: 500; letter-spacing: -.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#cairn-week-soft .goal-cell span { font-size: .74rem; color: var(--muted-foreground); }
+
+#cairn-week-soft .week-days { display: grid; gap: .3rem; }
+#cairn-week-soft .day-row { display: flex; align-items: stretch; gap: .7rem; padding: .35rem 0; }
+#cairn-week-soft .day-col { flex: 0 0 32px; display: flex; flex-direction: column; align-items: center; padding-top: .3rem; }
+#cairn-week-soft .day-dow { font-size: .68rem; letter-spacing: .03em; color: var(--muted-foreground); }
+#cairn-week-soft .day-num { font-size: 1.1rem; font-weight: 500; letter-spacing: -.02em; }
+#cairn-week-soft .day-num.is-today { color: var(--coral); }
+#cairn-week-soft .day-num.is-dimmed { opacity: .4; }
+#cairn-week-soft .day-sessions { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: .4rem; border-radius: .6rem; transition: background .15s, border-color .15s; }
+
+#cairn-week-soft .sess-tile { position: relative; display: flex; align-items: stretch; gap: 0; min-height: 44px; border-radius: .5rem; background: light-dark(#ffffff, #1e2522); box-shadow: 0 1px 3px rgb(0 0 0 / .08); cursor: pointer; overflow: hidden; transition: transform .15s, box-shadow .15s, opacity .15s; }
+#cairn-week-soft .sess-tile.is-standalone { opacity: .75; }
+#cairn-week-soft .sess-bar { flex: 0 0 4px; align-self: stretch; background: var(--bar-color, var(--bar-stone)); }
+#cairn-week-soft .sess-body { flex: 1 1 auto; min-width: 0; padding: .4rem .65rem; align-self: center; }
+#cairn-week-soft .sess-name { font-weight: 700; font-size: .86rem; letter-spacing: -.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#cairn-week-soft .sess-check { color: var(--forest); font-weight: 700; }
+#cairn-week-soft .sess-meta { font-size: .72rem; color: var(--muted-foreground); margin-top: .1rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#cairn-week-soft .sess-overflow { flex: 0 0 auto; align-self: stretch; padding: 0 .7rem; border: none; background: transparent; color: var(--muted-foreground); font-size: 1rem; letter-spacing: .1em; cursor: pointer; }
+
+/* Drag & drop states (Pointer Events) */
+#cairn-week-soft .sess-tile.is-dragging {
+  transform: rotate(-2deg) scale(1.03);
+  box-shadow: 0 8px 24px rgb(0 0 0 / .18);
+  opacity: .95;
+  z-index: 100;
+  position: relative;
+}
+#cairn-week-soft .day-row.drop-target .day-sessions {
+  background: color-mix(in srgb, var(--bar-sage) 12%, transparent);
+  border: 2px dashed var(--bar-sage);
+  min-height: 44px;
+  justify-content: center;
+}
+#cairn-week-soft .day-row.drop-target .day-sessions::after {
+  content: '↓';
+  display: block;
+  text-align: center;
+  color: var(--bar-sage);
+  font-size: 18px;
+}
 
 /* ── SESSION DETAIL BOTTOM-SHEET ── */
 #session-backdrop {
@@ -248,22 +249,10 @@ small, .text-small { font-size: .8rem; line-height: 1.5; }
 #cairn-week-soft .nav .active { background: var(--forest); color: var(--forest-ink); border-radius: 999px; }
 #cairn-week-soft .nav-item { display: inline-flex; align-items: center; gap: .35rem; }
 @media (max-width: 560px) {
-  #cairn-week-soft .week-card { min-height: 82px; }
-  #cairn-week-soft .day { flex-basis: 76px; display: grid; grid-template-columns: auto 1fr; gap: .35rem; padding-right: .55rem; }
-  #cairn-week-soft .day-number { font-size: 2rem; min-width: 1.85rem; }
-  #cairn-week-soft .day-name span { display: none; }
-  #cairn-week-soft .session { padding: .2rem .55rem; }
-  #cairn-week-soft .session h2 { margin-bottom: .12rem; }
-  #cairn-week-soft .week-card.has-structure { min-height: 94px; }
-  #cairn-week-soft .workout-profile { height: 18px; margin-top: .25rem; gap: 2px; }
-  #cairn-week-soft .phase.active { height: 17px; }
-  #cairn-week-soft .art { flex-basis: 92px; padding: .1rem; }
-  #cairn-week-soft .art img { height: 66px; }
   #cairn-week-soft .nav-text { display: none; }
 }
 @media (max-width: 390px) {
-  #cairn-week-soft .art { flex-basis: 72px; }
-  #cairn-week-soft .session-meta span:nth-child(n+3) { display: none; }
+  #cairn-week-soft .goals-row { grid-template-columns: repeat(2, minmax(0,1fr)); row-gap: .6rem; }
 }
 
 /* ── PLAN VIEW ── */
@@ -642,11 +631,16 @@ small, .text-small { font-size: .8rem; line-height: 1.5; }
       <div class="week-switcher">
         <div class="week-title">
           <h1 id="wk-kw">KW —</h1>
-          <p id="wk-range">Lade…</p>
         </div>
-        <div id="wk-km-stats" class="week-km-stats" style="display:none"></div>
+        <button class="wk-today-btn" id="wk-today-btn" type="button" onclick="jumpToToday()">Heute</button>
       </div>
-      <div id="week-days"><p class="loading-msg">Trainingsplan wird geladen…</p></div>
+      <div class="week-nav-row">
+        <button class="wk-nav-arrow" id="wk-prev" type="button" aria-label="Vorherige Woche" onclick="navigateWeek(-1)">‹</button>
+        <span class="wk-range-label" id="wk-range">Lade…</span>
+        <button class="wk-nav-arrow" id="wk-next" type="button" aria-label="Nächste Woche" onclick="navigateWeek(1)">›</button>
+      </div>
+      <div class="week-goals-box" id="week-goals-box" style="display:none"></div>
+      <div id="week-days" class="week-days"><p class="loading-msg">Trainingsplan wird geladen…</p></div>
     </div>
     <nav class="nav" aria-label="Hauptnavigation">
       <button class="btn active" type="button" onclick="navigate('week')"><span class="nav-item"><i data-lucide="calendar-days" aria-hidden="true"></i><span class="nav-text">Woche</span></span></button>
@@ -880,10 +874,6 @@ const SESSION_ASSET = {
   'Core Training': 'mobility',
 };
 
-const STRUCTURED_TYPES = new Set([
-  'Hill Session','Interval Session','Interval Run','Tempo Session','Tempo Run','Sprint Session','Time Trial'
-]);
-
 function getAssetKey(sessionType) {
   return SESSION_ASSET[sessionType] || 'cairn';
 }
@@ -892,14 +882,26 @@ function assetUrl(sessionType) {
   return `/static/assets/cairn/svg/${getAssetKey(sessionType)}.svg`;
 }
 
-function weekCardColor(session) {
-  if (session.is_past) return 'is-past';
-  if (session.is_today) return 'is-coral';
-  const t = session.session_type || '';
-  if (/long trail|long run/i.test(t)) return 'is-dark';
-  if (/upper body|lower body|strength|ruhetag|rest|mobility|core/i.test(t)) return 'is-sand';
-  if (/interval|hill|tempo|sprint|time trial/i.test(t)) return 'is-coral';
-  return 'is-soft';
+/* Day-row tile accent-bar color — see Handbook: CAIRN Week-Planner redesign. */
+function sessionColor(type) {
+  if (!type) return 'var(--bar-stone)';
+  const t = type.toLowerCase();
+  if (/easy.run|recovery.run/.test(t))                          return 'var(--bar-sage)';
+  if (/tempo|interval|hill|sprint|quality/.test(t))              return 'var(--bar-coral)';
+  if (/long.run|trail|race/.test(t))                              return 'var(--bar-forest)';
+  if (/strength|upper|lower|full.body|core|gym|kraft/.test(t))   return 'var(--bar-olive)';
+  if (/cycl|bike|ride|gravel|rennrad|indoor/.test(t))             return 'var(--bar-sand)';
+  if (/run|lauf/.test(t))                                         return 'var(--bar-sage)';
+  if (/rest|ruhe|urlaub/.test(t))                                 return 'var(--bar-stone)';
+  return 'var(--bar-stone)';
+}
+
+function isRestSess(sess) {
+  return /rest|ruhetag/i.test(sess.session_type || sess.type || '');
+}
+
+function isStrengthSess(sess) {
+  return /strength|upper|lower|full.?body|core|gym|kraft/i.test(sess.session_type || sess.type || '');
 }
 
 function activityCardColor(activity) {
@@ -1023,8 +1025,13 @@ function apiGet(path) {
 }
 
 /* ============================================================
-   WEEK VIEW
+   WEEK VIEW — single-week pager + drag & drop (Handbook: CAIRN
+   Week-Planner redesign)
    ============================================================ */
+state.weeksData = [];
+state.currentMonday = null;
+state.dragInitDone = false;
+
 async function loadWeek() {
   // Logo einblenden
   const brandEl = document.getElementById('week-brand');
@@ -1034,6 +1041,10 @@ async function loadWeek() {
     const data = await apiGet('/api/frontend/week/all');
     renderWeek(data);
     state.weekLoaded = true;
+    if (!state.dragInitDone) {
+      initDragDrop(document.getElementById('week-days'));
+      state.dragInitDone = true;
+    }
   } catch (err) {
     document.getElementById('week-days').innerHTML =
       `<p class="loading-msg">Trainingsplan konnte nicht geladen werden. (${err.message})</p>`;
@@ -1041,11 +1052,6 @@ async function loadWeek() {
 }
 
 /* ── KW-Stats helpers ─────────────────────────────────────── */
-const PHASE_LABELS = {
-  base:'Base', build:'Build', peak:'Peak',
-  taper:'Taper', deload:'Deload', race:'Race', transition:'Transition'
-};
-
 function isCyclingSess(sess) {
   // Primär: sport-Feld aus der DB (gesetzt wenn Cross Training explizit als Rennrad markiert)
   if (sess.sport === 'cycling') return true;
@@ -1054,17 +1060,22 @@ function isCyclingSess(sess) {
 }
 
 function weekKmStats(sessions) {
-  // plannedTotal: Summe der geplanten km als Laufäquivalent.
+  // plannedTotal: Summe der geplanten km als Laufäquivalent (= "Ziele Woche"-Zielwert).
   //   planned_km ist bereits Laufäquivalent (ChatGPT hat km_factor angewendet).
   // actualTotal: Summe der tatsächlichen km als Laufäquivalent.
   //   actual_distance_km (raw) × km_factor → Laufäquivalent.
   //   Fallback auf actual_km (aus trainings) wenn actual_distance_km fehlt —
   //   für Laufsessions (km_factor = null) sind beide identisch.
+  // totalDurationMin/elevationSum/kraftDone/kraftTotal: weitere Wochenziele,
+  //   nur aus geplanten Sessions (plan_id != null) — spontane, ungeplante
+  //   Aktivitäten zählen nicht in die Zielwerte der Woche.
   let plannedTotal = 0, actualTotal = 0, phase = '';
   let hasActual = false;
+  let totalDurationMin = 0, elevationSum = 0;
+  let kraftDone = 0, kraftTotal = 0;
 
   for (const s of sessions || []) {
-    if (/rest|ruhetag/i.test(s.session_type || '')) continue;
+    if (isRestSess(s)) continue;
     if (!phase && s.phase) phase = s.phase.toLowerCase();
 
     // Geplant: planned_km ist bereits normalisiert (Laufäquivalent)
@@ -1079,37 +1090,45 @@ function weekKmStats(sessions) {
       actualTotal += rawActual * factor;
       hasActual = true;
     }
+
+    if (s.plan_id != null) {
+      totalDurationMin += parseFloat(s.planned_duration_min) || 0;
+      elevationSum += parseFloat(s.elevation_gain_m) || 0;
+      if (isStrengthSess(s)) {
+        kraftTotal++;
+        if (s.status === 'completed' || s.matched_activity) kraftDone++;
+      }
+    }
   }
 
   plannedTotal = Math.round(plannedTotal * 10) / 10;
   actualTotal  = Math.round(actualTotal  * 10) / 10;
-  return { plannedTotal, actualTotal, hasActual, phase };
+  return {
+    plannedTotal, actualTotal, hasActual, phase,
+    totalDurationMin: Math.round(totalDurationMin),
+    elevationSum: Math.round(elevationSum),
+    kraftDone, kraftTotal,
+  };
 }
 
-function renderKmStatsHtml(stats) {
-  const { phase, plannedTotal, actualTotal, hasActual } = stats;
-  const phaseLabel = phase ? (PHASE_LABELS[phase] || phase) : '';
-
-  let html = '';
-  if (phaseLabel) {
-    html += `<span class="phase-badge phase-${phase}">${phaseLabel}</span>`;
+function renderWeekGoals(week) {
+  const box = document.getElementById('week-goals-box');
+  if (!box) return;
+  const stats = weekKmStats(week.sessions);
+  if (!stats.plannedTotal && !stats.totalDurationMin && !stats.kraftTotal && !stats.elevationSum) {
+    box.style.display = 'none';
+    return;
   }
-
-  // Km-Vergleich immer anzeigen wenn geplante km vorhanden
-  if (plannedTotal > 0) {
-    html += `<span class="wk-km-plan">${plannedTotal} km geplant</span>`;
-    if (hasActual) {
-      const delta = Math.round((actualTotal - plannedTotal) * 10) / 10;
-      const sign  = delta >= 0 ? '+' : '';
-      const cls   = delta >= 0 ? 'km-ok' : 'km-under';
-      html += `<span class="wk-km-actual ${cls}">${actualTotal} km gemacht`
-            + ` <span class="km-delta">(${sign}${delta})</span></span>`;
-    } else {
-      html += `<span class="wk-km-actual" style="opacity:.45">0 km gemacht</span>`;
-    }
-  }
-
-  return html;
+  const hFmt = fmtMin(stats.totalDurationMin) || '0 min';
+  box.innerHTML = `
+    <div class="goals-label">Ziele Woche</div>
+    <div class="goals-row">
+      <div class="goal-cell"><strong>${stats.plannedTotal ? stats.plannedTotal.toLocaleString('de-CH') : 0} km</strong><span>Laufen</span></div>
+      <div class="goal-cell"><strong>${hFmt}</strong><span>Training</span></div>
+      <div class="goal-cell"><strong>${stats.kraftDone}/${stats.kraftTotal}</strong><span>Kraft</span></div>
+      <div class="goal-cell"><strong>${stats.elevationSum ? stats.elevationSum + ' m' : '–'}</strong><span>HM</span></div>
+    </div>`;
+  box.style.display = '';
 }
 /* ── end KW-Stats helpers ─────────────────────────────────── */
 
@@ -1118,164 +1137,214 @@ function renderWeek(weeks) {
     document.getElementById('week-days').innerHTML = '<p class="loading-msg">Kein Plan gefunden.</p>';
     return;
   }
-
-  const currentWeek = weeks.find(w => w.is_current) || weeks[0];
-  document.getElementById('wk-kw').textContent = `KW ${currentWeek.kw}`;
-  document.getElementById('wk-range').textContent =
-    `${currentWeek.monday}–${currentWeek.sunday}${currentWeek.is_current ? ' · diese Woche' : ''}`;
-
-  // KW-Stats for current week header
-  const curStats = weekKmStats(currentWeek.sessions);
-  const curStatsEl = document.getElementById('wk-km-stats');
-  const curStatsHtml = renderKmStatsHtml(curStats);
-  if (curStatsEl && curStatsHtml) {
-    curStatsEl.innerHTML = curStatsHtml;
-    curStatsEl.style.display = '';
+  state.weeksData = weeks;
+  if (!state.currentMonday || !weeks.some(w => w.monday === state.currentMonday)) {
+    const cur = weeks.find(w => w.is_current) || weeks[0];
+    state.currentMonday = cur.monday;
   }
+  renderCurrentWeek();
+}
+
+function navigateWeek(delta) {
+  const idx = state.weeksData.findIndex(w => w.monday === state.currentMonday);
+  const newIdx = idx + delta;
+  if (newIdx < 0 || newIdx >= state.weeksData.length) return;
+  state.currentMonday = state.weeksData[newIdx].monday;
+  renderCurrentWeek();
+}
+
+function jumpToToday() {
+  const cur = state.weeksData.find(w => w.is_current);
+  if (cur) { state.currentMonday = cur.monday; renderCurrentWeek(); }
+}
+
+const DOW_SHORT = ['MO', 'DI', 'MI', 'DO', 'FR', 'SA', 'SO'];
+
+function renderCurrentWeek() {
+  const week = state.weeksData.find(w => w.monday === state.currentMonday);
+  if (!week) return;
+
+  document.getElementById('wk-kw').textContent = `KW ${week.kw}`;
+  document.getElementById('wk-range').textContent = `${week.monday} – ${week.sunday}`;
+
+  const idx = state.weeksData.findIndex(w => w.monday === state.currentMonday);
+  const prevBtn = document.getElementById('wk-prev');
+  const nextBtn = document.getElementById('wk-next');
+  if (prevBtn) prevBtn.disabled = idx <= 0;
+  if (nextBtn) nextBtn.disabled = idx >= state.weeksData.length - 1;
+  const todayBtn = document.getElementById('wk-today-btn');
+  if (todayBtn) todayBtn.classList.toggle('is-current', !!week.is_current);
+
+  renderWeekGoals(week);
 
   const container = document.getElementById('week-days');
   container.innerHTML = '';
 
-  // Render current week first (no divider), then remaining
-  const sorted = [
-    ...weeks.filter(w => w.is_current),
-    ...weeks.filter(w => !w.is_current && !w.is_past),
-    ...weeks.filter(w => !w.is_current && w.is_past),
-  ];
-
-  sorted.forEach((week, idx) => {
-    if (idx > 0) {
-      const stats   = weekKmStats(week.sessions);
-      const statsHtml = renderKmStatsHtml(stats);
-      const div = document.createElement('div');
-      div.className = 'week-divider';
-      div.setAttribute('aria-labelledby', `kw-${week.kw}`);
-      div.innerHTML = `
-        <div class="week-divider-left">
-          <h2 id="kw-${week.kw}">KW ${week.kw}</h2>
-          <p>${week.monday}–${week.sunday}</p>
-        </div>
-        ${statsHtml ? `<div class="week-divider-right">${statsHtml}</div>` : ''}`;
-      container.appendChild(div);
-    }
-
-    const section = document.createElement('section');
-    section.className = 'week-list';
-    section.setAttribute('aria-label', `Trainingstage der KW ${week.kw}`);
-
-    (week.sessions || []).forEach(sess => {
-      section.appendChild(buildWeekCard(sess));
-    });
-
-    container.appendChild(section);
+  const sessionsByDate = {};
+  (week.sessions || []).forEach(sess => {
+    (sessionsByDate[sess.date] = sessionsByDate[sess.date] || []).push(sess);
   });
+
+  const [md, mm, my] = week.monday.split('.').map(Number);
+
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(my, mm - 1, md + i);
+    const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const rawForDay = sessionsByDate[dateStr] || [];
+    const isToday = rawForDay.some(s => s.is_today);
+    const daySessions = rawForDay.filter(s => !isRestSess(s));
+    container.appendChild(buildDayRow(dateStr, daySessions, d.getDate(), DOW_SHORT[i], isToday));
+  }
 
   if (window.lucide) lucide.createIcons();
 }
 
-function buildWeekCard(sess) {
-  const color = weekCardColor(sess);
-  const hasStructure = STRUCTURED_TYPES.has(sess.session_type);
-  const isRest = /rest|ruhetag/i.test(sess.session_type || '');
-  const clickable = !isRest;
-  const classes = ['card', 'week-card', color, hasStructure ? 'has-structure' : '', clickable ? 'clickable' : ''].filter(Boolean).join(' ');
+function buildDayRow(dateStr, daySessions, dayNum, dow, isToday) {
+  const row = document.createElement('div');
+  row.className = 'day-row';
+  row.dataset.date = dateStr;
 
-  // Store session in map so onclick can retrieve it
-  const storeKey = sess.id ? `s${sess.id}` : `s${(sess.date || '')}${(sess.session_type || '').replace(/\W/g, '')}`;
+  const dayCol = document.createElement('div');
+  dayCol.className = 'day-col';
+  const numCls = ['day-num', isToday ? 'is-today' : '', !daySessions.length ? 'is-dimmed' : ''].filter(Boolean).join(' ');
+  dayCol.innerHTML = `<span class="day-dow">${dow}</span><span class="${numCls}">${dayNum}</span>`;
+  row.appendChild(dayCol);
+
+  const sessWrap = document.createElement('div');
+  sessWrap.className = 'day-sessions';
+  daySessions.forEach(sess => sessWrap.appendChild(buildSessTile(sess)));
+  row.appendChild(sessWrap);
+
+  return row;
+}
+
+function sessMetaText(sess) {
+  if (sess.matched_activity) {
+    const ma = sess.matched_activity;
+    const actualKm = ma.distance_km;
+    const plannedKm = sess.planned_km;
+    if (actualKm && plannedKm) return `${fmtKm(actualKm)} erledigt · ${fmtKm(plannedKm)} geplant`;
+    if (actualKm) return `${fmtKm(actualKm)} erledigt`;
+    if (ma.duration_min) return `${fmtMin(ma.duration_min)} erledigt`;
+    return 'erledigt';
+  }
+  if (sess.plan_id == null) {
+    const parts = [];
+    if (sess.actual_km) parts.push(fmtKm(sess.actual_km));
+    if (sess.actual_duration_min) parts.push(fmtMin(sess.actual_duration_min));
+    return parts.length ? parts.join(' · ') : 'Aktivität';
+  }
+  const isOptional = /^optional/i.test((sess.notes || '').trim());
+  const parts = [];
+  if (isOptional) parts.push('optional');
+  if (sess.planned_duration_min) parts.push(fmtMin(sess.planned_duration_min));
+  else if (sess.planned_km) parts.push(fmtKm(sess.planned_km));
+  if (sess.session_zone) parts.push(sess.session_zone);
+  return parts.join(' · ');
+}
+
+function openSessionSheetForSess(sess) {
+  const storeKey = sess.id != null ? `s${sess.id}` : `s${sess.date || ''}${(sess.session_type || sess.type || '').replace(/\W/g, '')}`;
   _sessionStore[storeKey] = sess;
-
-  const article = document.createElement('article');
-  article.className = classes;
-  article.setAttribute('aria-labelledby', `day-${sess.date}`);
-  if (clickable) {
-    article.setAttribute('tabindex', '0');
-    article.setAttribute('role', 'button');
-    article.setAttribute('aria-label', `Details zu ${sess.name || sess.session_type || 'Session'}`);
-    article.onclick = () => openSessionSheet(storeKey);
-    article.onkeydown = (ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); openSessionSheet(storeKey); } };
-  }
-
-  // Day column
-  const day = document.createElement('div');
-  day.className = 'day';
-  day.innerHTML = `<span class="day-number">${sess.day_number}</span><span class="day-name"><strong>${sess.day_short}</strong><span class="text-small">${sess.month_short}</span></span>`;
-  article.appendChild(day);
-
-  // Session column
-  const sessionDiv = document.createElement('div');
-  sessionDiv.className = 'session';
-
-  let sessionHTML = '';
-  if (sess.is_today) sessionHTML += `<span class="today text-small">HEUTE</span>`;
-  sessionHTML += `<h2 id="day-${sess.date}">${sess.name || sess.session_type || 'Session'}</h2>`;
-
-  // Meta row
-  const metaParts = [];
-  if (sess.planned_km) metaParts.push(fmtKm(sess.planned_km));
-  if (sess.planned_duration_min) metaParts.push(fmtMin(sess.planned_duration_min));
-  if (sess.session_zone) metaParts.push(sess.session_zone);
-  const statusLabel = sess.sync_status === 'synced' ? 'auf Garmin' :
-    sess.status === 'completed' ? 'abgeschlossen' : 'geplant';
-  metaParts.push(statusLabel);
-
-  if (metaParts.length) {
-    sessionHTML += `<div class="session-meta text-small">${metaParts.map(p => `<span>${p}</span>`).join('')}</div>`;
-  }
-
-  // Workout profile for structured sessions
-  if (hasStructure && sess.steps && sess.steps.length) {
-    sessionHTML += buildWorkoutProfile(sess.steps, sess.session_type);
-  }
-
-  sessionDiv.innerHTML = sessionHTML;
-  article.appendChild(sessionDiv);
-
-  // Art column (session image)
-  const art = document.createElement('div');
-  art.className = 'art';
-  art.innerHTML = `<img src="${assetUrl(sess.session_type)}" alt="${sess.session_type}" loading="lazy">`;
-  article.appendChild(art);
-
-  return article;
+  openSessionSheet(storeKey);
 }
 
-/* Expand Garmin repeat groups into flat step list */
-function flattenSteps(steps) {
-  const flat = [];
-  for (const step of (steps || [])) {
-    const t = (step.type || step.step_type || '').toLowerCase();
-    if (t === 'repeat' || t === 'repeatgroup' || t === 'repeat_group') {
-      const count = step.repeat_count || step.iterations || step.numberOfIterations || 1;
-      const sub = step.steps || step.workoutSteps || step.sub_steps || [];
-      for (let i = 0; i < count; i++) flat.push(...flattenSteps(sub));
-    } else {
-      flat.push(step);
-    }
-  }
-  return flat;
+function buildSessTile(sess) {
+  const isMatched = !!sess.matched_activity || (sess.plan_id != null && sess.status === 'completed');
+  const isStandalone = sess.plan_id == null;
+  const draggable = !isMatched && !isStandalone;
+
+  const tile = document.createElement('div');
+  tile.className = 'sess-tile' + (isStandalone ? ' is-standalone' : '');
+  tile.style.setProperty('--bar-color', sessionColor(sess.session_type || sess.type));
+  if (sess.id != null) tile.dataset.sessionId = sess.id;
+  if (draggable) tile.dataset.draggable = 'true';
+
+  const bar = document.createElement('div');
+  bar.className = 'sess-bar';
+  tile.appendChild(bar);
+
+  const body = document.createElement('div');
+  body.className = 'sess-body';
+  const name = sess.name || sess.session_type || sess.type || 'Session';
+  const meta = sessMetaText(sess);
+  body.innerHTML = `<div class="sess-name">${name}${isMatched ? ' <span class="sess-check">✓</span>' : ''}</div>`
+    + (meta ? `<div class="sess-meta">${meta}</div>` : '');
+  tile.appendChild(body);
+
+  const overflow = document.createElement('button');
+  overflow.className = 'sess-overflow';
+  overflow.type = 'button';
+  overflow.setAttribute('aria-label', 'Mehr');
+  overflow.textContent = '···';
+  overflow.onclick = (ev) => { ev.stopPropagation(); openSessionSheetForSess(sess); };
+  tile.appendChild(overflow);
+
+  tile.onclick = () => openSessionSheetForSess(sess);
+
+  return tile;
 }
 
-function buildWorkoutProfile(steps, sessionType) {
-  const flat = flattenSteps(steps);
-  if (!flat.length) return '';
-  let html = '<div class="workout-profile" role="img" aria-label="Workout-Struktur">';
-  const isHill = /hill/i.test(sessionType);
-  const type = isHill ? 'hill' : 'interval';
-  flat.forEach(step => {
-    const stepType = (step.type || step.step_type || step.stepType || '').toLowerCase();
-    if (stepType === 'warmup') {
-      html += '<span class="phase warmup"><span class="sr-only">Warm-up</span></span>';
-    } else if (stepType === 'cooldown') {
-      html += '<span class="phase cooldown"><span class="sr-only">Cooldown</span></span>';
-    } else if (stepType === 'active' || stepType === 'interval' || stepType === 'run') {
-      html += `<span class="phase active ${type}"><span class="sr-only">Aktiv</span></span>`;
-    } else if (stepType === 'recovery' || stepType === 'rest' || stepType === 'walk') {
-      html += `<span class="phase recovery ${type}"><span class="sr-only">Recovery</span></span>`;
-    }
-    // Ignore unknown step types (don't render garbage blocks)
+/* ── Drag & drop (Pointer Events, kein HTML5 Drag) ──────────── */
+function initDragDrop(gridEl) {
+  if (!gridEl) return;
+  let dragId = null, dragEl = null, timer = null;
+
+  gridEl.addEventListener('pointerdown', e => {
+    const tile = e.target.closest('[data-session-id][data-draggable]');
+    if (!tile) return;
+    timer = setTimeout(() => {
+      dragId = tile.dataset.sessionId;
+      dragEl = tile;
+      tile.setPointerCapture(e.pointerId);
+      tile.classList.add('is-dragging');
+    }, 400);
   });
-  html += '</div>';
-  return html;
+
+  gridEl.addEventListener('pointermove', e => {
+    if (!dragId) { clearTimeout(timer); return; }
+    gridEl.querySelectorAll('.day-row').forEach(r => r.classList.remove('drop-target'));
+    const row = document.elementFromPoint(e.clientX, e.clientY)?.closest('.day-row');
+    if (row) row.classList.add('drop-target');
+  });
+
+  gridEl.addEventListener('pointerup', async e => {
+    clearTimeout(timer);
+    if (!dragId) return;
+    dragEl?.classList.remove('is-dragging');
+    const row = document.elementFromPoint(e.clientX, e.clientY)?.closest('.day-row');
+    gridEl.querySelectorAll('.day-row').forEach(r => r.classList.remove('drop-target'));
+    if (row?.dataset.date) {
+      await moveSession(dragId, row.dataset.date);
+    }
+    dragId = null; dragEl = null;
+  });
+
+  gridEl.addEventListener('pointercancel', () => {
+    clearTimeout(timer);
+    dragEl?.classList.remove('is-dragging');
+    gridEl.querySelectorAll('.day-row').forEach(r => r.classList.remove('drop-target'));
+    dragId = null; dragEl = null;
+  });
+}
+
+async function moveSession(sessionId, newDate) {
+  try {
+    const res = await fetch(`/api/plan/session/${sessionId}/move`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ new_date: newDate })
+    });
+    const data = await res.json();
+    if (data.status === 'ok') {
+      if (data.garmin_warning) console.warn('[CAIRN] Garmin-Verschiebung:', data.garmin_warning);
+      await loadWeek();
+    } else {
+      console.warn('[CAIRN] Verschieben fehlgeschlagen:', data.message);
+    }
+  } catch (err) {
+    console.warn('[CAIRN] Verschieben fehlgeschlagen:', err.message);
+  }
 }
 
 /* ============================================================

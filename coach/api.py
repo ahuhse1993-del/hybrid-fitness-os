@@ -1401,6 +1401,91 @@ NUR JSON:
     except Exception as e:
         return jsonify({"status": "error", "message": str(e), "trace": traceback.format_exc()}), 500
 
+
+@app.route('/api/plan/session/<int:session_id>/move', methods=['POST'])
+def move_single_plan_session(session_id):
+    """
+    Verschiebt eine einzelne, noch ungematchte training_plan-Session auf ein
+    neues Datum (Drag & Drop im neuen Week-Planner). Sessions, die bereits mit
+    einer absolvierten Aktivität verknüpft sind (matched_training_id), können
+    nicht verschoben werden — dafür gibt es keinen sinnvollen Zielzustand.
+    War die Session bereits auf Garmin gepusht, wird der Garmin-Workout dort
+    mitverschoben; schlägt das fehl, bleibt die DB-Verschiebung trotzdem
+    bestehen und die Response trägt einen garmin_warning-Hinweis.
+    """
+    try:
+        data = request.get_json(force=True) or {}
+        new_date_str = data.get('new_date')
+        if not new_date_str:
+            return jsonify({"status": "error", "message": "new_date erforderlich"}), 400
+        try:
+            new_date_obj = date.fromisoformat(new_date_str)
+        except ValueError:
+            return jsonify({"status": "error", "message": "new_date muss YYYY-MM-DD sein"}), 400
+
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT id, matched_training_id, garmin_workout_id, session_type, name
+            FROM training_plan WHERE id = %s
+        """, (session_id,))
+        row = cur.fetchone()
+        if not row:
+            conn.close()
+            return jsonify({"status": "error", "message": "Session nicht gefunden"}), 404
+        if row[1] is not None:
+            conn.close()
+            return jsonify({"status": "error", "message": "Session ist bereits mit einer absolvierten Aktivität verknüpft und kann nicht verschoben werden"}), 400
+
+        garmin_workout_id = row[2]
+        new_week_date = new_date_obj - timedelta(days=new_date_obj.weekday())
+        new_day_of_week = new_date_obj.isoweekday()
+
+        cur.execute("""
+            UPDATE training_plan SET week_date = %s, day_of_week = %s WHERE id = %s
+        """, (new_week_date, new_day_of_week, session_id))
+        conn.commit()
+
+        garmin_warning = None
+        if garmin_workout_id:
+            try:
+                from coach.mcp_server import move_garmin_workout
+                cur.execute("""
+                    SELECT garmin_schedule_id FROM garmin_mcp_log
+                    WHERE garmin_workout_id = %s AND status = 'success'
+                    ORDER BY updated_at DESC LIMIT 1
+                """, (int(garmin_workout_id),))
+                log_row = cur.fetchone()
+                old_schedule_id = log_row[0] if log_row else None
+
+                result = move_garmin_workout(int(garmin_workout_id), new_date_str, old_schedule_id)
+
+                new_external_id = f"plan_session_{session_id}_{new_date_str}"
+                cur.execute("""
+                    INSERT INTO garmin_mcp_log
+                        (external_id, action, status, garmin_workout_id, garmin_schedule_id, workout_name, scheduled_date)
+                    VALUES (%s, 'move', 'success', %s, %s, %s, %s)
+                    ON CONFLICT (external_id) DO UPDATE SET
+                        status = 'success',
+                        garmin_schedule_id = EXCLUDED.garmin_schedule_id,
+                        scheduled_date = EXCLUDED.scheduled_date,
+                        updated_at = now()
+                """, (new_external_id, int(garmin_workout_id), result.get("garmin_schedule_id"),
+                      row[4] or row[3], new_date_str))
+                conn.commit()
+            except Exception as exc:
+                garmin_warning = f"Garmin-Verschiebung fehlgeschlagen: {type(exc).__name__}: {exc}"
+
+        conn.close()
+        resp = {"status": "ok"}
+        if garmin_warning:
+            resp["garmin_warning"] = garmin_warning
+        return jsonify(resp)
+
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e), "trace": traceback.format_exc()}), 500
+
+
 @app.route('/api/activity/<int:training_id>', methods=['GET'])
 def get_activity(training_id):
     try:
@@ -1958,6 +2043,87 @@ def frontend_week():
 
 # ─── FRONTEND API: Alle Wochen (für Week-View) ────────────────────────────────
 
+def sport_group(t):
+    t = (t or '').lower()
+    if any(x in t for x in ['run', 'trail', 'lauf', 'easy', 'long', 'tempo', 'interval', 'hill', 'sprint', 'race']):
+        return 'run'
+    if any(x in t for x in ['ride', 'cycl', 'bike', 'gravel', 'rennrad', 'virtual']):
+        return 'cycling'
+    if any(x in t for x in ['strength', 'upper', 'lower', 'full', 'core', 'gym', 'kraft', 'weighttraining', 'weight']):
+        return 'strength'
+    return 'other'
+
+
+def match_sessions_for_week(week_start, week_end, conn):
+    """
+    Matcht ungematchte training_plan-Einträge im Zeitraum [week_start, week_end]
+    auf trainings-Einträge derselben Sportgruppe innerhalb von ±1 Tag Toleranz.
+    Bei mehreren Kandidaten gewinnt der kleinste Datums-Abstand, bei Gleichstand
+    die kleinste Differenz zwischen geplanten und absolvierten km.
+    Schreibt matched_training_id (nie bei match_confirmed=TRUE).
+    Gibt {plan_id: training_id} der in diesem Aufruf neu geschriebenen Matches zurück.
+    """
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT id, (week_date + (day_of_week - 1) * INTERVAL '1 day')::date AS session_date,
+               session_type, distance_km
+        FROM training_plan
+        WHERE (week_date + (day_of_week - 1) * INTERVAL '1 day')::date BETWEEN %s AND %s
+          AND match_confirmed IS NOT TRUE
+    """, (week_start, week_end))
+    plan_rows = cur.fetchall()
+
+    window_start = week_start - timedelta(days=1)
+    window_end = week_end + timedelta(days=1)
+
+    cur.execute("""
+        SELECT id, date, type, distance_km
+        FROM trainings
+        WHERE date BETWEEN %s AND %s
+    """, (window_start, window_end))
+    training_rows = cur.fetchall()
+
+    # Bereits vergebene training_ids (auch außerhalb der neu zu matchenden Zeilen),
+    # damit ein Training nie zwei geplanten Sessions zugeordnet wird
+    cur.execute("""
+        SELECT matched_training_id FROM training_plan
+        WHERE matched_training_id IS NOT NULL
+          AND (week_date + (day_of_week - 1) * INTERVAL '1 day')::date BETWEEN %s AND %s
+    """, (window_start, window_end))
+    used_training_ids = {row[0] for row in cur.fetchall()}
+
+    matches = {}
+    for plan_id, plan_date, session_type, planned_km in plan_rows:
+        group = sport_group(session_type)
+        if group not in ('run', 'cycling', 'strength'):
+            continue
+        candidates = []
+        for t_id, t_date, t_type, t_km in training_rows:
+            if t_id in used_training_ids:
+                continue
+            if sport_group(t_type) != group:
+                continue
+            diff = abs((t_date - plan_date).days)
+            if diff <= 1:
+                km_diff = abs(float(t_km or 0) - float(planned_km or 0))
+                candidates.append((diff, km_diff, t_id))
+        if candidates:
+            candidates.sort(key=lambda c: (c[0], c[1]))
+            best_training_id = candidates[0][2]
+            matches[plan_id] = best_training_id
+            used_training_ids.add(best_training_id)
+
+    for plan_id, training_id in matches.items():
+        cur.execute("""
+            UPDATE training_plan SET matched_training_id = %s
+            WHERE id = %s AND match_confirmed IS NOT TRUE
+        """, (training_id, plan_id))
+    conn.commit()
+
+    return matches
+
+
 @app.route('/api/frontend/week/all')
 def frontend_week_all():
     """
@@ -1986,7 +2152,8 @@ def frontend_week_all():
                    session_type, session_zone, distance_km, duration_min,
                    notes, phase, garmin_workout_id, workout_steps,
                    sync_status, elevation_gain_m, sport,
-                   km_factor, actual_distance_km, linked_garmin_activity_id, name
+                   km_factor, actual_distance_km, linked_garmin_activity_id, name,
+                   matched_training_id
             FROM training_plan
             ORDER BY week_date, day_of_week
         """)
@@ -1996,23 +2163,31 @@ def frontend_week_all():
             conn.close()
             return jsonify([])
 
-        # Datumsbereich für Aktivitäten + Garmin-Logs
+        # Datumsbereich für Aktivitäten + Garmin-Logs + Matching
         all_dates = [r[1] for r in plan_rows]
         date_min, date_max = min(all_dates), max(all_dates)
 
-        # Absolvierte Trainings
+        new_matches = match_sessions_for_week(date_min, date_max, conn)
+
+        # Absolvierte Trainings (±1 Tag Puffer, damit auch Matches am Wochenrand
+        # per matched_training_id aufgelöst werden können)
+        actual_window_start = date_min - timedelta(days=1)
+        actual_window_end = date_max + timedelta(days=1)
         cur.execute("""
-            SELECT date, type, distance_km, duration_minutes, heart_rate_avg, id
+            SELECT date, type, distance_km, duration_minutes, heart_rate_avg, id, source
             FROM trainings
             WHERE date >= %s AND date <= %s
-        """, (date_min, date_max))
+        """, (actual_window_start, actual_window_end))
         actual_by_date = {}
+        trainings_by_id = {}
         for r in cur.fetchall():
             d = str(r[0])
-            actual_by_date.setdefault(d, []).append({
+            entry = {
                 "type": r[1], "distance_km": float(r[2]) if r[2] else 0,
-                "duration_min": r[3], "avg_hr": r[4], "training_id": r[5],
-            })
+                "duration_min": r[3], "avg_hr": r[4], "training_id": r[5], "source": r[6],
+            }
+            actual_by_date.setdefault(d, []).append(entry)
+            trainings_by_id[r[5]] = entry
 
         # Garmin-Push-Status
         cur.execute("""
@@ -2038,6 +2213,7 @@ def frontend_week_all():
                        'JUL', 'AUG', 'SEP', 'OKT', 'NOV', 'DEZ']
 
         # Sessions aufbauen und nach Montag (week_date) gruppieren
+        matched_ids_used = set(new_matches.values())
         weeks_dict = {}  # monday_str -> {meta, sessions[]}
         for r in plan_rows:
             session_date = r[1]
@@ -2049,9 +2225,32 @@ def frontend_week_all():
             garmin_info   = garmin_by_date.get(d_str, {})
             actual        = actual_by_date.get(d_str, [{}])[0]
             sync_status   = r[11] or ''
+            plan_id       = r[0]
+
+            # Ein Training, das hier schon naiv (gleiches Datum) als "actual" an
+            # diese Session gehängt wird, darf später nicht nochmal als eigene,
+            # ungematchte Karte auftauchen (keine Doppelkacheln).
+            if actual.get("training_id"):
+                matched_ids_used.add(actual["training_id"])
+
+            # Matched-Training auflösen: bereits in der DB gesetzter Match hat
+            # Vorrang vor einem gerade erst in diesem Request geschriebenen Match
+            matched_id = r[18] if r[18] is not None else new_matches.get(plan_id)
+            matched_activity = None
+            if matched_id is not None:
+                matched_ids_used.add(matched_id)
+                ma = trainings_by_id.get(matched_id)
+                if ma:
+                    matched_activity = {
+                        "id": matched_id,
+                        "distance_km": ma["distance_km"],
+                        "duration_min": ma["duration_min"],
+                        "avg_hr": ma["avg_hr"],
+                        "source": ma["source"],
+                    }
 
             # Status ableiten
-            if actual.get("training_id"):
+            if matched_activity or actual.get("training_id"):
                 status = "completed"
             elif garmin_info.get("status") == "failed":
                 status = "error"
@@ -2075,7 +2274,8 @@ def frontend_week_all():
                     steps = []
 
             session_obj = {
-                "id": r[0],
+                "id": plan_id,
+                "plan_id": plan_id,
                 "date": d_str,
                 "day_number": session_date.day,
                 "day_short": DAY_SHORT[session_date.weekday()],
@@ -2103,6 +2303,8 @@ def frontend_week_all():
                 "actual_duration_min": actual.get("duration_min"),
                 "actual_avg_hr": actual.get("avg_hr"),
                 "training_id": actual.get("training_id"),
+                "matched_training_id": matched_id,
+                "matched_activity": matched_activity,
             }
 
             if monday_str not in weeks_dict:
@@ -2136,6 +2338,7 @@ def frontend_week_all():
                 if d_str not in existing_dates:
                     week_data['sessions'].append({
                         "id": None,
+                        "plan_id": None,
                         "date": d_str,
                         "day_number": d.day,
                         "day_short": DAY_SHORT[d.weekday()],
@@ -2156,7 +2359,47 @@ def frontend_week_all():
                         "actual_duration_min": None,
                         "actual_avg_hr": None,
                         "training_id": None,
+                        "matched_training_id": None,
+                        "matched_activity": None,
                     })
+
+            # Nicht gematchte trainings-Einträge dieser Woche als eigene Karten
+            # anhängen (plan_id: null → im Frontend nicht draggable, eigene Farbe)
+            sunday_dt = monday_dt + timedelta(days=6)
+            d = monday_dt
+            while d <= sunday_dt:
+                for actual in actual_by_date.get(str(d), []):
+                    if actual["training_id"] in matched_ids_used:
+                        continue
+                    week_data['sessions'].append({
+                        "id": None,
+                        "plan_id": None,
+                        "date": str(d),
+                        "day_number": d.day,
+                        "day_short": DAY_SHORT[d.weekday()],
+                        "month_short": MONTH_SHORT[d.month],
+                        "is_today": d == today,
+                        "is_past": d < today,
+                        "session_type": actual["type"],
+                        "session_zone": "",
+                        "planned_km": None,
+                        "planned_duration_min": None,
+                        "notes": "",
+                        "phase": "",
+                        "status": "completed",
+                        "sync_status": "",
+                        "garmin_workout_id": None,
+                        "steps": [],
+                        "actual_km": actual["distance_km"],
+                        "actual_duration_min": actual["duration_min"],
+                        "actual_avg_hr": actual["avg_hr"],
+                        "training_id": actual["training_id"],
+                        "matched_training_id": None,
+                        "matched_activity": None,
+                    })
+                    matched_ids_used.add(actual["training_id"])
+                d += timedelta(days=1)
+
             # Neu sortieren nach Datum
             week_data['sessions'].sort(key=lambda s: s['date'])
 
