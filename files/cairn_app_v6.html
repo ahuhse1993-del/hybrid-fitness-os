@@ -1529,13 +1529,14 @@ function renderPlan(data) {
     week_number: w.week_number,
     km: w.total_km || 0,
     is_deload: w.is_deload,
+    phase: w.phase || '',
   }));
   const milestones = data.milestones || [];
   // Build a synthetic plan object for buildProgressCard
   const plan = {
     race_date: race.date || '',
     days_until_race: race.countdown_days || null,
-    phase_focus: block.phase || '',
+    phase_focus: block.week_focus || '',
   };
 
   document.getElementById('plan-week-pill').textContent = `WOCHE ${currentWeek} / ${totalWeeks}`;
@@ -1581,12 +1582,19 @@ function renderPlan(data) {
 }
 
 function buildProgressCard(plan, currentWeek, totalWeeks, phase, weeklyLoad) {
-  const phases = ['BASE', 'BUILD', 'PEAK', 'TAPER', 'RACE'];
-  const phaseTabs = phases.map(p =>
-    `<span${p === phase ? ' class="active"' : ''}>${p}</span>`
-  ).join('');
+  // Phasen kommen aus den echten Wochendaten statt einer festen
+  // Base/Build/Peak/Taper/Race-Liste — die passt nur auf periodisierte
+  // Rennpläne, nicht z.B. auf einen Return-to-Run-Block (Phase "Z2").
+  // Bei nur einer Phase im ganzen Block gibt es nichts zu wählen, also
+  // keine Tabs anzeigen.
+  const distinctPhases = [...new Set(weeklyLoad.map(w => (w.phase || '').toUpperCase()).filter(Boolean))];
+  const phaseTabsHtml = distinctPhases.length > 1
+    ? `<div class="phase-tabs text-small" aria-label="Trainingsphasen">${distinctPhases.map(p =>
+        `<span${p === phase ? ' class="active"' : ''}>${p}</span>`
+      ).join('')}</div>`
+    : '';
 
-  // Load chart - build 16 bars from weeklyLoad or pad to 16
+  // Load chart - build totalWeeks bars
   const bars = [];
   const maxKm = Math.max(...weeklyLoad.map(w => w.km || 0), 1);
   for (let i = 1; i <= totalWeeks; i++) {
@@ -1610,6 +1618,23 @@ function buildProgressCard(plan, currentWeek, totalWeeks, phase, weeklyLoad) {
     dots.push(`<span class="${cls}"><span class="sr-only">Woche ${i}${isDone?' abgeschlossen':isCurrent?' aktuell':''}</span></span>`);
   }
 
+  // Deload-Wochen aus den echten Wochendaten statt Platzhaltertext — der
+  // vorher stand da immer "DELOAD · W4 / W8 / W12", egal wie lang der
+  // Block tatsächlich war.
+  const deloadWeeks = weeklyLoad.filter(w => w.is_deload).map(w => w.week_number || w.week);
+  const deloadLabel = deloadWeeks.length ? `DELOAD · W${deloadWeeks.join(' / W')}` : '';
+
+  // Track-Labels: Start/Ende + aktuelle Woche dazwischen (nur falls
+  // unterschiedlich) — vorher per Math.round(totalWeeks/4) geraten, was bei
+  // kurzen Blöcken (z.B. 4 Wochen) dieselbe Woche doppelt zeigte.
+  const labelWeeks = totalWeeks === 1 ? [1] : [1, totalWeeks];
+  if (currentWeek !== 1 && currentWeek !== totalWeeks && !labelWeeks.includes(currentWeek)) {
+    labelWeeks.splice(1, 0, currentWeek);
+  }
+  const trackLabelsHtml = labelWeeks.map(w =>
+    `<span${w === currentWeek ? ' class="current-label"' : ''}>${w}${w === currentWeek ? ' · DU BIST HIER' : ''}</span>`
+  ).join('');
+
   const done = currentWeek - 1;
   const remaining = totalWeeks - currentWeek;
 
@@ -1618,13 +1643,13 @@ function buildProgressCard(plan, currentWeek, totalWeeks, phase, weeklyLoad) {
       <div><p class="eyebrow text-small">AKTUELLE PHASE</p><h2 id="phase-title">${phase}</h2></div>
       <div class="focus"><span class="text-small">FOKUS</span><strong>${plan.phase_focus || '—'}</strong></div>
     </div>
-    <div class="phase-tabs text-small" aria-label="Trainingsphasen">${phaseTabs}</div>
+    ${phaseTabsHtml}
     <div class="load-block">
-      <div class="load-head"><div><p class="eyebrow text-small">BELASTUNGSVERTEILUNG</p><h3>Wochenkilometer</h3></div><p class="text-small">DELOAD · W4 / W8 / W12</p></div>
-      <div class="load-chart" role="img" aria-label="Geplante Wochenkilometer">${bars.join('')}</div>
+      <div class="load-head"><div><p class="eyebrow text-small">BELASTUNGSVERTEILUNG</p><h3>Wochenkilometer</h3></div>${deloadLabel ? `<p class="text-small">${deloadLabel}</p>` : ''}</div>
+      <div class="load-chart" role="img" aria-label="Geplante Wochenkilometer" style="grid-template-columns: repeat(${totalWeeks}, minmax(0,1fr))">${bars.join('')}</div>
     </div>
     <div class="week-track" role="img" aria-label="Woche ${currentWeek} von ${totalWeeks}">${dots.join('')}</div>
-    <div class="track-labels text-small"><span>1</span><span>${Math.round(totalWeeks/4)}</span><span class="current-label">${currentWeek} · DU BIST HIER</span><span>${Math.round(totalWeeks*0.75)}</span><span>${totalWeeks}</span></div>
+    <div class="track-labels text-small">${trackLabelsHtml}</div>
     <div class="progress-foot text-small"><span>${done} WOCHE${done !== 1 ? 'N' : ''} ERLEDIGT</span><span>${remaining} WOCHE${remaining !== 1 ? 'N' : ''} + RACE</span></div>
   `;
 }
