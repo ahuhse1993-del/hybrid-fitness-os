@@ -149,22 +149,23 @@ small, .text-small { font-size: .8rem; line-height: 1.5; }
 #cairn-week-soft .confirm-save:disabled { opacity: .6; cursor: default; }
 
 #cairn-week-soft .week-days { display: grid; gap: 2px; padding-bottom: calc(env(safe-area-inset-bottom) + 60px); }
-#cairn-week-soft .day-row { display: flex; align-items: stretch; gap: .5rem; padding: 2px 0; }
+#cairn-week-soft .day-row { display: flex; align-items: stretch; gap: .5rem; padding: 6px 0; }
+#cairn-week-soft .day-row:not(:first-child) { border-top: 1px solid color-mix(in srgb, var(--line) 55%, transparent); }
 #cairn-week-soft .day-col { flex: 0 0 28px; display: flex; flex-direction: column; align-items: center; justify-content: center; }
 #cairn-week-soft .day-dow { font-size: .62rem; letter-spacing: .02em; color: var(--muted-foreground); line-height: 1.15; }
 #cairn-week-soft .day-num { font-size: 1rem; font-weight: 500; letter-spacing: -.02em; line-height: 1.15; }
 #cairn-week-soft .day-num.is-today { color: var(--coral); }
 #cairn-week-soft .day-num.is-dimmed { opacity: .4; }
-#cairn-week-soft .day-sessions { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 3px; border-radius: .5rem; transition: background .15s, border-color .15s; }
+#cairn-week-soft .day-sessions { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 4px; border-radius: .5rem; transition: background .15s, border-color .15s; }
 
-#cairn-week-soft .sess-tile { position: relative; display: flex; align-items: stretch; gap: 0; min-height: 38px; border-radius: .5rem; background: light-dark(#ffffff, #1e2522); box-shadow: 0 1px 3px rgb(0 0 0 / .08); cursor: pointer; overflow: hidden; transition: box-shadow .15s, opacity .15s; }
+#cairn-week-soft .sess-tile { position: relative; display: flex; align-items: stretch; gap: 0; min-height: 60px; flex: 0 0 auto; border-radius: .5rem; background: light-dark(#ffffff, #1e2522); box-shadow: 0 1px 3px rgb(0 0 0 / .08); cursor: pointer; overflow: hidden; transition: box-shadow .15s, opacity .15s; }
 #cairn-week-soft .sess-tile.is-standalone { opacity: .75; }
 #cairn-week-soft .sess-tile.pending { background: color-mix(in srgb, var(--coral) 6%, light-dark(#ffffff, #1e2522)); }
 #cairn-week-soft .sess-bar { flex: 0 0 4px; align-self: stretch; background: var(--bar-color, var(--bar-stone)); }
-#cairn-week-soft .sess-body { flex: 1 1 auto; min-width: 0; padding: 5px 10px; align-self: center; }
-#cairn-week-soft .sess-name { font-weight: 700; font-size: .8rem; letter-spacing: -.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#cairn-week-soft .sess-body { flex: 1 1 auto; min-width: 0; padding: 8px 8px 8px 12px; align-self: center; }
+#cairn-week-soft .sess-name { font-weight: 700; font-size: 13px; letter-spacing: -.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #cairn-week-soft .sess-check { color: var(--forest); font-weight: 700; }
-#cairn-week-soft .sess-meta { font-size: .68rem; color: var(--muted-foreground); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#cairn-week-soft .sess-meta { font-size: 11px; color: var(--muted-foreground); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #cairn-week-soft .sess-overflow { flex: 0 0 auto; align-self: stretch; padding: 0 .5rem; border: none; background: transparent; color: var(--muted-foreground); font-size: .9rem; letter-spacing: .1em; cursor: pointer; }
 
 /* Draggable Tiles: kein Text markieren / kein iOS-Callout während Long-Press */
@@ -174,7 +175,7 @@ small, .text-small { font-size: .8rem; line-height: 1.5; }
 #cairn-week-soft .day-row.drop-target .day-sessions {
   background: color-mix(in srgb, var(--bar-sage) 12%, transparent);
   border: 2px dashed var(--bar-sage);
-  min-height: 38px;
+  min-height: 60px;
   justify-content: center;
 }
 #cairn-week-soft .day-row.drop-target .day-sessions::after {
