@@ -90,6 +90,8 @@ small, .text-small { font-size: .8rem; line-height: 1.5; }
 .form-label { display: block; font-size: .8rem; letter-spacing: .04em; text-transform: uppercase; margin-bottom: .35rem; opacity: .7; }
 .loading-msg { padding: 2rem 1rem; text-align: center; opacity: .5; }
 .skeleton { background: color-mix(in srgb, currentColor 10%, transparent); border-radius: .5rem; }
+.btn-primary { background: var(--paper); color: var(--ink); border-color: transparent; }
+.btn-ghost-sm { font-size: .76rem; min-height: 1.7rem; padding: 0 .55rem; border: 1px solid color-mix(in srgb, currentColor 28%, transparent); background: transparent; color: inherit; }
 
 /* ── WEEK VIEW ── */
 #cairn-week-soft {
@@ -509,6 +511,16 @@ small, .text-small { font-size: .8rem; line-height: 1.5; }
 #cairn-profile-soft .hrz-zone { font-weight: 500; letter-spacing: -.02em; }
 #cairn-profile-soft .hrz-range { font-variant-numeric: tabular-nums; }
 #cairn-profile-soft .hrz-label { text-align: right; opacity: .75; }
+#cairn-profile-soft .shoes-card { --card: var(--soft); color: var(--ink); }
+#cairn-profile-soft .shoes-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: .5rem; }
+#cairn-profile-soft .shoes-head .section-title { margin-bottom: 0; }
+#cairn-profile-soft .shoe-row { display: flex; align-items: center; justify-content: space-between; gap: .7rem; padding: .6rem 0; border-top: 1px solid color-mix(in srgb, currentColor 22%, transparent); }
+#cairn-profile-soft .shoe-row:first-child { border-top: none; }
+#cairn-profile-soft .shoe-info { display: flex; flex-direction: column; gap: .1rem; min-width: 0; }
+#cairn-profile-soft .shoe-info strong { font-weight: 500; letter-spacing: -.01em; }
+#cairn-profile-soft .shoe-form { margin-top: .7rem; padding-top: .7rem; border-top: 1px solid color-mix(in srgb, currentColor 22%, transparent); }
+#cairn-profile-soft .shoe-form-row { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem; margin-bottom: .6rem; }
+#cairn-profile-soft .shoe-form-actions { display: flex; justify-content: flex-end; gap: .5rem; margin-top: .3rem; }
 #cairn-profile-soft .nav { display: flex; align-items: center; justify-content: space-between; gap: .25rem; flex-shrink: 0; margin-top: .5rem; padding: .45rem; border: 1px solid var(--line); border-radius: 999px; background: var(--paper); }
 #cairn-profile-soft .nav button { flex: 1; }
 #cairn-profile-soft .nav .active { background: var(--forest); color: var(--forest-ink); border-radius: 999px; }
@@ -1891,7 +1903,119 @@ function renderProfile(data) {
   `);
   container.appendChild(powerCard);
 
+  const shoesCard = e('section', 'card shoes-card', `
+    <div class="shoes-head">
+      <p class="section-title text-small">MEINE SCHUHE</p>
+      <button class="btn btn-ghost-sm" type="button" onclick="toggleShoeForm()">+ Schuh</button>
+    </div>
+    <div id="shoes-list"><p class="text-small" style="opacity:.7">Lade…</p></div>
+    <form id="shoe-add-form" class="shoe-form" style="display:none" onsubmit="submitNewShoe(event)">
+      <div class="shoe-form-row">
+        <input type="text" id="shoe-brand-input" placeholder="Marke" class="form-select">
+        <input type="text" id="shoe-model-input" placeholder="Modell" class="form-select">
+      </div>
+      <div class="shoe-form-row">
+        <select id="shoe-type-select" class="form-select">
+          <option value="">Typ wählen…</option>
+          <option value="running_shoe">Laufschuh</option>
+          <option value="trail_shoe">Trailschuh</option>
+          <option value="hiking_shoe">Wanderschuh</option>
+        </select>
+        <input type="number" id="shoe-km-input" placeholder="Start-km" class="form-select" min="0" step="0.1">
+      </div>
+      <p class="text-small" id="shoe-form-msg" style="color:var(--coral);min-height:1.2em"></p>
+      <div class="shoe-form-actions">
+        <button type="button" class="btn btn-ghost-sm" onclick="toggleShoeForm(false)">Abbrechen</button>
+        <button type="submit" class="btn btn-primary">Anlegen</button>
+      </div>
+    </form>
+  `);
+  container.appendChild(shoesCard);
+  loadShoesCard();
+
   if (window.lucide) lucide.createIcons();
+}
+
+/* ── Meine Schuhe (Gear) ──────────────────────────────────────── */
+const GEAR_TYPE_LABELS = {
+  running_shoe: 'Laufschuh',
+  trail_shoe: 'Trailschuh',
+  hiking_shoe: 'Wanderschuh',
+};
+
+async function loadShoesCard() {
+  const list = document.getElementById('shoes-list');
+  try {
+    const res = await apiGet('/api/athlete/gear?active_only=true');
+    const shoes = (res.gear || []).filter(g => GEAR_TYPE_LABELS[g.gear_type]);
+    renderShoesList(shoes);
+  } catch (err) {
+    if (list) list.innerHTML = '<p class="text-small" style="opacity:.7">Schuhe konnten nicht geladen werden.</p>';
+  }
+}
+
+function renderShoesList(shoes) {
+  const list = document.getElementById('shoes-list');
+  if (!list) return;
+  if (!shoes.length) {
+    list.innerHTML = '<p class="text-small" style="opacity:.7">Noch keine Schuhe hinterlegt.</p>';
+    return;
+  }
+  list.innerHTML = shoes.map(g => `
+    <div class="shoe-row">
+      <div class="shoe-info">
+        <strong>${g.nickname || g.model || g.brand || 'Schuh'}</strong>
+        <span class="text-small">${GEAR_TYPE_LABELS[g.gear_type] || g.gear_type} · ${g.total_distance_km} km</span>
+      </div>
+      <button class="btn btn-ghost-sm" type="button" onclick="retireShoe(${g.id})">Stilllegen</button>
+    </div>
+  `).join('');
+}
+
+function toggleShoeForm(show) {
+  const form = document.getElementById('shoe-add-form');
+  if (!form) return;
+  const next = show === undefined ? form.style.display === 'none' : show;
+  form.style.display = next ? '' : 'none';
+  if (!next) {
+    form.reset();
+    const msg = document.getElementById('shoe-form-msg');
+    if (msg) msg.textContent = '';
+  }
+}
+
+async function submitNewShoe(ev) {
+  ev.preventDefault();
+  const brand = document.getElementById('shoe-brand-input').value.trim();
+  const model = document.getElementById('shoe-model-input').value.trim();
+  const gearType = document.getElementById('shoe-type-select').value;
+  const initKm = parseFloat(document.getElementById('shoe-km-input').value) || 0;
+  const msgEl = document.getElementById('shoe-form-msg');
+
+  if (!gearType) { if (msgEl) msgEl.textContent = 'Bitte einen Typ wählen.'; return; }
+  if (!brand && !model) { if (msgEl) msgEl.textContent = 'Bitte Marke oder Modell angeben.'; return; }
+
+  try {
+    const res = await fetch('/api/athlete/gear', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ gear_type: gearType, brand: brand || null, model: model || null, initial_distance_km: initKm }),
+    }).then(r => r.json());
+    if (res.status !== 'ok') { if (msgEl) msgEl.textContent = `Fehler: ${res.message}`; return; }
+    toggleShoeForm(false);
+    loadShoesCard();
+  } catch (err) {
+    if (msgEl) msgEl.textContent = 'Anlegen fehlgeschlagen.';
+  }
+}
+
+async function retireShoe(gearId) {
+  if (!confirm('Diesen Schuh stilllegen?')) return;
+  try {
+    const res = await fetch(`/api/athlete/gear/${gearId}/retire`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}',
+    }).then(r => r.json());
+    if (res.status === 'ok') loadShoesCard();
+  } catch (err) {}
 }
 
 /* ============================================================

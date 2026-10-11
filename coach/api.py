@@ -1682,6 +1682,55 @@ def list_gear_for_frontend():
         return jsonify({"status": "error", "message": str(e), "trace": traceback.format_exc()}), 500
 
 
+@app.route('/api/athlete/gear', methods=['POST'])
+def create_gear_for_frontend():
+    """
+    Legt einen neuen Gear-Gegenstand an (z.B. einen Schuh) — ruft dieselbe
+    Funktion wie das MCP-Tool create_athlete_gear auf, fuer die "Meine
+    Schuhe"-Verwaltung im Profil-Tab.
+    """
+    try:
+        from coach.mcp_server import create_athlete_gear
+        data = request.get_json(force=True) or {}
+        gear_type = data.get('gear_type')
+        if not gear_type:
+            return jsonify({"status": "error", "message": "gear_type erforderlich"}), 400
+        result = create_athlete_gear(
+            gear_type=gear_type,
+            brand=data.get('brand'),
+            model=data.get('model'),
+            nickname=data.get('nickname'),
+            size=data.get('size'),
+            color=data.get('color'),
+            primary_surface=data.get('primary_surface'),
+            purchase_date=data.get('purchase_date'),
+            first_use_date=data.get('first_use_date'),
+            initial_distance_km=data.get('initial_distance_km') or 0,
+            target_distance_km=data.get('target_distance_km'),
+            notes=data.get('notes'),
+        )
+        if "error" in result:
+            return jsonify({"status": "error", "message": result["error"]}), 400
+        return jsonify({"status": "ok", **result})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e), "trace": traceback.format_exc()}), 500
+
+
+@app.route('/api/athlete/gear/<int:gear_id>/retire', methods=['POST'])
+def retire_gear_for_frontend(gear_id):
+    """Legt einen Gear-Gegenstand still (active=false, Historie bleibt erhalten) —
+    ruft dieselbe Funktion wie das MCP-Tool retire_athlete_gear auf."""
+    try:
+        from coach.mcp_server import retire_athlete_gear
+        data = request.get_json(force=True) or {}
+        result = retire_athlete_gear(gear_id=gear_id, retired_date=data.get('retired_date'))
+        if "error" in result:
+            return jsonify({"status": "error", "message": result["error"]}), 400
+        return jsonify({"status": "ok", **result})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e), "trace": traceback.format_exc()}), 500
+
+
 @app.route('/api/activities/<int:activity_id>/gear', methods=['POST'])
 def assign_gear_for_frontend(activity_id):
     """
