@@ -2359,13 +2359,13 @@ function renderAnalysisMap(route) {
     ? latlngs.filter((_, i) => i % routeStride === 0 || i === latlngs.length - 1)
     : latlngs;
   _analysisMapInstance = L.map(mapEl, { zoomControl: true, attributionControl: true }).setView(latlngs[Math.floor(latlngs.length / 2)], 13);
-  // CartoDB Positron statt Standard-OSM: rendert Gebäude als gefüllte graue
-  // Flächen (nicht nur Umrisse) — für den Strava-artigen Look nötig, das lässt
-  // sich über CSS-Filter auf OSM-Tiles nicht nachbilden, da die Füllung in
-  // den Kachel-Pixeln selbst fehlt.
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-    attribution: '© OpenStreetMap © CARTO',
-    subdomains: 'abcd',
+  // Esri Light Gray Canvas: heller, ruhiger Hintergrund wie vorher CARTO
+  // Positron — CARTO liefert seit 2026-10 ohne API-Key nur noch eine
+  // "API KEY REQUIRED"-Platzhalterkachel. Esri braucht keinen Key; Kacheln
+  // gibt es bis z16, darüber skaliert Leaflet (maxNativeZoom).
+  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
+    attribution: '© Esri · © OpenStreetMap',
+    maxNativeZoom: 16,
     maxZoom: 20,
   }).addTo(_analysisMapInstance);
   // Farbe über CSS-Klasse (nicht color/fillColor): Leaflet setzt diese Optionen
