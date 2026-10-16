@@ -10,3 +10,6 @@ __pycache__/
 
 # Umgebungsvariablen (Passwörter etc.)
 .env
+# Alte v6-Entwürfe (Aug 2026), nicht mehr verwendet
+files/cairn_app_v6_1.html
+files/cairn_app_v6_2.html

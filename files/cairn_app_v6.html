@@ -320,6 +320,27 @@ small, .text-small { font-size: .8rem; line-height: 1.5; }
 #cairn-plan-soft .load-value { position: absolute; left: 50%; top: -.1rem; transform: translate(-50%,-100%); white-space: nowrap; }
 #cairn-plan-soft .load-label { text-align: center; color: var(--muted-foreground); }
 #cairn-plan-soft .load-week.current .load-label { color: var(--ink); font-weight: 500; }
+/* Ab zweistelligen Wochenzahlen (>=10 Wochen) würden horizontale Labels
+   sich bei vielen Balken gegenseitig überlappen — hochkant gedreht passt
+   jede Zahl unabhängig von der Balkenanzahl, alle Wochen bleiben auf
+   einen Blick sichtbar statt ausgedünnt zu werden. */
+#cairn-plan-soft .load-chart.dense .load-label {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  white-space: nowrap;
+  justify-self: center;
+  font-size: .68rem;
+}
+/* Feste Label-Zeilenhöhe, sonst stehen Balken mit zweistelliger (gedreht
+   höherer) Wochenzahl ein paar Pixel höher als die mit einstelliger. */
+#cairn-plan-soft .load-chart.dense .load-week { grid-template-rows: 1fr 1.6rem; }
+/* Ab 20 Wochen reicht auch eine gedrehte Spalte nicht mehr aus — feste
+   Mindestbreite pro Balken, dafür horizontal scrollbar statt gestaucht. */
+/* overflow-x: auto clippt auch vertikal — padding-top hält die km-Zahl über
+   dem höchsten Balken sichtbar, padding-bottom den Scrollbalken von den
+   Wochenzahlen fern. */
+#cairn-plan-soft .load-chart.scrollable { overflow-x: auto; justify-content: start; scroll-behavior: smooth; padding: 1.3rem 0 10px; box-sizing: content-box; }
+#cairn-plan-soft .load-chart.scrollable .load-week { min-width: 22px; }
 #cairn-plan-soft .week-track { position: relative; display: flex; align-items: center; justify-content: space-between; margin: 1.25rem .2rem .45rem; }
 #cairn-plan-soft .week-track::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 1px; background: var(--line); }
 #cairn-plan-soft .week-node { position: relative; z-index: 1; display: grid; place-items: center; width: 14px; height: 14px; border-radius: 50%; border: 1px solid var(--line); background: var(--paper); }
@@ -1583,6 +1604,15 @@ function renderPlan(data) {
   progressCard.innerHTML = buildProgressCard(plan, currentWeek, totalWeeks, phase, weeklyLoad);
   container.appendChild(progressCard);
 
+  // Bei scrollbarem Chart (>=20 Wochen) zur aktuellen Woche scrollen statt
+  // bei Woche 1 stehen zu bleiben.
+  const loadChartEl = document.getElementById('load-chart');
+  const currentBarEl = loadChartEl?.querySelector('.load-week.current');
+  if (loadChartEl && currentBarEl && loadChartEl.classList.contains('scrollable')) {
+    const target = currentBarEl.offsetLeft - (loadChartEl.clientWidth / 2) + (currentBarEl.clientWidth / 2);
+    loadChartEl.scrollLeft = Math.max(0, target);
+  }
+
   // Milestones card
   if (milestones && milestones.length) {
     const msCard = e('section', 'card milestones-card', '');
@@ -1652,6 +1682,15 @@ function buildProgressCard(plan, currentWeek, totalWeeks, phase, weeklyLoad) {
   const done = currentWeek - 1;
   const remaining = totalWeeks - currentWeek;
 
+  // Ab 20 Wochen würden selbst hochkant gedrehte Labels wieder zu eng werden
+  // (Spaltenbreite < Label-Breite) — ab da feste Mindestbreite pro Balken
+  // und horizontal scrollen, statt die Balken immer weiter zu stauchen.
+  const scrollable = totalWeeks >= 20;
+  const chartStyle = scrollable
+    ? `grid-template-columns: repeat(${totalWeeks}, 22px)`
+    : `grid-template-columns: repeat(${totalWeeks}, minmax(0,1fr))`;
+  const chartClasses = ['load-chart', totalWeeks >= 10 ? 'dense' : '', scrollable ? 'scrollable' : ''].filter(Boolean).join(' ');
+
   return `
     <div class="section-head">
       <div><p class="eyebrow text-small">AKTUELLE PHASE</p><h2 id="phase-title">${phase}</h2></div>
@@ -1660,7 +1699,7 @@ function buildProgressCard(plan, currentWeek, totalWeeks, phase, weeklyLoad) {
     ${phaseTabsHtml}
     <div class="load-block">
       <div class="load-head"><div><p class="eyebrow text-small">BELASTUNGSVERTEILUNG</p><h3>Wochenkilometer</h3></div>${deloadLabel ? `<p class="text-small">${deloadLabel}</p>` : ''}</div>
-      <div class="load-chart" role="img" aria-label="Geplante Wochenkilometer" style="grid-template-columns: repeat(${totalWeeks}, minmax(0,1fr))">${bars.join('')}</div>
+      <div class="${chartClasses}" id="load-chart" role="img" aria-label="Geplante Wochenkilometer" style="${chartStyle}">${bars.join('')}</div>
     </div>
     <div class="week-track" role="img" aria-label="Woche ${currentWeek} von ${totalWeeks}">${dots.join('')}</div>
     <div class="track-labels text-small">${trackLabelsHtml}</div>
@@ -2350,11 +2389,19 @@ function renderAnalysisMap(route) {
 function loadShoeOptions(activityId, assignedGear) {
   const sel = document.getElementById('shoe-select');
   const btn = document.getElementById('shoe-assign-btn');
+  const label = document.getElementById('shoe-km-label');
   if (!sel) return;
   apiGet('/api/athlete/gear?active_only=true').then(res => {
     const shoes = (res.gear || []).filter(g => ['running_shoe', 'trail_shoe', 'hiking_shoe'].includes(g.gear_type));
     sel.innerHTML = '<option value="">Schuh wählen...</option>' +
       shoes.map(g => `<option value="${g.id}">${gearDisplayName(g)} · ${g.total_distance_km} km</option>`).join('');
+    // Bereits zugeordneten Schuh vorauswählen — sonst sieht es aus, als wäre
+    // die Zuordnung nicht gespeichert worden.
+    const assigned = shoes.find(s => assignedGear.some(a => a.id === s.id));
+    if (assigned) {
+      sel.value = assigned.id;
+      if (label) label.textContent = `Zugeordnet: ${gearDisplayName(assigned)} — ${assigned.total_distance_km.toFixed(1)} km gesamt.`;
+    }
   }).catch(() => {});
   if (btn) btn.onclick = () => assignShoe(activityId, sel.value);
 }
@@ -2383,19 +2430,11 @@ function buildElevationChart(points, elevUp, elevDown, distanceKm) {
   const minE = Math.min(...points.map(p => p[1] || p.y || 0));
   const range = maxE - minE || 1;
   const n = points.length;
-  const label = document.getElementById('shoe-km-label');
   const pts = points.map((p, i) => {
     const x = padX + (i / (n - 1)) * (W - padX - 16);
     const y = bottom - ((( (p[1] || p.y || 0) - minE) / range) * (bottom - padY));
     return [x, y];
   });
-    // Bereits zugeordneten Schuh vorauswählen — sonst sieht es aus, als wäre
-    // die Zuordnung nicht gespeichert worden.
-    const assigned = shoes.find(s => assignedGear.some(a => a.id === s.id));
-    if (assigned) {
-      sel.value = assigned.id;
-      if (label) label.textContent = `Zugeordnet: ${gearDisplayName(assigned)} — ${assigned.total_distance_km.toFixed(1)} km gesamt.`;
-    }
   const polyline = pts.map(p => p.join(' ')).join('L');
   const fill = `M${pts[0][0]} ${pts[0][1]}L${polyline}L${pts[pts.length-1][0]} ${bottom}L${pts[0][0]} ${bottom}Z`;
   const line = `M${polyline}`;
