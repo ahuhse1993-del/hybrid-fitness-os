@@ -717,12 +717,23 @@ def assign_activity_gear(
             existing_usage = cur.fetchone()
 
             if existing_usage and float(existing_usage[1]) == round(resolved_distance, 2):
-                gear_full = _fetchone_gear(gear_id)
+                # Gleiche gear-Form wie im Normalfall (previous/new_total_distance_km) —
+                # das Frontend liest new_total_distance_km und brach bei erneutem
+                # Zuordnen desselben Schuhs mit "Zuordnung fehlgeschlagen" ab.
+                total = _current_total(gear_id)
+                target = float(gear["target_distance_km"]) if gear["target_distance_km"] is not None else None
                 return {
                     "assigned": True, "idempotent": True, "distance_added_km": 0,
                     "activity_id": tid, "activity_distance_km": round(activity_distance, 2),
                     "pre_cutoff": pre_cutoff,
-                    "gear": gear_full, "replaced_gear": None,
+                    "gear": {
+                        "id": gear_id, "nickname": gear["nickname"],
+                        "previous_total_distance_km": round(total, 2),
+                        "new_total_distance_km": round(total, 2),
+                        "target_distance_km": target,
+                        "remaining_distance_km": round(target - total, 2) if target is not None else None,
+                    },
+                    "replaced_gear": None,
                     "warnings": ["Aktivität vor heute — keine km addiert (vermutlich schon in initial_distance_km enthalten)."] if pre_cutoff else [],
                 }
 

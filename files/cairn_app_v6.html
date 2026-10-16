@@ -2255,7 +2255,7 @@ function renderAnalysis(data) {
   if (window.lucide) lucide.createIcons();
 
   renderAnalysisMap(analysisData.route);
-  loadShoeOptions(activityId);
+  loadShoeOptions(activityId, summary.gear || []);
 }
 
 /* — Analysis data helpers — */
@@ -2347,7 +2347,7 @@ function renderAnalysisMap(route) {
   }, 150);
 }
 
-function loadShoeOptions(activityId) {
+function loadShoeOptions(activityId, assignedGear) {
   const sel = document.getElementById('shoe-select');
   const btn = document.getElementById('shoe-assign-btn');
   if (!sel) return;
@@ -2372,7 +2372,7 @@ function assignShoe(activityId, gearId) {
     label.textContent = res.pre_cutoff
       ? `Zugeordnet (keine km addiert, Aktivität vor heute) — ${totalLabel}`
       : `Zugeordnet — ${totalLabel}`;
-  }).catch(() => { if (label) label.textContent = 'Zuordnung fehlgeschlagen.'; });
+  }).catch(err => { if (label) label.textContent = `Zuordnung fehlgeschlagen (${err.message}).`; });
 }
 
 /* — Chart helpers — */
@@ -2383,11 +2383,19 @@ function buildElevationChart(points, elevUp, elevDown, distanceKm) {
   const minE = Math.min(...points.map(p => p[1] || p.y || 0));
   const range = maxE - minE || 1;
   const n = points.length;
+  const label = document.getElementById('shoe-km-label');
   const pts = points.map((p, i) => {
     const x = padX + (i / (n - 1)) * (W - padX - 16);
     const y = bottom - ((( (p[1] || p.y || 0) - minE) / range) * (bottom - padY));
     return [x, y];
   });
+    // Bereits zugeordneten Schuh vorauswählen — sonst sieht es aus, als wäre
+    // die Zuordnung nicht gespeichert worden.
+    const assigned = shoes.find(s => assignedGear.some(a => a.id === s.id));
+    if (assigned) {
+      sel.value = assigned.id;
+      if (label) label.textContent = `Zugeordnet: ${gearDisplayName(assigned)} — ${assigned.total_distance_km.toFixed(1)} km gesamt.`;
+    }
   const polyline = pts.map(p => p.join(' ')).join('L');
   const fill = `M${pts[0][0]} ${pts[0][1]}L${polyline}L${pts[pts.length-1][0]} ${bottom}L${pts[0][0]} ${bottom}Z`;
   const line = `M${polyline}`;
