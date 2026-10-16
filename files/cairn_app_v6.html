@@ -2213,7 +2213,9 @@ function renderAnalysis(data) {
   }
 
   // HR chart (soft)
-  const hrPts = streamPoints(analysisData.stream, 'heart_rate');
+  // HF auf der Zeitachse (elapsed_s), nicht auf der Distanz — Geh-/Stehphasen
+  // haben kaum Distanzfortschritt, sind aber Teil des HF-Verlaufs.
+  const hrPts = streamPoints(analysisData.stream, 'heart_rate', 'elapsed_s');
   if (hrPts.length > 1) {
     html += buildHRChart(hrPts, summary.avg_hr);
   }
@@ -2257,14 +2259,15 @@ function renderAnalysis(data) {
 }
 
 /* — Analysis data helpers — */
-function streamPoints(stream, fieldName) {
+function streamPoints(stream, fieldName, xField = 'distance_m') {
   if (!stream || !stream.data || !stream.fields) return [];
-  const iDist = stream.fields.indexOf('distance_m');
+  const iX = stream.fields.indexOf(xField);
   const iVal = stream.fields.indexOf(fieldName);
-  if (iVal < 0 || iDist < 0) return [];
+  if (iVal < 0 || iX < 0) return [];
+  const scale = xField === 'distance_m' ? 1000 : 1;
   return stream.data
-    .filter(r => r[iVal] != null && r[iDist] != null)
-    .map(r => [r[iDist] / 1000, r[iVal]]);
+    .filter(r => r[iVal] != null && r[iX] != null)
+    .map(r => [r[iX] / scale, r[iVal]]);
 }
 
 function buildCoachAnalysisCard(analysis) {
@@ -2449,9 +2452,11 @@ function buildHRChart(points, avgHr) {
   const maxH = Math.max(...hrs, 1);
   const minH = Math.min(...hrs);
   const range = maxH - minH || 1;
-  const n = points.length;
-  const pts = points.map((p, i) => {
-    const x = padX + (i / (n - 1)) * (W - padX - 16);
+  // x aus p[0] (elapsed_s) statt Punkt-Index — der Stream ist nicht
+  // gleichmässig getaktet (Distanz- UND Zeitpunkte gemischt).
+  const minX = points[0][0], spanX = (points[points.length - 1][0] - minX) || 1;
+  const pts = points.map(p => {
+    const x = padX + ((p[0] - minX) / spanX) * (W - padX - 16);
     const y = bottom - (((p[1] || p.hr || p.y || 0) - minH) / range) * (bottom - padY);
     return [Math.round(x), Math.round(y)];
   });

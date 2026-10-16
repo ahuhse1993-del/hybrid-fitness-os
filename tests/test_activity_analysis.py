@@ -552,3 +552,43 @@ class TestFrontendSharesGearLogic:
         src = inspect.getsource(api_module.assign_gear_for_frontend)
         assert "assign_activity_gear" in src, \
             "Das Flask-Gear-Endpoint muss dieselbe assign_activity_gear-Funktion wie das MCP-Tool nutzen"
+
+
+# ── Stream-Ausdünnung: zeitliche Mindestauflösung ───────────────────────────
+
+class TestStreamThinning:
+    """Reine Funktionstests ohne DB — Regression für Return-to-Run #1 (ID 662),
+    das bei stream_resolution_m=500 nur noch 7 HF-Punkte lieferte."""
+
+    @staticmethod
+    def _walk_run_stream():
+        # 27 min @ 1 Hz, 3.44 km; erste 5 min Gehen mit kaum Distanzfortschritt.
+        pts = []
+        for t in range(1626):
+            d = t * 0.1 if t < 300 else 30 + (t - 300) * (3408 / 1325)
+            pts.append({"distance_m": d, "elapsed_s": float(t), "heart_rate": 80 + t % 60})
+        return pts
+
+    def test_coarse_distance_resolution_keeps_time_resolution(self):
+        from coach.mcp_server import _stream_time_step_s, _thin_stream
+        raw = self._walk_run_stream()
+        step = _stream_time_step_s(raw)
+        kept = _thin_stream(raw, 500, step)
+        assert step == 5
+        assert len(kept) >= 300
+        gaps = [b["elapsed_s"] - a["elapsed_s"] for a, b in zip(kept, kept[1:])]
+        assert max(gaps) <= step
+
+    def test_walking_phase_not_collapsed(self):
+        from coach.mcp_server import _stream_time_step_s, _thin_stream
+        raw = self._walk_run_stream()
+        kept = _thin_stream(raw, 50, _stream_time_step_s(raw))
+        # Gehphase 0–300 s legt nur 30 m zurück — rein distanzbasiert bliebe 1 Punkt.
+        assert len([p for p in kept if p["elapsed_s"] < 300]) >= 50
+
+    def test_long_activity_stays_bounded(self):
+        from coach.mcp_server import _stream_time_step_s, _thin_stream
+        raw = [{"distance_m": t * 3.0, "elapsed_s": float(t), "heart_rate": 140} for t in range(4 * 3600)]
+        kept = _thin_stream(raw, 50, _stream_time_step_s(raw))
+        # 43.2 km / 50 m = 864 Distanzpunkte + ~300 Zeitpunkte, nicht 14400.
+        assert len(kept) < 1300

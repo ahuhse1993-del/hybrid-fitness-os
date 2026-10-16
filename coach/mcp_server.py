@@ -1942,6 +1942,46 @@ def bulk_delete_garmin_workouts(garmin_workout_ids: list[int]) -> dict:
     return {"deleted": deleted, "failed": failed, "db_rows_cleared": db_rows_cleared}
 
 
+# Zeitliche Mindestauflösung des ausgedünnten Streams. Rein distanzbasiertes
+# Ausdünnen hat kurze bzw. Geh-/Lauf-Einheiten zerstört: Return-to-Run #1
+# (3.44 km, 27 min, 1626 HF-Rohpunkte) kam bei stream_resolution_m=500 mit
+# nur 7 Punkten an, und Steh-/Gehphasen (kaum Distanzfortschritt) fielen fast
+# komplett aus dem HF-Verlauf. Zusätzlich zur Distanz wird darum spätestens
+# alle max_time_gap_s ein Punkt behalten — ~STREAM_MIN_TIME_POINTS Punkte über
+# die Dauer verteilt, aber nie dichter als STREAM_MIN_TIME_GAP_S.
+STREAM_MIN_TIME_POINTS = 300
+STREAM_MIN_TIME_GAP_S = 5
+
+
+def _stream_time_step_s(raw_stream: list[dict]) -> int:
+    elapsed = [r["elapsed_s"] for r in raw_stream if r.get("elapsed_s") is not None]
+    if not elapsed:
+        return STREAM_MIN_TIME_GAP_S
+    duration = max(elapsed) - min(elapsed)
+    return max(STREAM_MIN_TIME_GAP_S, round(duration / STREAM_MIN_TIME_POINTS))
+
+
+def _thin_stream(raw_stream: list[dict], resolution_m: float, time_step_s: float) -> list[dict]:
+    """
+    Behält einen Punkt, sobald seit dem letzten behaltenen Punkt entweder
+    resolution_m Distanz oder time_step_s Zeit vergangen ist. raw_stream muss
+    zeitlich sortiert sein (distance_m, elapsed_s).
+    """
+    kept = []
+    last_d = last_t = None
+    for r in raw_stream:
+        d, t = r.get("distance_m"), r.get("elapsed_s")
+        if (last_d is None
+                or (d is not None and d >= last_d + resolution_m)
+                or (t is not None and last_t is not None and t >= last_t + time_step_s)):
+            kept.append(r)
+            if d is not None:
+                last_d = d
+            if t is not None:
+                last_t = t
+    return kept
+
+
 @mcp.tool()
 def get_activity_analysis_data(
     activity_id: int | None = None,
@@ -1962,6 +2002,11 @@ def get_activity_analysis_data(
         stream_resolution_m: Ziel-Punktabstand des zurückgegebenen Streams in
                              Metern (Standard 50). Rohdaten bleiben in der DB
                              unverändert — nur die Tool-Antwort wird ausgedünnt.
+                             Unabhängig davon bleibt spätestens alle
+                             stream.max_time_gap_s Sekunden ein Punkt erhalten
+                             (~300 Punkte über die Dauer), damit der zeitliche
+                             HF-Verlauf auch bei groben Distanzauflösungen
+                             und Geh-/Stehphasen vollständig bleibt.
 
     Gibt zurück: summary, native_laps, km_splits, stream, route,
     trail_metrics, trail_segments, hr_zones, recovery_context, data_quality.
@@ -2033,7 +2078,7 @@ def get_activity_analysis_data(
             if lap_cadences:
                 summary["avg_cadence"] = round(sum(lap_cadences) / len(lap_cadences))
 
-        # ── Stream (distanzbasiert, ausgedünnt auf stream_resolution_m) ──
+        # ── Stream (ausgedünnt auf stream_resolution_m ODER max_time_gap_s) ──
         stream_out = None
         hr_stream_available = pace_stream_available = elevation_stream_available = False
         power_available = False
@@ -2045,7 +2090,7 @@ def get_activity_analysis_data(
                 cur.execute(
                     "SELECT distance_m, elapsed_s, moving_s, heart_rate, speed_ms, "
                     "cadence, power, elevation_m, lat, lon "
-                    "FROM activity_stream WHERE training_id = %s ORDER BY distance_m",
+                    "FROM activity_stream WHERE training_id = %s ORDER BY distance_m, elapsed_s",
                     (tid,)
                 )
                 cols = [d[0] for d in cur.description]
@@ -2053,36 +2098,35 @@ def get_activity_analysis_data(
 
             if raw_stream:
                 points = []
-                last_d = -resolution
                 orig_count = len(raw_stream)
-                for r in raw_stream:
+                time_step_s = _stream_time_step_s(raw_stream)
+                for r in _thin_stream(raw_stream, resolution, time_step_s):
                     d = r["distance_m"]
-                    if d >= last_d + resolution:
-                        row_out = [
-                            None,  # timestamp_ms — nicht separat gespeichert (elapsed_s deckt das ab)
-                            round(r["elapsed_s"], 1) if r["elapsed_s"] is not None else None,
-                            round(r["moving_s"], 1) if r["moving_s"] is not None else None,
-                            round(d, 1),
-                            r["heart_rate"],
-                            round(r["speed_ms"], 3) if r["speed_ms"] is not None else None,
-                            round(1000 / r["speed_ms"]) if r["speed_ms"] else None,
-                            r["cadence"],
-                            r["power"],
-                            round(r["elevation_m"], 1) if r["elevation_m"] is not None else None,
-                            None,  # grade_pct — bewusst nicht pro Punkt berechnet (siehe trail_segments)
-                            r["lat"], r["lon"],
-                        ]
-                        points.append(row_out)
-                        if r["heart_rate"] is not None: hr_stream_available = True
-                        if r["speed_ms"] is not None: pace_stream_available = True
-                        if r["elevation_m"] is not None: elevation_stream_available = True
-                        if r["power"] is not None: power_available = True
-                        last_d = d
+                    row_out = [
+                        None,  # timestamp_ms — nicht separat gespeichert (elapsed_s deckt das ab)
+                        round(r["elapsed_s"], 1) if r["elapsed_s"] is not None else None,
+                        round(r["moving_s"], 1) if r["moving_s"] is not None else None,
+                        round(d, 1),
+                        r["heart_rate"],
+                        round(r["speed_ms"], 3) if r["speed_ms"] is not None else None,
+                        round(1000 / r["speed_ms"]) if r["speed_ms"] else None,
+                        r["cadence"],
+                        r["power"],
+                        round(r["elevation_m"], 1) if r["elevation_m"] is not None else None,
+                        None,  # grade_pct — bewusst nicht pro Punkt berechnet (siehe trail_segments)
+                        r["lat"], r["lon"],
+                    ]
+                    points.append(row_out)
+                    if r["heart_rate"] is not None: hr_stream_available = True
+                    if r["speed_ms"] is not None: pace_stream_available = True
+                    if r["elevation_m"] is not None: elevation_stream_available = True
+                    if r["power"] is not None: power_available = True
                 stream_point_count = len(points)
                 stream_out = {
                     "source": "garmin_activity_stream",
                     "resolution_requested_m": stream_resolution_m,
                     "resolution_actual_m": resolution,
+                    "max_time_gap_s": time_step_s,
                     "original_point_count": orig_count,
                     "returned_point_count": stream_point_count,
                     "fields": ["timestamp_ms", "elapsed_s", "timer_time_s", "distance_m", "heart_rate",
