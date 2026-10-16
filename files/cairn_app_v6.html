@@ -141,6 +141,14 @@ small, .text-small { font-size: .8rem; line-height: 1.5; }
 #cairn-week-soft .week-goals-item:last-child { border-right: none; }
 #cairn-week-soft .week-goals-val { display: block; font-size: 14px; font-weight: 700; letter-spacing: -.02em; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #cairn-week-soft .week-goals-label { display: block; font-size: 10px; color: var(--muted-foreground); opacity: .8; margin-top: 1px; }
+/* Gemacht / geplant: Ist-Wert kräftig, Planwert gedämpft, darunter Fortschritt */
+#cairn-week-soft .week-goals-plan { font-weight: 500; color: var(--muted-foreground); }
+@media (max-width: 480px) {
+  /* Viertelspalte zu schmal für "2:10 / 3:49 h" — Planwert in eigene Zeile */
+  #cairn-week-soft .week-goals-plan { display: block; font-size: 11px; line-height: 1.3; }
+}
+#cairn-week-soft .week-goals-bar { display: block; height: 3px; margin: 3px auto 1px; max-width: 72px; border-radius: 99px; background: color-mix(in srgb, var(--ink) 10%, transparent); overflow: hidden; }
+#cairn-week-soft .week-goals-bar i { display: block; height: 100%; border-radius: inherit; background: var(--forest); }
 
 /* Entwurf-Modus: Confirm-Bar für noch nicht gespeicherte Verschiebungen */
 #cairn-week-soft .confirm-bar { display: flex; align-items: center; justify-content: space-between; padding: 6px 10px; margin-bottom: 4px; background: color-mix(in srgb, var(--coral) 8%, var(--paper)); border: 1px solid color-mix(in srgb, var(--coral) 24%, transparent); border-radius: .6rem; }
@@ -167,6 +175,12 @@ small, .text-small { font-size: .8rem; line-height: 1.5; }
 #cairn-week-soft .sess-body { flex: 1 1 auto; min-width: 0; padding: 8px 8px 8px 12px; align-self: center; }
 #cairn-week-soft .sess-name { font-weight: 700; font-size: 13px; letter-spacing: -.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #cairn-week-soft .sess-check { color: var(--forest); font-weight: 700; }
+/* Status-Kennzeichen geplant / gemacht / verpasst / ungeplant */
+#cairn-week-soft .sess-state { display: inline-block; margin-right: 5px; padding: 0 5px; border-radius: 99px; font-size: 9.5px; font-weight: 600; letter-spacing: .03em; text-transform: uppercase; line-height: 15px; vertical-align: 1px; }
+#cairn-week-soft .sess-state.is-planned { background: color-mix(in srgb, var(--ink) 8%, transparent); color: var(--muted-foreground); }
+#cairn-week-soft .sess-state.is-done { background: color-mix(in srgb, var(--forest) 16%, transparent); color: var(--forest); }
+#cairn-week-soft .sess-state.is-missed { background: color-mix(in srgb, var(--coral) 18%, transparent); color: var(--coral); }
+#cairn-week-soft .sess-state.is-unplanned { background: color-mix(in srgb, var(--ink) 8%, transparent); color: var(--ink); }
 #cairn-week-soft .sess-meta { font-size: 11px; color: var(--muted-foreground); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #cairn-week-soft .sess-overflow { flex: 0 0 auto; align-self: stretch; padding: 0 .5rem; border: none; background: transparent; color: var(--muted-foreground); font-size: .9rem; letter-spacing: .1em; cursor: pointer; }
 
@@ -225,6 +239,18 @@ small, .text-small { font-size: .8rem; line-height: 1.5; }
 #session-sheet .metric-cell strong { display: block; font-weight: 500; font-size: 1.05rem; letter-spacing: -.025em; }
 #session-sheet .sheet-section { margin-bottom: .9rem; }
 #session-sheet .sheet-section h3 { font-size: .72rem; text-transform: uppercase; letter-spacing: .05em; opacity: .5; margin: 0 0 .5rem; font-weight: 500; }
+#session-sheet .compare-table { display: grid; grid-template-columns: 1fr auto auto auto; gap: 0 .9rem; padding: .35rem .9rem; border-radius: .9rem; background: var(--soft, #e9e8e2); font-size: .9rem; }
+#session-sheet .compare-table > * { padding: .45rem 0; border-bottom: 1px solid color-mix(in srgb, currentColor 10%, transparent); text-align: right; white-space: nowrap; }
+#session-sheet .compare-table > .cmp-label { text-align: left; opacity: .7; }
+#session-sheet .compare-table > .cmp-head { font-size: .68rem; text-transform: uppercase; letter-spacing: .05em; opacity: .5; }
+#session-sheet .compare-table > .cmp-done { font-weight: 600; }
+#session-sheet .compare-table > .cmp-delta { font-size: .8rem; opacity: .75; }
+#session-sheet .compare-table > .cmp-last { border-bottom: none; }
+#session-sheet .compare-status { display: inline-block; margin-left: .4rem; padding: .05rem .5rem; border-radius: 99px; font-size: .68rem; letter-spacing: .04em; text-transform: uppercase; vertical-align: 1px; opacity: 1; }
+#session-sheet .compare-status.is-done { background: color-mix(in srgb, var(--forest, #29483e) 18%, transparent); color: var(--forest, #29483e); }
+#session-sheet .compare-status.is-missed { background: color-mix(in srgb, var(--coral, #ff6b61) 20%, transparent); color: var(--coral, #ff6b61); }
+#session-sheet .compare-status.is-planned, #session-sheet .compare-status.is-unplanned { background: color-mix(in srgb, currentColor 10%, transparent); }
+#session-sheet .compare-link { margin-top: .6rem; width: 100%; }
 #session-sheet .notes-box { padding: .75rem .9rem; border-radius: .9rem; background: var(--soft, #e9e8e2); line-height: 1.6; white-space: pre-wrap; }
 #session-sheet .step-list { display: grid; gap: .45rem; }
 #session-sheet .step-row { display: grid; grid-template-columns: 2.4rem 1fr auto; align-items: center; gap: .7rem; padding: .8rem 1rem; border-radius: 1rem; }
@@ -846,6 +872,11 @@ small, .text-small { font-size: .8rem; line-height: 1.5; }
       <button class="sheet-close btn" onclick="closeSessionSheet()" aria-label="Schliessen">✕</button>
     </div>
     <div class="metrics-grid" id="sheet-metrics"></div>
+    <div class="sheet-section" id="sheet-compare-section" style="display:none">
+      <h3 id="sheet-compare-title">Geplant vs. gemacht</h3>
+      <div class="compare-table" id="sheet-compare"></div>
+      <button class="btn compare-link" type="button" id="sheet-compare-link" style="display:none">Analyse öffnen</button>
+    </div>
     <div class="sheet-section" id="sheet-notes-section" style="display:none">
       <h3>Notizen &amp; Gelände</h3>
       <div class="notes-box" id="sheet-notes"></div>
@@ -1102,6 +1133,51 @@ function isCyclingSess(sess) {
   return /cycl|bike|rennrad|velo\b/i.test(sess.session_type || '');
 }
 
+/* ── Geplant / gemacht ─────────────────────────────────────── */
+// Ist-Werte einer Session: gematchte Aktivität hat Vorrang vor dem naiven
+// Same-Day-Treffer (actual_*). null = (noch) nichts absolviert.
+function sessActual(sess) {
+  const ma = sess.matched_activity;
+  if (ma) return { km: ma.distance_km || null, min: ma.duration_min || null, hm: ma.elevation_gain_m ?? null, hr: ma.avg_hr || null, trainingId: ma.id };
+  if (sess.training_id) return { km: sess.actual_km || null, min: sess.actual_duration_min || null, hm: sess.actual_elevation_m ?? null, hr: sess.actual_avg_hr || null, trainingId: sess.training_id };
+  return null;
+}
+
+// Geplante Höhenmeter: DB-Wert, sonst aus den Notizen ("800 HM", "+800m Aufstieg" …)
+function plannedHm(sess) {
+  let hm = sess.elevation_gain_m ? parseInt(sess.elevation_gain_m) : 0;
+  if (!hm && sess.notes) {
+    const m = sess.notes.match(/(?:\+|ca\.?\s*)?(\d{2,5})\s*(?:hm\+?|höhenmeter|m\s*(?:aufstieg|hoch))/i)
+           || sess.notes.match(/aufstieg[:\s]+(\d{2,5})/i);
+    if (m) hm = parseInt(m[1]);
+  }
+  return hm || null;
+}
+
+// 'planned' | 'done' | 'missed' | 'unplanned'
+function sessState(sess) {
+  if (sess.plan_id == null) return 'unplanned';
+  if (sessActual(sess) || sess.status === 'completed') return 'done';
+  if (sess.date && sess.date < todayDateStr()) return 'missed';
+  return 'planned';
+}
+const SESS_STATE_LABEL = { planned: 'geplant', done: 'gemacht', missed: 'verpasst', unplanned: 'ungeplant' };
+
+function fmtNum(n) {
+  return Number(n).toLocaleString('de-CH', { maximumFractionDigits: 1 });
+}
+function fmtHmm(min) {
+  const m = Math.round(min);
+  return `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}`;
+}
+// "3,2 / 5 km" — kompakt, Einheit nur einmal
+function fmtKmPair(done, plan) { return `${fmtNum(done || 0)} / ${fmtNum(plan)} km`; }
+function fmtMinPair(done, plan) {
+  return Math.max(done || 0, plan) >= 60
+    ? `${fmtHmm(done || 0)} / ${fmtHmm(plan)} h`
+    : `${Math.round(done || 0)} / ${Math.round(plan)} min`;
+}
+
 function weekKmStats(sessions) {
   // plannedTotal: Summe der geplanten km als Laufäquivalent (= "Ziele Woche"-Zielwert).
   //   planned_km ist bereits Laufäquivalent (ChatGPT hat km_factor angewendet).
@@ -1115,6 +1191,7 @@ function weekKmStats(sessions) {
   let plannedTotal = 0, actualTotal = 0, phase = '';
   let hasActual = false;
   let totalDurationMin = 0, elevationSum = 0;
+  let actualDurationMin = 0, actualElevation = 0;
   let kraftDone = 0, kraftTotal = 0;
 
   for (const s of sessions || []) {
@@ -1124,19 +1201,27 @@ function weekKmStats(sessions) {
     // Geplant: planned_km ist bereits normalisiert (Laufäquivalent)
     plannedTotal += parseFloat(s.planned_km) || 0;
 
-    // Tatsächlich: bevorzuge actual_distance_km × km_factor aus training_plan
+    // Tatsächlich: bevorzuge actual_distance_km × km_factor aus training_plan,
+    // sonst die gematchte Aktivität. Ungeplante Radfahrten zählen nicht in die
+    // Lauf-km — ohne km_factor wären es rohe Rad-km.
+    const act = sessActual(s);
     const rawActual = s.actual_distance_km != null
       ? parseFloat(s.actual_distance_km)
-      : (parseFloat(s.actual_km) || 0);
+      : (parseFloat(act?.km) || 0);
     const factor = s.km_factor != null ? parseFloat(s.km_factor) : 1.0;
-    if (rawActual > 0) {
+    const skipKm = s.plan_id == null && isCyclingSess(s);
+    if (rawActual > 0 && !skipKm) {
       actualTotal += rawActual * factor;
       hasActual = true;
+    }
+    if (act) {
+      actualDurationMin += parseFloat(act.min) || 0;
+      actualElevation += parseFloat(act.hm) || 0;
     }
 
     if (s.plan_id != null) {
       totalDurationMin += parseFloat(s.planned_duration_min) || 0;
-      elevationSum += parseFloat(s.elevation_gain_m) || 0;
+      elevationSum += plannedHm(s) || 0;
       if (isStrengthSess(s)) {
         kraftTotal++;
         if (s.status === 'completed' || s.matched_activity) kraftDone++;
@@ -1150,6 +1235,8 @@ function weekKmStats(sessions) {
     plannedTotal, actualTotal, hasActual, phase,
     totalDurationMin: Math.round(totalDurationMin),
     elevationSum: Math.round(elevationSum),
+    actualDurationMin: Math.round(actualDurationMin),
+    actualElevation: Math.round(actualElevation),
     kraftDone, kraftTotal,
   };
 }
@@ -1162,14 +1249,26 @@ function renderWeekGoals(week) {
     box.style.display = 'none';
     return;
   }
-  const hFmt = fmtMin(stats.totalDurationMin) || '0 min';
+  // Ein Ziel: Ist-Wert kräftig, " / Plan Einheit" gedämpft, Fortschrittsbalken.
+  // Ohne Planwert nur der Ist-Wert (oder "–"), ohne Balken.
+  const goal = (label, done, plan, fmtPair, fmtSingle) => {
+    let val, bar = '';
+    if (plan) {
+      const [d, rest] = fmtPair(done, plan).split(/ (?=\/)/);
+      val = `${d}<span class="week-goals-plan"> ${rest}</span>`;
+      bar = `<span class="week-goals-bar"><i style="width:${Math.min(100, Math.round((done || 0) / plan * 100))}%"></i></span>`;
+    } else {
+      val = done ? fmtSingle(done) : '–';
+    }
+    return `<div class="week-goals-item"><span class="week-goals-val">${val}</span>${bar}<span class="week-goals-label">${label}</span></div>`;
+  };
   box.innerHTML = `
-    <div class="week-goals-title">Ziele Woche</div>
+    <div class="week-goals-title">Woche · gemacht / geplant</div>
     <div class="week-goals">
-      <div class="week-goals-item"><span class="week-goals-val">${stats.plannedTotal ? stats.plannedTotal.toLocaleString('de-CH') : 0} km</span><span class="week-goals-label">Laufen</span></div>
-      <div class="week-goals-item"><span class="week-goals-val">${hFmt}</span><span class="week-goals-label">Training</span></div>
-      <div class="week-goals-item"><span class="week-goals-val">${stats.kraftDone}/${stats.kraftTotal}</span><span class="week-goals-label">Kraft</span></div>
-      <div class="week-goals-item"><span class="week-goals-val">${stats.elevationSum ? stats.elevationSum + ' m' : '–'}</span><span class="week-goals-label">HM</span></div>
+      ${goal('Laufen', stats.actualTotal, stats.plannedTotal, fmtKmPair, v => `${fmtNum(v)} km`)}
+      ${goal('Training', stats.actualDurationMin, stats.totalDurationMin, fmtMinPair, fmtMin)}
+      ${goal('Kraft', stats.kraftDone, stats.kraftTotal, (d, p) => `${d} / ${p}`, v => String(v))}
+      ${goal('HM', stats.actualElevation, stats.elevationSum, (d, p) => `${d} / ${p} m`, v => `${v} m`)}
     </div>`;
   box.style.display = '';
 }
@@ -1378,14 +1477,19 @@ function buildDayRow(dateStr, daySessions, dayNum, dow, isToday) {
 }
 
 function sessMetaText(sess) {
-  if (sess.matched_activity) {
-    const ma = sess.matched_activity;
-    const actualKm = ma.distance_km;
-    const plannedKm = sess.planned_km;
-    if (actualKm && plannedKm) return `${fmtKm(actualKm)} erledigt · ${fmtKm(plannedKm)} geplant`;
-    if (actualKm) return `${fmtKm(actualKm)} erledigt`;
-    if (ma.duration_min) return `${fmtMin(ma.duration_min)} erledigt`;
-    return 'erledigt';
+  const act = sessActual(sess);
+  if (act && sess.plan_id != null) {
+    // Gemacht / geplant je Kennzahl. Rad: planned_km ist Laufäquivalent und
+    // nicht mit Rad-km vergleichbar — dort nur Zeit (und HM) vergleichen.
+    const parts = [];
+    const plannedKm = isCyclingSess(sess) ? null : sess.planned_km;
+    if (act.km && plannedKm) parts.push(fmtKmPair(act.km, plannedKm));
+    else if (act.km) parts.push(fmtKm(act.km));
+    if (act.min && sess.planned_duration_min) parts.push(fmtMinPair(act.min, sess.planned_duration_min));
+    else if (act.min && !act.km) parts.push(fmtMin(act.min));
+    const pHm = plannedHm(sess);
+    if (pHm) parts.push(`${act.hm || 0} / ${pHm} HM`);
+    return parts.join(' · ');
   }
   if (sess.plan_id == null) {
     const parts = [];
@@ -1429,8 +1533,9 @@ function buildSessTile(sess) {
   body.className = 'sess-body';
   const name = sess.name || sess.session_type || sess.type || 'Session';
   const meta = sessMetaText(sess);
+  const state = sessState(sess);
   body.innerHTML = `<div class="sess-name">${name}${isMatched ? ' <span class="sess-check">✓</span>' : ''}</div>`
-    + (meta ? `<div class="sess-meta">${meta}</div>` : '');
+    + `<div class="sess-meta"><span class="sess-state is-${state}">${SESS_STATE_LABEL[state]}</span>${meta || ''}</div>`;
   tile.appendChild(body);
 
   const overflow = document.createElement('button');
@@ -2625,15 +2730,7 @@ function openSessionSheet(key) {
   const dateStr = d ? d.toLocaleDateString('de-CH', { weekday: 'long', day: 'numeric', month: 'long' }) : '';
   document.getElementById('sheet-subtitle').textContent = dateStr;
 
-  // HM: DB-Wert oder Fallback aus Notizen
-  // elevation_gain_m kann auch als String kommen → parseInt
-  let hmVal = sess.elevation_gain_m ? parseInt(sess.elevation_gain_m) : 0;
-  if (!hmVal && sess.notes) {
-    // Treffer: "800 HM", "800HM+", "ca. 800 Höhenmeter", "800m Aufstieg", "+800m"
-    const m = sess.notes.match(/(?:\+|ca\.?\s*)?(\d{2,5})\s*(?:hm\+?|höhenmeter|m\s*(?:aufstieg|hoch))/i)
-           || sess.notes.match(/aufstieg[:\s]+(\d{2,5})/i);
-    if (m) hmVal = parseInt(m[1]);
-  }
+  const hmVal = plannedHm(sess);
 
   // Metrics grid
   const metrics = [
@@ -2646,6 +2743,8 @@ function openSessionSheet(key) {
   document.getElementById('sheet-metrics').innerHTML = metrics.map(m =>
     `<div class="metric-cell"><span class="text-small">${m.label}</span><strong>${m.val}</strong></div>`
   ).join('');
+
+  renderSheetCompare(sess);
 
   // Notes
   const notesSection = document.getElementById('sheet-notes-section');
@@ -2682,6 +2781,56 @@ function openSessionSheet(key) {
   document.body.style.overflow = 'hidden';
 
   if (window.lucide) lucide.createIcons();
+}
+
+// Geplant-vs.-gemacht-Tabelle im Session-Sheet. Zeilen nur, wenn Plan- oder
+// Ist-Wert existiert; Δ nur, wenn beide da sind.
+function renderSheetCompare(sess) {
+  const section = document.getElementById('sheet-compare-section');
+  const table = document.getElementById('sheet-compare');
+  const link = document.getElementById('sheet-compare-link');
+  const state = sessState(sess);
+  const act = sessActual(sess) || {};
+  if (isRestSess(sess)) { section.style.display = 'none'; return; }
+
+  const isCyc = isCyclingSess(sess);
+  const signed = (v, fmt) => (v > 0 ? '+' : v < 0 ? '−' : '±') + fmt(Math.abs(v));
+  const rows = [
+    { label: 'Distanz', plan: isCyc ? null : sess.planned_km, done: act.km,
+      fmt: v => `${fmtNum(v)} km` },
+    { label: 'Dauer', plan: sess.planned_duration_min, done: act.min,
+      fmt: v => (v >= 60 ? `${fmtHmm(v)} h` : `${Math.round(v)} min`) },
+    { label: 'Höhenmeter', plan: plannedHm(sess), done: act.hm,
+      fmt: v => `${Math.round(v)} m` },
+    { label: 'Ø HF', plan: null, planText: sess.session_zone || null, done: act.hr,
+      fmt: v => `${Math.round(v)} bpm` },
+  ].filter(r => r.plan || r.planText || r.done);
+
+  if (!rows.length) { section.style.display = 'none'; return; }
+
+  let html = '<span class="cmp-head cmp-label"></span><span class="cmp-head">Geplant</span>'
+           + '<span class="cmp-head">Gemacht</span><span class="cmp-head">Δ</span>';
+  rows.forEach((r, i) => {
+    const last = i === rows.length - 1 ? ' cmp-last' : '';
+    const planCell = r.plan ? r.fmt(r.plan) : (r.planText || '—');
+    const doneCell = r.done ? r.fmt(r.done) : '—';
+    // Δ aus den angezeigten (gerundeten) Werten, sonst passt es optisch nicht (3,2 − 5 ≠ −1,9)
+    const rnd = v => (r.label === 'Distanz' ? Math.round(v * 10) / 10 : Math.round(v));
+    const delta = r.plan && r.done ? signed(rnd(r.done) - rnd(r.plan), r.fmt) : '';
+    html += `<span class="cmp-label${last}">${r.label}</span><span class="${last.trim()}">${planCell}</span>`
+          + `<span class="cmp-done${last}">${doneCell}</span><span class="cmp-delta${last}">${delta}</span>`;
+  });
+  table.innerHTML = html;
+  document.getElementById('sheet-compare-title').innerHTML =
+    `Geplant vs. gemacht<span class="compare-status is-${state}">${SESS_STATE_LABEL[state]}</span>`;
+
+  if (act.trainingId) {
+    link.style.display = '';
+    link.onclick = () => { closeSessionSheet(); navigate('analysis', act.trainingId); };
+  } else {
+    link.style.display = 'none';
+  }
+  section.style.display = '';
 }
 
 function closeSessionSheet() {

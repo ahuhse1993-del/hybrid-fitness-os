@@ -2223,7 +2223,8 @@ def frontend_week_all():
         actual_window_start = date_min - timedelta(days=1)
         actual_window_end = date_max + timedelta(days=1)
         cur.execute("""
-            SELECT date, type, distance_km, duration_minutes, heart_rate_avg, id, source
+            SELECT date, type, distance_km, duration_minutes, heart_rate_avg, id, source,
+                   elevation_gain_m
             FROM trainings
             WHERE date >= %s AND date <= %s
         """, (actual_window_start, actual_window_end))
@@ -2234,6 +2235,7 @@ def frontend_week_all():
             entry = {
                 "type": r[1], "distance_km": float(r[2]) if r[2] else 0,
                 "duration_min": r[3], "avg_hr": r[4], "training_id": r[5], "source": r[6],
+                "elevation_gain_m": round(float(r[7])) if r[7] is not None else None,
             }
             actual_by_date.setdefault(d, []).append(entry)
             trainings_by_id[r[5]] = entry
@@ -2296,6 +2298,7 @@ def frontend_week_all():
                         "duration_min": ma["duration_min"],
                         "avg_hr": ma["avg_hr"],
                         "source": ma["source"],
+                        "elevation_gain_m": ma["elevation_gain_m"],
                     }
 
             # Status ableiten
@@ -2351,6 +2354,7 @@ def frontend_week_all():
                 "actual_km": actual.get("distance_km"),
                 "actual_duration_min": actual.get("duration_min"),
                 "actual_avg_hr": actual.get("avg_hr"),
+                "actual_elevation_m": actual.get("elevation_gain_m"),
                 "training_id": actual.get("training_id"),
                 "matched_training_id": matched_id,
                 "matched_activity": matched_activity,
@@ -2442,6 +2446,7 @@ def frontend_week_all():
                         "actual_km": actual["distance_km"],
                         "actual_duration_min": actual["duration_min"],
                         "actual_avg_hr": actual["avg_hr"],
+                        "actual_elevation_m": actual["elevation_gain_m"],
                         "training_id": actual["training_id"],
                         "matched_training_id": None,
                         "matched_activity": None,
