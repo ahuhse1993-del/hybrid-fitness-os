@@ -260,6 +260,46 @@ class TestActivityGearAssignment:
 
         assert result["gear"]["new_total_distance_km"] == 12.0
 
+    def test_past_activity_counts_after_gear_creation(self, db_conn, cleanup_rows):
+        gid = create_athlete_gear(gear_type="running_shoe", nickname=f"{TEST_TAG}past")["gear"]["id"]
+        cleanup_rows["gear_ids"].append(gid)
+        # Schuh vor 30 Tagen angelegt, Training vor 10 Tagen -> km zählen.
+        db_conn.cursor().execute(
+            "UPDATE athlete_gear SET created_at = now() - interval '30 days', initial_distance_km = 100 WHERE id = %s",
+            (gid,))
+        db_conn.commit()
+        tid = _insert_training(db_conn, distance_km=7.0,
+                               date=datetime.date.today() - datetime.timedelta(days=10))
+        cleanup_rows["training_ids"].append(tid)
+
+        result = assign_activity_gear(activity_id=tid, gear_id=gid)
+        assert result["pre_cutoff"] is False
+        assert result["distance_added_km"] == 7.0
+        assert result["gear"]["new_total_distance_km"] == 107.0
+
+    def test_activity_before_gear_creation_not_double_counted(self, db_conn, cleanup_rows):
+        gid = create_athlete_gear(gear_type="running_shoe", nickname=f"{TEST_TAG}pre",
+                                  initial_distance_km=100)["gear"]["id"]
+        cleanup_rows["gear_ids"].append(gid)
+        tid = _insert_training(db_conn, distance_km=7.0,
+                               date=datetime.date.today() - datetime.timedelta(days=10))
+        cleanup_rows["training_ids"].append(tid)
+
+        result = assign_activity_gear(activity_id=tid, gear_id=gid)
+        assert result["pre_cutoff"] is True
+        assert result["distance_added_km"] == 0
+
+    def test_old_activity_counts_when_gear_has_no_start_km(self, db_conn, cleanup_rows):
+        gid = create_athlete_gear(gear_type="running_shoe", nickname=f"{TEST_TAG}zero")["gear"]["id"]
+        cleanup_rows["gear_ids"].append(gid)
+        tid = _insert_training(db_conn, distance_km=7.0,
+                               date=datetime.date.today() - datetime.timedelta(days=60))
+        cleanup_rows["training_ids"].append(tid)
+
+        result = assign_activity_gear(activity_id=tid, gear_id=gid)
+        assert result["pre_cutoff"] is False
+        assert result["distance_added_km"] == 7.0
+
     def test_remove_and_reassign(self, db_conn, cleanup_rows):
         tid = _insert_training(db_conn, distance_km=6.0)
         cleanup_rows["training_ids"].append(tid)

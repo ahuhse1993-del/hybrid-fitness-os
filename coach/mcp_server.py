@@ -660,12 +660,14 @@ def assign_activity_gear(
 
     Args:
         distance_km: None (Standard) = Distanz der Aktivität übernehmen — ausser
-                     bei Aktivitäten vor heute: deren km werden NICHT addiert
-                     (siehe pre_cutoff unten), weil ein neu angelegtes Gear-Item
-                     seine initial_distance_km typischerweise bereits als
-                     Summe aller bisherigen Aktivitäten bis zum Anlegen-Datum
-                     erhält (z.B. importierter Strava-Kilometerstand) — sie
-                     nochmal draufzuzählen würde doppelt zählen.
+                     bei Aktivitäten VOR dem Anlegen-Datum des Gear-Items, wenn
+                     es mit initial_distance_km > 0 angelegt wurde: deren km
+                     werden NICHT addiert (siehe pre_cutoff unten), weil der
+                     Start-Kilometerstand typischerweise schon alle Aktivitäten
+                     bis zum Anlegen enthält (z.B. importierter Strava-Stand) —
+                     sie nochmal draufzuzählen würde doppelt zählen. Aktivitäten
+                     ab dem Anlegen-Datum zählen immer, auch rückwirkend
+                     zugeordnete aus der Vergangenheit.
                      Explizit angeben, um das zu übersteuern (z.B. 0 für eine
                      reine Dokumentations-Zuordnung ohne km-Effekt, oder einen
                      echten Wert um eine Altaktivität bewusst nachzutragen).
@@ -674,7 +676,8 @@ def assign_activity_gear(
     if not training:
         return {"error": "Aktivität nicht gefunden."}
     gear = _fetchone(
-        "SELECT id, gear_type, nickname, initial_distance_km, target_distance_km "
+        "SELECT id, gear_type, nickname, initial_distance_km, target_distance_km, "
+        "created_at::date AS created_date "
         "FROM athlete_gear WHERE id = %s", (gear_id,)
     )
     if not gear:
@@ -682,10 +685,18 @@ def assign_activity_gear(
 
     tid = training["id"]
     activity_distance = float(training["distance_km"]) if training["distance_km"] is not None else 0.0
+    # Grenze ist das Anlegen-Datum des Gear-Items, nicht "heute" — sonst liessen
+    # sich vergangene Trainings nie mit km nachtragen. Ohne Start-km (0) enthält
+    # initial_distance_km nichts, dann zählt jede Aktivität.
+    cutoff_date = gear["created_date"]
+    if isinstance(cutoff_date, str):
+        cutoff_date = datetime.date.fromisoformat(cutoff_date[:10])
     pre_cutoff = (
         distance_km is None
+        and float(gear["initial_distance_km"] or 0) > 0
+        and cutoff_date is not None
         and training["date"] is not None
-        and datetime.date.fromisoformat(str(training["date"])) < datetime.date.today()
+        and datetime.date.fromisoformat(str(training["date"])[:10]) < cutoff_date
     )
     if distance_km is not None:
         resolved_distance = float(distance_km)
@@ -734,7 +745,7 @@ def assign_activity_gear(
                         "remaining_distance_km": round(target - total, 2) if target is not None else None,
                     },
                     "replaced_gear": None,
-                    "warnings": ["Aktivität vor heute — keine km addiert (vermutlich schon in initial_distance_km enthalten)."] if pre_cutoff else [],
+                    "warnings": ["Aktivität vor dem Anlegen des Schuhs — keine km addiert (schon im Start-Kilometerstand enthalten)."] if pre_cutoff else [],
                 }
 
             replaced_gear = None
@@ -793,7 +804,7 @@ def assign_activity_gear(
                 if gear["target_distance_km"] is not None else None,
         },
         "replaced_gear": replaced_gear,
-        "warnings": ["Aktivität vor heute — keine km addiert (vermutlich schon in initial_distance_km enthalten)."] if pre_cutoff else [],
+        "warnings": ["Aktivität vor dem Anlegen des Schuhs — keine km addiert (schon im Start-Kilometerstand enthalten)."] if pre_cutoff else [],
     }
 
 
