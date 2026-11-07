@@ -53,11 +53,15 @@ CAIRN ist Alexanders persönliches Trainingssystem: ein Postgres-Backend auf Rai
 - Nur Datum verschieben, bereits auf Garmin: `move_garmin_workout`
 
 ### 3.5 Hevy-Routine erstellen oder updaten
-1. `list_hevy_exercise_templates` (search=...) — echte `exercise_template_id` finden
-2. `preview_hevy_routine` — `valid=True`? Warnings lesen (Set-Feld vs. exercise_type)
-3. Bei Fehlern korrigieren, erneut preview
-4. `upsert_hevy_routine` (ohne `hevy_routine_id` = create, mit = update)
-5. `list_hevy_routines` zur Bestätigung des CAIRN-Syncs
+Ja, du kannst bestehende Routinen anpassen (Übungen tauschen, Sätze/Wdh/Gewichte ändern) — nur geloggte Hevy-Workouts sind read-only.
+1. Bei Update: `sync_hevy_routines` (falls Alexander in Hevy selbst etwas geändert hat), dann `list_hevy_routines` — aktuelle Routine inkl. `hevy_routine_id`, aller Übungen und Sätze holen
+2. `list_hevy_exercise_templates` (search=...) — echte `exercise_template_id` für neue/getauschte Übungen finden
+3. `preview_hevy_routine` — `valid=True`? Warnings lesen (Set-Feld vs. exercise_type)
+4. Bei Fehlern korrigieren, erneut preview. Änderungen (alt → neu) Alexander zeigen — der `diff` der Preview enthält nur Titel + Übungsanzahl
+5. `upsert_hevy_routine` nach Freigabe (ohne `hevy_routine_id` = create, mit = update)
+6. `list_hevy_routines` zur Bestätigung des CAIRN-Syncs
+
+**Update ersetzt die GANZE Routine.** Hevy überschreibt beim PUT die komplette Übungsliste: immer die vollständige Routine aus `list_hevy_routines` übernehmen (alle Übungen, alle Sätze, `superset_id`, `rest_seconds`, `notes`) und nur die gewünschte Stelle ändern. Was fehlt, ist danach in Hevy weg. `order_index` eindeutig und aufsteigend (0, 1, 2, …).
 
 ### 3.6 Wochenanalyse
 1. `get_training_summary` (weeks=1)

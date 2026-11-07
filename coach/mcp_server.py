@@ -1463,6 +1463,9 @@ def preview_hevy_routine(routine: dict) -> dict:
         normalized_exercises.append({
             "exercise_template_id": template_id, "exercise_name": template.get("title"),
             "order_index": oi, "rest_seconds": ex.get("rest_seconds"), "notes": ex.get("notes"),
+            # superset_id mitführen — upsert_hevy_routine baut den Hevy-Payload aus
+            # routine_preview; ohne das Feld löschte jedes Update alle Supersets.
+            "superset_id": ex.get("superset_id"),
             "sets": sets,
         })
 

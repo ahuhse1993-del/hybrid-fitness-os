@@ -235,3 +235,42 @@ class TestSyncHevyCompletionsMatching:
         cur = db_conn.cursor()
         cur.execute("SELECT COUNT(*) FROM training_plan WHERE hevy_id = %s", (hevy_id,))
         assert cur.fetchone()[0] == 1, "Kein doppeltes Linking bei wiederholtem Aufruf"
+
+
+class TestUpsertHevyRoutineSupersets:
+    """Update einer Routine darf Supersets nicht verlieren (kein echter Hevy-Call)."""
+
+    def test_superset_id_reaches_hevy_payload(self, monkeypatch):
+        import coach.hevy_client as hevy_client
+        import coach.mcp_server as srv
+
+        monkeypatch.setattr(hevy_client, "get_exercise_template",
+                            lambda tid: {"id": tid, "title": f"Ex {tid}", "type": "weight_reps"})
+        monkeypatch.setattr(srv, "_fetchone",
+                            lambda *a, **k: {"id": 1, "title": "Alt", "folder_id": None})
+        sent = {}
+
+        def fake_update(rid, payload):
+            sent["rid"], sent["payload"] = rid, payload
+            return {"routine": {"id": rid}}
+
+        monkeypatch.setattr(hevy_client, "update_routine", fake_update)
+        monkeypatch.setattr(srv, "sync_hevy_routines", lambda **k: {"synced": 0})
+
+        routine = {
+            "hevy_routine_id": f"{TEST_PREFIX}routine-ss",
+            "title": "Superset Test",
+            "exercises": [
+                {"exercise_template_id": "TESTSS01", "order_index": 0, "superset_id": 0,
+                 "sets": [{"set_index": 0, "set_type": "normal", "weight_kg": 20, "reps": 10}]},
+                {"exercise_template_id": "TESTSS02", "order_index": 1, "superset_id": 0,
+                 "sets": [{"set_index": 0, "set_type": "normal", "weight_kg": 20, "reps": 10}]},
+                {"exercise_template_id": "TESTSS03", "order_index": 2,
+                 "sets": [{"set_index": 0, "set_type": "normal", "weight_kg": 20, "reps": 10}]},
+            ],
+        }
+        result = srv.upsert_hevy_routine(routine)
+
+        assert result["action"] == "update"
+        exercises = sent["payload"]["routine"]["exercises"]
+        assert [e["superset_id"] for e in exercises] == [0, 0, None]
