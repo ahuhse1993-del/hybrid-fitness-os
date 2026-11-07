@@ -1555,6 +1555,34 @@ function buildSessTile(sess) {
    CSS-Transform auf dem Original, kein HTML5 Drag). Ein Drop legt die
    Verschiebung nur als Entwurf an (pendingMove) — erst "Bestätigen"
    schreibt sie an den Server. ─────────────────────────────────────── */
+/* ── Wischen links/rechts = Woche vor/zurück ──────────────────────────
+   Nur klar horizontale, zügige Gesten zählen; sobald ein Long-Press-Drag
+   einer Einheit gestartet wurde (_weekDragStarted), wird nicht gewechselt. */
+let _weekDragStarted = false;
+function initWeekSwipe() {
+  const body = document.getElementById('week-body');
+  if (!body || body.dataset.swipeInit) return;
+  body.dataset.swipeInit = '1';
+  let x0 = 0, y0 = 0, t0 = 0, tracking = false;
+  body.addEventListener('touchstart', e => {
+    if (e.touches.length !== 1) { tracking = false; return; }
+    _weekDragStarted = false;
+    tracking = true;
+    x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; t0 = Date.now();
+  }, { passive: true });
+  body.addEventListener('touchend', e => {
+    if (!tracking) return;
+    tracking = false;
+    if (_weekDragStarted) return;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - x0, dy = t.clientY - y0;
+    if (Date.now() - t0 > 700) return;
+    if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+    navigateWeek(dx < 0 ? 1 : -1);
+  }, { passive: true });
+  body.addEventListener('touchcancel', () => { tracking = false; }, { passive: true });
+}
+
 function initDragDrop(gridEl) {
   if (!gridEl) return;
   let dragId = null, dragEl = null, cloneEl = null, timer = null;
@@ -1568,6 +1596,7 @@ function initDragDrop(gridEl) {
     timer = setTimeout(() => {
       dragId = tile.dataset.sessionId;
       dragEl = tile;
+      _weekDragStarted = true; // Wisch-Geste für Wochenwechsel ignorieren
 
       const rect = tile.getBoundingClientRect();
       offsetX = e.clientX - rect.left;
@@ -3057,6 +3086,7 @@ function init() {
 
   // Load initial view
   loadWeek();
+  initWeekSwipe();
 
   // Init lucide icons
   if (window.lucide) lucide.createIcons();
