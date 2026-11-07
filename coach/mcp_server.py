@@ -2739,6 +2739,118 @@ def patch_planned_workout(session_id: int, patch: dict) -> dict:
 
 
 
+_NON_RUN_SESSION_TYPES = ("Rest Day", "Strength Training", "Core", "Mobility")
+
+
+def _rebuild_plan_weeks(cur, plan_id: int, call_week_starts: set, weeks_meta: list,
+                        keep_existing_meta: bool = True) -> int:
+    """
+    Baut plan_weeks eines Plans konsistent aus dem DB-Stand neu auf.
+
+    Wochennummer = Abstand in Wochen zum Planstart (früheste Woche aus
+    bestehenden plan_weeks bzw. diesem Aufruf), NICHT die Position innerhalb
+    eines Aufrufs. km = Summe aller nicht-archivierten Lauf-Sessions der Woche
+    aus training_plan (inkl. km_factor), egal wie viele davon im Aufruf waren.
+
+    weeks_meta: plan.weeks aus dem Aufruf — week_number dort absolut (Woche 1 =
+    Planstart). keep_existing_meta=False ignoriert phase/is_deload/week_focus
+    bestehender Zeilen (für Reparaturen kaputter Daten).
+    Gibt die Anzahl Wochen zurück und schreibt sie nach plans.total_weeks.
+    """
+    import datetime as _dt
+
+    cur.execute(
+        "SELECT id, week_number, week_start, phase, is_deload, week_focus "
+        "FROM plan_weeks WHERE plan_id = %s",
+        (plan_id,),
+    )
+    existing = cur.fetchall()
+    starts = {r[2] for r in existing} | set(call_week_starts)
+    if not starts:
+        return 0
+    anchor = min(starts)
+
+    def _wnum(wstart):
+        return (wstart - anchor).days // 7 + 1
+
+    # Zeilen, deren Nummer zum Datum passt, behalten ihre Metadaten.
+    valid_meta = {
+        r[2]: {"phase": r[3], "is_deload": r[4], "week_focus": r[5]}
+        for r in existing if r[1] == _wnum(r[2])
+    }
+
+    cur.execute(
+        """SELECT week_date, day_of_week, session_type, phase, session_zone,
+                  COALESCE(distance_km, 0) * COALESCE(km_factor, 1)
+           FROM training_plan
+           WHERE plan_id = %s AND status != 'archived' AND week_date >= %s
+           ORDER BY week_date, day_of_week, id""",
+        (plan_id, anchor),
+    )
+    km_by_week: dict = {}
+    phase_by_week: dict = {}
+    for wdate, _dow, stype, sphase, szone, km in cur.fetchall():
+        km_by_week.setdefault(wdate, 0.0)
+        if stype not in _NON_RUN_SESSION_TYPES:
+            km_by_week[wdate] += float(km or 0)
+        if wdate not in phase_by_week and (sphase or szone):
+            phase_by_week[wdate] = sphase or szone
+
+    last = max(starts | set(km_by_week))
+    n_weeks = _wnum(last)
+
+    meta_by_start = {}
+    for wm in weeks_meta:
+        wn = wm.get("week_number")
+        if wn:
+            meta_by_start[anchor + _dt.timedelta(weeks=int(wn) - 1)] = wm
+
+    rows = []
+    prev_km = 0.0
+    for i in range(n_weeks):
+        wstart = anchor + _dt.timedelta(weeks=i)
+        wkm = round(km_by_week.get(wstart, 0.0), 1)
+        meta = meta_by_start.get(wstart, {})
+        old = valid_meta.get(wstart, {}) if keep_existing_meta else {}
+        phase = meta.get("phase") or old.get("phase") or phase_by_week.get(wstart) or "base"
+        if "is_deload" in meta:
+            is_deload = bool(meta["is_deload"])
+        elif "is_deload" in old:
+            is_deload = bool(old["is_deload"])
+        else:
+            is_deload = prev_km > 0 and wkm > 0 and wkm / prev_km < 0.75
+        if wkm > 0:
+            prev_km = wkm
+        focus = meta.get("week_focus") or old.get("week_focus") or ""
+        rows.append((i + 1, wstart, phase, is_deload, wkm, focus))
+
+    max_km = max((r[4] for r in rows), default=0)
+    cur.execute("DELETE FROM plan_weeks WHERE plan_id = %s AND week_number > %s", (plan_id, n_weeks))
+    for wnum, wstart, phase, is_deload, wkm, focus in rows:
+        cur.execute(
+            """INSERT INTO plan_weeks (plan_id, week_number, week_start, phase, is_deload, is_peak, target_run_km, week_focus)
+               VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+               ON CONFLICT (plan_id, week_number) DO UPDATE SET
+                   week_start=EXCLUDED.week_start, phase=EXCLUDED.phase,
+                   is_deload=EXCLUDED.is_deload, is_peak=EXCLUDED.is_peak,
+                   target_run_km=EXCLUDED.target_run_km, week_focus=EXCLUDED.week_focus,
+                   updated_at=now()""",
+            (plan_id, wnum, wstart, phase, is_deload, max_km > 0 and wkm == max_km,
+             wkm or None, focus),
+        )
+
+    # Sessions an die (neu) passende Woche hängen.
+    cur.execute(
+        """UPDATE training_plan tp SET week_id = pw.id
+           FROM plan_weeks pw
+           WHERE tp.plan_id = %s AND pw.plan_id = tp.plan_id AND pw.week_start = tp.week_date
+             AND tp.week_id IS DISTINCT FROM pw.id""",
+        (plan_id,),
+    )
+    cur.execute("UPDATE plans SET total_weeks = %s WHERE id = %s", (n_weeks, plan_id))
+    return n_weeks
+
+
 @mcp.tool()
 def upsert_training_block(plan: dict, confirm_race_date_change: bool = False) -> dict:
     """
@@ -2937,95 +3049,27 @@ def upsert_training_block(plan: dict, confirm_race_date_change: bool = False) ->
                             (new_hash, row_id),
                         )
 
-        # ─── plan_weeks: Wochenstruktur aus Sessions ableiten ────────────────────
-        import collections as _collections
+        # ─── plan_weeks: Wochenstruktur aus ALLEN Sessions des Plans ableiten ─────
+        # Nicht nur aus den Sessions dieses Aufrufs: ChatGPT schickt oft nur einen
+        # Teil (z.B. nur die Qualitätseinheiten oder ein paar geänderte Wochen).
+        # Früher wurden die Wochen dieses Teils ab 1 durchnummeriert — das hat
+        # bestehende Wochen mit falschem Datum und falschen km überschrieben.
         import datetime as _dt
 
-        week_groups = _collections.defaultdict(list)
+        call_week_starts = set()
         for s in sessions:
             sdate = _dt.date.fromisoformat(s["date"])
-            wstart = sdate - _dt.timedelta(days=sdate.weekday())
-            week_groups[wstart].append(s)
-
-        sorted_weeks = sorted(week_groups.keys())
-
-        def _week_km(slist):
-            return sum(
-                (s.get("distance_km") or 0)
-                for s in slist
-                if s.get("session_type") not in ("Rest Day", "Strength Training", "Core", "Mobility")
-            )
-
-        # Optionale Wochen-Metadaten (phase-Override, week_focus) aus plan.weeks
-        week_meta: dict = {}
-        for wm in (plan.get("weeks") or []):
-            wn = wm.get("week_number")
-            if wn:
-                week_meta[int(wn)] = wm
-
-        # Peak-Woche: höchstes km-Volumen
-        week_km_totals = {
-            wnum: _week_km(week_groups[wstart])
-            for wnum, wstart in enumerate(sorted_weeks, start=1)
-        }
-        max_km = max(week_km_totals.values(), default=0)
+            call_week_starts.add(sdate - _dt.timedelta(days=sdate.weekday()))
 
         with conn.cursor() as cur:
-            pw_id_map: dict = {}
-            prev_km = 0.0
-            for wnum, wstart in enumerate(sorted_weeks, start=1):
-                slist = week_groups[wstart]
-                wkm = _week_km(slist)
-                meta = week_meta.get(wnum, {})
-                phases_in_week = [s.get("phase") or s.get("session_zone") for s in slist if s.get("phase") or s.get("session_zone")]
-                phase_val = meta.get("phase") or (phases_in_week[0] if phases_in_week else "base")
-                if "is_deload" in meta:
-                    is_deload = bool(meta["is_deload"])
-                else:
-                    is_deload = (prev_km > 0 and wkm > 0 and wkm / prev_km < 0.75)
-                if wkm > 0:
-                    prev_km = wkm
-                is_peak = (max_km > 0 and wkm == max_km)
-                week_focus = meta.get("week_focus") or ""
-
-                cur.execute(
-                    """INSERT INTO plan_weeks (plan_id, week_number, week_start, phase, is_deload, is_peak, target_run_km, week_focus)
-                       VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-                       ON CONFLICT (plan_id, week_number) DO UPDATE SET
-                           week_start=EXCLUDED.week_start,
-                           phase=EXCLUDED.phase,
-                           is_deload=EXCLUDED.is_deload,
-                           is_peak=EXCLUDED.is_peak,
-                           target_run_km=EXCLUDED.target_run_km,
-                           week_focus=EXCLUDED.week_focus,
-                           updated_at=now()
-                       RETURNING id""",
-                    (plan_id, wnum, wstart, phase_val, is_deload, is_peak, round(wkm, 1) if wkm else None, week_focus),
-                )
-                pw_id = cur.fetchone()[0]
-                pw_id_map[wstart] = pw_id
-
-            for s in sessions:
-                sdate = _dt.date.fromisoformat(s["date"])
-                wstart = sdate - _dt.timedelta(days=sdate.weekday())
-                pw_id = pw_id_map.get(wstart)
-                if pw_id:
-                    cur.execute(
-                        "UPDATE training_plan SET week_id=%s WHERE external_id=%s AND plan_id=%s",
-                        (pw_id, s["external_id"], plan_id),
-                    )
-
-        # total_weeks aus tatsächlichen Wochen ableiten und in plans speichern
-        with conn.cursor() as cur:
-            cur.execute(
-                "UPDATE plans SET total_weeks=%s WHERE id=%s",
-                (len(sorted_weeks), plan_id),
+            total_weeks = _rebuild_plan_weeks(
+                cur, plan_id, call_week_starts, plan.get("weeks") or [],
             )
 
         conn.commit()
         logger.info(
             "upsert_training_block committed: plan_id=%s created=%s updated=%s race_date_changed=%s routing=%s total_weeks=%s",
-            plan_id, created, updated, race_date_changed, routing_summary, len(sorted_weeks),
+            plan_id, created, updated, race_date_changed, routing_summary, total_weeks,
         )
         return {
             "plan_id": plan_id, "created": created, "updated": updated,

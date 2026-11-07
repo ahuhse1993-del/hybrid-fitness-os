@@ -2500,14 +2500,17 @@ def frontend_plan():
         # plan_weeks (kanonisch)
         cur.execute("""
             SELECT pw.week_number, pw.week_start, pw.phase, pw.is_deload, pw.is_peak,
+                   -- Live-Summe der geplanten Sessions zuerst: target_run_km ist nur
+                   -- ein beim Import gespeicherter Wert und veraltet, sobald einzelne
+                   -- Sessions geändert werden.
                    COALESCE(
-                       NULLIF(pw.target_run_km, 0),
-                       (SELECT ROUND(COALESCE(SUM(tp.distance_km * COALESCE(tp.km_factor, 1)), 0)::numeric, 1)
+                       NULLIF((SELECT ROUND(COALESCE(SUM(tp.distance_km * COALESCE(tp.km_factor, 1)), 0)::numeric, 1)
                         FROM training_plan tp
                         WHERE tp.plan_id = pw.plan_id
                           AND tp.week_date = pw.week_start
                           AND tp.session_type NOT IN ('Rest Day','Strength Training','Core','Mobility')
-                          AND tp.status != 'archived')
+                          AND tp.status != 'archived'), 0),
+                       pw.target_run_km
                    ) AS km,
                    pw.week_focus
             FROM plan_weeks pw

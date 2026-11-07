@@ -12,6 +12,7 @@ DB-Zugriffe laufen echt gegen die Dev-DB mit klar markierten Testzeilen
 (external_id-Praefix 'test-elev-'), die per Fixture aufgeraeumt werden.
 Garmin-Netzwerkaufrufe sind durchgehend gemockt.
 """
+import datetime
 import os
 import sys
 from unittest.mock import MagicMock
@@ -22,7 +23,12 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import coach.garmin_batch as garmin_batch
 from coach.garmin_batch import run_batch
-from coach.mcp_server import get_planned_workouts, upsert_planned_workout, upsert_training_block
+from coach.mcp_server import (
+    _rebuild_plan_weeks,
+    get_planned_workouts,
+    upsert_planned_workout,
+    upsert_training_block,
+)
 from coach.sync_utils import HASH_FIELDS, compute_content_hash
 from database.connection import get_connection
 
@@ -80,13 +86,21 @@ class TestUpsertTrainingBlockElevationGain:
         # Testdaten ueberschreibt (nur die neue training_plan-Testzeile zaehlt).
         cur = db_conn.cursor()
         cur.execute(
-            "SELECT race_name, race_date, race_distance_km, goal_type "
+            "SELECT race_name, race_date, race_distance_km, goal_type, id "
             "FROM plans WHERE status='active' ORDER BY created_at DESC LIMIT 1"
         )
         active = cur.fetchone()
         if not active:
             pytest.skip("Kein aktiver Plan in der DB — Test setzt einen aktiven Plan voraus")
-        race_name, race_date, race_distance_km, goal_type = active
+        race_name, race_date, race_distance_km, goal_type, active_plan_id = active
+        # Testsession INNERHALB des bestehenden Planzeitraums: upsert_training_block
+        # baut plan_weeks aus allen Sessions neu auf — ein Datum vor Planstart
+        # würde den Planstart des echten Plans nach vorne verschieben.
+        cur.execute("SELECT MIN(week_start) FROM plan_weeks WHERE plan_id = %s", (active_plan_id,))
+        first_week = cur.fetchone()[0]
+        if first_week is None:
+            pytest.skip("Aktiver Plan hat keine plan_weeks")
+        session_date = first_week + datetime.timedelta(days=1)
 
         ext_id = f"{TEST_PREFIX}block-1"
         plan = {
@@ -94,15 +108,21 @@ class TestUpsertTrainingBlockElevationGain:
                      "race_distance_km": float(race_distance_km) if race_distance_km is not None else None,
                      "goal_type": goal_type},
             "sessions": [{
-                "external_id": ext_id, "date": "2026-09-22", "session_type": "Hill Session",
+                "external_id": ext_id, "date": str(session_date), "session_type": "Hill Session",
                 "distance_km": 12, "duration_min": 80, "elevation_gain_m": 850,
             }],
         }
-        result = upsert_training_block(plan)
-        assert "error" not in result
+        try:
+            result = upsert_training_block(plan)
+            assert "error" not in result
 
-        cur.execute("SELECT elevation_gain_m FROM training_plan WHERE external_id = %s", (ext_id,))
-        assert cur.fetchone()[0] == 850
+            cur.execute("SELECT elevation_gain_m FROM training_plan WHERE external_id = %s", (ext_id,))
+            assert cur.fetchone()[0] == 850
+        finally:
+            # Testsession entfernen und Wochen-km des echten Plans wiederherstellen.
+            cur.execute("DELETE FROM training_plan WHERE external_id = %s", (ext_id,))
+            _rebuild_plan_weeks(cur, active_plan_id, set(), [])
+            db_conn.commit()
 
 
 # ── 2: get_planned_workouts gibt elevation_gain_m zurueck ──────────────────
